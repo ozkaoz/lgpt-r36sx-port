@@ -1,40 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
-LETTER="${1:-}"
-if [[ -z "$LETTER" ]]; then
-  echo "Uso: bash tools/wsl/02_verify_treefrog_sd.sh F" >&2
-  echo "Cambia F por la letra real de la SD en Windows." >&2
-  exit 2
-fi
-LETTER="${LETTER%:}"
-SD="/mnt/${LETTER,,}"
-if [[ ! -d "$SD" ]]; then
-  echo "No existe $SD. Revisa que la SD esté montada en Windows y visible en WSL." >&2
-  exit 1
-fi
-printf 'SD detectada: %s\n' "$SD"
-missing=0
-for p in cubegm cubegm/cores; do
-  if [[ -e "$SD/$p" ]]; then
-    printf '[OK] %s\n' "$p"
-  else
-    printf '[FALTA] %s\n' "$p"
-    missing=1
-  fi
-done
-if [[ -d "$SD/frogui" ]]; then
-  echo "[OK] frogui"
-elif [[ -d "$SD/roms" ]]; then
-  echo "[OK] roms"
+DRIVE="${1:-F}"; DRIVE="${DRIVE%:}"
+SD="/mnt/${DRIVE,,}"
+[[ -d "$SD" ]] || { echo "ERROR: SD no detectada: $SD" >&2; exit 1; }
+echo "SD detectada: $SD"
+check_dir(){ [[ -d "$SD/$1" ]] && echo "[OK] $1" || echo "[FALTA] $1"; }
+check_file(){ [[ -f "$SD/$1" ]] && echo "[OK] $1" || echo "[FALTA] $1"; }
+check_dir cubegm
+check_dir cubegm/cores
+check_dir frogui
+check_dir roms
+check_dir roms/lgpt
+check_dir lgpt
+check_file cubegm/cores/lgpt_libretro.so
+check_file cubegm/lgpt_libretro.so
+check_file cubegm/lgpt
+check_file cubegm/lgpt.elf
+check_file roms/lgpt/start.lgpt
+check_file lgpt/config.xml
+if [[ -f "$SD/roms/lgpt/start.lgpt" ]]; then
+  echo "Contenido start.lgpt: $(tr -d '\r\n' < "$SD/roms/lgpt/start.lgpt" 2>/dev/null || true)"
 else
-  echo "[AVISO] No veo frogui/ ni roms/. Puede que TreeFrog no esté instalado todavía o use otra estructura."
-fi
-if [[ -f "$SD/cubegm/cores/lgpt_libretro.so" ]]; then
-  echo "[OK] LGPT ya está instalado como cubegm/cores/lgpt_libretro.so"
-else
-  echo "[INFO] LGPT todavía no está instalado. Eso es normal antes de compilar/copiar el core."
-fi
-if [[ "$missing" -ne 0 ]]; then
-  echo "La SD no parece tener una instalación TreeFrogUI/Stock lista para recibir el core." >&2
-  exit 1
+  echo "[INFO] LGPT todavía no está instalado. Antes de instalar es normal que falten /lgpt y roms/lgpt/start.lgpt."
 fi
