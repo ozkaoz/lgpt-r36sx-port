@@ -1,0 +1,121 @@
+--- /tmp/lgpt_cmp/au11l/U2_38AU11L_IDEMPOTENT_USB_SAFE_INSTRUMENT_FULL_SOURCE/source_full/LGPT_PORT_U2_50_AU11L_IDEMPOTENT_USB_SAFE_INSTRUMENT_FULL_SOURCE/r36s_au10f_usb_audio_io.c	2026-07-10 06:11:04.000000000 +0000
++++ /tmp/build_au11m/U2_38AU11M_REVERT_INSTRUMENT_RECORDING_FIX_HOSTHELPER_SOURCE/source_full/LGPT_PORT_U2_50_AU11M_REVERT_INSTRUMENT_RECORDING_FIX_FULL_SOURCE/r36s_au10f_usb_audio_io.c	2026-07-10 06:30:49.893944832 +0000
+@@ -38,6 +38,7 @@
+ static const char *CAPTURE_MONITOR = "/tmp/r36sx_lgpt_usb/usb_capture_monitor";
+ static const char *CAPTURE_MONITOR_FIFO = "/tmp/r36sx_usb_capture_monitor_fifo";
+ static const char *RUNTIME_MIRROR_DIR = "/mnt/sdcard/lgpt/otg/logs/runtime_state";
++static const char *CAPTURE_STAGING_DIR = "/mnt/sdcard/lgpt/usbrecs";
+ 
+ static void loge(const char *msg) { fprintf(stderr, "%s errno=%d (%s)\n", msg, errno, strerror(errno)); }
+ static void die_errno(const char *msg) { loge(msg); exit(2); }
+@@ -83,6 +84,38 @@
+ static void mark_active(void) { char b[64]; snprintf(b, sizeof(b), "%ld\n", (long)time(NULL)); write_text_file(ACTIVE_MARKER, b); }
+ static void mark_inactive(void) { unlink(ACTIVE_MARKER); }
+ 
++static void ensure_capture_staging_dir(void) {
++    mkdir("/mnt/sdcard", 0777);
++    mkdir("/mnt/sdcard/lgpt", 0777);
++    mkdir(CAPTURE_STAGING_DIR, 0777);
++}
++
++static void basename_from_path(const char *path, char *dst, int len) {
++    const char *b = path ? strrchr(path, '/') : 0;
++    b = b ? b + 1 : path;
++    if (!b || !b[0]) b = "USBREC.wav";
++    snprintf(dst, len, "%s", b);
++}
++
++static int open_capture_wav_with_fallback(const char *requested, const char *name, char *actual, int actual_len) {
++    ensure_capture_staging_dir();
++    if (requested && requested[0]) snprintf(actual, actual_len, "%s", requested);
++    else snprintf(actual, actual_len, "%s/%s", CAPTURE_STAGING_DIR, name && name[0] ? name : "USBREC.wav");
++    int fd = open(actual, O_WRONLY | O_CREAT | O_TRUNC, 0666);
++    if (fd >= 0) return fd;
++    int first_errno = errno;
++    fprintf(stderr, "CAPTURE_OPEN_REQUESTED_FAILED path=%s errno=%d (%s)\n", actual, first_errno, strerror(first_errno));
++    char safe_name[128]; basename_from_path(name && name[0] ? name : requested, safe_name, sizeof(safe_name));
++    snprintf(actual, actual_len, "%s/%s", CAPTURE_STAGING_DIR, safe_name);
++    fd = open(actual, O_WRONLY | O_CREAT | O_TRUNC, 0666);
++    if (fd >= 0) {
++        fprintf(stderr, "CAPTURE_OPEN_FALLBACK_OK path=%s from_errno=%d\n", actual, first_errno);
++        return fd;
++    }
++    fprintf(stderr, "CAPTURE_OPEN_FALLBACK_FAILED path=%s errno=%d (%s)\n", actual, errno, strerror(errno));
++    return -1;
++}
++
+ static int pcm_prepare_common(int fd, int is_capture, unsigned rate, unsigned channels, unsigned period_frames, unsigned periods) {
+     int version = 0;
+     if (ioctl(fd, SNDRV_PCM_IOCTL_PVERSION, &version) < 0) die_errno(is_capture ? "CAP_PVERSION" : "PLAY_PVERSION");
+@@ -226,10 +259,9 @@
+     if (!path || !path[0]) { set_status("USB capture error: missing path"); return; }
+     if (seconds <= 0) seconds = 15; if (seconds > 120) seconds = 120;
+     memset(&cap, 0, sizeof(cap)); cap.pcm = -1; cap.wav = -1;
+-    snprintf(cap.path, sizeof(cap.path), "%s", path);
+     snprintf(cap.name, sizeof(cap.name), "%s", (name && name[0]) ? name : "USBREC.wav");
+     cap.max_seconds = seconds; cap.start_time = time(NULL);
+-    cap.wav = open(cap.path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
++    cap.wav = open_capture_wav_with_fallback(path, cap.name, cap.path, sizeof(cap.path));
+     if (cap.wav < 0) { set_status("USB capture error: WAV open failed"); loge("capture wav open"); return; }
+     write_wav_header(cap.wav, 0, 48000, 1);
+     cap.pcm = open(pcmc, O_RDONLY | O_NONBLOCK);
+@@ -270,13 +302,13 @@
+     if (strstr(cmd, "MONITOR")) {
+         monitor_refresh_flag();
+         if (strstr(cmd, "MONITOR=0") || strstr(cmd, "RECOVER_OUT")) {
+-            /* AU11L_NO_REOPEN_ON_RECORD_EXIT
++            /* AU11M_NO_REOPEN_ON_RECORD_EXIT
+                Keep both ALSA endpoints open and stable.  The old RECOVER_OUT path
+                closed pcmC0D0p and the passive capture drain, which made Windows
+                keep the device visible but broke audible routing in common setups. */
+             force_playback_reopen = 0;
+             monitor_fifo_reset();
+-            fprintf(stderr, "AU11L_MONITOR_OFF_KEEP_ENDPOINTS_OPEN cmd=%s\n", cmd);
++            fprintf(stderr, "AU11M_MONITOR_OFF_KEEP_ENDPOINTS_OPEN cmd=%s\n", cmd);
+         }
+         fprintf(stderr, "CAPTURE_MONITOR_REQUEST cmd=%s\n", cmd);
+     }
+@@ -307,11 +339,14 @@
+ 
+ static void capture_tick(void) {
+     if (!cap.active) return;
+-    if (cap.max_seconds > 0 && (time(NULL) - cap.start_time) >= cap.max_seconds) { stop_capture("duration"); return; }
++    int elapsed_now = (int)(time(NULL) - cap.start_time);
++    if (elapsed_now < 0) elapsed_now = 0;
++    set_elapsed_seconds(elapsed_now);
++    if (cap.max_seconds > 0 && elapsed_now >= cap.max_seconds) { stop_capture("duration"); return; }
+     int16_t buf[480]; int r = read_frames(cap.pcm, buf, 480);
+     if (r > 0) {
+         int ll = 0, rr = 0; peak_percent_lr_s16(buf, r, &ll, &rr); int level = (ll > rr) ? ll : rr;
+-        set_lr_level_percent(ll, rr); set_elapsed_seconds((int)(time(NULL) - cap.start_time));
++        set_lr_level_percent(ll, rr);
+         ssize_t w = write(cap.wav, buf, (size_t)r * 2);
+         if (w > 0) { cap.data_bytes += (uint32_t)w; cap.frames += (long)r; }
+         monitor_write_samples(buf, r);
+@@ -332,7 +367,7 @@
+     const int period_frames = lowlat ? 240 : 480;
+     const int periods = 4;
+     mkdir(RUNTIME_DIR, 0777);
+-    fprintf(stderr, "AU11L_USB_AUDIO_IO_START fifo=%s pcmp=%s pcmc=%s period_frames=%d periods=%d lowlat=%d runtime=%s\n", fifo, pcmp, pcmc, period_frames, periods, lowlat, RUNTIME_DIR);
++    fprintf(stderr, "AU11M_USB_AUDIO_IO_START AU11M_CAPTURE_WRITES_STAGING_AND_COUNTDOWN fifo=%s pcmp=%s pcmc=%s period_frames=%d periods=%d lowlat=%d runtime=%s\n", fifo, pcmp, pcmc, period_frames, periods, lowlat, RUNTIME_DIR);
+     set_status("USB capture idle"); set_level_percent(0); set_lr_level_percent(0,0); set_elapsed_seconds(0); write_text_file(CAPTURE_MONITOR, "0\n"); mark_inactive();
+     if (mkfifo(fifo, 0666) < 0 && errno != EEXIST) die_errno("mkfifo"); chmod(fifo, 0666);
+     int in = open(fifo, O_RDONLY | O_NONBLOCK); if (in < 0) die_errno("open fifo read nonblock");
+@@ -342,7 +377,7 @@
+         int conf = usb_configured();
+         if (conf != last_conf) { fprintf(stderr, "USB_STATE_CHANGE configured=%d ring_fill=%u\n", conf, rfill); last_conf = conf; }
+         drain_fifo(in, &dropped); monitor_refresh_flag(); poll_capture_command(pcmc); capture_tick(); passive_monitor_tick(pcmc, conf);
+-        /* AU11L_WINDOWS_MONITORING_FIX
++        /* AU11M_WINDOWS_MONITORING_FIX
+            Do NOT close/reopen pcmC0D0p while USB-C RECORD monitor is active.
+            AU11G generated thousands of reconnects here. Windows then kept the
+            R36SX input endpoint alive but did not present stable audible monitor
+@@ -360,7 +395,7 @@
+         }
+         if (force_playback_reopen) {
+             force_playback_reopen = 0;
+-            if (pcm >= 0) { close(pcm); pcm = -1; fprintf(stderr, "AU11L_PCM_PLAY_FORCE_REOPEN_AFTER_USB_REC_EXIT\n"); }
++            if (pcm >= 0) { close(pcm); pcm = -1; fprintf(stderr, "AU11M_PCM_PLAY_FORCE_REOPEN_AFTER_USB_REC_EXIT\n"); }
+             ring_reset();
+             good_write_streak = 0;
+             mark_inactive();

@@ -1,0 +1,147 @@
+INPUT MAP VALIDADO - R36SX / LGPT PORT V 100_Estable
+
+Estado:
+Este mapa refleja comportamiento observado en consola R36SX, no un mapa teórico de LGPT desktop.
+
+Botones físicos:
+
+D-pad:
+- Navegación principal en vistas y menús.
+- En combinación con A modifica valores donde aplica.
+
+A:
+- Acción primaria.
+- En selector de proyectos, A sobre proyecto carga el proyecto.
+- En campos editables, A + flechas modifica valores.
+- En Table, A + arriba sobre la primera casilla muestra comandos.
+
+B:
+- Modificador/cancelación según contexto.
+- Para combinaciones A+B, en algunos contextos debe mantenerse B primero y luego pulsar A.
+
+X:
+- Duplicado de A.
+- Validado como duplicado funcional.
+
+Y:
+- Duplicado de B.
+- Validado como duplicado funcional.
+
+L1 / L2:
+- Mapeados como L.
+- Funciones contextuales según vista.
+
+R1 / R2:
+- Mapeados como R.
+- Navegación contextual entre vistas donde aplica.
+
+START:
+- Reproduce/detiene correctamente.
+- Validado en Song/Phrase/Project context.
+
+SELECT:
+- Desactivado en esta build.
+
+Selector de proyectos:
+
+Validado:
+- Abre directamente en projects.
+- Muestra proyectos.
+- A carga proyecto.
+- B + A sobre proyecto activa acción tipo borrar/confirmación si está disponible.
+- Si se pulsa A primero, entra al proyecto. Esto es esperado.
+
+Project:
+
+Validado:
+- Navegación funciona.
+- Exit menu en inglés:
+  Return to Main Menu
+  Exit to TreeFrogUI
+  Cancel
+- Las opciones funcionan.
+
+Song:
+
+Validado:
+- Navegación funciona.
+- START reproduce/detiene.
+- A + flechas modifica/introduce valores donde aplica.
+- A + B compacta/corta posición y mueve filas hacia arriba.
+
+Notas:
+- A + B en Song NO es clear-cell en esta build. Funciona como cut/delete row con compactación.
+- R + abajo no mostró acceso a Mixer. No se considera función validada.
+- L + izquierda/derecha no mostró cambio visible de tempo. No se considera función validada.
+
+Groove:
+
+Validado:
+- Navegación funciona.
+- Selección visual correcta.
+- Edición básica funciona según flujo observado.
+
+Chain:
+
+Validado:
+- Navegación funciona.
+- Selección visual correcta.
+- Carga/uso dentro del flujo Song -> Chain funciona.
+
+No validado:
+- B + flechas no mostró acción visible.
+
+Phrase:
+
+Validado:
+- Navegación funciona.
+- Selección visual correcta.
+- Sample importado dispara correctamente en Phrase.
+- A + flechas modifica valores donde aplica.
+
+No validado:
+- B + flechas no mostró acción visible.
+
+Table:
+
+Validado:
+- Navegación funciona.
+- Selección visual correcta.
+- A + arriba muestra comandos en la primera casilla.
+- Funcionamiento general correcto.
+
+Import Sample:
+
+Validado:
+- Samples se leen desde:
+  F:\lgpt\samples
+- Listen funciona.
+- Import funciona.
+- El sample importado funciona en Phrase.
+
+Layout validado:
+
+Runtime Windows:
+F:\lgpt
+F:\lgpt\projects
+F:\lgpt\samples
+F:\lgpt\instruments
+
+Runtime TreeFrog/Linux:
+ROOTFOLDER=/mnt/sdcard/lgpt
+SAMPLELIB=/mnt/sdcard/lgpt/samples
+INSTRUMENTFOLDER=/mnt/sdcard/lgpt/instruments
+
+TreeFrogUI launcher necesario:
+
+F:\roms\lgpt
+F:\cubegm\lgpt
+F:\cubegm\lgpt_wrapper.sh
+
+Core:
+
+F:\cubegm\cores\lgpt_libretro.so
+
+No usar:
+
+F:\roms\gme

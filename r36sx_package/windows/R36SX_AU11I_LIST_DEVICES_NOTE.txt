@@ -1,0 +1,6 @@
+Abra SoundVolumeView.exe y copie los nombres exactos o el Command-Line Friendly ID de:
+- Micrófono R36SX USB Audio
+- Conector AUX interno R36SX USB Audio
+- Parlantes/Audífonos/BEHRINGER que usará para oír el proyecto
+
+Luego edite los .cmd incluidos.

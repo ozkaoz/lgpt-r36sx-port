@@ -1,0 +1,47 @@
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp.bak_comment_cleanup_20260702_092303	2026-07-02 09:12:59.538774800 -0500
++++ /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp	2026-07-02 09:23:03.351882100 -0500
+@@ -82,13 +82,9 @@
+         GUITextProperties props;
+         props.invert_ = true;
+ 
+-        // Layout físico observado en R36SX/LGPT:
+-        //   P G
+-        //   SCPI
+-        //     TT
+-        // La prueba V2.5 demostró que desde P -> abajo se entra al primer Table,
+-        // y desde I -> abajo se entra al segundo Table. Por tanto no se toca la
+-        // lógica de navegación: solo se desplaza el dibujo una columna a la derecha.
++        // TREEFROG_UI_MAP_LAYOUT:
++        // Layout visual validado en R36SX: P G / SCPI / TT.
++        // Solo afecta dibujo; la navegación original no se modifica.
+         SetColor(CD_HILITE1);
+         DrawString(baseX,     baseY,     "P G ", props);
+         DrawString(baseX,     baseY + 1, "SCPI", props);
+@@ -146,9 +142,9 @@
+                 break;
+         }
+ 
+-        // TREEFROG_V1_3_8_MAP_FOCUS_PLAYBAR_MATCH
+-        // Celda activa del mapa con la misma semántica visual que la barra inferior seleccionada:
+-        // CD_HILITE2 + invert_.
++        // TREEFROG_UI_MAP_FOCUS:
++        // Celda activa validada con semántica clásica: CD_HILITE2 + invert_.
++        // Mantener equivalente visual a la barra inferior seleccionada.
+         SetColor(CD_HILITE2);
+         props.invert_ = true;
+         DrawString(ax, ay, glyph, props);
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp.bak_comment_cleanup_20260702_092303	2026-07-02 09:07:14.577721900 -0500
++++ /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp	2026-07-02 09:23:03.352888600 -0500
+@@ -13,9 +13,9 @@
+ 
+ static char *buttonText[3] = {"Load", "New", "Exit"};
+ 
+-// TREEFROG_V1_3_7_START_IN_PROJECTS
+-// El layout validado para R36SX mantiene projects/samples/instruments dentro de /lgpt.
+-// El selector inicial debe abrir directamente en /lgpt/projects, no en /lgpt.
++// TREEFROG_UI_PROJECT_START:
++// Layout validado: abrir directamente en root:projects.
++// No depender de roms/gme; runtime dentro de /mnt/sdcard/lgpt.
+ Path SelectProjectDialog::lastFolder_("root:projects") ;
+ int SelectProjectDialog::lastProject_ = 0 ;
+ 

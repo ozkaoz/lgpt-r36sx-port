@@ -1,0 +1,44 @@
+R36SX LGPT Song Y+X cut test build
+Generated: 20260702_122631
+
+DEV=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT
+BUILD_SCRIPT=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/BUILD_TREEFROG_R36SX_BADGE_OFF_SELECT_OFF.sh
+LOG=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/docs/R36SX_BUILD_SONG_YX_CUT_TEST_20260702_122631.log
+
+Patch marker:
+672-        selection active
+673- ******************************************************/
+674-
+675-void SongView::processNormalButtonMask(unsigned int mask) {
+676-
+677:    // TREEFROG_INPUT_SONG_YX_CUT_NORMAL_MODE
+678-    // R36SX TreeFrog: physical Y+X keeps the historical Song cut/compact behavior.
+679-    // Exact combo only. A+B remains clearPosition().
+680-    const unsigned int treefrogSongYXMask = EPBM_Y | EPBM_X;
+681-    if ((mask & treefrogSongYXMask) == treefrogSongYXMask &&
+682-        (mask & ~treefrogSongYXMask) == 0) {
+683-        cutPosition();
+684-        mask = 0;
+685-    }
+686-
+687-    // B Modifier
+
+Core source:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/dist/lgpt_libretro.so
+-rwxr-xr-x 1 dafunknoise dafunknoise 853K Jul  2 12:27 /home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/dist/lgpt_libretro.so
+
+Core copied to:
+/mnt/d/R36S/PORT LPTRACKER/TEST/LGPT_PORT_V102_SongYXCut_Test_20260702_122631/cubegm/cores/lgpt_libretro.so
+-rwxrwxrwx 1 dafunknoise dafunknoise 853K Jul  2 12:27 /mnt/d/R36S/PORT LPTRACKER/TEST/LGPT_PORT_V102_SongYXCut_Test_20260702_122631/cubegm/cores/lgpt_libretro.so
+
+SHA256 source:
+0a2fc1b99563dbdd444b925df0835b74d2b59cb42f730eeab69cfc00565883ad  /home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/dist/lgpt_libretro.so
+
+SHA256 copied:
+0a2fc1b99563dbdd444b925df0835b74d2b59cb42f730eeab69cfc00565883ad  /mnt/d/R36S/PORT LPTRACKER/TEST/LGPT_PORT_V102_SongYXCut_Test_20260702_122631/cubegm/cores/lgpt_libretro.so
+
+Runtime target on SD:
+F:\cubegm\cores\lgpt_libretro.so
+
+Do not use:
+F:\roms\gme

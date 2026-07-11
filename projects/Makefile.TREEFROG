@@ -1,0 +1,125 @@
+-include $(PWD)/rules_base
+
+# Little Piggy Tracker as a libretro core for TreeFrogUI/picoarch on SF3000/GB300/R36SX.
+# This is intentionally not an SDL/Linux executable target.
+
+TREEFROG_INPUT_PROFILE ?= 0
+TREEFROG_INPUT_DEBUG ?= 0
+TREEFROG_AUDIO_MODE ?= 0
+TREEFROG_TIMER_MODE ?= 1
+TREEFROG_FACE_TAP_MODE ?= 0
+TREEFROG_EVENT_DEBUG_ALL ?= 0
+TREEFROG_DISABLE_PHRASE_AUDITION ?= 1
+TREEFROG_HIGH_CONTRAST_SELECTION ?= 1
+TREEFROG_PURPLE_FOCUS_SELECTION ?= 1
+TREEFROG_PURPLE_FOCUS_RGB565 ?= 0xd99b
+TREEFROG_VIDEO_MODE ?= 0
+TREEFROG_VIDEO_PROBE ?= 0
+TREEFROG_ENABLE_START ?= 1
+TREEFROG_ENABLE_SELECT ?= 1
+TREEFROG_PORT_VERSION_BADGE ?= 1
+TREEFROG_PORT_VERSION_BADGE_COLOR ?= 0xd99b
+TREEFROG_AUDIO_DEBUG ?= 0
+TREEFROG_RETRO_LIFECYCLE_DEBUG ?= 0
+TREEFROG_UAC2_BRIDGE ?= 1
+
+# Profiles:
+#   V1 stable uses explicit gates instead of forwarding START/SELECT blindly.
+#   TREEFROG_ENABLE_START=1 forwards physical START to LGPT after the Player
+#                          empty-channel guard is applied.
+#   TREEFROG_ENABLE_SELECT=1 keeps SELECT suppressed until it is assigned safely.
+#
+# Debug is off by default to reduce SD writes. Enable with TREEFROG_INPUT_DEBUG=1.
+# TREEFROG_TIMER_MODE=0 disables LGPT timer callbacks for phrase-screen diagnostics only.
+# TREEFROG_FACE_TAP_MODE=1 sends face buttons as one-shot down/up pulses; diagnostic for Phrase A crashes.
+# TREEFROG_EVENT_DEBUG_ALL=1 logs every queued/dispatched pad event; use only for short tests.
+# TREEFROG_DISABLE_PHRASE_AUDITION=1 disables every PhraseView PM_AUDITION preview path, including A-alone preview. v0.15 keeps SAMPLELIB, keeps PhraseView audition disabled, adds TREEFROG_VIDEO_PROBE=1 hard border/edge markers, and adds TREEFROG_VIDEO_MODE=2 to map the right edge into the visible left side for crop diagnostics.
+
+DEFINES := \
+	-DPLATFORM_TREEFROG \
+	-DTREEFROG_INPUT_PROFILE=$(TREEFROG_INPUT_PROFILE) \
+	-DTREEFROG_INPUT_DEBUG=$(TREEFROG_INPUT_DEBUG) \
+	-DTREEFROG_AUDIO_MODE=$(TREEFROG_AUDIO_MODE) \
+	-DTREEFROG_TIMER_MODE=$(TREEFROG_TIMER_MODE) \
+	-DTREEFROG_FACE_TAP_MODE=$(TREEFROG_FACE_TAP_MODE) \
+	-DTREEFROG_MODIFIER_RETRIGGER=$(TREEFROG_MODIFIER_RETRIGGER) \
+	-DTREEFROG_EVENT_DEBUG_ALL=$(TREEFROG_EVENT_DEBUG_ALL) \
+	-DTREEFROG_DISABLE_PHRASE_AUDITION=$(TREEFROG_DISABLE_PHRASE_AUDITION) \
+	-DTREEFROG_HIGH_CONTRAST_SELECTION=$(TREEFROG_HIGH_CONTRAST_SELECTION) \
+	-DTREEFROG_PURPLE_FOCUS_SELECTION=$(TREEFROG_PURPLE_FOCUS_SELECTION) \
+	-DTREEFROG_PURPLE_FOCUS_RGB565=$(TREEFROG_PURPLE_FOCUS_RGB565) \
+	-DTREEFROG_VIDEO_MODE=$(TREEFROG_VIDEO_MODE) \
+	-DTREEFROG_VIDEO_PROBE=$(TREEFROG_VIDEO_PROBE) \
+	-DTREEFROG_ENABLE_START=$(TREEFROG_ENABLE_START) \
+	-DTREEFROG_ENABLE_SELECT=$(TREEFROG_ENABLE_SELECT) \
+	-DTREEFROG_PORT_VERSION_BADGE=$(TREEFROG_PORT_VERSION_BADGE) \
+	-DTREEFROG_PORT_VERSION_BADGE_COLOR=$(TREEFROG_PORT_VERSION_BADGE_COLOR) \
+	-DTREEFROG_AUDIO_DEBUG=$(TREEFROG_AUDIO_DEBUG) \
+	-DTREEFROG_RETRO_LIFECYCLE_DEBUG=$(TREEFROG_RETRO_LIFECYCLE_DEBUG) \
+	-DTREEFROG_UAC2_BRIDGE=$(TREEFROG_UAC2_BRIDGE) \
+	-DCPP_MEMORY \
+	-DHAVE_STDINT_H \
+	-D_NDEBUG \
+	-D_NO_JACK_ \
+	-DDUMMYMIDI \
+	-D_LGPT_NO_SCREEN_CACHE_
+
+TOOLCHAIN ?= $(HOME)/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot
+ifneq (,$(wildcard $(TOOLCHAIN)/bin/mips-mti-linux-gnu-g++))
+CROSS_COMPILE ?= $(TOOLCHAIN)/bin/mips-mti-linux-gnu-
+else
+CROSS_COMPILE ?= $(TOOLCHAIN)/opt/ext-toolchain/bin/mips-mti-linux-gnu-
+endif
+SYSROOT ?= $(TOOLCHAIN)/mipsel-buildroot-linux-gnu/sysroot
+
+CC  := $(CROSS_COMPILE)gcc
+CXX := $(CROSS_COMPILE)g++
+AR  := $(CROSS_COMPILE)ar
+STRIP := $(CROSS_COMPILE)strip
+
+TREEFROG_FLAGS := -mips32r2 -march=mips32r2 -mtune=74kc -mdspr2 -mfp32 -mhard-float -mlong-calls -EL --sysroot=$(SYSROOT)
+OPT_FLAGS := -O2 -fno-strict-aliasing -fPIC -ffunction-sections -fdata-sections
+
+TREEFROGDIRS := \
+	../sources/Adapters/TREEFROG/Main \
+	../sources/Adapters/TREEFROG/System \
+	../sources/Adapters/TREEFROG/GUI \
+	../sources/Adapters/TREEFROG/Audio \
+	../sources/Adapters/TREEFROG/Timer \
+	../sources/Adapters/Unix/FileSystem \
+	../sources/Adapters/Unix/Process \
+	../sources/Adapters/Dummy/Midi \
+	../sources/System/Process
+
+TREEFROGFILES := \
+	TreeFrogLibretro.o \
+	TreeFrogSystem.o \
+	TreeFrogGUIFactory.o \
+	TreeFrogGUIWindowImp.o \
+	TreeFrogEventManager.o \
+	TreeFrogAudio.o \
+	TreeFrogAudioDriver.o \
+	TreeFrogUac2Bridge.o \
+	TreeFrogTimer.o \
+	UnixFileSystem.o \
+	UnixProcess.o \
+	Process.o \
+	DummyMidi.o
+
+INCLUDES := \
+	-Iinclude \
+	-I$(PWD)/../sources/Adapters/TREEFROG/Compat \
+	-I$(PWD)/../sources \
+	-I$(SYSROOT)/usr/include
+
+CFLAGS := $(DEFINES) $(INCLUDES) $(TREEFROG_FLAGS) $(OPT_FLAGS) -include stdint.h -include SDL_types_force.h -Wall
+CXXFLAGS := $(CFLAGS) -std=gnu++03
+LDFLAGS := $(TREEFROG_FLAGS) -shared -Wl,--gc-sections -Wl,--no-undefined -L$(SYSROOT)/usr/lib -L$(SYSROOT)/lib
+LIBS := -lpthread -lrt -lm
+
+OUTPUT := ../lgpt_libretro
+EXTENSION := so
+
+%.so: $(OFILES)
+	$(CXX) $(LDFLAGS) -o $@ $(OFILES) $(LIBS)
+	$(STRIP) $@

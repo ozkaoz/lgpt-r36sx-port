@@ -1,0 +1,9 @@
+LGPT PORT U2.30 candidate
+
+Base: U2.29 hardware-validated.
+
+Scope:
+- Center operation completion overlay.
+- Fix InstrumentView B prelisten after Chopper/Pitch/Envelope destructive edits.
+
+No changes to rendered chop export/persistence model in this increment.

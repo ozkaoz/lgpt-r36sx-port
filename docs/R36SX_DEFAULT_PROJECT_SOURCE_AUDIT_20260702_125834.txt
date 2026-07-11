@@ -1,0 +1,348 @@
+R36SX LGPT default project source audit
+Generated: 20260702_125834
+
+Goal:
+- Find reproducible candidate projects for a default external-project-read test.
+- Prefer upstream/source-tree/default project over random internet project.
+- Candidate must contain lgptsav.dat.
+- Candidate may contain samples/ and other project-local assets.
+
+DEV=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT
+WINROOT=/mnt/d/R36S/PORT LPTRACKER
+FROZEN_V102=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V102_SongABClear_YXCut_Estable
+
+=== Current V102 stable ZIP check ===
+-rwxrwxrwx 1 dafunknoise dafunknoise 619K Jul  2 12:55 /mnt/d/R36S/PORT LPTRACKER/ESTABLE/LGPT PORT V102_SongABClear_YXCut_Estable.zip
+    55470  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft/lgptsav.dat
+        0  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft/samples/
+    88244  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft/samples/test_440_A.wav
+    12303  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/reentry_debug.log
+     1977  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/start_debug.log
+   406548  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/timer_debug.log
+
+=== Candidate lgptsav.dat files in DEV / frozen / WINROOT ===
+/mnt/d/R36S/PORT LPTRACKER/BUILD_STABLE/LGPT_PORT_V102_SongABClear_YXCut_Estable/LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft/lgptsav.dat
+
+=== Candidate ZIPs containing lgptsav.dat ===
+--- ZIP: /mnt/d/R36S/PORT LPTRACKER/ESTABLE/LGPT PORT V102_SongABClear_YXCut_Estable.zip
+        0  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/
+        0  2026-07-02 12:11   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/.keep
+        0  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft/
+    55470  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft/lgptsav.dat
+        0  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft/samples/
+    88244  1980-01-01 00:00   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft/samples/test_440_A.wav
+        0  2026-07-02 12:07   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/samples/
+        0  2026-07-02 12:11   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/samples/.keep
+        0  2026-07-02 12:07   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/samples/R36SX_TESTS/
+    88244  2026-07-02 12:07   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/samples/R36SX_TESTS/test_440_A.wav
+    88244  2026-07-02 12:07   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/samples/R36SX_TESTS/test_880_A5.wav
+    10628  2026-07-02 12:07   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/samples/R36SX_TESTS/test_click_noise.wav
+    61782  2026-07-02 12:07   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/samples/R36SX_TESTS/test_kick_decay.wav
+    88244  2026-07-02 12:07   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/samples/test_440_A.wav
+    88244  2026-07-02 12:07   LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/samples/test_880_A5.wav
+        0  2026-07-02 12:55   LGPT PORT V102_SongABClear_YXCut_Estable/source_notes/current_key_files/projects/
+    16304  2026-07-02 12:55   LGPT PORT V102_SongABClear_YXCut_Estable/source_notes/current_key_files/projects/Makefile
+     4641  2026-07-02 12:55   LGPT PORT V102_SongABClear_YXCut_Estable/source_notes/current_key_files/projects/Makefile.TREEFROG
+
+
+=== Possible TreeFrog/LGPT source trees under /home/dafunknoise ===
+/home/dafunknoise/LGPT
+/home/dafunknoise/LGPT/lgpt_treefrog_mod
+/home/dafunknoise/LGPT/lgpt_treefrog_mod/dist/treefrog-lgpt
+/home/dafunknoise/LGPT/lgpt_treefrog_mod/projects/buildTREEFROG
+/home/dafunknoise/LGPT/lgpt_treefrog_mod/projects/lgpt.xcodeproj
+/home/dafunknoise/LGPT/lgpt_treefrog_mod/projects/lgpt64.xcodeproj
+/home/dafunknoise/LGPT/lgpt_treefrog_mod/projects/treefrog
+/home/dafunknoise/LGPT/lgpt_treefrog_mod/sdcard_overlay/ports/lgpt
+/home/dafunknoise/LGPT/lgpt_treefrog_mod/sdcard_overlay/roms/lgpt
+/home/dafunknoise/LGPT/lgpt_treefrog_mod/sources/Adapters/TREEFROG
+/home/dafunknoise/lgpt-r36sx-archive
+/home/dafunknoise/lgpt-r36sx-archive/20260629-215525/lgpt-r36sx-clean
+/home/dafunknoise/lgpt-r36sx-archive/20260629-230116/lgpt-r36sx-clean
+/home/dafunknoise/lgpt-r36sx-archive/20260629-230116/lgpt-r36sx-clean/LittleGPTracker_v43_clean
+/home/dafunknoise/lgpt-r36sx-archive/LittleGPTracker_v43_clean_dirty_before_v60_20260629-204048
+/home/dafunknoise/lgpt-r36sx-archive/LittleGPTracker_v43_clean_dirty_before_v60_20260629-204048/projects/buildTREEFROG
+/home/dafunknoise/lgpt-r36sx-archive/LittleGPTracker_v43_clean_dirty_before_v60_20260629-204048/projects/lgpt.xcodeproj
+/home/dafunknoise/lgpt-r36sx-archive/LittleGPTracker_v43_clean_dirty_before_v60_20260629-204048/projects/lgpt64.xcodeproj
+/home/dafunknoise/lgpt-r36sx-archive/LittleGPTracker_v43_clean_dirty_before_v60_20260629-204048/sources/Adapters/TREEFROG
+/home/dafunknoise/lgpt-r36sx-archive/LittleGPTracker_v43_clean_dirty_before_v60_20260629-204048/treefrog_sd_base
+/home/dafunknoise/lgpt-r36sx-archive/LittleGPTracker_v43_clean_dirty_before_v60_20260629-204048/treefrog_sd_base/lgpt
+/home/dafunknoise/lgpt-r36sx-clean
+/home/dafunknoise/lgpt-r36sx-clean/LittleGPTracker_v43_clean
+/home/dafunknoise/lgpt-r36sx-clean/LittleGPTracker_v43_clean/projects/buildTREEFROG
+/home/dafunknoise/lgpt-r36sx-clean/LittleGPTracker_v43_clean/projects/lgpt.xcodeproj
+/home/dafunknoise/lgpt-r36sx-clean/LittleGPTracker_v43_clean/projects/lgpt64.xcodeproj
+/home/dafunknoise/lgpt-r36sx-clean/LittleGPTracker_v43_clean/sources/Adapters/TREEFROG
+/home/dafunknoise/lgpt-r36sx-work
+/home/dafunknoise/lgpt-r36sx-work/LittleGPTracker
+/home/dafunknoise/lgpt-r36sx-work/LittleGPTracker/projects/lgpt.xcodeproj
+/home/dafunknoise/lgpt-r36sx-work/LittleGPTracker/projects/lgpt64.xcodeproj
+/home/dafunknoise/lgpt-treefrog-v1_1
+/home/dafunknoise/r36sx-lgpt
+/home/dafunknoise/r36sx-lgpt-port
+/home/dafunknoise/r36sx-lgpt-port-backups
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/_dirty_rc_backup_20260630_223233/src/LittleGPTracker_V6_1_STABLE_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/_dirty_rc_backup_20260630_223233/src/LittleGPTracker_V6_2_RC1_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/_dirty_rc_backup_20260630_223233/src/LittleGPTracker_V6_2_RC2_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/_dirty_rc_backup_20260630_223233/src/LittleGPTracker_V6_2_RC3_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/_dirty_rc_backup_20260630_223233/src/LittleGPTracker_V6_2_RC4_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/_dirty_rc_backup_20260630_223233/src/LittleGPTracker_V6_2_RC5_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/_dirty_rc_backup_20260630_223233/src/LittleGPTracker_V6_2_RC6_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/_dirty_rc_backup_20260630_223233/src/LittleGPTracker_V6_2_RC7_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/_dirty_rc_backup_20260630_223233/src/LittleGPTracker_V6_2_RC8_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/BOOT_OK_AFTER_PROJECT_QUARANTINE_20260630_200217/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/V6_0_4_UI_OK_REENTRY_OK_20260630_200804/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/V6_0_ESTABLE_CONFIRMED_20260630_184800/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/V6_0_GOLDEN_STABLE_20260630_191815/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/V6_0_STABLE_CONFIRMED_FOR_V612_20260630_190609/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/V6_1_2_tools_before_install_20260630_190600/lgpt_before_v612_tools
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/V6_STABLE_SNAPSHOT_20260630_185416/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/before_official_project_20260630_183127/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/before_quarantine_latest_project_v6_0_4_20260630_200002/lgpt_before_quarantine
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/before_quarantine_latest_project_v6_0_4_20260630_200026/lgpt_before_quarantine
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/before_remove_v612_artifacts_20260630_191138/lgpt_before_remove_v612_artifacts
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/before_remove_v612_artifacts_20260630_191138/moved_from_lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/before_remove_v612_artifacts_20260630_191345/lgpt_before_remove_v612_artifacts
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/broken_after_sample_import_20260630_192452/lgpt_broken
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/broken_before_restore_v6_0_20260630_191525/lgpt_broken
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/broken_runtime_before_return_to_v6_clean_20260630_184427/lgpt_broken
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/lgpt_runtime_minimal_reset_20260630_135122
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/restore_treefrog_r36sx_before_20260630_142416
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_projects_before_v6_2_rc2_sanitize_20260630_211743
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_projects_before_v6_2_rc2_sanitize_20260630_211807
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_projects_before_v6_2_rc2_sanitize_20260630_212020
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_projects_before_v6_2_rc3_sanitize_20260630_212350
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v2_3_ui_color_select_20260630_133523
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v2_3_ui_color_select_20260630_135706
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v2_3_ui_color_select_20260630_135706/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v2_3_ui_color_select_20260630_141026
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v2_3_ui_color_select_20260630_141026/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v2_3_ui_color_select_20260630_142806
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v2_3_ui_color_select_20260630_142806/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v3_0_unestable_20260630_145921
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v3_0_unestable_20260630_145921/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v3_1_project_state_guard_20260630_151609
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v3_1_project_state_guard_20260630_151609/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v3_2_last_project_guard_20260630_152631
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v3_2_last_project_guard_20260630_152631/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v3_3_project_persistence_fix_20260630_153942
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v3_3_project_persistence_fix_20260630_153942/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_0_estable_20260630_155605
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_0_estable_20260630_155605/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_0_estable_20260630_155759
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_0_estable_20260630_155759/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_1_ui_save_demo_20260630_161321
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_1_ui_save_demo_20260630_161321/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_2_ui_save_confirm_20260630_162019
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_2_ui_save_confirm_20260630_162019/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_2_ui_save_confirm_20260630_175819
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_3_ui_no_white_boxes_20260630_162853
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v4_3_ui_no_white_boxes_20260630_162853/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_181305
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_181305/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_182220
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_183818
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_183818/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_184430
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_184430/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_184440
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_184440/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_185953
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_185958
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_185958/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_191534
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_191534/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_191539
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_191539/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_192608
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_192608/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_192614
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_192614/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_193324
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_193324/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_194037
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_194037/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_194923
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_194923/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_200229
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_200229/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_203507
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_203507/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_212019
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_212019/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_212350
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_0_estable_20260630_212350/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_1_stable_20260630_204843
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_1_stable_20260630_223256
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/sd_lgpt_runtime_before_clean_v6_1_stable_20260630_223256/lgpt
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/backups/treefrogui_before_r36sx_v26_patch_20260630_133330
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/cache/lgpt-resources
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/cache/lgpt-resources/lgpt_1_l3ven
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/cache/lgpt-resources/lgpt_BA0BAB_D1BBB5
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/cache/lgpt-resources/lgpt_Bootloop-FastJump
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/cache/lgpt-resources/lgpt_Float-Fi-WildDope
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/cache/lgpt-resources/lgpt_Luce-COMPSENTRY
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/cache/lgpt-resources/lgpt_djdiskmachine-SereneDream
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V2_3_UI_COLOR_SELECT_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V2_4_REENTRY_PROCESS_EXIT_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V2_5_REENTRY_STABLE_PATH_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V3_0_UNESTABLE_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V3_1_PROJECT_STATE_GUARD_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V3_2_LAST_PROJECT_GUARD_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V3_3_PROJECT_PERSISTENCE_FIX_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V4_0_ESTABLE_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V4_1_UI_SAVE_DEMO_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V4_2_UI_SAVE_CONFIRM_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V4_3_UI_NO_WHITE_BOXES_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V4_4_UI_PURPLE_SELECTION_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V4_5_UI_FIELD_BACKGROUND_TRANSPARENT_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V4_6_UI_FONT_BITINVERT_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V5_0_ESTABLE_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V5_1_ESTABLE_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V5_1_PROJECT_EXIT_AUTOSAVE_UI_MODAL_FIX_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V5_2_UI_MODAL_TEXT_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V5_3_LAST_PROJECT_BOOT_GUARD_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_0_1_PHRASE_CURSOR_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_0_2_PHRASE_LOCATOR_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_0_3_PHRASE_ROW_MARKER_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_0_4_PHRASE_TABLE_MARKER_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_0_ESTABLE_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_1_DIAGNOSTICO_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_2_RC10_CLEANBASE_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_2_RC11_PROJECTBANK_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_2_RC12_WATCHBANK_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_2_RC13_SOURCEFIX_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_2_RC14_SOURCEFIX2_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_2_RC15_RECOVERY_CLEAN_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_2_RC16_HARDCLEAN_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_2_RC9_CLEANBASE_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port-backups/r36sx-lgpt-port_sucio_20260701_093823/src/LittleGPTracker_V6_5_UNESTABLE_PRISTINE
+/home/dafunknoise/r36sx-lgpt-port/audit_v3_3_sources/treefrog-ui
+/home/dafunknoise/r36sx-lgpt-port/backups/FIX_LAUNCHER_CORE_20260702_120331/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/FIX_LGPT_LAUNCHER_LIBRETRO_20260702_121117
+/home/dafunknoise/r36sx-lgpt-port/backups/FIX_LGPT_LAUNCHER_LIBRETRO_20260702_121117/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/FIX_LGPT_LAUNCHER_LIBRETRO_20260702_121117/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_BEFORE_FULL_V4_VISUAL_ROLLBACK_20260702_035632/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_BEFORE_FULL_V4_VISUAL_ROLLBACK_20260702_035632/roms_lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_BEFORE_INSTALL_STABLE_20260702_120658/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_BEFORE_INSTALL_STABLE_20260702_120658/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_BEFORE_LGPT_CLEAN_REINSTALL_20260702_084604
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_BEFORE_LGPT_CLEAN_REINSTALL_20260702_084604/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_BEFORE_LGPT_FOLDER_LAYOUT_20260702_025111
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_BEFORE_LGPT_FOLDER_LAYOUT_20260702_025111/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_LGPT_V14_FUNCIONAL_20260701_230229
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_LGPT_V14_FUNCIONAL_20260701_230229/projects/lgpt_BuzzyYell
+/home/dafunknoise/r36sx-lgpt-port/backups/SD_LGPT_V14_FUNCIONAL_20260701_230229/roms_lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_102051
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_102051/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_110108
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_110108/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_112734
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_112734/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_113744
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_113744/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_120651
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_120651/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_121306
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_121306/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_121755
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_121755/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_123249
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_123249/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_124819
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_124819/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_125533
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_125533/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_224916
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_224916/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_230340
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_230340/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_231222
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_231222/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_231802
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_231802/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_233832
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_233832/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_235306
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260701_235306/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260702_000433
+/home/dafunknoise/r36sx-lgpt-port/backups/port_lgpt_tracker_v1_install_20260702_000433/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/sd_lgpt_runtime_before_clean_port_lgpt_tracker_v1_20260701_102017
+/home/dafunknoise/r36sx-lgpt-port/backups/sd_lgpt_runtime_before_clean_port_lgpt_tracker_v1_20260701_102017/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/sd_lgpt_runtime_before_clean_port_lgpt_tracker_v1_20260701_224803
+/home/dafunknoise/r36sx-lgpt-port/backups/sd_lgpt_runtime_before_clean_port_lgpt_tracker_v1_20260701_224803/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/sd_lgpt_runtime_before_clean_port_lgpt_tracker_v1_20260701_224832
+/home/dafunknoise/r36sx-lgpt-port/backups/sd_lgpt_runtime_before_clean_port_lgpt_tracker_v1_20260701_224832/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/sd_lgpt_runtime_before_clean_v7_2_lgpt_native_20260701_094406
+/home/dafunknoise/r36sx-lgpt-port/backups/sd_lgpt_runtime_before_clean_v7_3_lgpt_native_20260701_095521
+/home/dafunknoise/r36sx-lgpt-port/backups/sd_lgpt_runtime_before_clean_v7_3_lgpt_native_20260701_095521/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/v3_1_install_20260702_003121/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/v3_1_install_20260702_003121/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/v3_2_direct_install_20260702_004425/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/v3_2_direct_install_20260702_004425/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/backups/v4_install_20260702_005437/roms_lgpt.prev
+/home/dafunknoise/r36sx-lgpt-port/backups/v4_install_20260702_005831/roms_lgpt.prev
+/home/dafunknoise/r36sx-lgpt-port/backups/v4_install_20260702_010002/roms_lgpt.prev
+/home/dafunknoise/r36sx-lgpt-port/backups/v7_3_lgpt_native_install_20260701_095556
+/home/dafunknoise/r36sx-lgpt-port/backups/v7_3_lgpt_native_install_20260701_095556/roms/lgpt
+/home/dafunknoise/r36sx-lgpt-port/baselines/V1_3_1_UI_BIGHEX_FUNCIONAL_20260702_023257/lgpt_runtime
+/home/dafunknoise/r36sx-lgpt-port/baselines/V4_SOURCE_ROOTED_FUNCIONAL_20260702_012607/roms_lgpt
+/home/dafunknoise/r36sx-lgpt-port/cache/lgpt_runtime_restore_20260702_084604
+/home/dafunknoise/r36sx-lgpt-port/cache/lgpt_runtime_restore_20260702_084604/projects/lgpt_BuzzyYell
+/home/dafunknoise/r36sx-lgpt-port/cache/lgpt_runtime_restore_20260702_084604/projects/lgpt_PaleChew
+/home/dafunknoise/r36sx-lgpt-port/cache/lgpt_runtime_restore_20260702_084604/projects/lgpt_SereneSkier
+/home/dafunknoise/r36sx-lgpt-port/dev/PORT_LGPT_TRACKER_V1_4_1_InputNormalize
+/home/dafunknoise/r36sx-lgpt-port/dev/PORT_LGPT_TRACKER_V1_4_2_InputGuard
+/home/dafunknoise/r36sx-lgpt-port/dev/PORT_LGPT_TRACKER_V1_4_3_InputNoRetrigger
+/home/dafunknoise/r36sx-lgpt-port/dev/PORT_LGPT_TRACKER_V1_4_4_ComboDebounce
+/home/dafunknoise/r36sx-lgpt-port/dev/PORT_LGPT_TRACKER_V2_CLEAN_NATIVE
+/home/dafunknoise/r36sx-lgpt-port/dev/PORT_LGPT_TRACKER_V2_CLEAN_NATIVE/runtime/lgpt
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V 100_Estable
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V 100_Estable/dist/lgpt
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V 100_Estable/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V 100_Estable/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V101_InputReserved_Estable
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V101_InputReserved_Estable/dist/lgpt
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V101_InputReserved_Estable/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V101_InputReserved_Estable/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V102_SongABClear_YXCut_Estable
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V102_SongABClear_YXCut_Estable/dist/lgpt
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V102_SongABClear_YXCut_Estable/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT PORT V102_SongABClear_YXCut_Estable/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/dist/lgpt
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/buildTREEFROG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/dist/lgpt
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/projects/buildTREEFROG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_1_InputFix
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_1_InputFix/projects/buildTREEFROG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_1_InputFix/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_1_InputFix/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_2_ListenFix
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_2_ListenFix/projects/buildTREEFROG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_2_ListenFix/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_2_ListenFix/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_3_CleanAudit
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_3_CleanAudit.pre_v1_3_3_audit_bak_20260702_030126
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_3_CleanAudit.pre_v1_3_3_audit_bak_20260702_030126/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_3_CleanAudit.pre_v1_3_3_audit_bak_20260702_030126/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_3_CleanAudit/projects/buildTREEFROG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_3_CleanAudit/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_3_CleanAudit/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_RefactorAudit
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_RefactorAudit.previous_20260702_031012
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_RefactorAudit.previous_20260702_031012/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_RefactorAudit.previous_20260702_031012/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_RefactorAudit/projects/buildTREEFROG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_RefactorAudit/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_RefactorAudit/projects/lgpt64.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_UIRefactor
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_UIRefactor.previous_20260702_031705
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_UIRefactor.previous_20260702_031705/projects/lgpt.xcodeproj
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LittleGPTracker_V1_3_4_UIRefactor.previous_20260702_031705/projects/lgpt64.xcodeproj

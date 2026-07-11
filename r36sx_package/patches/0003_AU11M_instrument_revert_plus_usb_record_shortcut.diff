@@ -1,0 +1,47 @@
+--- /tmp/lgpt_cmp/final/LGPT_PORT_U2_50_FINAL_MIXER_MASTER_SOURCE/sources/Application/Views/InstrumentView.cpp	2026-07-06 13:30:30.000000000 +0000
++++ /tmp/build_au11m/U2_38AU11M_REVERT_INSTRUMENT_RECORDING_FIX_HOSTHELPER_SOURCE/source_full/LGPT_PORT_U2_50_AU11M_REVERT_INSTRUMENT_RECORDING_FIX_FULL_SOURCE/sources/Application/Views/InstrumentView.cpp	2026-07-10 06:30:49.752023604 +0000
+@@ -14,6 +14,11 @@
+ #include "ModalDialogs/MessageBox.h"
+ #include "System/System/System.h"
+ #include "System/FileSystem/FileSystem.h"
++#include "Services/Time/TimeService.h"
++
++// U2_38AU11M_REVERT_INSTRUMENT_RECORDING_FIX
++// InstrumentView is intentionally restored from U2_50_FINAL_MIXER_MASTER.
++// Only the USB-C RECORD shortcut is added. No safe-view/samplepool guards.
+ 
+ InstrumentView::InstrumentView(GUIWindow &w,ViewData *data):FieldView(w,data) {
+ 
+@@ -373,6 +378,32 @@
+ 
+     Player *player=Player::GetInstance() ;
+ 
++    // AU11M_USB_REC_SHORTCUT_STABLE_INSTRUMENT
++    // R1 + RIGHT from Instrument opens USB-C RECORD without changing the stable
++    // U2_50_FINAL_MIXER_MASTER Instrument field construction. The project
++    // transport is stopped only when entering the record modal.
++    if ((mask & EPBM_R) && (mask & EPBM_RIGHT) &&
++        !(mask & (EPBM_LEFT | EPBM_UP | EPBM_DOWN | EPBM_A | EPBM_B |
++                  EPBM_X | EPBM_Y | EPBM_L | EPBM_L2 | EPBM_R2 |
++                  EPBM_SELECT | EPBM_START))) {
++        player->Stop();
++        player->StopStreaming();
++        TimeService::GetInstance()->Sleep(180);
++        int instrIndex = viewData_->currentInstrument_;
++        SampleChopperModal *scm = new SampleChopperModal(*this,
++            instrIndex,
++            NO_SAMPLE,
++            "",
++            0,
++            0,
++            false,
++            true);
++        DoModal(scm);
++        onInstrumentChange();
++        isDirty_ = true;
++        return;
++    }
++
+ 	// B Modifier
+ 
+     if (mask & EPBM_B) {

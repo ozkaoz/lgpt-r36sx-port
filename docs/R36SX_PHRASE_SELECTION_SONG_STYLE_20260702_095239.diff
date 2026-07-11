@@ -1,0 +1,15 @@
+--- /home/dafunknoise/r36sx-lgpt-port/backups/source_backups_20260702_095239/PhraseView.cpp.before_phrase_selection_song_style	2026-07-02 02:19:46.000000000 -0500
++++ /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp	2026-07-02 09:52:39.524441900 -0500
+@@ -1253,8 +1253,11 @@
+             SetColor(CD_NORMAL);
+             props.invert_ = false;
+         } else {
++            // TREEFROG_UI_PHRASE_SELECTION_SONG_STYLE
++            // Selección validada con la misma semántica visual que Song:
++            // CD_HILITE2 + invert_.
+             SetColor(CD_HILITE2);
+-            props.invert_ = false;
++            props.invert_ = true;
+         }
+     }
+ };

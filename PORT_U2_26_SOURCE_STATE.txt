@@ -1,0 +1,16 @@
+LGPT PORT U2.26 CANDIDATE
+
+Base: U2.25 validated on R36S except progress visibility and Pitch/Envelope preview for modified values.
+Scope: fix only Chopper UI/progress/preview and compact Pitch/Envelope panel before starting rendered chop persistence/export.
+
+Files changed:
+- sources/Application/Views/ModalDialogs/SampleChopperModal.cpp
+- sources/Application/Views/ModalDialogs/SampleChopperModal.h
+- sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp
+
+Expected hardware-visible changes:
+- Chopper header displays Graphical Chopper U2.26 and Pitch panel displays PITCH / ENVELOPE U2.26.
+- CROP/PITCH progress calls force libretro video refresh after each DrawView/w_.Flush.
+- Pitch/Envelope modified B preview uses WavFile writer and range streaming.
+- Pitch/Envelope has a Sample selector row.
+- Bottom controls no longer duplicate/overlap the full Pitch/Envelope panel.

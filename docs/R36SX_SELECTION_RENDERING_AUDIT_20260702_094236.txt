@@ -1,0 +1,1524 @@
+R36SX selection rendering audit
+Generated: 20260702_094236
+DEV=/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR
+
+=== View files present ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/FieldView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/FieldView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/ModalView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/ModalView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ChainView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ChainView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ConsoleView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ConsoleView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/InstrumentView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/InstrumentView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ListSelectView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ListSelectView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/MixerView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/MixerView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/NullView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/NullView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ProjectView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ProjectView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/SongView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/SongView.h
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/TableView.cpp
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/TableView.h
+
+=== Groove-related files / references ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:91:    _grooveView = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:394:    _grooveView = new GrooveView((*this), _viewData);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:395:    _grooveView->AddObserver(*this);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:589:        case VT_GROOVE:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:590:            _currentView = _grooveView;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.h:7:#include "Application/Views/GrooveView.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.h:72:    GrooveView *_grooveView;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:2:#include "Groove.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:4:unsigned char Groove::data_[MAX_GROOVES][16] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:6:Groove::Groove():Persistent("GROOVES") {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:10:Groove::~Groove() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:13:void Groove::Clear() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:14:	// Init all grooves with basic datas
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:15:	memset(data_,NO_GROOVE_DATA,MAX_GROOVES*0xF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:16:	for (int i=0;i<MAX_GROOVES;i++) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:20:	// init grooves selectah
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:23:		channelGroove_[i].groove_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:24:		channelGroove_[i].position_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:25:		channelGroove_[i].ticks_=data_[0][0] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:28:// Resest groove data at song startup
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:30:void Groove::Reset() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:33:		ChannelGroove &c=channelGroove_[i] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:35:		c.ticks_=data_[c.groove_][c.position_] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:39:void Groove::GetChannelData(int channel,int *groove,int *position) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:40:		ChannelGroove &c=channelGroove_[channel] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:41:		*groove=c.groove_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:45:void Groove::SaveContent(TiXmlNode *node) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:46:	 saveHexBuffer(node,"DATA",(unsigned char *)data_,16*MAX_GROOVES) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:49: void Groove::RestoreContent(TiXmlElement *element) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:53:// Trigger grooves so we go to the next step
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:55:void Groove::Trigger() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:57:		ChannelGroove &c=channelGroove_[i] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:58:		UpdateGroove(c,false) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:62:bool Groove::UpdateGroove(ChannelGroove &c,bool reverse) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:68:		if (c.groove_==255) { // Default table groove
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:74:			if (c.ticks_==data_[c.groove_][c.position_]) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:76:				if (data_[c.groove_][c.position_]==0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:86:			if (data_[c.groove_][c.position_]==0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:89:			c.ticks_=data_[c.groove_][c.position_] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:97:void Groove::SetGroove(int channel,int groove) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:98:		if (groove>=MAX_GROOVES) return ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:99:		channelGroove_[channel].groove_=groove ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:100:		channelGroove_[channel].position_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:101:		channelGroove_[channel].ticks_=data_[channelGroove_[channel].groove_][channelGroove_[channel].position_] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:104:// Returns true if, according to current groove setting it is time to go
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:107:bool Groove::TriggerChannel(int i) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:108:	ChannelGroove &c=channelGroove_[i] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:109:	return ((c.ticks_)%(data_[c.groove_][c.position_])==0) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:112:unsigned char *Groove::GetGrooveData(int groove) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.cpp:113:	return data_[groove] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:2:#ifndef _GROOVE_H_
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:3:#define _GROOVE_H_
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:10:#define MAX_GROOVES 0x20
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:11:#define NO_GROOVE_DATA 0xFF
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:13:struct ChannelGroove {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:14:	unsigned char groove_ ; // selected groove
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:15:	unsigned char position_ ; // step in the groove table
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:20:class Groove:public T_Singleton<Groove>,Persistent {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:22:	Groove() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:23:	~Groove() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:28:	void SetGroove(int channel,int groove) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:29:	bool UpdateGroove(ChannelGroove &g,bool reverse) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:30:	void GetChannelData(int channel,int *groove,int *position) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:31:	unsigned char *GetGrooveData(int groove) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:36:	ChannelGroove channelGroove_[SONG_CHANNEL_COUNT] ; 
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Groove.h:37:	static unsigned char data_[MAX_GROOVES][16] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Project.cpp:7:#include "Groove.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Model/Project.cpp:66:	Groove::GetInstance()->Clear() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:25:#include "Application/Model/Groove.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:144:	Groove::GetInstance()->Reset() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:565:			Groove::GetInstance()->Trigger() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:662:	Groove *gs=Groove::GetInstance() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:672:				if (gs->TriggerChannel(i)) { // If groove says it is time to play
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:744:				Groove *gr=Groove::GetInstance() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:749:						gr->SetGroove(i,param) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:752:					gr->SetGroove(channel,param) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:1018:    Groove *gs=Groove::GetInstance() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:1025:      { // If groove says it is time to play
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:46:	groove_.groove_=-1 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:47:	groove_.position_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:48:	groove_.ticks_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:69:		groove_.groove_=-1 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:70:		groove_.position_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:71:		groove_.ticks_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:148:			groove_.groove_=(unsigned char)param ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:149:			groove_.position_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:150:			groove_.ticks_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:158:	Groove *gs=Groove::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:163:			// See if groove tells us we need to process a step
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:165:			if (groove_.ticks_==0) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:192:			// if groove's end reached, update position
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.cpp:194:			if (gs->UpdateGroove(groove_,true)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.h:6:#include "Application/Model/Groove.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/TablePlayback.h:38:	ChannelGroove groove_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Utils/HelpLegend.h:103:			result[1].assign("trigger groove bb");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:103:            case VT_GROOVE:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp.bak_comment_cleanup_20260702_092303:107:            case VT_GROOVE:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.h:42:    VT_GROOVE,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:2:#include "GrooveView.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:3:#include "Application/Model/Groove.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:6:GrooveView::GrooveView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:11:GrooveView::~GrooveView() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:14:void GrooveView::updateCursor(int dir) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:21:void GrooveView::updateCursorValue(int val,bool sync) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:22:	unsigned char *grooveData=Groove::GetInstance()->GetGrooveData(viewData_->currentGroove_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:23:	int value=grooveData[position_] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:27:	grooveData[position_]=val ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:31:void GrooveView::warpGroove(int dir) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:32:	int current=viewData_->currentGroove_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:34:	if (current>=MAX_GROOVES) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:35:		current-=MAX_GROOVES ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:38:		current+=MAX_GROOVES ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:40:	viewData_->currentGroove_=current ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:44:void GrooveView::initCursorValue() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:45:	unsigned char *grooveData=Groove::GetInstance()->GetGrooveData(viewData_->currentGroove_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:46:	if (grooveData[position_]==NO_GROOVE_DATA) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:47:		grooveData[position_]=1 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:52:void GrooveView::clearCursorValue() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:53:	unsigned char *grooveData=Groove::GetInstance()->GetGrooveData(viewData_->currentGroove_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:54:	grooveData[position_]=NO_GROOVE_DATA ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:58:void GrooveView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:66:				warpGroove(-1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:69:				warpGroove(1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:72:				warpGroove(-0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:75:				warpGroove(0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:126:void GrooveView::DrawView() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:139:	sprintf(title,"Groove: %2.2x",viewData_->currentGroove_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:159:// Display current groove
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:165:	unsigned char *grooveData=Groove::GetInstance()->GetGrooveData(viewData_->currentGroove_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:167:		if (grooveData[j]!=NO_GROOVE_DATA) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:168:			hex2char(grooveData[j],buffer) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:182:void GrooveView::OnPlayerUpdate(PlayerEventType ,unsigned int tick) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:192:	Groove *gr=Groove::GetInstance() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:196:	int groove ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:197:	int groovepos ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:199:	gr->GetChannelData(channel,&groove,&groovepos) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:201:	if (groove==viewData_->currentGroove_ &&
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:203:		lastPosition_=groovepos ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:214:void GrooveView::OnFocus() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.h:1:#ifndef _GROOVE_VIEW_H_
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.h:2:#define _GROOVE_VIEW_H_
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.h:7:class GrooveView: public View {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.h:9:	GrooveView(GUIWindow &w,ViewData *viewData) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.h:10:	~GrooveView() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.h:21:	void warpGroove(int dir) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:1084:                    // Go to groove view
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:1086:                    ViewType vt = VT_GROOVE;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1075:                    // Go to groove view
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1077:                    ViewType vt = VT_GROOVE;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ViewData.cpp:17:	currentGroove_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ViewData.h:73:	int currentGroove_ ;			// .Current edited groove
+
+=== Selection/color/invert references in key views ===
+
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/SongView.cpp ---
+912-                          viewData_->songX_,
+913-                          viewData_->songY_ + viewData_->songOffset_);
+914-
+915-        selRect.Normalize();
+916-    }
+917-
+918-    // Draw title
+919-
+920:    SetColor(CD_NORMAL);
+921-
+922-    Player *player = Player::GetInstance();
+923-
+924-    std::ostringstream os;
+925-
+926-    os << ((player->GetSequencerMode() == SM_SONG) ? "Song" : "Live");
+927-    os << ": ";
+928-
+929-    if (songname_.substr(0, 5) == "lgpt_") {
+930-        os << songname_.substr(5);
+931-    }
+932-
+933-    std::string buffer(os.str());
+934-
+935:    DrawString(pos._x, pos._y, buffer.c_str(), props);
+936-
+937-    // Compute song grid location
+938-
+939-    GUIPoint anchor = GetAnchor();
+940-
+941-    // Display row numbers
+942-
+943-    char row[3];
+944-    pos = anchor;
+945-    pos._x -= 3;
+946-    for (int j = 0; j < View::songRowCount_; j++) {
+947-        char p = j + viewData_->songOffset_;
+948:        ((p / altRowNumber_) % 2) ? SetColor(CD_ROW) : SetColor(CD_ROW2);
+949-        hex2char(p, row);
+950:        DrawString(pos._x, pos._y, row, props);
+951-        pos._y += 1;
+952-    }
+953-
+954:    SetColor(CD_NORMAL);
+955-
+956-    pos = anchor;
+957-    unsigned char *data =
+958-        viewData_->song_->data_ + (SONG_CHANNEL_COUNT * viewData_->songOffset_);
+959-    short dx = 3;
+960-    short dy = 1;
+961-    for (int j = 0; j < View::songRowCount_; j++) {
+962-
+--
+981-                }
+982-            }
+983-
+984-            // draw current step
+985-
+986-            unsigned char d = *data++;
+987-
+988-            if (d == 0xFE) {
+989:                SetColor(CD_SONGVIEWFE);
+990-            } else if (d == 0x00) {
+991:                SetColor(CD_SONGVIEW00);
+992-            } else {
+993:                SetColor(CD_NORMAL);
+994-            }
+995-
+996-            if (invert) {
+997:                SetColor(CD_HILITE2);
+998:                props.invert_ = true;
+999-            }
+1000-
+1001-            if (d == 0xFF) {
+1002:                DrawString(pos._x, pos._y, "--", props);
+1003-            } else {
+1004-                hex2char(d, row);
+1005:                DrawString(pos._x, pos._y, row, props);
+1006-            }
+1007-
+1008-            // Put back drawing state
+1009-
+1010-            if (invert) {
+1011:                SetColor(CD_NORMAL);
+1012:                props.invert_ = false;
+1013-            }
+1014-
+1015-            // Next step
+1016-
+1017-            pos._x += dx;
+1018-        }
+1019-        pos._y += dy;
+1020-    }
+1021:    SetColor(CD_NORMAL);
+1022-
+1023-    drawMap();
+1024-    drawNotes();
+1025-
+1026-    if (player->IsRunning()) {
+1027-        OnPlayerUpdate(PET_UPDATE);
+1028-    };
+1029-};
+--
+1039-
+1040-    Player *player = Player::GetInstance();
+1041-
+1042-    GUIPoint anchor = GetAnchor();
+1043-    GUIPoint pos = anchor;
+1044-    pos._x -= 1;
+1045-
+1046-    GUITextProperties props;
+1047:    SetColor(CD_CURSOR);
+1048-
+1049-    // Loop on all channels
+1050-
+1051-    for (int i = 0; i < SONG_CHANNEL_COUNT; i++) {
+1052-
+1053-        // Clear all current positions
+1054-
+1055-        int y = lastPlayedPosition_[i] - viewData_->songOffset_;
+1056-        if (y >= 0 && y < View::songRowCount_ &&
+1057-            viewData_->playMode_ != PM_AUDITION) {
+1058-            pos._y = anchor._y + y;
+1059:            DrawString(pos._x, pos._y, " ", props);
+1060-        }
+1061-
+1062-        // Clear all last queued positions
+1063-
+1064-        y = lastQueuedPosition_[i] - viewData_->songOffset_;
+1065-        if (y >= 0 && y < View::songRowCount_) {
+1066-            pos._y = anchor._y + y;
+1067:            DrawString(pos._x, pos._y, " ", props);
+1068-        }
+1069-
+1070-        // For each playing position, draw current location
+1071-
+1072-        if (player->IsChannelPlaying(i)) {
+1073-            if (eventType != PET_STOP) {
+1074-                if (viewData_->currentPlayChain_[i] != 0xFF) {
+1075-                    int y = viewData_->songPlayPos_[i] - viewData_->songOffset_;
+1076-                    if (y >= 0 && y < View::songRowCount_) {
+1077-                        pos._y = anchor._y + y;
+1078-                        if (!player->IsChannelMuted(i)) {
+1079:                            SetColor(CD_PLAY);
+1080:                            DrawString(pos._x, pos._y, ">", props);
+1081-                        } else {
+1082:                            SetColor(CD_MUTE);
+1083:                            DrawString(pos._x, pos._y, "-", props);
+1084-                        }
+1085:                        SetColor(CD_CURSOR);
+1086-                        lastPlayedPosition_[i] = viewData_->songPlayPos_[i];
+1087-                    }
+1088-                }
+1089-            }
+1090-        }
+1091-
+1092-        // If in live mode, update queued position
+1093-
+--
+1095-            if (player->GetQueueingMode(i) != QM_NONE) {
+1096-
+1097-                if (eventType != PET_STOP) {
+1098-                    int y =
+1099-                        player->GetQueuePosition(i) - viewData_->songOffset_;
+1100-                    if (y >= 0 && y < View::songRowCount_) {
+1101-                        pos._y = anchor._y + y;
+1102-                        char *indicator = player->GetLiveIndicator(i);
+1103:                        DrawString(pos._x, pos._y, indicator, props);
+1104-                        lastQueuedPosition_[i] = player->GetQueuePosition(i);
+1105-                    }
+1106-                }
+1107-            };
+1108-        }
+1109-        pos._x += 3;
+1110-    }
+1111-
+1112:    SetColor(CD_NORMAL);
+1113-
+1114-    // Draw clipping indicator & CPU usage
+1115-
+1116-    if (View::miniLayout_) {
+1117-        pos._y = 0;
+1118-        pos._x = 25;
+1119-    } else {
+1120-        pos = anchor;
+1121-        pos._x += 25;
+1122-    }
+1123-
+1124-    if (player->Clipped()) {
+1125:        DrawString(pos._x, pos._y, "clip", props);
+1126-    } else {
+1127:        DrawString(pos._x, pos._y, "----", props);
+1128-    }
+1129-
+1130-    char strbuffer[10];
+1131-    pos._y += 1;
+1132-    sprintf(strbuffer, "%3.3d%%", player->GetPlayedBufferPercentage());
+1133:    DrawString(pos._x, pos._y, strbuffer, props);
+1134-
+1135-    System *sys = System::GetInstance();
+1136-    int batt = sys->GetBatteryLevel();
+1137-    if (batt >= 0) {
+1138-        if (batt < 90) {
+1139:            SetColor(CD_HILITE2);
+1140-            invertBatt_ = !invertBatt_;
+1141-        } else {
+1142-            invertBatt_ = false;
+1143-        };
+1144:        props.invert_ = invertBatt_;
+1145-
+1146-        pos._y += 1;
+1147-        sprintf(strbuffer, "%3.3d", batt);
+1148:        DrawString(pos._x, pos._y, strbuffer, props);
+1149-    }
+1150-
+1151-    if (eventType != PET_STOP) {
+1152:        SetColor(CD_NORMAL);
+1153:        props.invert_ = false;
+1154-        int time = int(player->GetPlayTime());
+1155-        int mi = time / 60;
+1156-        int se = time - mi * 60;
+1157-        sprintf(strbuffer, "%2.2d:%2.2d", mi, se);
+1158-        pos._y += 1;
+1159:        DrawString(pos._x, pos._y, strbuffer, props);
+1160-    }
+1161-    drawNotes();
+1162-};
+1163-
+1164-void SongView::nudgeTempo(int direction) {
+1165-    ApplicationCommandDispatcher *dispatcher =
+1166-        ApplicationCommandDispatcher::GetInstance();
+1167-    switch (direction) {
+
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ChainView.cpp ---
+642-    } else {
+643-        if ((viewData_->chainCol_ == row) && (viewData_->chainRow_ == col)) {
+644-            invert = true;
+645-        }
+646-    }
+647-
+648-    if (invert) {
+649-        if (restore) {
+650:            SetColor(CD_NORMAL);
+651:            props.invert_ = false;
+652-        } else {
+653:            SetColor(CD_HILITE2);
+654:            props.invert_ = false;
+655-        }
+656-    }
+657-};
+658-
+659-void ChainView::DrawView() {
+660-
+661-    Clear();
+662-    View::EnableNotification();
+663-
+664-    GUITextProperties props;
+665-    GUIPoint pos = GetTitlePosition();
+666-
+667-    // Draw title
+668-
+669-    char title[20];
+670:    SetColor(CD_NORMAL);
+671-    sprintf(title, "Chain %2.2x", viewData_->currentChain_);
+672:    DrawString(pos._x, pos._y, title, props);
+673-
+674-    // Compute song grid location
+675-
+676-    GUIPoint anchor = GetAnchor();
+677-
+678-    // Display row numbers
+679-
+680-    char row[3];
+681-    pos = anchor;
+682-    pos._x -= 3;
+683-    for (int j = 0; j < 16; j++) {
+684:        ((j / altRowNumber_) % 2) ? SetColor(CD_ROW) : SetColor(CD_ROW2);
+685-        hex2char(j, row);
+686:        DrawString(pos._x, pos._y, row, props);
+687-        pos._y += 1;
+688-    }
+689-
+690:    SetColor(CD_NORMAL);
+691-
+692-    pos = anchor;
+693-
+694-    // Display phrases
+695-
+696-    pos = anchor;
+697-
+698-    unsigned char *data =
+699-        viewData_->song_->chain_->data_ + (16 * viewData_->currentChain_);
+700-
+701-    for (int j = 0; j < 16; j++) {
+702-        unsigned char d = *data++;
+703-        setTextProps(props, 0, j, false);
+704-        if (d == 0xFF) {
+705:            DrawString(pos._x, pos._y, "--", props);
+706-        } else {
+707-            hex2char(d, row);
+708:            DrawString(pos._x, pos._y, row, props);
+709-        }
+710-        setTextProps(props, 0, j, true);
+711-        pos._y++;
+712-    }
+713-
+714-    // Draw Transpose
+715-
+716-    pos = anchor;
+--
+718-
+719-    data =
+720-        viewData_->song_->chain_->transpose_ + (16 * viewData_->currentChain_);
+721-
+722-    for (int j = 0; j < 16; j++) {
+723-        unsigned char d = *data++;
+724-        hex2char(d, row);
+725-        setTextProps(props, 1, j, false);
+726:        DrawString(pos._x, pos._y, row, props);
+727-        setTextProps(props, 1, j, true);
+728-        pos._y++;
+729-    }
+730-    Player *player = Player::GetInstance();
+731-
+732-    drawMap();
+733-    drawNotes();
+734-
+--
+743-
+744-    drawNotes();
+745-
+746-    GUIPoint anchor = GetAnchor();
+747-    GUIPoint pos = anchor;
+748-    pos._x -= 1;
+749-
+750-    GUITextProperties props;
+751:    SetColor(CD_NORMAL);
+752-
+753-    // Clear last played & queued
+754-
+755-    pos._y = anchor._y + lastPlayingPos_;
+756:    DrawString(pos._x, pos._y, " ", props);
+757-
+758-    pos._y = anchor._y + lastQueuedPos_;
+759:    DrawString(pos._x, pos._y, " ", props);
+760-
+761-    if (eventType != PET_STOP) {
+762-
+763-        // Loop on all channels to see if one of them is playing current chain
+764-
+765-        for (int i = 0; i < SONG_CHANNEL_COUNT; i++) {
+766-            if (player->IsChannelPlaying(i)) {
+767-                if (viewData_->currentPlayChain_[i] ==
+768-                        viewData_->currentChain_ &&
+769-                    viewData_->playMode_ != PM_AUDITION) {
+770-                    pos._y = anchor._y + viewData_->chainPlayPos_[i];
+771-                    if (!player->IsChannelMuted(i)) {
+772:                        SetColor(CD_PLAY);
+773:                        DrawString(pos._x, pos._y, ">", props);
+774:                        SetColor(CD_NORMAL);
+775-                    } else {
+776:                        SetColor(CD_MUTE);
+777:                        DrawString(pos._x, pos._y, "-", props);
+778:                        SetColor(CD_NORMAL);
+779-                    }
+780-                    lastPlayingPos_ = viewData_->chainPlayPos_[i];
+781-                    break;
+782-                }
+783-            }
+784-        }
+785-
+786-        // Loop on all channels to see if one has queued current chain
+--
+794-                    unsigned char songPos = player->GetQueuePosition(i);
+795-                    unsigned char *chain =
+796-                        viewData_->song_->data_ + i + 8 * songPos;
+797-                    if (*chain == viewData_->currentChain_) {
+798-                        unsigned char chainPos =
+799-                            player->GetQueueChainPosition(i);
+800-                        pos._y = anchor._y + chainPos;
+801-                        char *indicator = player->GetLiveIndicator(i);
+802:                        DrawString(pos._x, pos._y, indicator, props);
+803-                        lastQueuedPos_ = chainPos;
+804-                        break;
+805-                    }
+806-                }
+807-            }
+808-        }
+809-    }
+810-
+811-    pos = anchor;
+812-    pos._x += 200;
+813-/*
+814-	if (player->Clipped()) {
+815:           w_.DrawString("clip",pos,props); 
+816-    } else {
+817:           w_.DrawString("----",pos,props); 
+818-    }
+819-*/} ;
+
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp ---
+1227-        }
+1228-    }
+1229-};
+1230-
+1231-void PhraseView::setTextProps(GUITextProperties &props, int row, int col,
+1232-                              bool restore) {
+1233-
+1234-    // TREEFROG_V1_3_PHRASE_TEXT_FOCUS_ORDER:
+1235:    // este port evita props.invert_ para no generar barras/recuadros en TreeFrog;
+1236-    // por eso DrawView debe aplicar el color base de fila antes de setTextProps().
+1237-    bool invert = false;
+1238-
+1239-    if (clipboard_.active_) {
+1240-        GUIRect selRect = getSelectionRect();
+1241-        if ((row >= selRect.Left()) && (row <= selRect.Right()) &&
+1242-            (col >= selRect.Top()) && (col <= selRect.Bottom())) {
+1243-            invert = true;
+--
+1245-    } else {
+1246-        if ((col_ == row) && (row_ == col)) {
+1247-            invert = true;
+1248-        }
+1249-    }
+1250-
+1251-    if (invert) {
+1252-        if (restore) {
+1253:            SetColor(CD_NORMAL);
+1254:            props.invert_ = false;
+1255-        } else {
+1256:            SetColor(CD_HILITE2);
+1257:            props.invert_ = false;
+1258-        }
+1259-    }
+1260-};
+1261-
+1262-void PhraseView::DrawView() {
+1263-
+1264-    Clear();
+1265-    View::EnableNotification();
+1266-
+1267-    GUITextProperties props;
+1268-    GUIPoint pos = GetTitlePosition();
+1269-
+1270-    // Draw title
+1271-
+1272-    char title[20];
+1273-
+1274:    SetColor(CD_NORMAL);
+1275-    sprintf(title, "Phrase %2.2x", viewData_->currentPhrase_);
+1276:    DrawString(pos._x, pos._y, title, props);
+1277-
+1278-    // Compute song grid location
+1279-
+1280-    GUIPoint anchor = GetAnchor();
+1281-
+1282-    // Display row numbers
+1283-
+1284-    char buffer[6];
+1285-    pos = anchor;
+1286-    pos._x -= 3;
+1287-    for (int j = 0; j < 16; j++) {
+1288:        ((j / altRowNumber_) % 2) ? SetColor(CD_ROW) : SetColor(CD_ROW2);
+1289-        hex2char(j, buffer);
+1290:        DrawString(pos._x, pos._y, buffer, props);
+1291-        pos._y++;
+1292-    }
+1293-
+1294:    SetColor(CD_NORMAL);
+1295-
+1296-    pos = anchor;
+1297-
+1298-    // Display notes
+1299-
+1300-    unsigned char *data = phrase_->note_ + (16 * viewData_->currentPhrase_);
+1301-
+1302-    buffer[4] = 0;
+1303-    for (int j = 0; j < 16; j++) {
+1304-        unsigned char d = *data++;
+1305:        (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
+1306:                                                : SetColor(CD_NORMAL);
+1307-        setTextProps(props, 0, j, false);
+1308-        if (d == 0xFF) {
+1309:            DrawString(pos._x, pos._y, "----", props);
+1310-        } else {
+1311-            note2char(d, buffer);
+1312:            DrawString(pos._x, pos._y, buffer, props);
+1313-        }
+1314-        setTextProps(props, 0, j, true);
+1315-        pos._y++;
+1316-    }
+1317-
+1318-    // Draw instruments
+1319-
+1320-    pos = anchor;
+1321-    pos._x += 4;
+1322-
+1323-    data = phrase_->instr_ + (16 * viewData_->currentPhrase_);
+1324-    buffer[0] = 'I';
+1325-    buffer[3] = 0;
+1326-
+1327-    for (int j = 0; j < 16; j++) {
+1328-        unsigned char d = *data++;
+1329:        (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
+1330:                                                : SetColor(CD_NORMAL);
+1331-        setTextProps(props, 1, j, false);
+1332-        if (d == 0xFF) {
+1333:            DrawString(pos._x, pos._y, "I", props);
+1334:            DrawString(pos._x + 1, pos._y, "--", props);
+1335-        } else {
+1336-            hex2char(d, buffer + 1);
+1337:            DrawString(pos._x, pos._y, buffer, props);
+1338-            if (j == row_ && (col_ == 0 || col_ == 1)) {
+1339:                SetColor(CD_NORMAL);
+1340-                sprintf(buffer, "I%2.2x: ", d);
+1341-                std::string instrLine = buffer;
+1342-                setTextProps(props, 1, j, true);
+1343-                GUIPoint location = GetTitlePosition();
+1344-                location._x += 12;
+1345-                InstrumentBank *bank = viewData_->project_->GetInstrumentBank();
+1346-                I_Instrument *instr = bank->GetInstrument(d);
+1347-                instrLine += instr->GetName();
+1348:                DrawString(location._x, location._y, instrLine.c_str(), props);
+1349-            }
+1350-        }
+1351-        setTextProps(props, 1, j, true);
+1352-        pos._y++;
+1353-    }
+1354-
+1355-    // Draw command 1
+1356-
+--
+1359-
+1360-    FourCC *f = phrase_->cmd1_ + (16 * viewData_->currentPhrase_);
+1361-
+1362-    buffer[4] = 0;
+1363-
+1364-    for (int j = 0; j < 16; j++) {
+1365-        FourCC command = *f++;
+1366-        fourCC2char(command, buffer);
+1367:        (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
+1368:                                                : SetColor(CD_NORMAL);
+1369-        setTextProps(props, 2, j, false);
+1370:        DrawString(pos._x, pos._y, buffer, props);
+1371-        setTextProps(props, 2, j, true);
+1372-        pos._y++;
+1373-        if (j == row_ && col_ == 2) {
+1374-            printHelpLegend(command, props);
+1375-        }
+1376-    }
+1377-
+1378-    // Draw commands params 1
+--
+1381-    pos._x += 13;
+1382-
+1383-    ushort *param = phrase_->param1_ + (16 * viewData_->currentPhrase_);
+1384-    buffer[5] = 0;
+1385-
+1386-    for (int j = 0; j < 16; j++) {
+1387-        ushort p = *param++;
+1388-        /*		if (p==0xFFFF) {
+1389:                    DrawString(pos._x,pos._y,"----",props) ;
+1390-                } else {
+1391:        */ (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
+1392:                                                   : SetColor(CD_NORMAL);
+1393-        setTextProps(props, 3, j, false);
+1394-        hexshort2char(p, buffer);
+1395:        DrawString(pos._x, pos._y, buffer, props);
+1396-        /*		}
+1397-         */
+1398-        setTextProps(props, 3, j, true);
+1399-        pos._y++;
+1400-    }
+1401-
+1402-    // Draw commands 2
+1403-
+--
+1406-
+1407-    f = phrase_->cmd2_ + (16 * viewData_->currentPhrase_);
+1408-
+1409-    buffer[4] = 0;
+1410-
+1411-    for (int j = 0; j < 16; j++) {
+1412-        FourCC command = *f++;
+1413-        fourCC2char(command, buffer);
+1414:        (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
+1415:                                                : SetColor(CD_NORMAL);
+1416-        setTextProps(props, 4, j, false);
+1417:        DrawString(pos._x, pos._y, buffer, props);
+1418-        setTextProps(props, 4, j, true);
+1419-        pos._y++;
+1420-        if (j == row_ && col_ == 4) {
+1421-            printHelpLegend(command, props);
+1422-        }
+1423-    }
+1424-
+1425-    // Draw commands params
+--
+1428-    pos._x += 23;
+1429-
+1430-    param = phrase_->param2_ + (16 * viewData_->currentPhrase_);
+1431-    buffer[5] = 0;
+1432-
+1433-    for (int j = 0; j < 16; j++) {
+1434-        ushort p = *param++;
+1435-        /*		if (p==0xFFFF) {
+1436:                    DrawString(pos._x,pos._y,"----",props) ;
+1437-                } else {
+1438:        */ (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
+1439:                                                   : SetColor(CD_NORMAL);
+1440-        setTextProps(props, 5, j, false);
+1441-        hexshort2char(p, buffer);
+1442:        DrawString(pos._x, pos._y, buffer, props);
+1443-        /*		}
+1444-         */
+1445-        setTextProps(props, 5, j, true);
+1446-        pos._y++;
+1447-    }
+1448-
+1449-    drawMap();
+1450-    drawNotes();
+--
+1464-
+1465-    GUITextProperties props;
+1466-    drawNotes();
+1467-
+1468-    GUIPoint anchor = GetAnchor();
+1469-    GUIPoint pos = anchor;
+1470-    pos._x -= 1;
+1471-
+1472:    SetColor(CD_NORMAL);
+1473-
+1474-    pos._y = anchor._y + lastPlayingPos_;
+1475-    if (!commandSelectorModalActive_ ||
+1476-        !CommandSelectorCommon::popupContainsPoint(anchor, pos._x, pos._y)) {
+1477:        DrawString(pos._x, pos._y, " ", props);
+1478-    }
+1479-
+1480-    Player *player = Player::GetInstance();
+1481-
+1482-    if (eventType != PET_STOP) {
+1483-
+1484-        // Clear current position if needed
+1485-
+--
+1488-                if (viewData_->currentPlayPhrase_[i] ==
+1489-                        viewData_->currentPhrase_ &&
+1490-                    viewData_->playMode_ != PM_AUDITION) {
+1491-                    pos._y = anchor._y + viewData_->phrasePlayPos_[i];
+1492-                    if (!commandSelectorModalActive_ ||
+1493-                        !CommandSelectorCommon::popupContainsPoint(
+1494-                            anchor, pos._x, pos._y)) {
+1495-                        if (!player->IsChannelMuted(i)) {
+1496:                            SetColor(CD_PLAY);
+1497:                            DrawString(pos._x, pos._y, ">", props);
+1498-                        } else {
+1499:                            SetColor(CD_MUTE);
+1500:                            DrawString(pos._x, pos._y, "-", props);
+1501-                        }
+1502-                    }
+1503:                    SetColor(CD_NORMAL);
+1504-                    lastPlayingPos_ = viewData_->phrasePlayPos_[i];
+1505-                    break;
+1506-                }
+1507-            }
+1508-        }
+1509-
+1510-        // clear any live indicator
+1511-        pos._y = anchor._y;
+--
+1520-                    unsigned char songPos = player->GetQueuePosition(i);
+1521-                    unsigned char *chain =
+1522-                        viewData_->song_->data_ + i + 8 * songPos;
+1523-                    if (*chain == viewData_->currentChain_) {
+1524-                        char *indicator = player->GetLiveIndicator(i);
+1525-                        if (!commandSelectorModalActive_ ||
+1526-                            !CommandSelectorCommon::popupContainsPoint(
+1527-                                anchor, pos._x, pos._y)) {
+1528:                            DrawString(pos._x, pos._y, indicator, props);
+1529-                        }
+1530-                        break;
+1531-                    }
+1532-                }
+1533-            }
+1534-        }
+1535-    }
+1536-
+1537-    pos = anchor;
+1538-    pos._x += 200;
+1539-
+1540-    /*	if (player->Clipped()) {
+1541:               w_.DrawString("clip",pos,props);
+1542-        } else {
+1543:               w_.DrawString("----",pos,props);
+1544-        }
+1545-    */
+1546-};
+1547-
+1548-void PhraseView::printHelpLegend(FourCC command, GUITextProperties props) {
+1549:    SetColor(CD_NORMAL);
+1550-    std::string *cmdStr = getHelpLegend(command);
+1551:    DrawString(10, 0, cmdStr[0].c_str(), props);
+1552:    DrawString(10, 1, cmdStr[1].c_str(), props);
+1553:    DrawString(10, 2, cmdStr[2].c_str(), props);
+1554-}
+
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/TableView.cpp ---
+794-    } else {
+795-        if ((col_ == row) && (row_ == col)) {
+796-            invert = true;
+797-        }
+798-    }
+799-
+800-    if (invert) {
+801-        if (restore) {
+802:            SetColor(CD_NORMAL);
+803:            props.invert_ = false;
+804-        } else {
+805:            SetColor(CD_HILITE2);
+806:            props.invert_ = false;
+807-        }
+808-    }
+809-}
+810-
+811-void TableView::DrawView() {
+812-
+813-    Clear();
+814-
+--
+816-    GUIPoint pos = GetTitlePosition();
+817-
+818-    Table &table =
+819-        TableHolder::GetInstance()->GetTable(viewData_->currentTable_);
+820-
+821-    // Draw title
+822-
+823-    char title[20];
+824:    SetColor(CD_NORMAL);
+825-    sprintf(title, "Table %2.2x", viewData_->currentTable_);
+826:    DrawString(pos._x, pos._y, title, props);
+827-
+828-    // Compute song grid location
+829-
+830-    GUIPoint anchor = GetAnchor();
+831-
+832-    // Display row numbers
+833-
+834-    char buffer[6];
+835-    pos = anchor;
+836-    pos._x -= 3;
+837-    for (int j = 0; j < 16; j++) {
+838:        ((j / altRowNumber_) % 2) ? SetColor(CD_ROW) : SetColor(CD_ROW2);
+839-        hex2char(j, buffer);
+840:        DrawString(pos._x, pos._y, buffer, props);
+841-        pos._y++;
+842-    }
+843-
+844:    SetColor(CD_NORMAL);
+845-
+846-    // Draw command 1
+847-
+848-    pos = anchor;
+849-
+850-    FourCC *f = table.cmd1_;
+851-
+852-    buffer[4] = 0;
+853-
+854-    for (int j = 0; j < 16; j++) {
+855-        FourCC command = *f++;
+856-        fourCC2char(command, buffer);
+857-        setTextProps(props, 0, j, false);
+858:        DrawString(pos._x, pos._y, buffer, props);
+859-        setTextProps(props, 0, j, true);
+860-        pos._y++;
+861-        if (j == row_ && col_ == 0) {
+862-            printHelpLegend(command, props);
+863-        }
+864-    }
+865-
+866-    // Draw commands params 1
+--
+870-
+871-    ushort *param = table.param1_;
+872-    buffer[5] = 0;
+873-
+874-    for (int j = 0; j < 16; j++) {
+875-        ushort p = *param++;
+876-        setTextProps(props, 1, j, false);
+877-        hexshort2char(p, buffer);
+878:        DrawString(pos._x, pos._y, buffer, props);
+879-        setTextProps(props, 1, j, true);
+880-        pos._y++;
+881-    }
+882-
+883-    // Draw commands 2
+884-
+885-    pos = anchor;
+886-    pos._x += 10;
+--
+888-    f = table.cmd2_;
+889-
+890-    buffer[4] = 0;
+891-
+892-    for (int j = 0; j < 16; j++) {
+893-        FourCC command = *f++;
+894-        fourCC2char(command, buffer);
+895-        setTextProps(props, 2, j, false);
+896:        DrawString(pos._x, pos._y, buffer, props);
+897-        setTextProps(props, 2, j, true);
+898-        pos._y++;
+899-        if (j == row_ && col_ == 2) {
+900-            printHelpLegend(command, props);
+901-        }
+902-    }
+903-
+904-    // Draw commands params
+--
+908-
+909-    param = table.param2_;
+910-    buffer[5] = 0;
+911-
+912-    for (int j = 0; j < 16; j++) {
+913-        ushort p = *param++;
+914-        setTextProps(props, 3, j, false);
+915-        hexshort2char(p, buffer);
+916:        DrawString(pos._x, pos._y, buffer, props);
+917-        setTextProps(props, 3, j, true);
+918-        pos._y++;
+919-    }
+920-
+921-    // Draw command 3
+922-
+923-    pos = anchor;
+924-    pos._x += 20;
+--
+926-    f = table.cmd3_;
+927-
+928-    buffer[4] = 0;
+929-
+930-    for (int j = 0; j < 16; j++) {
+931-        FourCC command = *f++;
+932-        fourCC2char(command, buffer);
+933-        setTextProps(props, 4, j, false);
+934:        DrawString(pos._x, pos._y, buffer, props);
+935-        setTextProps(props, 4, j, true);
+936-        pos._y++;
+937-        if (j == row_ && col_ == 5) {
+938-            printHelpLegend(command, props);
+939-        }
+940-    }
+941-
+942-    // Draw commands params 3
+--
+946-
+947-    param = table.param3_;
+948-    buffer[5] = 0;
+949-
+950-    for (int j = 0; j < 16; j++) {
+951-        ushort p = *param++;
+952-        setTextProps(props, 5, j, false);
+953-        hexshort2char(p, buffer);
+954:        DrawString(pos._x, pos._y, buffer, props);
+955-        setTextProps(props, 5, j, true);
+956-        pos._y++;
+957-    }
+958-
+959-    if ((viewMode_ != VM_SELECTION) &&
+960-        ((col_ == 1) || (col_ == 3) || (col_ == 5))) {
+961-        cmdEditField_->SetFocus();
+962-        cmdEditField_->Draw(w_);
+--
+977-    GUITextProperties props;
+978-    GUIPoint anchor = GetAnchor();
+979-    GUIPoint pos;
+980-
+981-    pos._x = anchor._x - 1;
+982-    pos._y = anchor._y + lastPosition_[0];
+983-    if (!commandSelectorModalActive_ ||
+984-        !CommandSelectorCommon::popupContainsPoint(anchor, pos._x, pos._y)) {
+985:        DrawString(pos._x, pos._y, " ", props);
+986-    }
+987-
+988-    pos._x += 10;
+989-    pos._y = anchor._y + lastPosition_[1];
+990-    if (!commandSelectorModalActive_ ||
+991-        !CommandSelectorCommon::popupContainsPoint(anchor, pos._x, pos._y)) {
+992:        DrawString(pos._x, pos._y, " ", props);
+993-    }
+994-
+995-    pos._x += 10;
+996-    pos._y = anchor._y + lastPosition_[2];
+997-    if (!commandSelectorModalActive_ ||
+998-        !CommandSelectorCommon::popupContainsPoint(anchor, pos._x, pos._y)) {
+999:        DrawString(pos._x, pos._y, " ", props);
+1000-    }
+1001-
+1002-    TableHolder *th = TableHolder::GetInstance();
+1003-    // Get current channel
+1004-    int channel = viewData_->songX_;
+1005-    // Table associated to the channel playerpb
+1006-    TablePlayback &tpb = TablePlayback::GetTablePlayback(channel);
+1007-    Table *playbackTable = tpb.GetTable();
+--
+1013-        lastPosition_[1] = tpb.GetPlaybackPosition(1);
+1014-        lastPosition_[2] = tpb.GetPlaybackPosition(2);
+1015-
+1016-        pos._x = anchor._x - 1;
+1017-        pos._y = anchor._y + lastPosition_[0];
+1018-        if (!commandSelectorModalActive_ ||
+1019-            !CommandSelectorCommon::popupContainsPoint(anchor, pos._x,
+1020-                                                       pos._y)) {
+1021:            SetColor(CD_PLAY);
+1022:            DrawString(pos._x, pos._y, ">", props);
+1023-        }
+1024-
+1025-        pos._x += 10;
+1026-        pos._y = anchor._y + lastPosition_[1];
+1027-        if (!commandSelectorModalActive_ ||
+1028-            !CommandSelectorCommon::popupContainsPoint(anchor, pos._x,
+1029-                                                       pos._y)) {
+1030:            DrawString(pos._x, pos._y, ">", props);
+1031-        }
+1032-
+1033-        pos._x += 10;
+1034-        pos._y = anchor._y + lastPosition_[2];
+1035-        if (!commandSelectorModalActive_ ||
+1036-            !CommandSelectorCommon::popupContainsPoint(anchor, pos._x,
+1037-                                                       pos._y)) {
+1038:            DrawString(pos._x, pos._y, ">", props);
+1039-        }
+1040-    };
+1041-    drawNotes();
+1042-}
+1043-
+1044-void TableView::printHelpLegend(FourCC command, GUITextProperties props) {
+1045-    std::string *cmdStr = getHelpLegend(command);
+1046:    DrawString(10, 0, cmdStr[0].c_str(), props);
+1047:    DrawString(10, 1, cmdStr[1].c_str(), props);
+1048:    DrawString(10, 2, cmdStr[2].c_str(), props);
+1049-}
+
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ProjectView.cpp ---
+111-class TreeFrogProjectExitModal : public ModalView {
+112-public:
+113-    TreeFrogProjectExitModal(View &view) : ModalView(view), selected_(0) {}
+114-    virtual ~TreeFrogProjectExitModal() {}
+115-
+116-    virtual void DrawView() {
+117-        SetWindow(28,6);
+118-        GUITextProperties props;
+119:        SetColor(CD_NORMAL);
+120:        DrawString(1,0,"Project Exit",props);
+121-
+122-        static const char *items[3] = {
+123-            "Return to Main Menu",
+124-            "Exit to TreeFrogUI",
+125-            "Cancel"
+126-        };
+127-        for (int i=0;i<3;i++) {
+128:            props.invert_ = (i==selected_);
+129:            SetColor((i==selected_)?CD_HILITE2:CD_NORMAL);
+130:            DrawString(2,2+i,items[i],props);
+131-        }
+132:        props.invert_ = false;
+133-    }
+134-
+135-    virtual void ProcessButtonMask(unsigned short mask,bool pressed) {
+136-        if (!pressed) return;
+137-        if (mask&EPBM_UP) {
+138-            selected_--;
+139-            if (selected_<0) selected_=2;
+140-            isDirty_=true;
+--
+301-	GUIPoint pos=GetTitlePosition() ;
+302-
+303-// Draw title
+304-
+305-	char projectString[80] ;
+306-    sprintf(projectString, "Project (Build %s.%s.%s)", PROJECT_NUMBER,
+307-            PROJECT_RELEASE, BUILD_COUNT);
+308-
+309:    SetColor(CD_NORMAL);
+310:    DrawString(pos._x,pos._y,projectString,props) ;
+311-
+312-    FieldView::Redraw();
+313-    drawMap();
+314-
+315-    int currentMode = project_->GetRenderMode();
+316-    if ((viewData_->renderMode_ != currentMode) && !MixerService::GetInstance()->IsRendering()) {
+317-        // Mode changed
+318-        if (currentMode > 0 && viewData_->renderMode_ == 0) {
+
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp ---
+75-        static const char *tf_v30_sidebar_marker = "TREEFROG_V32_SIDEBAR_VISUAL_TABLE_SHIFT";
+76-        (void)tf_v30_sidebar_marker;
+77-
+78-        GUIPoint anchor = GetAnchor();
+79-        const int baseX = View::margin_;
+80-        const int baseY = anchor._y;
+81-
+82-        GUITextProperties props;
+83:        props.invert_ = true;
+84-
+85-        // TREEFROG_UI_MAP_LAYOUT:
+86-        // Layout visual validado en R36SX: P G / SCPI / TT.
+87-        // Solo afecta dibujo; la navegación original no se modifica.
+88:        SetColor(CD_HILITE1);
+89:        DrawString(baseX,     baseY,     "P G ", props);
+90:        DrawString(baseX,     baseY + 1, "SCPI", props);
+91:        DrawString(baseX,     baseY + 2, "  TT", props);
+92-
+93-        int ax = baseX;
+94-        int ay = baseY + 1;
+95-        const char *glyph = "S";
+96-
+97-        switch (viewType_) {
+98-            case VT_PROJECT:
+99-                ax = baseX;
+--
+138-            default:
+139-                ax = baseX;
+140-                ay = baseY + 1;
+141-                glyph = "S";
+142-                break;
+143-        }
+144-
+145-        // TREEFROG_UI_MAP_FOCUS:
+146:        // Celda activa validada con semántica clásica: CD_HILITE2 + invert_.
+147-        // Mantener equivalente visual a la barra inferior seleccionada.
+148:        SetColor(CD_HILITE2);
+149:        props.invert_ = true;
+150:        DrawString(ax, ay, glyph, props);
+151:        props.invert_ = false;
+152-    }
+153-}
+154-
+155-void View::drawNotes() {
+156-
+157-    if (!miniLayout_) {
+158-
+159-		GUIPoint anchor=GetAnchor() ;
+160-		int initialX = View::margin_+10 ;
+161-		int initialY = anchor._y+23 ;
+162-		GUIPoint pos(initialX,initialY) ;
+163-		GUITextProperties props ;
+164-
+165-        Player *player=Player::GetInstance() ;
+166-		
+167-		//column banger refactor
+168:		props.invert_ = true;
+169-        for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+170-			if (i==viewData_->songX_) {
+171:				SetColor(CD_HILITE2) ;
+172-			} else {
+173:				SetColor(CD_HILITE1) ;
+174-			}
+175-			if (player->IsRunning() && viewData_->playMode_ != PM_AUDITION) {
+176:				DrawString(pos._x,pos._y,player->GetPlayedNote(i),props) ; //row for the note values
+177-				pos._y++ ;
+178:				DrawString(pos._x,pos._y,player->GetPlayedOctive(i),props) ; //row for the octive values
+179-				pos._y++ ;
+180:				DrawString(pos._x,pos._y,player->GetPlayedInstrument(i),props) ; //draw instrument number
+181-			} else {
+182:				DrawString(pos._x,pos._y,"  ",props) ; //row for the note values
+183-				pos._y++ ;
+184:				DrawString(pos._x,pos._y,"  ",props) ; //row for the octive values
+185-				pos._y++ ;
+186:				DrawString(pos._x,pos._y,"  ",props) ; //draw instrument number
+187-			}
+188-			pos._y = initialY ;
+189-			pos._x+= 3;
+190-		}
+191-     }
+192-}
+193-
+194-void View::DoModal(ModalView *view,ModalViewCallback cb) {
+--
+232-	}
+233-	if (isDirty_) ((AppWindow &)w_).SetDirty() ;
+234-} ;
+235-
+236-void View::Clear() {
+237-	((AppWindow &)w_).Clear() ;
+238-}
+239-
+240:void View::SetColor(ColorDefinition cd) {
+241:	((AppWindow &)w_).SetColor(cd) ;
+242-} ;
+243-
+244-void View::ClearRect(int x,int y,int w,int h) {
+245-	GUIRect rect(x,y,(x+w),(y+h)) ;
+246-	w_.ClearRect(rect) ;
+247-} ;
+248-
+249:void View::DrawString(int x,int y,const char *txt,GUITextProperties &props) {
+250-	GUIPoint pos(x,y) ;
+251:	w_.DrawString(txt,pos,props) ;
+252-} ;
+253-
+254-/*
+255-	Displays the saved notification for 1 second
+256-*/
+257-void View::EnableNotification() {
+258-	if ((SDL_GetTicks() - notificationTime_) <= NOTIFICATION_TIMEOUT) {
+259:		SetColor(CD_NORMAL);
+260-		GUITextProperties props;
+261-        int xOffset = 4;
+262:        DrawString(xOffset, notiDistY_, displayNotification_.c_str(), props);
+263-    } else {
+264-		displayNotification_ = "";
+265-	}
+266-}
+267-
+268-/*
+269-    Set displayed notification
+270-    Saves the current time
+
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp ---
+13-
+14-void UIBigHexVarField::Draw(GUIWindow &w,int offset) {
+15-
+16-	GUITextProperties props ;
+17-	GUIPoint position=GetPosition() ;
+18-	position._y+=offset ;
+19-
+20-	if (focus_) {
+21:		((AppWindow&)w).SetColor(CD_HILITE2) ;
+22:		props.invert_ = false;
+23-	} else {
+24:		((AppWindow&)w).SetColor(CD_NORMAL) ;
+25-	}
+26-	
+27-	char buffer[80] ;
+28-	int value=src_.GetInt() ;
+29-	sprintf(buffer,format_,value) ;
+30:	w.DrawString(buffer,position,props) ;
+31-	
+32-	int percentPos=-1 ;
+33-	for (unsigned int i=0;i<strlen(format_);i++) {
+34-		if (format_[i]=='%') {
+35-			percentPos=i ;
+36-			break ;
+37-		} ;
+38-	} ;
+--
+41-		buffer[offset+1]=0 ;
+42-		position._x+=offset ;
+43-		#if defined(PLATFORM_TREEFROG)
+44-			/* TREEFROG_V1_3_1_BIGHEX_FULL_FOCUS: the classic editor redraws the active nibble in
+45-			   CD_NORMAL after drawing the whole hex field. With TreeFrog's
+46-			   color-only focus this made 0000 look like only 3 chars were
+47-			   selected in Phrase/Table param fields. Keep the active nibble
+48-			   in highlight color while the field has focus. */
+49:			((AppWindow&)w).SetColor(focus_ ? CD_HILITE2 : CD_NORMAL) ;
+50-		#else
+51:			((AppWindow&)w).SetColor(CD_NORMAL) ;
+52-		#endif
+53:		w.DrawString(buffer+offset,position,props) ;
+54-	}
+55-} ;
+56-
+57-void UIBigHexVarField::ProcessArrow(unsigned short mask) {
+58-
+59-	int value=src_.GetInt() ;
+60-	int offset=1 ;
+61-	for (unsigned int i=0;i<position_;i++) {
+
+=== TREEFROG GUI text/invert implementation ===
+65-    return true;
+66-}
+67-
+68-TreeFrogGUIWindowImp::TreeFrogGUIWindowImp(GUICreateWindowParams &p)
+69-: framebuffer_(g_fallback_framebuffer), currentColor_(0xffff), backgroundColor_(0x0000) {
+70-    TreeFrogCreateWindowParams *tp = (TreeFrogCreateWindowParams *)&p;
+71-    if (tp && tp->framebuffer_) framebuffer_ = tp->framebuffer_;
+72-    g_window_imp = this;
+73-    memset(framebuffer_, 0, TREEFROG_LGPT_WIDTH * TREEFROG_LGPT_HEIGHT * sizeof(uint16_t));
+74-}
+75-
+76-TreeFrogGUIWindowImp::~TreeFrogGUIWindowImp() {
+77-    if (g_window_imp == this) g_window_imp = 0;
+78-}
+79-
+80:void TreeFrogGUIWindowImp::SetColor(GUIColor &c) {
+81-    currentColor_ = rgb565(c);
+82-}
+83-
+84-void TreeFrogGUIWindowImp::DrawRect(GUIRect &r) {
+85-    int x0 = r.Left();
+86-    int y0 = r.Top();
+87-    int x1 = r.Right();
+88-    int y1 = r.Bottom();
+89-    if (!clipRect(x0, y0, x1, y1)) return;
+90-
+91-    for (int y = y0; y < y1; ++y) {
+92-        uint16_t *dst = framebuffer_ + y * TREEFROG_LGPT_WIDTH + x0;
+93-        for (int x = x0; x < x1; ++x) {
+94-            *dst++ = currentColor_;
+95-        }
+96-    }
+97-}
+98-
+99:void TreeFrogGUIWindowImp::DrawCharInternal(const char c, GUIPoint &pos, GUITextProperties &props, bool overlay) {
+100-    int x0 = (int)pos._x;
+101-    int y0 = (int)pos._y;
+102-
+103-    if (x0 <= -8 || y0 <= -8 || x0 >= TREEFROG_LGPT_WIDTH || y0 >= TREEFROG_LGPT_HEIGHT) {
+104-        return;
+105-    }
+106-
+107-    unsigned int ch = (unsigned char)c;
+108-    if (ch >= 128) ch = (unsigned int)'?';
+109-
+110-    /* LittleGPTracker's mkfont.py generates font.h in scanline-major order:
+111-     * for each glyph row, it stores all 128 characters, 8 pixels each.
+112-     * Pixel address = y * (128 * 8) + character * 8 + x.
+113-     */
+114-    const size_t FONT_SCANLINE_WIDTH = 128 * 8;
+115-
+116-    uint16_t fg = currentColor_;
+117-    uint16_t bg = backgroundColor_;
+118-
+119-#if TREEFROG_HIGH_CONTRAST_SELECTION
+120:    if (props.invert_) {
+121:        /* Classic LGPT invert: glyph pixels use the screen background,
+122-         * the cell/background pixels use the current AppWindow color.
+123-         * This lets map blocks, song cursor cells and bottom bangers render
+124-         * with their own CD_HILITE1/CD_HILITE2 colors instead of a fixed RGB565.
+125-         */
+126-        fg = backgroundColor_;
+127-        bg = currentColor_;
+128-    }
+129-#endif
+130-
+131-    for (int y = 0; y < 8; ++y) {
+132-        int yy = y0 + y;
+133-        if (yy < 0 || yy >= TREEFROG_LGPT_HEIGHT) continue;
+134-
+135-        for (int x = 0; x < 8; ++x) {
+136-            int xx = x0 + x;
+137-            if (xx < 0 || xx >= TREEFROG_LGPT_WIDTH) continue;
+138-
+139-            size_t idx = (size_t)y * FONT_SCANLINE_WIDTH + (size_t)ch * 8 + (size_t)x;
+140-            bool rawOn = (idx < sizeof(treefrog_font)) && treefrog_font[idx] != 0;
+141-#if TREEFROG_FONT_ZERO_IS_INK
+142-            bool on = (idx < sizeof(treefrog_font)) && !rawOn;
+143-            if ((unsigned char)c == (unsigned char)' ') on = false;
+144-#else
+145-            bool on = rawOn;
+146-#endif
+147-
+148-            if (on) {
+149-                framebuffer_[yy * TREEFROG_LGPT_WIDTH + xx] = fg;
+150:            } else if (!overlay || props.invert_) {
+151-                framebuffer_[yy * TREEFROG_LGPT_WIDTH + xx] = bg;
+152-            }
+153-        }
+154-    }
+155-}
+156-
+157:void TreeFrogGUIWindowImp::DrawChar(const char c, GUIPoint &pos, GUITextProperties &props) {
+158:    DrawCharInternal(c, pos, props, false);
+159-}
+160-
+161:void TreeFrogGUIWindowImp::DrawString(const char *string, GUIPoint &pos, GUITextProperties &props, bool overlay) {
+162-    (void)overlay;
+163-
+164-    if (!string) return;
+165-
+166-    GUIPoint p = pos;
+167-
+168-    for (const char *s = string; *s; ++s) {
+169:        DrawCharInternal(*s, p, props, overlay);
+170-        p._x += 8;
+171-    }
+172-}
+173-
+174-GUIRect TreeFrogGUIWindowImp::GetRect() {
+175-    return GUIRect(0, 0, TREEFROG_LGPT_WIDTH, TREEFROG_LGPT_HEIGHT);
+176-}
+177-
+178-void TreeFrogGUIWindowImp::Invalidate() {
+179-}
+180-
+181-void TreeFrogGUIWindowImp::Flush() {
+182-}
+183-
+184-void TreeFrogGUIWindowImp::Lock() {
+185-}
+186-
+187-void TreeFrogGUIWindowImp::Unlock() {
+188-}
+189-
+190-void TreeFrogGUIWindowImp::Clear(GUIColor &c, bool overlay) {
+191-    (void)overlay;
+192-
+193-    backgroundColor_ = rgb565(c);
+194-
+
+=== Markers summary ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/ModalView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIActionField.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:44:			/* TREEFROG_V1_3_1_BIGHEX_FULL_FOCUS: the classic editor redraws the active nibble in
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIIntField.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIIntVarField.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIIntVarOffField.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UINoteVarField.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:85:        // TREEFROG_UI_MAP_LAYOUT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:145:        // TREEFROG_UI_MAP_FOCUS:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp.bak_comment_cleanup_20260702_092303:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp.bak_comment_cleanup_20260702_092303:149:        // TREEFROG_V1_3_8_MAP_FOCUS_PLAYBAR_MATCH
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ChainView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/MixerView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:91:    // TREEFROG_V1_3_IMPORT_MENU_TEXT_FOCUS
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:16:// TREEFROG_UI_PROJECT_START:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp.bak_comment_cleanup_20260702_092303:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp.bak_comment_cleanup_20260702_092303:16:// TREEFROG_V1_3_7_START_IN_PROJECTS
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp.bak_refactor_initial_folder_20260702_092438:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp.bak_refactor_initial_folder_20260702_092438:16:// TREEFROG_UI_PROJECT_START:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:1234:    // TREEFROG_V1_3_PHRASE_TEXT_FOCUS_ORDER:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ProjectView.cpp:363:        case ACTION_SAVE: { MixerService::GetInstance()->SetRenderMode(0); PersistencyService *service = PersistencyService::GetInstance(); service->Save(); View::SetNotification("Song saved OK"); /* TREEFROG_V42_SAVE_CONFIRM */ break; }
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/SongView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/TableView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:543:#define TREEFROG_V133_RETRO_TRACE 1

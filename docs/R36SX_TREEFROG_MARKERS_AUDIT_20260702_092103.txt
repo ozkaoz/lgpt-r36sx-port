@@ -1,0 +1,351 @@
+R36SX / TreeFrog markers audit
+Generated: 20260702_092103
+
+Files with TREEFROG markers:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudio.h:1:#ifndef TREEFROG_AUDIO_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudio.h:2:#define TREEFROG_AUDIO_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:8:#ifndef TREEFROG_AUDIO_MODE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:9:#define TREEFROG_AUDIO_MODE 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:12:#ifndef TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:13:#define TREEFROG_INPUT_DEBUG 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:16:#ifndef TREEFROG_AUDIO_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:17:#define TREEFROG_AUDIO_DEBUG 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:20:#define TREEFROG_AUDIO_FRAME_BYTES ((int)(2 * sizeof(int16_t)))
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:21:#define TREEFROG_AUDIO_MAX_LAZY_REQUESTS 2
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:22:#define TREEFROG_AUDIO_MAX_BUFFER_BYTES (512 * 1024)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:23:#define TREEFROG_AUDIO_V133_STARTDIAG 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:45:#if TREEFROG_AUDIO_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:155:    if (slot.size_ < TREEFROG_AUDIO_FRAME_BYTES ||
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:156:        slot.size_ > TREEFROG_AUDIO_MAX_BUFFER_BYTES ||
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:157:        (slot.size_ % TREEFROG_AUDIO_FRAME_BYTES) != 0) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:177:    if (requestingBuffer_ || lazyRequestsThisRender_ >= TREEFROG_AUDIO_MAX_LAZY_REQUESTS) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:203:    if (!slot.buffer_ || currentBufferOffset_ + TREEFROG_AUDIO_FRAME_BYTES > slot.size_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:211:    currentBufferOffset_ += TREEFROG_AUDIO_FRAME_BYTES;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:235:#if TREEFROG_AUDIO_MODE == 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.h:1:#ifndef TREEFROG_AUDIO_DRIVER_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.h:2:#define TREEFROG_AUDIO_DRIVER_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Compat/SDL/SDL.h:1:#ifndef TREEFROG_SDL_COMPAT_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Compat/SDL/SDL.h:2:#define TREEFROG_SDL_COMPAT_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Compat/SDL_types_force.h:1:#ifndef TREEFROG_SDL_TYPES_FORCE_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Compat/SDL_types_force.h:2:#define TREEFROG_SDL_TYPES_FORCE_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:9:#ifndef TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:10:#define TREEFROG_INPUT_DEBUG 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:13:#ifndef TREEFROG_EVENT_DEBUG_ALL
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:14:#define TREEFROG_EVENT_DEBUG_ALL 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:50:#if TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:117:#if TREEFROG_EVENT_DEBUG_ALL
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:139:#if TREEFROG_EVENT_DEBUG_ALL
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:150:#if TREEFROG_EVENT_DEBUG_ALL
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.h:1:#ifndef TREEFROG_EVENT_MANAGER_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.h:2:#define TREEFROG_EVENT_MANAGER_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIFactory.h:1:#ifndef TREEFROG_GUI_FACTORY_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIFactory.h:2:#define TREEFROG_GUI_FACTORY_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:10:// TREEFROG_V51_ESTABLE_FONT_ZERO_IS_INK_NO_WHITE_BOXES
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:12:#ifndef TREEFROG_FONT_ZERO_IS_INK
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:13:#define TREEFROG_FONT_ZERO_IS_INK 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:15:#ifndef TREEFROG_TEXT_INVERT_BG_RGB565
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:16:#define TREEFROG_TEXT_INVERT_BG_RGB565 0xd99b
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:18:#ifndef TREEFROG_TEXT_INVERT_FG_RGB565
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:19:#define TREEFROG_TEXT_INVERT_FG_RGB565 0xffff
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:22:#ifndef TREEFROG_HIGH_CONTRAST_SELECTION
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:23:#define TREEFROG_HIGH_CONTRAST_SELECTION 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:26:#ifndef TREEFROG_PURPLE_FOCUS_SELECTION
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:27:#define TREEFROG_PURPLE_FOCUS_SELECTION 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:30:#ifndef TREEFROG_PURPLE_FOCUS_RGB565
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:31:#define TREEFROG_PURPLE_FOCUS_RGB565 0xd99b
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:39:static uint16_t g_fallback_framebuffer[TREEFROG_LGPT_WIDTH * TREEFROG_LGPT_HEIGHT];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:60:    if (x1 > TREEFROG_LGPT_WIDTH) x1 = TREEFROG_LGPT_WIDTH;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:61:    if (y1 > TREEFROG_LGPT_HEIGHT) y1 = TREEFROG_LGPT_HEIGHT;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:63:    if (x0 >= TREEFROG_LGPT_WIDTH || y0 >= TREEFROG_LGPT_HEIGHT) return false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:73:    memset(framebuffer_, 0, TREEFROG_LGPT_WIDTH * TREEFROG_LGPT_HEIGHT * sizeof(uint16_t));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:92:        uint16_t *dst = framebuffer_ + y * TREEFROG_LGPT_WIDTH + x0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:103:    if (x0 <= -8 || y0 <= -8 || x0 >= TREEFROG_LGPT_WIDTH || y0 >= TREEFROG_LGPT_HEIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:119:#if TREEFROG_HIGH_CONTRAST_SELECTION
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:133:        if (yy < 0 || yy >= TREEFROG_LGPT_HEIGHT) continue;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:137:            if (xx < 0 || xx >= TREEFROG_LGPT_WIDTH) continue;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:141:#if TREEFROG_FONT_ZERO_IS_INK
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:149:                framebuffer_[yy * TREEFROG_LGPT_WIDTH + xx] = fg;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:151:                framebuffer_[yy * TREEFROG_LGPT_WIDTH + xx] = bg;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:175:    return GUIRect(0, 0, TREEFROG_LGPT_WIDTH, TREEFROG_LGPT_HEIGHT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:195:    for (int i = 0; i < TREEFROG_LGPT_WIDTH * TREEFROG_LGPT_HEIGHT; ++i) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:208:        uint16_t *dst = framebuffer_ + y * TREEFROG_LGPT_WIDTH + x0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h:1:#ifndef TREEFROG_GUI_WINDOW_IMP_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h:2:#define TREEFROG_GUI_WINDOW_IMP_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h:7:#define TREEFROG_LGPT_WIDTH  320
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h:8:#define TREEFROG_LGPT_HEIGHT 240
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Libretro/libretro.h:1:#ifndef TREEFROG_MINIMAL_LIBRETRO_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Libretro/libretro.h:2:#define TREEFROG_MINIMAL_LIBRETRO_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:1:#include "Adapters/TREEFROG/Libretro/libretro.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:9:#include "Adapters/TREEFROG/Audio/TreeFrogAudioDriver.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:10:#include "Adapters/TREEFROG/GUI/TreeFrogEventManager.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:11:#include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:12:#include "Adapters/TREEFROG/System/TreeFrogSystem.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:13:#include "Adapters/TREEFROG/Timer/TreeFrogTimer.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:20:#ifndef TREEFROG_INPUT_PROFILE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:21:#define TREEFROG_INPUT_PROFILE 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:24:#ifndef TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:25:#define TREEFROG_INPUT_DEBUG 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:28:#ifndef TREEFROG_FACE_TAP_MODE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:29:#define TREEFROG_FACE_TAP_MODE 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:32:#ifndef TREEFROG_MODIFIER_RETRIGGER
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:33:#define TREEFROG_MODIFIER_RETRIGGER 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:36:#ifndef TREEFROG_VIDEO_MODE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:37:#define TREEFROG_VIDEO_MODE 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:40:#ifndef TREEFROG_VIDEO_PROBE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:41:#define TREEFROG_VIDEO_PROBE 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:44:#ifndef TREEFROG_ENABLE_START
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:45:#define TREEFROG_ENABLE_START 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:48:#ifndef TREEFROG_ENABLE_SELECT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:49:#define TREEFROG_ENABLE_SELECT 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:52:#ifndef TREEFROG_PORT_VERSION_BADGE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:53:#define TREEFROG_PORT_VERSION_BADGE 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:56:#ifndef TREEFROG_PORT_VERSION_BADGE_COLOR
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:57:#define TREEFROG_PORT_VERSION_BADGE_COLOR 0xd99b
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:66:static uint16_t framebuffer[TREEFROG_LGPT_WIDTH * TREEFROG_LGPT_HEIGHT];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:67:#if TREEFROG_VIDEO_MODE == 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:70:#elif TREEFROG_VIDEO_MODE == 2
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:84: * revisions and can be verified with TREEFROG_INPUT_DEBUG=1. */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:246:#if TREEFROG_FACE_TAP_MODE == 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:265:#if TREEFROG_ENABLE_START
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:271:#if TREEFROG_ENABLE_SELECT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:276:#if TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:327:    fprintf(input_log, " profile=%d\n", TREEFROG_INPUT_PROFILE);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:354:#if TREEFROG_MODIFIER_RETRIGGER
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:385:#if TREEFROG_FACE_TAP_MODE == 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:432:                if (px >= 0 && py >= 0 && px < TREEFROG_LGPT_WIDTH && py < TREEFROG_LGPT_HEIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:433:                    dst[py * TREEFROG_LGPT_WIDTH + px] = color;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:441:#if TREEFROG_VIDEO_PROBE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:451:    for (int x = 0; x < TREEFROG_LGPT_WIDTH; ++x) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:452:        dst[0 * TREEFROG_LGPT_WIDTH + x] = white;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:453:        dst[(TREEFROG_LGPT_HEIGHT - 1) * TREEFROG_LGPT_WIDTH + x] = white;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:455:    for (int y = 0; y < TREEFROG_LGPT_HEIGHT; ++y) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:456:        dst[y * TREEFROG_LGPT_WIDTH + 0] = white;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:457:        dst[y * TREEFROG_LGPT_WIDTH + (TREEFROG_LGPT_WIDTH - 1)] = red;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:458:        dst[y * TREEFROG_LGPT_WIDTH + 239] = mag;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:459:        dst[y * TREEFROG_LGPT_WIDTH + 279] = green;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:464:    for (int y = 2; y < 14; ++y) for (int x = 2; x < 34; ++x) dst[y * TREEFROG_LGPT_WIDTH + x] = black;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:482:                if (px >= 0 && py >= 0 && px < TREEFROG_LGPT_WIDTH && py < TREEFROG_LGPT_HEIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:483:                    dst[py * TREEFROG_LGPT_WIDTH + px] = color;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:491:#if TREEFROG_PORT_VERSION_BADGE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:496:    const uint16_t color = (uint16_t)TREEFROG_PORT_VERSION_BADGE_COLOR;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:498:    const int x = TREEFROG_LGPT_WIDTH - 22;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:510:#if TREEFROG_VIDEO_MODE == 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:513:            unsigned sx = (x * TREEFROG_LGPT_WIDTH) / 240;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:514:            video_squeeze_buffer[y * 240 + x] = src[y * TREEFROG_LGPT_WIDTH + sx];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:521:#elif TREEFROG_VIDEO_MODE == 2
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:525:            video_right_probe_buffer[y * 240 + x] = src[y * TREEFROG_LGPT_WIDTH + sx];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:533:    *w = TREEFROG_LGPT_WIDTH;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:534:    *h = TREEFROG_LGPT_HEIGHT;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:535:    *pitch = TREEFROG_LGPT_WIDTH * sizeof(uint16_t);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:542:#if TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:543:#define TREEFROG_V133_RETRO_TRACE 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:555:static const char *treefrog_v40_source_rooted_marker = "TREEFROG_PORT_LGPT_TRACKER_V4_0_SOURCE_ROOTED";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:586:#if TREEFROG_VIDEO_MODE == 1 || TREEFROG_VIDEO_MODE == 2
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:593:    info->geometry.base_width = TREEFROG_LGPT_WIDTH;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:594:    info->geometry.base_height = TREEFROG_LGPT_HEIGHT;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:595:    info->geometry.max_width = TREEFROG_LGPT_WIDTH;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:596:    info->geometry.max_height = TREEFROG_LGPT_HEIGHT;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:605:// TREEFROG_V51_ESTABLE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:617:        fprintf(fp, "TREEFROG_V51_ESTABLE: %s %s\n", where ? where : "unknown", detail ? detail : "");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:635:    fprintf(fp, "TREEFROG_V51_ESTABLE: project-root %s\n", where ? where : "unknown");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:676:static const char *treefrog_v51_ui_marker = "TREEFROG_V51_ESTABLE_FONT_ZERO_IS_INK_NO_WHITE_BOXES";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:678:static const char *treefrog_port_lgpt_tracker_v1_marker = "TREEFROG_PORT_LGPT_TRACKER_V1_ESTABLE_BADGE";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:680:static const char *treefrog_v11_marker = "TREEFROG_PORT_LGPT_TRACKER_V1_1_STARTDIAG_MARKER";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:682:static const char *treefrog_v133_marker = "TREEFROG_PORT_LGPT_TRACKER_V1_3_3_AUDIORENDERSKIP_MARKER";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:684:static const char *treefrog_v14_marker = "TREEFROG_PORT_LGPT_TRACKER_V1_4_RENDERGUARD_MARKER";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:12:#include "Adapters/TREEFROG/Audio/TreeFrogAudio.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:13:#include "Adapters/TREEFROG/GUI/TreeFrogGUIFactory.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:14:#include "Adapters/TREEFROG/GUI/TreeFrogEventManager.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:15:#include "Adapters/TREEFROG/Timer/TreeFrogTimer.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:26:#ifndef LGPT_TREEFROG_ROOT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:27:#define LGPT_TREEFROG_ROOT "/mnt/sdcard/lgpt"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:50:    mkdir_if_missing(LGPT_TREEFROG_ROOT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:51:    mkdir_if_missing(LGPT_TREEFROG_ROOT "/projects");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:52:    mkdir_if_missing(LGPT_TREEFROG_ROOT "/samples");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:53:    mkdir_if_missing(LGPT_TREEFROG_ROOT "/instruments");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:60:    Path::SetAlias("bin", LGPT_TREEFROG_ROOT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.cpp:61:    Path::SetAlias("root", LGPT_TREEFROG_ROOT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.h:1:#ifndef TREEFROG_SYSTEM_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/System/TreeFrogSystem.h:2:#define TREEFROG_SYSTEM_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:7:#ifndef TREEFROG_TIMER_MODE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:8:#define TREEFROG_TIMER_MODE 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:11:#ifndef TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:12:#define TREEFROG_INPUT_DEBUG 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:19:#if TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:26:            TREEFROG_TIMER_MODE);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:94:#if TREEFROG_TIMER_MODE == 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.h:1:#ifndef TREEFROG_TIMER_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.h:2:#define TREEFROG_TIMER_H
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:19:#ifndef TREEFROG_DISABLE_ALL_UI_INVERT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:20:#define TREEFROG_DISABLE_ALL_UI_INVERT 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:173:    #if TREEFROG_DISABLE_ALL_UI_INVERT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:403:    // TREEFROG_V40_ESTABLE_APPWINDOW
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:410:        Trace::Log("TREEFROG_V40_ESTABLE", "autosaved initial project: %s", _root.GetPath().c_str());
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:413:            fprintf(fp, "TREEFROG_V40_ESTABLE_APPWINDOW: autosaved_initial_project path=%s\n", _root.GetPath().c_str());
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:2:#if defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:3:#ifndef TREEFROG_STARTTRACE_REAL_LOGGER_V133
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:4:#define TREEFROG_STARTTRACE_REAL_LOGGER_V133 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:29:#if defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:99:#if defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:108:#if !defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:230:#if !defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:237:#if defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:246:#if !defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:263:#if !defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:858:	/* TREEFROG_START_GUARD: empty phrase/no row protection. */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:1223:    TreeFrogStartTrace("TREEFROG_SOFT_STOP_STATE_ONLY: enter");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:1242:    TreeFrogStartTrace("TREEFROG_SOFT_STOP_STATE_ONLY: leave");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:1254:        TreeFrogStartTrace("TREEFROG_GETPLAYTIME_CLAMP_NEGATIVE");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:1284:#if defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:1285:    /* TREEFROG_V1_2_LISTEN_STREAM_ARM: ImportSampleDialog::preview() uses
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:1295:#if defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Player/Player.cpp:1296:    /* TREEFROG_V1_2_LISTEN_STREAM_ARM: disarm after stream preview only when
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/ModalView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIActionField.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:43:		#if defined(PLATFORM_TREEFROG)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:44:			/* TREEFROG_V1_3_1_BIGHEX_FULL_FOCUS: the classic editor redraws the active nibble in
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIIntField.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIIntVarField.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIIntVarOffField.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UINoteVarField.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:75:        static const char *tf_v30_sidebar_marker = "TREEFROG_V32_SIDEBAR_VISUAL_TABLE_SHIFT";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:149:        // TREEFROG_V1_3_8_MAP_FOCUS_PLAYBAR_MATCH
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ChainView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/MixerView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:91:    // TREEFROG_V1_3_IMPORT_MENU_TEXT_FOCUS
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:2:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:16:// TREEFROG_V1_3_7_START_IN_PROJECTS
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:22:// TREEFROG_V40_ESTABLE_SELECT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:43:        fprintf(fp, "TREEFROG_V40_ESTABLE_SELECT: %s shown=%d path=%s\n", where ? where : "unknown", shown ? 1 : 0, p.GetPath().c_str());
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:187:    // TREEFROG_V51_START_MENU_TEXT_FOCUS
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:158:        #if !defined(TREEFROG_DISABLE_PHRASE_AUDITION) || !TREEFROG_DISABLE_PHRASE_AUDITION
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:161:#endif /* TREEFROG_DISABLE_PHRASE_AUDITION_V133 */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:286:                #if !defined(TREEFROG_DISABLE_PHRASE_AUDITION) || !TREEFROG_DISABLE_PHRASE_AUDITION
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:289:#endif /* TREEFROG_DISABLE_PHRASE_AUDITION_V133 */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:292:            #if !defined(TREEFROG_DISABLE_PHRASE_AUDITION) || !TREEFROG_DISABLE_PHRASE_AUDITION
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:295:#endif /* TREEFROG_DISABLE_PHRASE_AUDITION_V133 */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:995:                    #if !defined(TREEFROG_DISABLE_PHRASE_AUDITION) || !TREEFROG_DISABLE_PHRASE_AUDITION
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:998:#endif /* TREEFROG_DISABLE_PHRASE_AUDITION_V133 */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:1234:    // TREEFROG_V1_3_PHRASE_TEXT_FOCUS_ORDER:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ProjectView.cpp:363:        case ACTION_SAVE: { MixerService::GetInstance()->SetRenderMode(0); PersistencyService *service = PersistencyService::GetInstance(); service->Save(); View::SetNotification("Song saved OK"); /* TREEFROG_V42_SAVE_CONFIRM */ break; }
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/SongView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/TableView.cpp:1:// TREEFROG_V42_NO_WHITE_BOX_UI
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:6:TREEFROG_INPUT_PROFILE ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:7:TREEFROG_INPUT_DEBUG ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:8:TREEFROG_AUDIO_MODE ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:9:TREEFROG_TIMER_MODE ?= 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:10:TREEFROG_FACE_TAP_MODE ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:11:TREEFROG_EVENT_DEBUG_ALL ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:12:TREEFROG_DISABLE_PHRASE_AUDITION ?= 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:13:TREEFROG_HIGH_CONTRAST_SELECTION ?= 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:14:TREEFROG_PURPLE_FOCUS_SELECTION ?= 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:15:TREEFROG_PURPLE_FOCUS_RGB565 ?= 0xd99b
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:16:TREEFROG_VIDEO_MODE ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:17:TREEFROG_VIDEO_PROBE ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:18:TREEFROG_ENABLE_START ?= 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:19:TREEFROG_ENABLE_SELECT ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:20:TREEFROG_PORT_VERSION_BADGE ?= 1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:21:TREEFROG_PORT_VERSION_BADGE_COLOR ?= 0xd99b
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:25:#   TREEFROG_ENABLE_START=1 forwards physical START to LGPT after the Player
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:27:#   TREEFROG_ENABLE_SELECT=0 keeps SELECT suppressed until it is assigned safely.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:29:# Debug is off by default to reduce SD writes. Enable with TREEFROG_INPUT_DEBUG=1.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:30:# TREEFROG_TIMER_MODE=0 disables LGPT timer callbacks for phrase-screen diagnostics only.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:31:# TREEFROG_FACE_TAP_MODE=1 sends face buttons as one-shot down/up pulses; diagnostic for Phrase A crashes.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:32:# TREEFROG_EVENT_DEBUG_ALL=1 logs every queued/dispatched pad event; use only for short tests.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:33:# TREEFROG_DISABLE_PHRASE_AUDITION=1 disables every PhraseView PM_AUDITION preview path, including A-alone preview. v0.15 keeps SAMPLELIB, keeps PhraseView audition disabled, adds TREEFROG_VIDEO_PROBE=1 hard border/edge markers, and adds TREEFROG_VIDEO_MODE=2 to map the right edge into the visible left side for crop diagnostics.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:36:	-DPLATFORM_TREEFROG \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:37:	-DTREEFROG_INPUT_PROFILE=$(TREEFROG_INPUT_PROFILE) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:38:	-DTREEFROG_INPUT_DEBUG=$(TREEFROG_INPUT_DEBUG) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:39:	-DTREEFROG_AUDIO_MODE=$(TREEFROG_AUDIO_MODE) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:40:	-DTREEFROG_TIMER_MODE=$(TREEFROG_TIMER_MODE) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:41:	-DTREEFROG_FACE_TAP_MODE=$(TREEFROG_FACE_TAP_MODE) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:42:	-DTREEFROG_MODIFIER_RETRIGGER=$(TREEFROG_MODIFIER_RETRIGGER) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:43:	-DTREEFROG_EVENT_DEBUG_ALL=$(TREEFROG_EVENT_DEBUG_ALL) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:44:	-DTREEFROG_DISABLE_PHRASE_AUDITION=$(TREEFROG_DISABLE_PHRASE_AUDITION) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:45:	-DTREEFROG_HIGH_CONTRAST_SELECTION=$(TREEFROG_HIGH_CONTRAST_SELECTION) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:46:	-DTREEFROG_PURPLE_FOCUS_SELECTION=$(TREEFROG_PURPLE_FOCUS_SELECTION) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:47:	-DTREEFROG_PURPLE_FOCUS_RGB565=$(TREEFROG_PURPLE_FOCUS_RGB565) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:48:	-DTREEFROG_VIDEO_MODE=$(TREEFROG_VIDEO_MODE) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:49:	-DTREEFROG_VIDEO_PROBE=$(TREEFROG_VIDEO_PROBE) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:50:	-DTREEFROG_ENABLE_START=$(TREEFROG_ENABLE_START) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:51:	-DTREEFROG_ENABLE_SELECT=$(TREEFROG_ENABLE_SELECT) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:52:	-DTREEFROG_PORT_VERSION_BADGE=$(TREEFROG_PORT_VERSION_BADGE) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:53:	-DTREEFROG_PORT_VERSION_BADGE_COLOR=$(TREEFROG_PORT_VERSION_BADGE_COLOR) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:74:TREEFROG_FLAGS := -mips32r2 -march=mips32r2 -mtune=74kc -mdspr2 -mfp32 -mhard-float -mlong-calls -EL --sysroot=$(SYSROOT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:77:TREEFROGDIRS := \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:78:	../sources/Adapters/TREEFROG/Main \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:79:	../sources/Adapters/TREEFROG/System \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:80:	../sources/Adapters/TREEFROG/GUI \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:81:	../sources/Adapters/TREEFROG/Audio \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:82:	../sources/Adapters/TREEFROG/Timer \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:88:TREEFROGFILES := \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:104:	-I$(PWD)/../sources/Adapters/TREEFROG/Compat \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:108:CFLAGS := $(DEFINES) $(INCLUDES) $(TREEFROG_FLAGS) $(OPT_FLAGS) -include stdint.h -include SDL_types_force.h -Wall
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:110:LDFLAGS := $(TREEFROG_FLAGS) -shared -Wl,--gc-sections -Wl,--no-undefined -L$(SYSROOT)/usr/lib -L$(SYSROOT)/lib
+
+Files with R36SX markers:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:82:/* Cubevol shared-memory fallback used by FrogUI/TreeFrogUI on SF3000/GB300/R36SX.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:83: * Known bits match FrogUI. The L2/R2/FN bits are best-effort for R36SX
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:250:    /* R36SX-friendly safe duplicates.  On this hardware the right-stick lines
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/AppWindow.cpp:405:    // En R36SX/TreeFrog, salir sin guardarlo deja una carpeta lgpt_* sin lgptsav.dat;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:85:        // Layout físico observado en R36SX/LGPT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:17:// El layout validado para R36SX mantiene projects/samples/instruments dentro de /lgpt.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:25:// lgptsav.dat el proyecto está incompleto y en TreeFrog/R36SX provoca SIG=11
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/projects/Makefile.TREEFROG:3:# Little Piggy Tracker as a libretro core for TreeFrogUI/picoarch on SF3000/GB300/R36SX.
+
+Files with invert_ references in views:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/ModalView.cpp:44:    props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIActionField.cpp:25:		props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:22:		props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIIntField.cpp:26:		props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIIntVarField.cpp:40:		props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UIIntVarOffField.cpp:56:		props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/UINoteVarField.cpp:20:		props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:83:        props.invert_ = true;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:151:        // CD_HILITE2 + invert_.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:153:        props.invert_ = true;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:155:        props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/BaseClasses/View.cpp:172:		props.invert_ = true;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ChainView.cpp:651:            props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ChainView.cpp:654:            props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/GrooveView.cpp:173:		props.invert_=(j==position_) ; 
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/MixerView.cpp:209:			 props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/MixerView.cpp:217:			 props.invert_=false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/MixerView.cpp:270:		props.invert_=invertBatt_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/MixerView.cpp:277:	props.invert_=false ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:159:            props.invert_ = isSelected;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:165:    props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:69:				props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:72:				props.invert_=false ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:93:    // Evita props.invert_ en TreeFrog, que produce barra/subrayado visual.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:98:		props.invert_=false ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/MessageBox.cpp:54:		props.invert_=(i==selected_)?true:false ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:41:        props.invert_ = ((i == currentChar_) && (selected_ == 0));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:57:                props.invert_ =
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:62:                props.invert_ =
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:67:                props.invert_ =
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:72:                    props.invert_ =
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:79:        props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:89:    props.invert_=false ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:96:        props.invert_=(selected_==i+1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:171:				props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:174:				props.invert_=false ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:188:    // No usar props.invert_ en los botones inferiores del menú inicial.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:199:        props.invert_=false ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:1235:    // este port evita props.invert_ para no generar barras/recuadros en TreeFrog;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:1254:            props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp:1257:            props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1242:            props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1245:            props.invert_ = true;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ProjectView.cpp:128:            props.invert_ = (i==selected_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ProjectView.cpp:132:        props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/SongView.cpp:998:                props.invert_ = true;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/SongView.cpp:1012:                props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/SongView.cpp:1144:        props.invert_ = invertBatt_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/SongView.cpp:1153:        props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/TableView.cpp:803:            props.invert_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/TableView.cpp:806:            props.invert_ = false;

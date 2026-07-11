@@ -1,0 +1,16 @@
+R36SX fast LGPT project candidate audit
+Generated candidates: 1
+
+=== Candidate project summary ===
+
+[01] lgpt_FreshCraft
+PROJECT_SRC=/mnt/d/R36S/PORT LPTRACKER/BUILD_STABLE/LGPT_PORT_V102_SongABClear_YXCut_Estable/LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft
+LGPT_SAV=/mnt/d/R36S/PORT LPTRACKER/BUILD_STABLE/LGPT_PORT_V102_SongABClear_YXCut_Estable/LGPT PORT V102_SongABClear_YXCut_Estable/SD_ROOT/lgpt/projects/lgpt_FreshCraft/lgptsav.dat
+SAV_SIZE=55470
+SAV_SHA256=fe6ffeaf64b6768106652abf1799c6cb45a85a39c8621708fc5fe4e4b6547057
+FILES=2
+SAMPLES=1
+HAS_SAMPLES_DIR=True
+TOTAL_BYTES=143714
+SAMPLE_PREVIEW=
+  - samples/test_440_A.wav

@@ -1,0 +1,2525 @@
+R36SX Song clear-cell candidates
+Generated: 20260702_111320
+DEV=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT
+
+=== SongView.h ===
+     1	
+     2	#ifndef _SONG_VIEW_H_
+     3	#define _SONG_VIEW_H_
+     4	
+     5	#include "BaseClasses/View.h"
+     6	
+     7	class SongView;
+     8	
+     9	class SongView : public View {
+    10	  public:
+    11	    SongView(GUIWindow &w, ViewData *viewData, const char *song);
+    12	    ~SongView();
+    13	
+    14	    // View implementation
+    15	    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+    16	    virtual void DrawView();
+    17	    virtual void OnPlayerUpdate(PlayerEventType, unsigned int tick = 0);
+    18	    virtual void OnFocus();
+    19	
+    20	  protected:
+    21	    void processNormalButtonMask(unsigned int mask);
+    22	    void processSelectionButtonMask(unsigned int mask);
+    23	
+    24	    void extendSelection();
+    25	    void updateChain(int offset);
+    26	    void updateSongOffset(int offset);
+    27	    void updateCursor(int dx, int dy);
+    28	    void setChain(unsigned char);
+    29	    void cutPosition();
+    30	    void clonePosition();
+    31	    void deepClonePosition();
+    32	    void pasteLast();
+    33	    void fillClipboardData();
+    34	    GUIRect getSelectionRect();
+    35	    void copySelection();
+    36	    void pasteClipboard();
+    37	    void cutSelection();
+    38	
+    39	    void unMuteAll();
+    40	    void toggleMute();
+    41	    void switchSoloMode();
+    42	
+    43	    void onStart();
+    44	    void startCurrentRow();
+    45	    void startImmediate();
+    46	    void onStop();
+    47	
+    48	    void jumpToNextSection(int dir);
+    49	
+    50	  private:
+    51	    bool updatingChain_; // .Flag that tells we're updating chain
+    52	                         //  so we don't allocate chains while
+    53	                         //  doing multiple A+ARROWS
+    54	
+    55	    int updateX_; // . Position where update is happening
+    56	    int updateY_; //
+    57	
+    58	    unsigned char lastChain_; // .Last chain clipboard
+    59	
+    60	    int lastPlayedPosition_[8]; // .Last position played for song
+    61	                                //  used for drawing purpose
+    62	
+    63	    int lastQueuedPosition_[8]; // .Last live queued position for song
+    64	                                //  used for drawing purpose
+    65	
+    66	    struct {                  // .Clipboard structure
+    67	        bool active_;         // .If currently making a selection
+    68	        unsigned char *data_; // .Null if clipboard empty
+    69	        int x_;               // .Current selection positions
+    70	        int y_;               // .
+    71	        int offset_;          // .
+    72	        int width_;           // .Size of selection
+    73	        int height_;          // .
+    74	    } clipboard_;
+    75	
+    76	    int saveX_;
+    77	    int saveY_;
+    78	    int saveOffset_;
+    79	    std::string songname_;
+    80	    bool invertBatt_;
+    81	    bool needClear_;
+    82	    bool canDeepClone_;
+    83	    void nudgeTempo(int direction);
+    84	    uint8_t jumpLength_; // When jumping columns with B
+    85	};
+    86	
+    87	#endif
+
+=== SongView ProcessButtonMask / normal / selection blocks ===
+   560	                                   SONG_CHANNEL_COUNT * current;
+   561	            if (*start == 0xFF) {
+   562	                current++;
+   563	                break;
+   564	            };
+   565	            current--;
+   566	        };
+   567	    }
+   568	
+   569	    // Update viewdata position from current
+   570	
+   571	    if ((current - viewData_->songOffset_ > 0x17) ||
+   572	        (current - viewData_->songOffset_ < 0)) {
+   573	        viewData_->songOffset_ = current - 4;
+   574	        if (viewData_->songOffset_ < 0) {
+   575	            viewData_->songOffset_ = 0;
+   576	        }
+   577	    }
+   578	    viewData_->songY_ = current - viewData_->songOffset_;
+   579	    isDirty_ = true;
+   580	}
+   581	
+   582	/******************************************************
+   583	 ProcessButtonMask:
+   584	        process button mask even coming from the main
+   585	        application window
+   586	 ******************************************************/
+   587	
+   588	void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
+   589	
+   590	    if (!pressed) {
+   591	        if (viewMode_ == VM_MUTEON) {
+   592	            if (mask & EPBM_R) {
+   593	                toggleMute();
+   594	            }
+   595	        };
+   596	        if (viewMode_ == VM_SOLOON) {
+   597	            if (mask & EPBM_R) {
+   598	                switchSoloMode();
+   599	            }
+   600	        };
+   601	        return;
+   602	    };
+   603	
+   604	    if (viewMode_ == VM_NEW) {
+   605	        if (mask == EPBM_A) {
+   606	            unsigned short next = viewData_->song_->chain_->GetNext();
+   607	            if (next != NO_MORE_CHAIN) {
+   608	                setChain((unsigned char)next);
+   609	                isDirty_ = true;
+   610	            }
+   611	            mask &= (0xFFFF - EPBM_A);
+   612	        }
+   613	    }
+   614	
+   615	    if (viewMode_ == VM_CLONE) {
+   616	        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+   617	            clonePosition();
+   618	            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+   619	            canDeepClone_ = true;
+   620	        } else {
+   621	            viewMode_ = VM_SELECTION;
+   622	        }
+   623	    };
+   624	
+   625	    if (canDeepClone_ && (mask & EPBM_A) && (mask & EPBM_L)) {
+   626	        deepClonePosition();
+   627	        mask &= (0xFFFF - (EPBM_A | EPBM_L));
+   628	        canDeepClone_ = false;
+   629	    }
+   630	    if (clipboard_.active_) {
+   631	        viewMode_ = VM_SELECTION;
+   632	    };
+   633	    // Process selection related keys
+   634	
+   635	    if (viewMode_ == VM_SELECTION) {
+   636	        if (clipboard_.active_ == false) {
+   637	            clipboard_.active_ = true;
+   638	            clipboard_.x_ = viewData_->songX_;
+   639	            clipboard_.y_ = viewData_->songY_;
+   640	            clipboard_.offset_ = viewData_->songOffset_;
+   641	            saveX_ = clipboard_.x_;
+   642	            saveY_ = clipboard_.y_;
+   643	            saveOffset_ = clipboard_.offset_;
+   644	        }
+   645	        processSelectionButtonMask(mask);
+   646	    } else {
+   647	
+   648	        // Switch back to normal mode
+   649	
+   650	        viewMode_ = VM_NORMAL;
+   651	        processNormalButtonMask(mask);
+   652	    }
+   653	}
+   654	
+   655	/******************************************************
+   656	 processNormalButtonMask:
+   657	        process button mask in the case there is no
+   658	        selection active
+   659	 ******************************************************/
+   660	
+   661	void SongView::processNormalButtonMask(unsigned int mask) {
+   662	
+   663	    // B Modifier
+   664	
+   665	    if (mask & EPBM_B) {
+   666	
+   667	        if (mask & EPBM_DOWN)
+   668	            updateSongOffset(SongView::jumpLength_);
+   669	        if (mask & EPBM_UP)
+   670	            updateSongOffset(-SongView::jumpLength_);
+   671	        if (mask & (EPBM_RIGHT | EPBM_LEFT)) {
+   672	            Player *player = Player::GetInstance();
+   673	            switch (player->GetSequencerMode()) {
+   674	            case SM_SONG:
+   675	                player->SetSequencerMode(SM_LIVE);
+   676	                break;
+   677	            case SM_LIVE:
+   678	                player->SetSequencerMode(SM_SONG);
+   679	                break;
+   680	            }
+   681	            isDirty_ = true;
+   682	        }
+   683	        if ((mask & EPBM_A) && (!(mask & EPBM_R)))
+   684	            cutPosition();
+   685	        if (mask & EPBM_L) {
+   686	
+   687	            viewMode_ = VM_CLONE;
+   688	        };
+   689	        if (mask & EPBM_R) {
+   690	            toggleMute();
+   691	        };
+   692	        if (mask & EPBM_START) {
+   693	            startImmediate();
+   694	        }
+   695	    } else {
+   696	
+   697	        // A modifier
+   698	
+   699	        if (mask & EPBM_A) {
+   700	
+   701	            if (mask & EPBM_DOWN)
+   702	                updateChain(-0x10);
+   703	            if (mask & EPBM_UP)
+   704	                updateChain(0x10);
+   705	            if (mask & EPBM_LEFT)
+   706	                updateChain(-0x01);
+   707	            if (mask & EPBM_RIGHT)
+   708	                updateChain(0x01);
+   709	            if (mask & EPBM_L && !canDeepClone_) {
+   710	                pasteClipboard();
+   711	            }
+   712	            if (mask == EPBM_A) {
+   713	
+   714	                pasteLast();
+   715	                viewMode_ = VM_NEW;
+   716	            }
+   717	            if (mask & EPBM_R) {
+   718	                switchSoloMode();
+   719	            };
+   720	        } else {
+   721	
+   722	            // R Modifier
+   723	
+   724	            if (mask & EPBM_R) {
+   725	
+   726	                if (mask & EPBM_L) {
+   727	                    unMuteAll();
+   728	                }
+   729	
+   730	                if (mask & EPBM_RIGHT) {
+   731	                    unsigned char *data = viewData_->GetCurrentSongPointer();
+   732	                    if (*data != 0xFF) {
+   733	                        ViewType vt = VT_CHAIN;
+   734	                        ViewEvent ve(VET_SWITCH_VIEW, &vt);
+   735	                        viewData_->currentChain_ = *data;
+   736	                        SetChanged();
+   737	                        NotifyObservers(&ve);
+   738	                    }
+   739	                }
+   740	
+   741	                if (mask & EPBM_UP) {
+   742	                    ViewType vt = VT_PROJECT;
+   743	                    ViewEvent ve(VET_SWITCH_VIEW, &vt);
+   744	                    SetChanged();
+   745	                    NotifyObservers(&ve);
+   746	                }
+   747	
+   748	                if (mask & EPBM_DOWN) {
+   749	                    ViewType vt = VT_MIXER;
+   750	                    ViewEvent ve(VET_SWITCH_VIEW, &vt);
+   751	                    SetChanged();
+   752	                    NotifyObservers(&ve);
+   753	                }
+   754	
+   755	                if (mask & EPBM_START) {
+   756	                    onStop();
+   757	                }
+   758	
+   759	            } else {
+   760	
+   761	                // L Modifier
+   762	
+   763	                if (mask & EPBM_L) {
+   764	                    if (mask & EPBM_DOWN)
+   765	                        jumpToNextSection(1);
+   766	                    if (mask & EPBM_UP)
+   767	                        jumpToNextSection(-1);
+   768	                    if (mask & EPBM_START)
+   769	                        startCurrentRow();
+   770	                    if (mask & EPBM_LEFT)
+   771	                        nudgeTempo(-1);
+   772	                    if (mask & EPBM_RIGHT)
+   773	                        nudgeTempo(1);
+   774	                } else {
+   775	
+   776	                    // No modifier
+   777	
+   778	                    if (mask & EPBM_DOWN)
+   779	                        updateCursor(0, 1);
+   780	                    if (mask & EPBM_UP)
+   781	                        updateCursor(0, -1);
+   782	                    if (mask & EPBM_LEFT)
+   783	                        updateCursor(-1, 0);
+   784	                    if (mask & EPBM_RIGHT)
+   785	                        updateCursor(1, 0);
+   786	
+   787	                    if (mask & EPBM_START) {
+   788	                        onStart();
+   789	                    }
+   790	                }
+   791	            }
+   792	        }
+   793	    }
+   794	
+   795	    if ((!(mask & EPBM_A)) && updatingChain_) {
+   796	        unsigned char *c = viewData_->song_->data_ + updateX_ +
+   797	                           8 * (viewData_->songOffset_ + updateY_);
+   798	        viewData_->song_->chain_->SetUsed(*c);
+   799	        updatingChain_ = false;
+   800	    }
+   801	};
+   802	
+   803	/******************************************************
+   804	 processSelectionButtonMask:
+   805	        process button mask in the case there is a
+   806	        selection active
+   807	 ******************************************************/
+   808	
+   809	void SongView::processSelectionButtonMask(unsigned int mask) {
+   810	
+   811	    // B Modifier
+   812	
+   813	    if (mask & EPBM_B) {
+   814	        if (mask & EPBM_R) {
+   815	            toggleMute();
+   816	        };
+   817	        if (mask & EPBM_L) {
+   818	            extendSelection();
+   819	        };
+   820	        if (mask == EPBM_B) {
+   821	            copySelection();
+   822	        }
+   823	
+   824	    } else {
+   825	
+   826	        // A modifier
+   827	
+   828	        if (mask & EPBM_A) {
+   829	            if (mask & EPBM_L) {
+   830	                cutSelection();
+   831	            }
+   832	            if (mask & EPBM_R) {
+   833	                switchSoloMode();
+   834	            };
+   835	        } else {
+   836	
+   837	            // R Modifier
+   838	
+   839	            if (mask & EPBM_R) {
+   840	
+   841	                if (mask & EPBM_L) {
+   842	                    unMuteAll();
+   843	                }
+   844	
+   845	                if (mask & EPBM_RIGHT) {
+   846	                    unsigned char *data = viewData_->GetCurrentSongPointer();
+   847	                    if (*data != 0xFF) {
+   848	                        ViewType vt = VT_CHAIN;
+   849	                        ViewEvent ve(VET_SWITCH_VIEW, &vt);
+   850	                        viewData_->currentChain_ = *data;
+   851	                        SetChanged();
+   852	                        NotifyObservers(&ve);
+   853	                    }
+   854	                }
+   855	
+   856	                if (mask & EPBM_UP) {
+   857	                    ViewType vt = VT_PROJECT;
+   858	                    ViewEvent ve(VET_SWITCH_VIEW, &vt);
+   859	                    SetChanged();
+   860	                    NotifyObservers(&ve);
+
+=== SongView cutPosition / cutSelection / clone / paste blocks ===
+4-#include "Application/Mixer/MixerService.h"
+5-#include "Application/Model/ProjectDatas.h"
+6-#include "Application/Player/Player.h"
+7-#include "Application/Utils/char.h"
+8-#include "System/Console/Trace.h"
+9-#include "System/System/System.h"
+10-#include "UIController.h"
+11-#include <iostream>
+12-#include <sstream>
+13-#include <stdlib.h>
+14-#include <string>
+15-
+16-/****************
+17- Constructor
+18- ****************/
+19-
+20-SongView::SongView(GUIWindow &w, ViewData *viewData, const char *song)
+21-    : View(w, viewData) {
+22-
+23-    updatingChain_ = false;
+24-    lastChain_ = 0;
+25-    songname_ = song;
+26-
+27-    for (int i = 0; i < 8; i++) {
+28-        this->lastPlayedPosition_[i] = 0;
+29-        this->lastQueuedPosition_[i] = 0;
+30-    }
+31-    clipboard_.active_ = false;
+32-    clipboard_.data_ = 0;
+33-    invertBatt_ = false;
+34:    canDeepClone_ = false;
+35-    jumpLength_ = 0x10; // B-jump 16 rows like LSDJ
+36-}
+37-
+38-/****************
+39- Destructor
+40- ****************/
+41-
+42-SongView::~SongView() {
+43-    if (clipboard_.data_ != 0)
+44-        SYS_FREE((void *)clipboard_.data_);
+45-};
+46-
+47-/******************************************************
+48- updateChain:
+49-        update current chain value by adding offset
+50-        parameter
+51- ******************************************************/
+52-
+53-void SongView::updateChain(int offset) {
+54-
+55-    unsigned int chain = viewData_->UpdateSongChain(offset);
+56-    updatingChain_ = true;
+57-    lastChain_ = chain;
+58-    updateX_ = viewData_->songX_;
+59-    updateY_ = viewData_->songY_;
+60-    isDirty_ = true;
+61:    canDeepClone_ = false;
+62-}
+63-
+64-/******************************************************
+65- updateChain:
+66-        set current chain value to value parameter
+67- ******************************************************/
+68-
+69-void SongView::setChain(unsigned char value) {
+70-    viewData_->SetSongChain(value);
+71-    lastChain_ = value;
+72-    isDirty_ = true;
+73-}
+74-
+75-/******************************************************
+76- updateSongOffset:
+77-        Jump from the current position up or down
+78-    by [offset] rows
+79- ******************************************************/
+80-
+81-void SongView::updateSongOffset(int offset) {
+82-    viewData_->UpdateSongOffset(offset);
+83-    isDirty_ = true;
+84:    canDeepClone_ = false;
+85-}
+86-
+87-/******************************************************
+88- updateCursor:
+89-        modify location of cursor in view by
+90-        adding dx & dy parameters
+91- ******************************************************/
+92-
+93-void SongView::updateCursor(int dx, int dy) {
+94-    viewData_->UpdateSongCursor(dx, dy);
+95-    isDirty_ = true;
+96:    canDeepClone_ = false;
+97-}
+98-
+99-/******************************************************
+100- cutPosition:
+101-        copy current position content to clipboard &
+102-        erase current position value
+103- ******************************************************/
+104-
+105:void SongView::cutPosition() {
+106-
+107-    // prepare selection data
+108-    clipboard_.x_ = viewData_->songX_;
+109-    clipboard_.y_ = viewData_->songY_;
+110-    clipboard_.offset_ = viewData_->songOffset_;
+111-
+112-    saveX_ = viewData_->songX_;
+113-    saveY_ = viewData_->songY_;
+114-    saveOffset_ = viewData_->songOffset_;
+115-
+116-    // cut selection
+117-    cutSelection();
+118-};
+119-
+120-/******************************************************
+121: pastePosition:
+122-        set current position to last chain value if
+123-        current step is empty
+124- ******************************************************/
+125-
+126:void SongView::pasteLast() {
+127-
+128-    // If we're on an empty spot, we past the last chain
+129-    // otherwise we take the current chain as last
+130-
+131-    unsigned char *c = viewData_->GetCurrentSongPointer();
+132-    if (*c == 0xFF) {
+133-        *c = lastChain_;
+134-        viewData_->song_->chain_->SetUsed(*c);
+135-        isDirty_ = true;
+136-    } else {
+137-        lastChain_ = *c;
+138-    }
+139-};
+140-
+141-/******************************************************
+142: clonePosition:
+143:        slim clone current position
+144- ******************************************************/
+145-
+146:void SongView::clonePosition() {
+147-
+148-    unsigned char *pos = viewData_->GetCurrentSongPointer();
+149-    unsigned char current = *pos;
+150-    if (current == 255)
+151-        return;
+152-
+153-    unsigned short next = viewData_->song_->chain_->GetNext();
+154-    if (next == NO_MORE_CHAIN)
+155-        return;
+156-
+157-    unsigned char *src = viewData_->song_->chain_->data_ + 16 * current;
+158-    unsigned char *dst = viewData_->song_->chain_->data_ + 16 * next;
+159-
+160-    for (int i = 0; i < 16; i++) {
+161-        *dst++ = *src++;
+162-    };
+163-
+164-    src = viewData_->song_->chain_->transpose_ + 16 * current;
+165-    dst = viewData_->song_->chain_->transpose_ + 16 * next;
+166-
+167-    for (int i = 0; i < 16; i++) {
+168-        *dst++ = *src++;
+169-    };
+170-    setChain((unsigned char)next);
+171-    isDirty_ = true;
+172-};
+173-
+174-/******************************************************
+175: deepClonePosition:
+176:        deep clone chain and all phrases within
+177-        made by koisignal (https://github.com/koi-ikeno)
+178- ******************************************************/
+179-
+180:void SongView::deepClonePosition() {
+181-    Phrase *ph = viewData_->song_->phrase_;
+182-    Chain *ch = viewData_->song_->chain_;
+183-    unsigned char *pos = viewData_->GetCurrentSongPointer();
+184-    unsigned char curChainNum = *pos;
+185-
+186-    if (curChainNum == CHAIN_COUNT) {
+187-        View::SetNotification("no more chains!");
+188-        return;
+189-    }
+190-
+191-    unsigned char *srcChain = ch->data_ + 16 * curChainNum;
+192-    unsigned char *dstChain = ch->data_ + 16 * curChainNum;
+193-    unsigned short srcPhrases[16];
+194-    unsigned short dstPhrases[16];
+195-
+196-    // Init outside valid range
+197-    for (int i = 0; i < 16; i++) {
+198-        srcPhrases[i] = NO_MORE_CHAIN;
+199-        dstPhrases[i] = NO_MORE_CHAIN;
+200-    }
+201-
+202-    for (int i = 0; i < 16; i++) {
+203-        unsigned short srcPhraseNum = *srcChain;
+204-
+205-        // skip when "--"
+206-        if (srcPhraseNum == CHAIN_COUNT) {
+207-            srcChain++;
+208-            dstChain++;
+209-            continue;
+210-        }
+211-
+212-        unsigned short newPhraseNum = NO_MORE_CHAIN;
+213-
+214-        for (int j = 0; j < 16; j++) {
+215-            if (srcPhrases[j] == srcPhraseNum) {
+216-                newPhraseNum = dstPhrases[j];
+217-                break;
+218-            }
+219-        }
+220-
+221-        if (newPhraseNum == NO_MORE_CHAIN) {
+222-            newPhraseNum = ph->GetNext();
+223-            if (newPhraseNum == NO_MORE_PHRASE) {
+224-                View::SetNotification("no more phrases!");
+225-                return;
+226-            }
+227-            for (int k = 0; k < 16; k++) {
+228-                *(ph->note_ + 16 * newPhraseNum + k) =
+229-                    *(ph->note_ + 16 * srcPhraseNum + k);
+230-                *(ph->instr_ + 16 * newPhraseNum + k) =
+231-                    *(ph->instr_ + 16 * srcPhraseNum + k);
+232-                *(ph->cmd1_ + 16 * newPhraseNum + k) =
+233-                    *(ph->cmd1_ + 16 * srcPhraseNum + k);
+234-                *(ph->cmd2_ + 16 * newPhraseNum + k) =
+235-                    *(ph->cmd2_ + 16 * srcPhraseNum + k);
+236-                *(ph->param1_ + 16 * newPhraseNum + k) =
+237-                    *(ph->param1_ + 16 * srcPhraseNum + k);
+238-                *(ph->param2_ + 16 * newPhraseNum + k) =
+239-                    *(ph->param2_ + 16 * srcPhraseNum + k);
+240-            }
+241-        }
+242-        srcPhrases[i] = srcPhraseNum;
+243-        dstPhrases[i] = newPhraseNum;
+244-        *dstChain = newPhraseNum;
+245-        srcChain++;
+246-        dstChain++;
+247-    }
+248:    View::SetNotification("deep clone");
+249-
+250-    setChain((unsigned char)curChainNum);
+251-}
+252-
+253-void SongView::extendSelection() {
+254-    GUIRect rect = getSelectionRect();
+255-    if (rect.Left() > 0 || rect.Right() < 7) {
+256-        if (viewData_->songX_ < clipboard_.x_) {
+257-            viewData_->songX_ = 0;
+258-            clipboard_.x_ = 7;
+259-        } else {
+260-            viewData_->songX_ = 7;
+261-            clipboard_.x_ = 0;
+262-        }
+263-        isDirty_ = true;
+264-    } else {
+265-        if (viewData_->songY_ < clipboard_.y_) {
+266-            viewData_->songY_ = 0;
+267-            clipboard_.y_ = 0x17;
+268-        } else {
+269-            clipboard_.y_ = 0;
+270-            viewData_->songY_ = 0x17;
+271-        }
+272-        isDirty_ = true;
+273-    }
+274-}
+275-
+276-/******************************************************
+277- OnFocus:
+278-        called when current view is becoming active
+279- ******************************************************/
+280-
+281-void SongView::OnFocus() { clipboard_.active_ = false; };
+282-
+283-GUIRect SongView::getSelectionRect() {
+284-
+285-    GUIRect selRect(clipboard_.x_, clipboard_.y_ + clipboard_.offset_,
+286-                    viewData_->songX_,
+287-                    viewData_->songY_ + viewData_->songOffset_);
+288-
+289-    selRect.Normalize();
+290-    return selRect;
+291-}
+292-
+293-/******************************************************
+294- fillClipboard:
+295-        fill clipboard with current selection value
+296- ******************************************************/
+297-
+298-void SongView::fillClipboardData() {
+299-
+300-    // Clear current selection data
+301-
+302-    if (!clipboard_.data_)
+303-        SYS_FREE((void *)clipboard_.data_);
+304-
+305-    // Prepare selection related information
+306-
+307-    GUIRect selRect = getSelectionRect();
+308-
+309-    // Set current selection  data
+310-
+311-    clipboard_.width_ = selRect.Width() + 1;
+312-    clipboard_.height_ = selRect.Height() + 1;
+313-
+314-    clipboard_.data_ =
+315-        (unsigned char *)SYS_MALLOC(clipboard_.width_ * clipboard_.height_);
+316-
+317-    unsigned char *src = viewData_->song_->data_ + selRect.Left() +
+318-                         SONG_CHANNEL_COUNT * selRect.Top();
+319-    unsigned char *dst = clipboard_.data_;
+320-
+321-    for (int j = 0; j < clipboard_.height_; j++) {
+322-        for (int i = 0; i < clipboard_.width_; i++) {
+323-            *dst++ = *src++;
+324-        }
+325-        src += (SONG_CHANNEL_COUNT - clipboard_.width_);
+326-    }
+327-};
+328-
+329-/******************************************************
+330- copySelection:
+331-        copy current selection to clipboard
+332- ******************************************************/
+333-
+334-void SongView::copySelection() {
+335-
+336-    fillClipboardData();
+337-    clipboard_.active_ = false;
+338-    viewMode_ = VM_NORMAL;
+339-    viewData_->songX_ = saveX_;
+340-    viewData_->songY_ = saveY_;
+341-    viewData_->songOffset_ = saveOffset_;
+342-    View::SetNotification("copied selection");
+343-}
+344-
+345-/******************************************************
+346- cutSelection:
+347-        cut current selection to clipboard
+348- ******************************************************/
+349-
+350:void SongView::cutSelection() {
+351-
+352-    // first copy the data to clipboard
+353-
+354-    fillClipboardData();
+355-    GUIRect selRect = getSelectionRect();
+356-
+357-    // now move all rows up for cut
+358-
+359-    unsigned char *dst = viewData_->song_->data_ + selRect.Left() +
+360-                         SONG_CHANNEL_COUNT * (selRect.Top());
+361-    unsigned char *src = dst + SONG_CHANNEL_COUNT * clipboard_.height_;
+362-
+363-    int rowCount = SONG_ROW_COUNT - selRect.Bottom() - 1;
+364-
+365-    for (int j = 0; j < rowCount; j++) {
+366-
+367-        for (int i = 0; i < clipboard_.width_; i++) {
+368-            *dst++ = *src++;
+369-        }
+370-        src += (SONG_CHANNEL_COUNT - clipboard_.width_);
+371-        dst += (SONG_CHANNEL_COUNT - clipboard_.width_);
+372-    }
+373-
+374-    for (int j = 0; j > clipboard_.height_; j++) {
+375-        for (int i = 0; i < clipboard_.width_; i++) {
+376-            *dst++ = 0xFF;
+377-        }
+378-        dst += (SONG_CHANNEL_COUNT - clipboard_.width_);
+379-    };
+380-
+381-    clipboard_.active_ = false;
+382-    viewMode_ = VM_NORMAL;
+383-    viewData_->songX_ = saveX_;
+384-    viewData_->songY_ = saveY_;
+385-    viewData_->songOffset_ = saveOffset_;
+386-
+387-    isDirty_ = true;
+388-}
+389-
+390-/******************************************************
+391: pasteSelection:
+392:        paste clipboard content to song
+393- ******************************************************/
+394-
+395:void SongView::pasteClipboard() {
+396-
+397-    if (!clipboard_.data_)
+398-        return;
+399-
+400-    // Check we're not out of scope
+401-
+402-    int width = clipboard_.width_;
+403-    int height = clipboard_.height_;
+404-
+405-    if (viewData_->songX_ + width > SONG_CHANNEL_COUNT) {
+406-        width = SONG_CHANNEL_COUNT - viewData_->songX_;
+407-    }
+408-    if (viewData_->songY_ + viewData_->songOffset_ + height > SONG_ROW_COUNT) {
+409-        height = SONG_ROW_COUNT - viewData_->songY_ - viewData_->songOffset_;
+410-    } else {
+411-
+412-        // Move down from insert point
+413-
+414-        unsigned char *dst = viewData_->song_->data_ + viewData_->songX_ +
+415-                             (SONG_ROW_COUNT - 1) * SONG_CHANNEL_COUNT;
+416-        unsigned char *src = dst - height * SONG_CHANNEL_COUNT;
+417-
+418-        int rowCount =
+419-            SONG_ROW_COUNT - (viewData_->songY_ + viewData_->songOffset_);
+420-
+421-        for (int j = 0; j < rowCount; j++) {
+422-            for (int i = 0; i < width; i++) {
+423-                *dst++ = *src++;
+424-            }
+425-            dst -= (SONG_CHANNEL_COUNT + width);
+426-            src -= (SONG_CHANNEL_COUNT + width);
+427-        }
+428-    }
+429-
+430-    // Prepare copy pointer
+431-
+432-    unsigned char *dst = viewData_->GetCurrentSongPointer();
+433-    unsigned char *src = clipboard_.data_;
+434-
+435-    for (int j = 0; j < height; j++) {
+436-        for (int i = 0; i < width; i++) {
+437-            *dst++ = *src++;
+438-        }
+439-        dst += (SONG_CHANNEL_COUNT - width);
+440-        src += (clipboard_.width_ - width);
+441-    }
+442-
+443-    updateCursor(0, height);
+444-}
+445-
+446-void SongView::unMuteAll() {
+447-
+448-    UIController *controller = UIController::GetInstance();
+449-    controller->UnMuteAll();
+450-};
+451-
+452-void SongView::toggleMute() {
+453-
+454-    UIController *controller = UIController::GetInstance();
+455-
+456-    int from = viewData_->songX_;
+457-    int to = from;
+458-    if (clipboard_.active_) {
+459-        GUIRect r = getSelectionRect();
+460-        from = r.Left();
+461-        to = r.Right();
+462-    };
+463-    controller->ToggleMute(from, to);
+464-    viewMode_ = (viewMode_ != VM_MUTEON) ? VM_MUTEON : VM_NORMAL;
+465-};
+466-
+467-void SongView::switchSoloMode() {
+468-
+469-    UIController *controller = UIController::GetInstance();
+470-    int from = viewData_->songX_;
+471-    int to = from;
+472-    if (clipboard_.active_) {
+473-        GUIRect r = getSelectionRect();
+474-        from = r.Left();
+475-        to = r.Right();
+--
+587-
+588-void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
+589-
+590-    if (!pressed) {
+591-        if (viewMode_ == VM_MUTEON) {
+592-            if (mask & EPBM_R) {
+593-                toggleMute();
+594-            }
+595-        };
+596-        if (viewMode_ == VM_SOLOON) {
+597-            if (mask & EPBM_R) {
+598-                switchSoloMode();
+599-            }
+600-        };
+601-        return;
+602-    };
+603-
+604-    if (viewMode_ == VM_NEW) {
+605-        if (mask == EPBM_A) {
+606-            unsigned short next = viewData_->song_->chain_->GetNext();
+607-            if (next != NO_MORE_CHAIN) {
+608-                setChain((unsigned char)next);
+609-                isDirty_ = true;
+610-            }
+611-            mask &= (0xFFFF - EPBM_A);
+612-        }
+613-    }
+614-
+615-    if (viewMode_ == VM_CLONE) {
+616-        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+617:            clonePosition();
+618-            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+619:            canDeepClone_ = true;
+620-        } else {
+621-            viewMode_ = VM_SELECTION;
+622-        }
+623-    };
+624-
+625:    if (canDeepClone_ && (mask & EPBM_A) && (mask & EPBM_L)) {
+626:        deepClonePosition();
+627-        mask &= (0xFFFF - (EPBM_A | EPBM_L));
+628:        canDeepClone_ = false;
+629-    }
+630-    if (clipboard_.active_) {
+631-        viewMode_ = VM_SELECTION;
+632-    };
+633-    // Process selection related keys
+634-
+635-    if (viewMode_ == VM_SELECTION) {
+636-        if (clipboard_.active_ == false) {
+637-            clipboard_.active_ = true;
+638-            clipboard_.x_ = viewData_->songX_;
+639-            clipboard_.y_ = viewData_->songY_;
+640-            clipboard_.offset_ = viewData_->songOffset_;
+641-            saveX_ = clipboard_.x_;
+642-            saveY_ = clipboard_.y_;
+643-            saveOffset_ = clipboard_.offset_;
+644-        }
+645-        processSelectionButtonMask(mask);
+646-    } else {
+647-
+648-        // Switch back to normal mode
+649-
+650-        viewMode_ = VM_NORMAL;
+651-        processNormalButtonMask(mask);
+652-    }
+653-}
+654-
+655-/******************************************************
+656- processNormalButtonMask:
+657-        process button mask in the case there is no
+658-        selection active
+659- ******************************************************/
+660-
+661-void SongView::processNormalButtonMask(unsigned int mask) {
+662-
+663-    // B Modifier
+664-
+665-    if (mask & EPBM_B) {
+666-
+667-        if (mask & EPBM_DOWN)
+668-            updateSongOffset(SongView::jumpLength_);
+669-        if (mask & EPBM_UP)
+670-            updateSongOffset(-SongView::jumpLength_);
+671-        if (mask & (EPBM_RIGHT | EPBM_LEFT)) {
+672-            Player *player = Player::GetInstance();
+673-            switch (player->GetSequencerMode()) {
+674-            case SM_SONG:
+675-                player->SetSequencerMode(SM_LIVE);
+676-                break;
+677-            case SM_LIVE:
+678-                player->SetSequencerMode(SM_SONG);
+679-                break;
+680-            }
+681-            isDirty_ = true;
+682-        }
+683-        if ((mask & EPBM_A) && (!(mask & EPBM_R)))
+684-            cutPosition();
+685-        if (mask & EPBM_L) {
+686-
+687-            viewMode_ = VM_CLONE;
+688-        };
+689-        if (mask & EPBM_R) {
+690-            toggleMute();
+691-        };
+692-        if (mask & EPBM_START) {
+693-            startImmediate();
+694-        }
+695-    } else {
+696-
+697-        // A modifier
+698-
+699-        if (mask & EPBM_A) {
+700-
+701-            if (mask & EPBM_DOWN)
+702-                updateChain(-0x10);
+703-            if (mask & EPBM_UP)
+704-                updateChain(0x10);
+705-            if (mask & EPBM_LEFT)
+706-                updateChain(-0x01);
+707-            if (mask & EPBM_RIGHT)
+708-                updateChain(0x01);
+709:            if (mask & EPBM_L && !canDeepClone_) {
+710:                pasteClipboard();
+711-            }
+712-            if (mask == EPBM_A) {
+713-
+714:                pasteLast();
+715-                viewMode_ = VM_NEW;
+716-            }
+717-            if (mask & EPBM_R) {
+718-                switchSoloMode();
+719-            };
+720-        } else {
+721-
+722-            // R Modifier
+723-
+724-            if (mask & EPBM_R) {
+725-
+726-                if (mask & EPBM_L) {
+727-                    unMuteAll();
+728-                }
+729-
+730-                if (mask & EPBM_RIGHT) {
+731-                    unsigned char *data = viewData_->GetCurrentSongPointer();
+732-                    if (*data != 0xFF) {
+733-                        ViewType vt = VT_CHAIN;
+734-                        ViewEvent ve(VET_SWITCH_VIEW, &vt);
+735-                        viewData_->currentChain_ = *data;
+736-                        SetChanged();
+737-                        NotifyObservers(&ve);
+738-                    }
+739-                }
+740-
+741-                if (mask & EPBM_UP) {
+742-                    ViewType vt = VT_PROJECT;
+743-                    ViewEvent ve(VET_SWITCH_VIEW, &vt);
+744-                    SetChanged();
+745-                    NotifyObservers(&ve);
+746-                }
+747-
+748-                if (mask & EPBM_DOWN) {
+749-                    ViewType vt = VT_MIXER;
+750-                    ViewEvent ve(VET_SWITCH_VIEW, &vt);
+751-                    SetChanged();
+752-                    NotifyObservers(&ve);
+753-                }
+754-
+755-                if (mask & EPBM_START) {
+756-                    onStop();
+757-                }
+758-
+759-            } else {
+760-
+761-                // L Modifier
+762-
+763-                if (mask & EPBM_L) {
+764-                    if (mask & EPBM_DOWN)
+765-                        jumpToNextSection(1);
+766-                    if (mask & EPBM_UP)
+767-                        jumpToNextSection(-1);
+768-                    if (mask & EPBM_START)
+769-                        startCurrentRow();
+770-                    if (mask & EPBM_LEFT)
+771-                        nudgeTempo(-1);
+772-                    if (mask & EPBM_RIGHT)
+773-                        nudgeTempo(1);
+774-                } else {
+775-
+776-                    // No modifier
+777-
+778-                    if (mask & EPBM_DOWN)
+779-                        updateCursor(0, 1);
+780-                    if (mask & EPBM_UP)
+781-                        updateCursor(0, -1);
+782-                    if (mask & EPBM_LEFT)
+783-                        updateCursor(-1, 0);
+784-                    if (mask & EPBM_RIGHT)
+785-                        updateCursor(1, 0);
+786-
+787-                    if (mask & EPBM_START) {
+788-                        onStart();
+789-                    }
+790-                }
+791-            }
+792-        }
+793-    }
+794-
+
+=== SongView references to current cursor and song cell ===
+11-#include <iostream>
+12-#include <sstream>
+13-#include <stdlib.h>
+14-#include <string>
+15-
+16-/****************
+17- Constructor
+18- ****************/
+19-
+20-SongView::SongView(GUIWindow &w, ViewData *viewData, const char *song)
+21-    : View(w, viewData) {
+22-
+23:    updatingChain_ = false;
+24:    lastChain_ = 0;
+25-    songname_ = song;
+26-
+27-    for (int i = 0; i < 8; i++) {
+28-        this->lastPlayedPosition_[i] = 0;
+29-        this->lastQueuedPosition_[i] = 0;
+30-    }
+31-    clipboard_.active_ = false;
+32-    clipboard_.data_ = 0;
+33-    invertBatt_ = false;
+34-    canDeepClone_ = false;
+35-    jumpLength_ = 0x10; // B-jump 16 rows like LSDJ
+36-}
+37-
+38-/****************
+39- Destructor
+40- ****************/
+41-
+42-SongView::~SongView() {
+43-    if (clipboard_.data_ != 0)
+44-        SYS_FREE((void *)clipboard_.data_);
+45-};
+46-
+47-/******************************************************
+48: updateChain:
+49:        update current chain value by adding offset
+50-        parameter
+51- ******************************************************/
+52-
+53:void SongView::updateChain(int offset) {
+54-
+55:    unsigned int chain = viewData_->UpdateSongChain(offset);
+56:    updatingChain_ = true;
+57:    lastChain_ = chain;
+58:    updateX_ = viewData_->songX_;
+59:    updateY_ = viewData_->songY_;
+60-    isDirty_ = true;
+61-    canDeepClone_ = false;
+62-}
+63-
+64-/******************************************************
+65: updateChain:
+66:        set current chain value to value parameter
+67- ******************************************************/
+68-
+69:void SongView::setChain(unsigned char value) {
+70:    viewData_->SetSongChain(value);
+71:    lastChain_ = value;
+72-    isDirty_ = true;
+73-}
+74-
+75-/******************************************************
+76- updateSongOffset:
+77-        Jump from the current position up or down
+78-    by [offset] rows
+79- ******************************************************/
+80-
+81-void SongView::updateSongOffset(int offset) {
+82-    viewData_->UpdateSongOffset(offset);
+83-    isDirty_ = true;
+--
+96-    canDeepClone_ = false;
+97-}
+98-
+99-/******************************************************
+100- cutPosition:
+101-        copy current position content to clipboard &
+102-        erase current position value
+103- ******************************************************/
+104-
+105-void SongView::cutPosition() {
+106-
+107-    // prepare selection data
+108:    clipboard_.x_ = viewData_->songX_;
+109:    clipboard_.y_ = viewData_->songY_;
+110-    clipboard_.offset_ = viewData_->songOffset_;
+111-
+112:    saveX_ = viewData_->songX_;
+113:    saveY_ = viewData_->songY_;
+114-    saveOffset_ = viewData_->songOffset_;
+115-
+116-    // cut selection
+117-    cutSelection();
+118-};
+119-
+120-/******************************************************
+121- pastePosition:
+122:        set current position to last chain value if
+123-        current step is empty
+124- ******************************************************/
+125-
+126-void SongView::pasteLast() {
+127-
+128:    // If we're on an empty spot, we past the last chain
+129:    // otherwise we take the current chain as last
+130-
+131-    unsigned char *c = viewData_->GetCurrentSongPointer();
+132:    if (*c == 0xFF) {
+133:        *c = lastChain_;
+134:        viewData_->song_->chain_->SetUsed(*c);
+135-        isDirty_ = true;
+136-    } else {
+137:        lastChain_ = *c;
+138-    }
+139-};
+140-
+141-/******************************************************
+142- clonePosition:
+143-        slim clone current position
+144- ******************************************************/
+145-
+146-void SongView::clonePosition() {
+147-
+148-    unsigned char *pos = viewData_->GetCurrentSongPointer();
+149-    unsigned char current = *pos;
+150-    if (current == 255)
+151-        return;
+152-
+153:    unsigned short next = viewData_->song_->chain_->GetNext();
+154-    if (next == NO_MORE_CHAIN)
+155-        return;
+156-
+157:    unsigned char *src = viewData_->song_->chain_->data_ + 16 * current;
+158:    unsigned char *dst = viewData_->song_->chain_->data_ + 16 * next;
+159-
+160-    for (int i = 0; i < 16; i++) {
+161-        *dst++ = *src++;
+162-    };
+163-
+164:    src = viewData_->song_->chain_->transpose_ + 16 * current;
+165:    dst = viewData_->song_->chain_->transpose_ + 16 * next;
+166-
+167-    for (int i = 0; i < 16; i++) {
+168-        *dst++ = *src++;
+169-    };
+170:    setChain((unsigned char)next);
+171-    isDirty_ = true;
+172-};
+173-
+174-/******************************************************
+175- deepClonePosition:
+176:        deep clone chain and all phrases within
+177-        made by koisignal (https://github.com/koi-ikeno)
+178- ******************************************************/
+179-
+180-void SongView::deepClonePosition() {
+181-    Phrase *ph = viewData_->song_->phrase_;
+182:    Chain *ch = viewData_->song_->chain_;
+183-    unsigned char *pos = viewData_->GetCurrentSongPointer();
+184:    unsigned char curChainNum = *pos;
+185-
+186:    if (curChainNum == CHAIN_COUNT) {
+187:        View::SetNotification("no more chains!");
+188-        return;
+189-    }
+190-
+191:    unsigned char *srcChain = ch->data_ + 16 * curChainNum;
+192:    unsigned char *dstChain = ch->data_ + 16 * curChainNum;
+193-    unsigned short srcPhrases[16];
+194-    unsigned short dstPhrases[16];
+195-
+196-    // Init outside valid range
+197-    for (int i = 0; i < 16; i++) {
+198-        srcPhrases[i] = NO_MORE_CHAIN;
+199-        dstPhrases[i] = NO_MORE_CHAIN;
+200-    }
+201-
+202-    for (int i = 0; i < 16; i++) {
+203:        unsigned short srcPhraseNum = *srcChain;
+204-
+205:        // skip when "--"
+206-        if (srcPhraseNum == CHAIN_COUNT) {
+207:            srcChain++;
+208:            dstChain++;
+209-            continue;
+210-        }
+211-
+212-        unsigned short newPhraseNum = NO_MORE_CHAIN;
+213-
+214-        for (int j = 0; j < 16; j++) {
+215-            if (srcPhrases[j] == srcPhraseNum) {
+216-                newPhraseNum = dstPhrases[j];
+217-                break;
+218-            }
+219-        }
+220-
+--
+232-                *(ph->cmd1_ + 16 * newPhraseNum + k) =
+233-                    *(ph->cmd1_ + 16 * srcPhraseNum + k);
+234-                *(ph->cmd2_ + 16 * newPhraseNum + k) =
+235-                    *(ph->cmd2_ + 16 * srcPhraseNum + k);
+236-                *(ph->param1_ + 16 * newPhraseNum + k) =
+237-                    *(ph->param1_ + 16 * srcPhraseNum + k);
+238-                *(ph->param2_ + 16 * newPhraseNum + k) =
+239-                    *(ph->param2_ + 16 * srcPhraseNum + k);
+240-            }
+241-        }
+242-        srcPhrases[i] = srcPhraseNum;
+243-        dstPhrases[i] = newPhraseNum;
+244:        *dstChain = newPhraseNum;
+245:        srcChain++;
+246:        dstChain++;
+247-    }
+248-    View::SetNotification("deep clone");
+249-
+250:    setChain((unsigned char)curChainNum);
+251-}
+252-
+253-void SongView::extendSelection() {
+254-    GUIRect rect = getSelectionRect();
+255-    if (rect.Left() > 0 || rect.Right() < 7) {
+256:        if (viewData_->songX_ < clipboard_.x_) {
+257:            viewData_->songX_ = 0;
+258-            clipboard_.x_ = 7;
+259-        } else {
+260:            viewData_->songX_ = 7;
+261-            clipboard_.x_ = 0;
+262-        }
+263-        isDirty_ = true;
+264-    } else {
+265:        if (viewData_->songY_ < clipboard_.y_) {
+266:            viewData_->songY_ = 0;
+267-            clipboard_.y_ = 0x17;
+268-        } else {
+269-            clipboard_.y_ = 0;
+270:            viewData_->songY_ = 0x17;
+271-        }
+272-        isDirty_ = true;
+273-    }
+274-}
+275-
+276-/******************************************************
+277- OnFocus:
+278-        called when current view is becoming active
+279- ******************************************************/
+280-
+281-void SongView::OnFocus() { clipboard_.active_ = false; };
+282-
+283-GUIRect SongView::getSelectionRect() {
+284-
+285-    GUIRect selRect(clipboard_.x_, clipboard_.y_ + clipboard_.offset_,
+286:                    viewData_->songX_,
+287:                    viewData_->songY_ + viewData_->songOffset_);
+288-
+289-    selRect.Normalize();
+290-    return selRect;
+291-}
+292-
+293-/******************************************************
+294- fillClipboard:
+295-        fill clipboard with current selection value
+296- ******************************************************/
+297-
+298-void SongView::fillClipboardData() {
+299-
+--
+327-};
+328-
+329-/******************************************************
+330- copySelection:
+331-        copy current selection to clipboard
+332- ******************************************************/
+333-
+334-void SongView::copySelection() {
+335-
+336-    fillClipboardData();
+337-    clipboard_.active_ = false;
+338-    viewMode_ = VM_NORMAL;
+339:    viewData_->songX_ = saveX_;
+340:    viewData_->songY_ = saveY_;
+341-    viewData_->songOffset_ = saveOffset_;
+342-    View::SetNotification("copied selection");
+343-}
+344-
+345-/******************************************************
+346- cutSelection:
+347-        cut current selection to clipboard
+348- ******************************************************/
+349-
+350-void SongView::cutSelection() {
+351-
+352-    // first copy the data to clipboard
+--
+364-
+365-    for (int j = 0; j < rowCount; j++) {
+366-
+367-        for (int i = 0; i < clipboard_.width_; i++) {
+368-            *dst++ = *src++;
+369-        }
+370-        src += (SONG_CHANNEL_COUNT - clipboard_.width_);
+371-        dst += (SONG_CHANNEL_COUNT - clipboard_.width_);
+372-    }
+373-
+374-    for (int j = 0; j > clipboard_.height_; j++) {
+375-        for (int i = 0; i < clipboard_.width_; i++) {
+376:            *dst++ = 0xFF;
+377-        }
+378-        dst += (SONG_CHANNEL_COUNT - clipboard_.width_);
+379-    };
+380-
+381-    clipboard_.active_ = false;
+382-    viewMode_ = VM_NORMAL;
+383:    viewData_->songX_ = saveX_;
+384:    viewData_->songY_ = saveY_;
+385-    viewData_->songOffset_ = saveOffset_;
+386-
+387-    isDirty_ = true;
+388-}
+389-
+390-/******************************************************
+391- pasteSelection:
+392-        paste clipboard content to song
+393- ******************************************************/
+394-
+395-void SongView::pasteClipboard() {
+396-
+397-    if (!clipboard_.data_)
+398-        return;
+399-
+400-    // Check we're not out of scope
+401-
+402-    int width = clipboard_.width_;
+403-    int height = clipboard_.height_;
+404-
+405:    if (viewData_->songX_ + width > SONG_CHANNEL_COUNT) {
+406:        width = SONG_CHANNEL_COUNT - viewData_->songX_;
+407-    }
+408:    if (viewData_->songY_ + viewData_->songOffset_ + height > SONG_ROW_COUNT) {
+409:        height = SONG_ROW_COUNT - viewData_->songY_ - viewData_->songOffset_;
+410-    } else {
+411-
+412-        // Move down from insert point
+413-
+414:        unsigned char *dst = viewData_->song_->data_ + viewData_->songX_ +
+415-                             (SONG_ROW_COUNT - 1) * SONG_CHANNEL_COUNT;
+416-        unsigned char *src = dst - height * SONG_CHANNEL_COUNT;
+417-
+418-        int rowCount =
+419:            SONG_ROW_COUNT - (viewData_->songY_ + viewData_->songOffset_);
+420-
+421-        for (int j = 0; j < rowCount; j++) {
+422-            for (int i = 0; i < width; i++) {
+423-                *dst++ = *src++;
+424-            }
+425-            dst -= (SONG_CHANNEL_COUNT + width);
+426-            src -= (SONG_CHANNEL_COUNT + width);
+427-        }
+428-    }
+429-
+430-    // Prepare copy pointer
+431-
+--
+444-}
+445-
+446-void SongView::unMuteAll() {
+447-
+448-    UIController *controller = UIController::GetInstance();
+449-    controller->UnMuteAll();
+450-};
+451-
+452-void SongView::toggleMute() {
+453-
+454-    UIController *controller = UIController::GetInstance();
+455-
+456:    int from = viewData_->songX_;
+457-    int to = from;
+458-    if (clipboard_.active_) {
+459-        GUIRect r = getSelectionRect();
+460-        from = r.Left();
+461-        to = r.Right();
+462-    };
+463-    controller->ToggleMute(from, to);
+464-    viewMode_ = (viewMode_ != VM_MUTEON) ? VM_MUTEON : VM_NORMAL;
+465-};
+466-
+467-void SongView::switchSoloMode() {
+468-
+469-    UIController *controller = UIController::GetInstance();
+470:    int from = viewData_->songX_;
+471-    int to = from;
+472-    if (clipboard_.active_) {
+473-        GUIRect r = getSelectionRect();
+474-        from = r.Left();
+475-        to = r.Right();
+476-    };
+477-    controller->SwitchSoloMode(from, to, (viewMode_ != VM_SOLOON));
+478-    viewMode_ = (viewMode_ != VM_SOLOON) ? VM_SOLOON : VM_NORMAL;
+479-    isDirty_ = true;
+480-};
+481-
+482-void SongView::onStart() {
+483:    // Always play with zero offset in chains when in SongView
+484:    viewData_->chainRow_ = 0;
+485-    Player *player = Player::GetInstance();
+486:    unsigned char from = viewData_->songX_;
+487-    unsigned char to = from;
+488-    if (clipboard_.active_) {
+489-        GUIRect r = getSelectionRect();
+490-        from = r.Left();
+491-        to = r.Right();
+492-    }
+493-    int renderMode = viewData_->renderMode_;
+494-    if (renderMode > 0 && !player->IsRunning()) {
+495-        viewData_->isRendering_ = true;
+496-        View::SetNotification("Rendering started!");
+497-    } else if (viewData_->isRendering_ && player->IsRunning()) {
+498-        viewData_->isRendering_ = false;
+--
+501-    player->OnSongStartButton(from, to, false, false);
+502-};
+503-
+504-void SongView::startCurrentRow() {
+505-    Player *player = Player::GetInstance();
+506-    player->SetSequencerMode(SM_LIVE);
+507-    player->OnSongStartButton(0, 7, false, false);
+508-}
+509-
+510-void SongView::startImmediate() {
+511-    Player *player = Player::GetInstance();
+512-
+513:    unsigned char from = viewData_->songX_;
+514-    unsigned char to = from;
+515-    player->OnSongStartButton(from, to, false, true);
+516-}
+517-
+518-void SongView::onStop() {
+519:    // Always play with zero offset in chains when in SongView
+520:    viewData_->chainRow_ = 0;
+521-    Player *player = Player::GetInstance();
+522:    unsigned char from = viewData_->songX_;
+523-    unsigned char to = from;
+524-    if (clipboard_.active_) {
+525-        GUIRect r = getSelectionRect();
+526-        from = r.Left();
+527-        to = r.Right();
+528-    }
+529-
+530-    player->OnSongStartButton(from, to, true, false);
+531-};
+532-
+533-void SongView::jumpToNextSection(int direction) {
+534-
+535:    int current = viewData_->songY_ + viewData_->songOffset_;
+536-    bool foundGap = false;
+537-    for (int i = 0; i < SONG_ROW_COUNT; i++) {
+538:        unsigned char *start = viewData_->song_->data_ + viewData_->songX_ +
+539-                               SONG_CHANNEL_COUNT * current;
+540:        if (foundGap && (*start != 0xFF)) {
+541-            break;
+542-        } else {
+543:            if (*start == 0xFF) {
+544-                foundGap = true;
+545-            }
+546-        }
+547-        current += direction;
+548-        if (current < 0) {
+549-            current += SONG_ROW_COUNT;
+550-        }
+551-        if (current >= SONG_ROW_COUNT) {
+552-            current -= SONG_ROW_COUNT;
+553-        }
+554-    }
+555-    // If we go backwards, we stil have to go to the beginning of the block
+556-
+557-    if (direction < 0) {
+558-        while (current > 0) {
+559:            unsigned char *start = viewData_->song_->data_ + viewData_->songX_ +
+560-                                   SONG_CHANNEL_COUNT * current;
+561:            if (*start == 0xFF) {
+562-                current++;
+563-                break;
+564-            };
+565:            current--;
+566-        };
+567-    }
+568-
+569-    // Update viewdata position from current
+570-
+571-    if ((current - viewData_->songOffset_ > 0x17) ||
+572-        (current - viewData_->songOffset_ < 0)) {
+573-        viewData_->songOffset_ = current - 4;
+574-        if (viewData_->songOffset_ < 0) {
+575-            viewData_->songOffset_ = 0;
+576-        }
+577-    }
+578:    viewData_->songY_ = current - viewData_->songOffset_;
+579-    isDirty_ = true;
+580-}
+581-
+582-/******************************************************
+583- ProcessButtonMask:
+584-        process button mask even coming from the main
+585-        application window
+586- ******************************************************/
+587-
+588-void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
+589-
+590-    if (!pressed) {
+--
+594-            }
+595-        };
+596-        if (viewMode_ == VM_SOLOON) {
+597-            if (mask & EPBM_R) {
+598-                switchSoloMode();
+599-            }
+600-        };
+601-        return;
+602-    };
+603-
+604-    if (viewMode_ == VM_NEW) {
+605-        if (mask == EPBM_A) {
+606:            unsigned short next = viewData_->song_->chain_->GetNext();
+607-            if (next != NO_MORE_CHAIN) {
+608:                setChain((unsigned char)next);
+609-                isDirty_ = true;
+610-            }
+611:            mask &= (0xFFFF - EPBM_A);
+612-        }
+613-    }
+614-
+615-    if (viewMode_ == VM_CLONE) {
+616-        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+617-            clonePosition();
+618:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+619-            canDeepClone_ = true;
+620-        } else {
+621-            viewMode_ = VM_SELECTION;
+622-        }
+623-    };
+624-
+625-    if (canDeepClone_ && (mask & EPBM_A) && (mask & EPBM_L)) {
+626-        deepClonePosition();
+627:        mask &= (0xFFFF - (EPBM_A | EPBM_L));
+628-        canDeepClone_ = false;
+629-    }
+630-    if (clipboard_.active_) {
+631-        viewMode_ = VM_SELECTION;
+632-    };
+633-    // Process selection related keys
+634-
+635-    if (viewMode_ == VM_SELECTION) {
+636-        if (clipboard_.active_ == false) {
+637-            clipboard_.active_ = true;
+638:            clipboard_.x_ = viewData_->songX_;
+639:            clipboard_.y_ = viewData_->songY_;
+640-            clipboard_.offset_ = viewData_->songOffset_;
+641-            saveX_ = clipboard_.x_;
+642-            saveY_ = clipboard_.y_;
+643-            saveOffset_ = clipboard_.offset_;
+644-        }
+645-        processSelectionButtonMask(mask);
+646-    } else {
+647-
+648-        // Switch back to normal mode
+649-
+650-        viewMode_ = VM_NORMAL;
+651-        processNormalButtonMask(mask);
+--
+690-            toggleMute();
+691-        };
+692-        if (mask & EPBM_START) {
+693-            startImmediate();
+694-        }
+695-    } else {
+696-
+697-        // A modifier
+698-
+699-        if (mask & EPBM_A) {
+700-
+701-            if (mask & EPBM_DOWN)
+702:                updateChain(-0x10);
+703-            if (mask & EPBM_UP)
+704:                updateChain(0x10);
+705-            if (mask & EPBM_LEFT)
+706:                updateChain(-0x01);
+707-            if (mask & EPBM_RIGHT)
+708:                updateChain(0x01);
+709-            if (mask & EPBM_L && !canDeepClone_) {
+710-                pasteClipboard();
+711-            }
+712-            if (mask == EPBM_A) {
+713-
+714-                pasteLast();
+715-                viewMode_ = VM_NEW;
+716-            }
+717-            if (mask & EPBM_R) {
+718-                switchSoloMode();
+719-            };
+720-        } else {
+721-
+722-            // R Modifier
+723-
+724-            if (mask & EPBM_R) {
+725-
+726-                if (mask & EPBM_L) {
+727-                    unMuteAll();
+728-                }
+729-
+730-                if (mask & EPBM_RIGHT) {
+731-                    unsigned char *data = viewData_->GetCurrentSongPointer();
+732:                    if (*data != 0xFF) {
+733-                        ViewType vt = VT_CHAIN;
+734-                        ViewEvent ve(VET_SWITCH_VIEW, &vt);
+735:                        viewData_->currentChain_ = *data;
+736-                        SetChanged();
+737-                        NotifyObservers(&ve);
+738-                    }
+739-                }
+740-
+741-                if (mask & EPBM_UP) {
+742-                    ViewType vt = VT_PROJECT;
+743-                    ViewEvent ve(VET_SWITCH_VIEW, &vt);
+744-                    SetChanged();
+745-                    NotifyObservers(&ve);
+746-                }
+747-
+--
+783-                        updateCursor(-1, 0);
+784-                    if (mask & EPBM_RIGHT)
+785-                        updateCursor(1, 0);
+786-
+787-                    if (mask & EPBM_START) {
+788-                        onStart();
+789-                    }
+790-                }
+791-            }
+792-        }
+793-    }
+794-
+795:    if ((!(mask & EPBM_A)) && updatingChain_) {
+796-        unsigned char *c = viewData_->song_->data_ + updateX_ +
+797-                           8 * (viewData_->songOffset_ + updateY_);
+798:        viewData_->song_->chain_->SetUsed(*c);
+799:        updatingChain_ = false;
+800-    }
+801-};
+802-
+803-/******************************************************
+804- processSelectionButtonMask:
+805-        process button mask in the case there is a
+806-        selection active
+807- ******************************************************/
+808-
+809-void SongView::processSelectionButtonMask(unsigned int mask) {
+810-
+811-    // B Modifier
+--
+835-        } else {
+836-
+837-            // R Modifier
+838-
+839-            if (mask & EPBM_R) {
+840-
+841-                if (mask & EPBM_L) {
+842-                    unMuteAll();
+843-                }
+844-
+845-                if (mask & EPBM_RIGHT) {
+846-                    unsigned char *data = viewData_->GetCurrentSongPointer();
+847:                    if (*data != 0xFF) {
+848-                        ViewType vt = VT_CHAIN;
+849-                        ViewEvent ve(VET_SWITCH_VIEW, &vt);
+850:                        viewData_->currentChain_ = *data;
+851-                        SetChanged();
+852-                        NotifyObservers(&ve);
+853-                    }
+854-                }
+855-
+856-                if (mask & EPBM_UP) {
+857-                    ViewType vt = VT_PROJECT;
+858-                    ViewEvent ve(VET_SWITCH_VIEW, &vt);
+859-                    SetChanged();
+860-                    NotifyObservers(&ve);
+861-                }
+862-
+--
+900-
+901-    Clear();
+902-    View::EnableNotification();
+903-
+904-    GUITextProperties props;
+905-    GUIPoint pos = GetTitlePosition();
+906-
+907-    // Prepare selection related information
+908-
+909-    GUIRect selRect;
+910-    if (clipboard_.active_) {
+911-        selRect = GUIRect(clipboard_.x_, clipboard_.y_ + clipboard_.offset_,
+912:                          viewData_->songX_,
+913:                          viewData_->songY_ + viewData_->songOffset_);
+914-
+915-        selRect.Normalize();
+916-    }
+917-
+918-    // Draw title
+919-
+920-    SetColor(CD_NORMAL);
+921-
+922-    Player *player = Player::GetInstance();
+923-
+924-    std::ostringstream os;
+925-
+--
+967-            bool invert = false;
+968-
+969-            // see if we need to invert current step
+970-            // if there's a selection or we are at cursor position
+971-
+972-            if (clipboard_.active_) {
+973-                if ((i >= selRect.Left()) && (i <= selRect.Right()) &&
+974-                    (j + viewData_->songOffset_ >= selRect.Top()) &&
+975-                    (j + viewData_->songOffset_ <= selRect.Bottom())) {
+976-                    invert = true;
+977-                }
+978-            } else {
+979:                if (i == viewData_->songX_ && j == viewData_->songY_) {
+980-                    invert = true;
+981-                }
+982-            }
+983-
+984-            // draw current step
+985-
+986-            unsigned char d = *data++;
+987-
+988-            if (d == 0xFE) {
+989-                SetColor(CD_SONGVIEWFE);
+990-            } else if (d == 0x00) {
+991-                SetColor(CD_SONGVIEW00);
+992-            } else {
+993-                SetColor(CD_NORMAL);
+994-            }
+995-
+996-            if (invert) {
+997-                SetColor(CD_HILITE2);
+998-                props.invert_ = true;
+999-            }
+1000-
+1001:            if (d == 0xFF) {
+1002:                DrawString(pos._x, pos._y, "--", props);
+1003-            } else {
+1004-                hex2char(d, row);
+1005-                DrawString(pos._x, pos._y, row, props);
+1006-            }
+1007-
+1008-            // Put back drawing state
+1009-
+1010-            if (invert) {
+1011-                SetColor(CD_NORMAL);
+1012-                props.invert_ = false;
+1013-            }
+1014-
+--
+1062-        // Clear all last queued positions
+1063-
+1064-        y = lastQueuedPosition_[i] - viewData_->songOffset_;
+1065-        if (y >= 0 && y < View::songRowCount_) {
+1066-            pos._y = anchor._y + y;
+1067-            DrawString(pos._x, pos._y, " ", props);
+1068-        }
+1069-
+1070-        // For each playing position, draw current location
+1071-
+1072-        if (player->IsChannelPlaying(i)) {
+1073-            if (eventType != PET_STOP) {
+1074:                if (viewData_->currentPlayChain_[i] != 0xFF) {
+1075-                    int y = viewData_->songPlayPos_[i] - viewData_->songOffset_;
+1076-                    if (y >= 0 && y < View::songRowCount_) {
+1077-                        pos._y = anchor._y + y;
+1078-                        if (!player->IsChannelMuted(i)) {
+1079-                            SetColor(CD_PLAY);
+1080-                            DrawString(pos._x, pos._y, ">", props);
+1081-                        } else {
+1082-                            SetColor(CD_MUTE);
+1083-                            DrawString(pos._x, pos._y, "-", props);
+1084-                        }
+1085-                        SetColor(CD_CURSOR);
+1086-                        lastPlayedPosition_[i] = viewData_->songPlayPos_[i];
+--
+1115-
+1116-    if (View::miniLayout_) {
+1117-        pos._y = 0;
+1118-        pos._x = 25;
+1119-    } else {
+1120-        pos = anchor;
+1121-        pos._x += 25;
+1122-    }
+1123-
+1124-    if (player->Clipped()) {
+1125-        DrawString(pos._x, pos._y, "clip", props);
+1126-    } else {
+1127:        DrawString(pos._x, pos._y, "----", props);
+1128-    }
+1129-
+1130-    char strbuffer[10];
+1131-    pos._y += 1;
+1132-    sprintf(strbuffer, "%3.3d%%", player->GetPlayedBufferPercentage());
+1133-    DrawString(pos._x, pos._y, strbuffer, props);
+1134-
+1135-    System *sys = System::GetInstance();
+1136-    int batt = sys->GetBatteryLevel();
+1137-    if (batt >= 0) {
+1138-        if (batt < 90) {
+1139-            SetColor(CD_HILITE2);
+
+=== Model/API candidates for Song data ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:27:GUIColor AppWindow::normalColor_(0xF5, 0xEB, 0xFF);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:28:GUIColor AppWindow::borderColor_(0xFF, 0x00, 0x8C);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:33:GUIColor AppWindow::consoleColor_(0x00, 0xFF, 0x00);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:34:GUIColor AppWindow::cursorColor_(0xFF, 0x00, 0x8C);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:35:GUIColor AppWindow::playColor_(0xFF, 0x00, 0x8C);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:36:GUIColor AppWindow::muteColor_(0xF5, 0xEB, 0xFF);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:38:GUIColor AppWindow::rownumber2Color_(0xFF, 0x00, 0xFF);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:84:    _chainView = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:379:    _chainView = new ChainView((*this), _viewData);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:380:    _chainView->AddObserver((*this));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:446:    SAFE_DELETE(_chainView);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:498:        _mask &= (0xFFFF - v);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.cpp:572:            _currentView = _chainView;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.h:5:#include "Application/Views/ChainView.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/AppWindow.h:67:    ChainView *_chainView;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/CommandList.cpp:106:	FourCC tReturn=0xFFFFFFFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/CommandList.cpp:117:				if (tReturn==0xFFFFFFFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/CommandList.cpp:129:	if (tReturn!=0xFFFFFFFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/MidiInstrument.cpp:148:				unsigned char loop=(value&0xFF) ; // number of ticks before repeat
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:60:	 drive_=new Variable("crushdrive",SIP_CRUSHVOL,0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:75:	 cutoff_=new Variable("filter cut",SIP_FILTCUTOFF,0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:87:	 attenuate_=new Variable("attenuate",SIP_ATTENUATE,0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:536:	     fixed mask=0xFFFFFFFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:549:		 unsigned int dsMask=0xFFFFFFFF<<downsmpl ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:811:        if (dsMask!=0xFFFFFFFF)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1118:            // Backward shift (two's complement): 0xFFFF = -1, 0x8001 = -32767
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1156:        int relSfht = value & 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1182:				float targetVolume=float(value&0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1199:				float targetPan=float(value&0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1200:				if (targetPan==0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1218:				float target=float(value&0xFF)/255.0f ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1234:				float target=float(value&0xFF)/255.0f ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1252:				float target=float(value&0xFF)/255.0f ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1270:				float target=float(value&0xFF)/255.0f ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1286:				int pitch=(char)(value&0xFF) ; // number of semi tones
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1311:				int pitch=(char)(value&0xFF) ; // number of semi tones
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1349:				float semi=(value&0xFF)/float(0x80) ; // number of semi tones
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1374:				unsigned char loop=(value&0xFF) ; // number of ticks before repeat
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:1390:    			float res=(value&0xFF)/255.0f;	// resonance, aka Q (0=none) so default is FF00
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Instruments/SRPUpdaters.cpp:326:		arp=(arp&0xFFF0)>>4 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.cpp:1:#include "Chain.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.cpp:6:Chain::Chain() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.cpp:10:	memset(data_,0xFF,size) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.cpp:18:Chain::~Chain() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.cpp:23:unsigned short Chain::GetNext() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.cpp:33:void Chain::SetUsed(unsigned char c) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.cpp:37:void Chain::ClearAllocation() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.h:4:#define CHAIN_COUNT 0xFF
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.h:7:class Chain {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.h:9:	Chain() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Chain.h:10:	~Chain() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Groove.cpp:76:				if (data_[c.groove_][c.position_]==0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Groove.cpp:86:			if (data_[c.groove_][c.position_]==0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Groove.h:11:#define NO_GROOVE_DATA 0xFF
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Phrase.cpp:10:	memset(note_,0xFF,size) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Phrase.cpp:12:	memset(instr_,0xFF,size) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Phrase.h:5:#define PHRASE_COUNT 0xFF
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:182:	song_->chain_->ClearAllocation() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:188:		if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:189:			song_->chain_->SetUsed(*data) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:194:    data=song_->chain_->data_ ;        
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:195:    unsigned char *data2=song_->chain_->transpose_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:199:		if (song_->chain_->IsUsed(i)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:201:				if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:210:				*data++=0xFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:227:				*data=0xFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:228:				*data2=0xFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:253:			if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:380:		file->Read(song_->chain_->data_,sizeof(char),CHAIN_COUNT*16) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:381:		file->Read(song_->chain_->transpose_,sizeof(char),CHAIN_COUNT*16) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:405:		// Restore chain & phrase allocation table
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:409:			if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:410:				song_->chain_->SetUsed(*data) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:415:        data=song_->chain_->data_ ;        
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:419:                if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:420:                    song_->chain_->SetUsed(i) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:431:                if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:442:			*data++=0xFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Project.cpp:454:                if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:14:	memset(data_,0xFF,SONG_CHANNEL_COUNT*SONG_ROW_COUNT) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:16:	chain_=new Chain() ;   // Allocate chain datas
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:22:	delete chain_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:33:	saveHexBuffer(node,"CHAINS",chain_->data_,CHAIN_COUNT*16) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:34:	saveHexBuffer(node,"TRANSPOSES",chain_->transpose_,CHAIN_COUNT*16) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:53:			restoreHexBuffer(current,chain_->data_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:56:			restoreHexBuffer(current,chain_->transpose_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:89:	// Restore chain & phrase allocation table
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:93:		if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:95:				chain_->SetUsed(*data) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:101:    data=chain_->data_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:105:            if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:106:                chain_->SetUsed(i) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.cpp:125:            if (*data!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.h:4:#include "Chain.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.h:16:class Song:Persistent {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Model/Song.h:25:	Chain *chain_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:125:  // Always set position, allows for playing song with chain offset
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:164:             if (isPlayable(playPos, i, viewData_->chainRow_)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:166:                updateSongPos(playPos, i, viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:170:                viewData_->currentPlayChain_[i] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:171:                viewData_->currentPlayPhrase_[i] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:172:                viewData_->chainPlayPos_[i] = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:190:           updateSongPos(liveQueuePosition_[i],i,liveQueueChainPosition_[i]) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:202:      int currentChainPos=viewData_->chainRow_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:203:      updateSongPos(playPos,currentChannel,currentChainPos) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:209:	    int currentChainPos = viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:212:	    updateSongPos(playPos, currentChannel, currentChainPos, currentPhrasePos);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:355:void Player::OnStartButton(PlayMode origin,unsigned int from,bool startFromPrevious,unsigned char chainPos) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:409:				// not playing; we queue the chains in the selection
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:426:				// Queue all chain in the given selection
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:472:bool Player::isPlayable(int row,int col,int chainPos) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:474:	uchar *chain=viewData_->song_->data_+8*row+col ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:475:	if (*chain!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:476:       uchar data=viewData_->song_->chain_->data_[16*(*chain)+chainPos] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:477:    	return (data!=0xFF);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:483:bool Player::findPlayable(uchar *row,int col,uchar  chainPos) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:487:	uchar *chain=viewData_->song_->data_+8*(*row)+col ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:488:	if (*chain!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:489:		uchar data=viewData_->song_->chain_->data_[16*(*chain)+chainPos] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:490:		return (data!=0xFF);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:496:		chain=viewData_->song_->data_+8*(*row)+col ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:497:		if (*chain!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:508:		chain=viewData_->song_->data_+8*(*row)+col ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:509:		if (*chain==0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:520:	chain=viewData_->song_->data_+8*(*row)+col ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:521:	uchar data=0xFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:522:	if (*chain!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:523:		data=viewData_->song_->chain_->data_[16*(*chain)+chainPos] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:525:    return (data!=0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:536:unsigned char Player::GetQueueChainPosition(int i) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:537:	return liveQueueChainPosition_[i] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:540:void Player::QueueChannel(int i,QueueingMode mode,unsigned char position,unsigned char chainpos) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:543:	liveQueueChainPosition_[i]=chainpos ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:567:			triggerLiveChains_=false ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:577:			if (triggerLiveChains_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:578:				triggerLiveChains() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:626:						if ((note!=0xFF)&&(instr!=0)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:671:			if (phrase!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:718:                int timeToLive=(param&0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:745:				bool all=(param&0xFF00)!=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:746:				param=param&0xFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:779: triggerLiveChains:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:780:        look if there's any chain needed to be started
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:785:void Player::triggerLiveChains() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:793:                    if (findPlayable(&(liveQueuePosition_[i]),i,liveQueueChainPosition_[i])) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:795:                        updateSongPos(liveQueuePosition_[i],i,liveQueueChainPosition_[i]) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:807:	give chain position directly (for PM_CHAIN/PM_PHRASE)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:810:void Player::updateSongPos(int pos,int channel,int chainPos,int hop) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:813:	viewData_->currentPlayChain_[channel]=*data ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:814:	updateChainPos(chainPos,channel,hop) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:818: updateChainPos:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:819:	sets current chain position for a give channel
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:822:void Player::updateChainPos(int pos,int channel,int hop) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:823:	unsigned char chain=viewData_->currentPlayChain_[channel] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:824:	if (chain!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:825:		viewData_->chainPlayPos_[channel]=pos ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:826:		unsigned char *data=viewData_->song_->chain_->data_+(16*chain+pos) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:828:		if (*data==0xFF) { // This could happen if starting in song mode on a row
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:829:			               // where a chain contains no phrase
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:833:		viewData_->currentPlayPhrase_[channel]=0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:836:	if (viewData_->currentPlayPhrase_[channel] != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:859:    if ((phrase==0xFF)||(pos<0)||(pos>=16)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:882:	// Get chain content and see if instr needs to be started/Stopped
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:885:	if (currentPhrase!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:895:		if (note!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:907:			if (instr!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:920:				int chain=viewData_->currentPlayChain_[channel] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:921:				int chainPos=viewData_->chainPlayPos_[channel] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:922:				unsigned char *trsp=viewData_->song_->chain_->transpose_+(16*chain+chainPos) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:954:		if ((note!=0xFF)||(instr!=0xFF)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1003:        if (findPlayable(&(liveQueuePosition_[i]),i,liveQueueChainPosition_[i]))
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1006:          updateSongPos(liveQueuePosition_[i],i,liveQueueChainPosition_[i]) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1026:        if (viewData_->currentPlayPhrase_[i]!=0xFF)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1050:              // next chain has a hop on pos zero, it is effective
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1064:	// queueing of chains
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1066:		triggerLiveChains_=true ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1088:                  if (findPlayable(&(liveQueuePosition_[channel]),channel,liveQueueChainPosition_[channel])) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1089:    				  updateSongPos(liveQueuePosition_[channel],channel,liveQueueChainPosition_[channel],hop) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1108:	int chain=viewData_->currentPlayChain_[channel] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1109:	int pos=(viewData_->chainPlayPos_[channel])+1 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1112:	// which means we continue in the current chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1116:		unsigned char *data=viewData_->song_->chain_->data_+(16*chain+pos) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1117:		canContinue=(*data!=0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1123:		updateChainPos(pos,channel,hop) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1124:	} else { // Should move to next chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1126:			moveToNextChain(channel,hop) ; // HOP. here
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1128:			updateChainPos(0,channel,hop) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1134: moveToNextChain:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1135:	Compute what is the next chain to be triggered on
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1136:	the selected channel. Called when the current chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1140:void Player::moveToNextChain(int channel,int hop) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1145:    triggerLiveChains_=true ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1149:    int chainPosition=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1162:                  if (findPlayable(&(liveQueuePosition_[channel]),channel,liveQueueChainPosition_[channel])) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1166:				     chainPosition=liveQueueChainPosition_[channel] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1188:      	bool loopBack=(*data==0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1189:       	// Check if first step of chain contains somethin, if not we loop back
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1191:		   unsigned char step=viewData_->song_->chain_->data_[*data*16] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1192:		   loopBack=(step==0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1198:                if (*data==0xFF) { // we stop searching if there's a blank
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1200:                } else  { // Or if first phrase of chain is empty
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1201:                    if (viewData_->song_->chain_->data_[(*data)*16]==0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1212:    // Do a last check in case we had only one chain and it go destroyed
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1214:    if (isPlayable(nextPos,channel,chainPosition)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1215:    	updateSongPos(nextPos,channel,chainPosition,hop) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1229:            viewData_->currentPlayChain_[i] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1230:            viewData_->currentPlayPhrase_[i] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.cpp:1231:            viewData_->chainPlayPos_[i] = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:67:	void OnStartButton(PlayMode origin,unsigned int from,bool startFromLastPos,unsigned char chainPos) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:89:	unsigned char GetQueueChainPosition(int i) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:90:	void QueueChannel(int i,QueueingMode mode,unsigned char position,unsigned char chainpos=0) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:110:	void updateSongPos(int position,int channel,int chainPos=0,int hop=-1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:111:	void updateChainPos(int position,int channel,int hop=0) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:117:	void moveToNextChain(int channel,int hop) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:119:    void triggerLiveChains() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:121:    bool isPlayable(int row,int col,int chainPos=0) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:122:    bool findPlayable(uchar *row,int col,uchar chainPos=0) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:134:	unsigned long startClock_ ;    // .Used to time display live queued chains
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:141:	bool triggerLiveChains_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/Player.h:151:	unsigned char liveQueueChainPosition_[SONG_CHANNEL_COUNT] ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/PlayerMixer.cpp:63:        notes_[i]=0xFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/PlayerMixer.cpp:128:    notes_[channel]=0xFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/PlayerMixer.cpp:174:    if (notes_[channel]!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/PlayerMixer.cpp:182:    if (notes_[channel]!=0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/PlayerMixer.h:73:	// store trigger notes, 0xFF = none
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/TablePlayback.cpp:141:			tpc.timeToLive_=(param&0xFF)+1 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Player/TablePlayback.cpp:144:			tpc.instrRetrigger_=(param&0xFF) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:140:        if (v == 0xFF) { // Uninitiaized data
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:2:#include "ChainView.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:7:ChainView::ChainView(GUIWindow &w, ViewData *viewData) : View(w, viewData) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:18:        clipboard_.phrase_[i] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:23:void ChainView::setPhrase(unsigned char value) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:24:    viewData_->SetChainPhrase(value);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:29:void ChainView::cutPosition() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:31:    clipboard_.row_ = viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:32:    clipboard_.col_ = viewData_->chainCol_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:33:    saveRow_ = viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:34:    saveCol_ = viewData_->chainCol_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:38:void ChainView::pasteLastPhrase() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:43:    unsigned char *c = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:44:    if ((*c == 0xFF)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:52:void ChainView::updateCursor(int dx, int dy) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:53:    viewData_->UpdateChainCursor(dx, dy);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:57:void ChainView::updateCursorValue(int offset, int dx, int dy) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:59:    unsigned char v = viewData_->UpdateChainCursorValue(offset, dx, dy);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:60:    if (viewData_->chainCol_ == 0) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:63:        updateRow_ = viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:68:void ChainView::updateSelectionValue(int offset) { // HERE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:70:    int savecol = viewData_->chainCol_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:71:    int saverow = viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:73:    viewData_->chainCol_ = r.Left();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:74:    viewData_->chainRow_ = r.Top();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:80:    viewData_->chainCol_ = savecol;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:81:    viewData_->chainRow_ = saverow;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:84:void ChainView::warpInColumn(int offset) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:93:        if (*data != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:94:            viewData_->currentChain_ = *data;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:104:void ChainView::warpToNeighbour(int offset) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:113:        if (*c != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:114:            viewData_->currentChain_ = *c;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:125:void ChainView::clonePosition() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:127:    unsigned char *pos = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:182:GUIRect ChainView::getSelectionRect() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:183:    GUIRect r(clipboard_.col_, clipboard_.row_, viewData_->chainCol_,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:184:              viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:199:void ChainView::fillClipboardData() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:216:        viewData_->song_->chain_->data_ + 16 * viewData_->currentChain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:219:        viewData_->song_->chain_->transpose_ + 16 * viewData_->currentChain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:228:void ChainView::extendSelection() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:231:        if (viewData_->chainCol_ < clipboard_.col_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:232:            viewData_->chainCol_ = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:235:            viewData_->chainCol_ = 1;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:240:        if (viewData_->chainRow_ < clipboard_.row_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:241:            viewData_->chainRow_ = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:245:            viewData_->chainRow_ = 15;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:257:void ChainView::copySelection() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:269:    viewData_->chainRow_ = saveRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:270:    viewData_->chainCol_ = saveCol_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:281:void ChainView::cutSelection() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:293:        viewData_->song_->chain_->data_ + 16 * viewData_->currentChain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:295:        viewData_->song_->chain_->transpose_ + 16 * viewData_->currentChain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:301:                dst1[j + clipboard_.row_] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:314:    viewData_->chainRow_ = saveRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:315:    viewData_->chainCol_ = saveCol_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:324:void ChainView::pasteClipboard() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:329:    if (viewData_->chainRow_ + height > 16) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:330:        height = 16 - viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:334:        viewData_->song_->chain_->data_ + 16 * viewData_->currentChain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:337:        viewData_->song_->chain_->transpose_ + 16 * viewData_->currentChain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:344:                dst1[j + viewData_->chainRow_] = src1[j];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:347:                dst2[j + viewData_->chainRow_] = src2[j];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:356:void ChainView::unMuteAll() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:362:void ChainView::toggleMute() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:369:void ChainView::switchSoloMode() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:378:void ChainView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:401:            mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:408:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:420:            clipboard_.col_ = viewData_->chainCol_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:421:            clipboard_.row_ = viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:422:            saveCol_ = viewData_->chainCol_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:423:            saveRow_ = viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:435:void ChainView::processNormalButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:463:                updateCursorValue(viewData_->chainCol_ == 0 ? -0x10 : -0x0C);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:465:                updateCursorValue(viewData_->chainCol_ == 0 ? 0x10 : 0x0C);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:474:                if (viewData_->chainCol_ == 0)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:493:                    unsigned char *data = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:494:                    if (*data != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:503:                // We toggle full chain start only if we"re not in live mode
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:508:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:528:                                              false, viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:535:        unsigned char *c = viewData_->song_->chain_->data_ +
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:536:                           (16 * viewData_->currentChain_ + updateRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:542:void ChainView::processSelectionButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:562:                updateSelectionValue(viewData_->chainCol_ == 0 ? -0x10 : -0x0C);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:564:                updateSelectionValue(viewData_->chainCol_ == 0 ? 0x10 : 0x0C);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:589:                    unsigned char *data = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:590:                    if (*data != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:601:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:622:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:629:void ChainView::OnFocus() { clipboard_.active_ = false; };
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:631:void ChainView::setTextProps(GUITextProperties &props, int row, int col,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:643:        if ((viewData_->chainCol_ == row) && (viewData_->chainRow_ == col)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:662:void ChainView::DrawView() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:674:    sprintf(title, "Chain %2.2x", viewData_->currentChain_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:702:        viewData_->song_->chain_->data_ + (16 * viewData_->currentChain_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:707:        if (d == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:723:        viewData_->song_->chain_->transpose_ + (16 * viewData_->currentChain_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:743:void ChainView::OnPlayerUpdate(PlayerEventType eventType, unsigned int tick) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:766:        // Loop on all channels to see if one of them is playing current chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:770:                if (viewData_->currentPlayChain_[i] ==
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:771:                        viewData_->currentChain_ &&
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:773:                    pos._y = anchor._y + viewData_->chainPlayPos_[i];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:783:                    lastPlayingPos_ = viewData_->chainPlayPos_[i];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:789:        // Loop on all channels to see if one has queued current chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:796:                    // find the chain queued in channel
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:798:                    unsigned char *chain =
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:800:                    if (*chain == viewData_->currentChain_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:801:                        unsigned char chainPos =
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:802:                            player->GetQueueChainPosition(i);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:803:                        pos._y = anchor._y + chainPos;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.cpp:806:                        lastQueuedPos_ = chainPos;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.h:8:class ChainView : public View {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.h:10:    ChainView(GUIWindow &w, ViewData *data);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ChainView.h:51:    struct ChainClip {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/GrooveView.cpp:110:					player->OnStartButton(PM_PHRASE,viewData_->songX_,true,viewData_->chainRow_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/GrooveView.cpp:118:					player->OnStartButton(PM_PHRASE,viewData_->songX_,false,viewData_->chainRow_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:132:    f1=new UIIntVarField(position,*v,"drive: %2.2X",0,0xFF,1,0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:148:	f1=new UIIntVarField(position,*v,"%2.2X",0,0xFF,1,0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:153:	f1=new UIIntVarField(position,*v,"%2.2X",0,0xFF,1,0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:159:	f1=new UIIntVarField(position,*v,"type: %2.2X",0,0xFF,1,0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:169:	f1=new UIIntVarField(position,*v,"attenuate: %d [%2.2X]",1,0xFF,1,0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:178:	f1=new UIIntVarField(position,*v,"%2.2X",0,0xFF,1,0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:183:	f1=new UIIntVarField(position,*v,"%2.2X",0,0xFF,1,0X10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:200:	f1=new UIIntVarField(position,*v,"slices: %2.2X",1,0xFF,1,0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:245:	f1=new UIIntVarField(position,*v,"volume: %2.2X",0,0xFF,1,0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:250:	f1=new UIIntVarField(position,*v,"length: %2.2X",0,0xFF,1,0x10) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:324:			mask&=(0xFFFF-EPBM_A) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:331:			mask&=(0xFFFF-EPBM_A) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:342:		mask&=(0xFFFF-(EPBM_A|EPBM_L)) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:439:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:445:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:31:        new UIBigHexVarField(pos, cmdEdit_, 4, "%4.4X", 0, 0xFFFF, 16, true);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:46:        clipboard_.note_[i] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:63:        // Try to see if the current chain has a phrase after this one
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:65:        if ((viewMode_ != VM_SELECTION) && (viewData_->chainRow_ < 15)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:66:            viewData_->chainRow_++;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:67:            unsigned char *p = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:68:            if (*p != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:72:                viewData_->chainRow_--;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:81:        // Try to see if the current chain has a phrase before this one
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:83:        if ((viewMode_ != VM_SELECTION) && (viewData_->chainRow_ > 0)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:84:            viewData_->chainRow_--;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:85:            unsigned char *p = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:86:            if (*p != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:90:                viewData_->chainRow_++;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:160:                              viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:259:    if ((c) && (*c != 0xFF)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:288:                                      viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:294:                                  viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:312:        if ((*c == 0xFF)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:325:        if ((*c == 0xFF)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:388:void PhraseView::warpInChain(int offset) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:390:    int currentRow = viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:391:    viewData_->chainRow_ += offset;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:392:    if ((viewData_->chainRow_ < 16) && (viewData_->chainRow_ >= 0)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:393:        unsigned char *p = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:394:        if (*p != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:407:            viewData_->chainRow_ = currentRow;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:410:        viewData_->chainRow_ = currentRow;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:425:        // is there a chain ?
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:426:        unsigned char oldChain = viewData_->currentChain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:427:        if (*c != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:428:            // go to chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:429:            viewData_->currentChain_ = *c;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:431:            unsigned char *p = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:433:            if (*p != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:440:                viewData_->currentChain_ = *c;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:446:            // no chain, to neighbour song channel
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:596:        if (startNote == 0xFF || endNote == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:683:                dst1[j + clipboard_.row_] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:686:                dst2[j + clipboard_.row_] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:852:                mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:864:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:878:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:892:                if (*c != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:940:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:976:            warpInChain(-1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:978:            warpInChain(1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:997:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1042:                    if (*c != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1050:                    if (viewData_->currentInstrument_ != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1094:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1116:                                              false, viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1129:    if (instr[row] != 0xFF) return instr[row];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1133:        if (up >= 0 && instr[up] != 0xFF) return instr[up];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1134:        if (down < 16 && instr[down] != 0xFF) return instr[down];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1186:                    if (*c != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1201:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1223:                                              false, viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1311:        if (d == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1335:        if (d == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1391:        /*		if (p==0xFFFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1438:        /*		if (p==0xFFFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1516:        // Loop on all channels to see if one has queued current chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1522:                    // find the chain queued in channel
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1524:                    unsigned char *chain =
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1526:                    if (*chain == viewData_->currentChain_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:30:        new UIBigHexVarField(pos, cmdEdit_, 4, "%4.4X", 0, 0xFFFF, 16, true);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:45:        clipboard_.note_[i] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:62:        // Try to see if the current chain has a phrase after this one
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:64:        if ((viewMode_ != VM_SELECTION) && (viewData_->chainRow_ < 15)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:65:            viewData_->chainRow_++;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:66:            unsigned char *p = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:67:            if (*p != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:71:                viewData_->chainRow_--;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:80:        // Try to see if the current chain has a phrase before this one
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:82:        if ((viewMode_ != VM_SELECTION) && (viewData_->chainRow_ > 0)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:83:            viewData_->chainRow_--;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:84:            unsigned char *p = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:85:            if (*p != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:89:                viewData_->chainRow_++;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:158:                              viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:256:    if ((c) && (*c != 0xFF)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:284:                                      viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:288:                                  viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:305:        if ((*c == 0xFF)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:318:        if ((*c == 0xFF)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:381:void PhraseView::warpInChain(int offset) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:383:    int currentRow = viewData_->chainRow_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:384:    viewData_->chainRow_ += offset;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:385:    if ((viewData_->chainRow_ < 16) && (viewData_->chainRow_ >= 0)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:386:        unsigned char *p = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:387:        if (*p != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:400:            viewData_->chainRow_ = currentRow;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:403:        viewData_->chainRow_ = currentRow;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:418:        // is there a chain ?
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:419:        unsigned char oldChain = viewData_->currentChain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:420:        if (*c != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:421:            // go to chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:422:            viewData_->currentChain_ = *c;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:424:            unsigned char *p = viewData_->GetCurrentChainPointer();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:426:            if (*p != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:433:                viewData_->currentChain_ = *c;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:439:            // no chain, to neighbour song channel
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:589:        if (startNote == 0xFF || endNote == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:676:                dst1[j + clipboard_.row_] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:679:                dst2[j + clipboard_.row_] = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:845:                mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:857:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:871:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:885:                if (*c != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:933:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:969:            warpInChain(-1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:971:            warpInChain(1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:989:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1033:                    if (*c != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1041:                    if (viewData_->currentInstrument_ != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1085:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1107:                                              false, viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1120:    if (instr[row] != 0xFF) return instr[row];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1124:        if (up >= 0 && instr[up] != 0xFF) return instr[up];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1125:        if (down < 16 && instr[down] != 0xFF) return instr[down];
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1177:                    if (*c != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1192:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1214:                                              false, viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1296:        if (d == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1320:        if (d == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1378:        /*		if (p==0xFFFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1425:        /*		if (p==0xFFFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1502:        // Loop on all channels to see if one has queued current chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1508:                    // find the chain queued in channel
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1510:                    unsigned char *chain =
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1512:                    if (*chain == viewData_->currentChain_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/PhraseView.h:32:    void warpInChain(int offset);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:23:    updatingChain_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:24:    lastChain_ = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:48: updateChain:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:49:        update current chain value by adding offset
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:53:void SongView::updateChain(int offset) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:55:    unsigned int chain = viewData_->UpdateSongChain(offset);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:56:    updatingChain_ = true;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:57:    lastChain_ = chain;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:65: updateChain:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:66:        set current chain value to value parameter
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:69:void SongView::setChain(unsigned char value) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:70:    viewData_->SetSongChain(value);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:71:    lastChain_ = value;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:122:        set current position to last chain value if
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:128:    // If we're on an empty spot, we past the last chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:129:    // otherwise we take the current chain as last
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:132:    if (*c == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:133:        *c = lastChain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:134:        viewData_->song_->chain_->SetUsed(*c);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:137:        lastChain_ = *c;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:153:    unsigned short next = viewData_->song_->chain_->GetNext();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:157:    unsigned char *src = viewData_->song_->chain_->data_ + 16 * current;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:158:    unsigned char *dst = viewData_->song_->chain_->data_ + 16 * next;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:164:    src = viewData_->song_->chain_->transpose_ + 16 * current;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:165:    dst = viewData_->song_->chain_->transpose_ + 16 * next;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:170:    setChain((unsigned char)next);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:176:        deep clone chain and all phrases within
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:182:    Chain *ch = viewData_->song_->chain_;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:184:    unsigned char curChainNum = *pos;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:186:    if (curChainNum == CHAIN_COUNT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:187:        View::SetNotification("no more chains!");
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:191:    unsigned char *srcChain = ch->data_ + 16 * curChainNum;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:192:    unsigned char *dstChain = ch->data_ + 16 * curChainNum;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:203:        unsigned short srcPhraseNum = *srcChain;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:207:            srcChain++;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:208:            dstChain++;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:244:        *dstChain = newPhraseNum;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:245:        srcChain++;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:246:        dstChain++;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:250:    setChain((unsigned char)curChainNum);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:376:            *dst++ = 0xFF;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:483:    // Always play with zero offset in chains when in SongView
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:484:    viewData_->chainRow_ = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:519:    // Always play with zero offset in chains when in SongView
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:520:    viewData_->chainRow_ = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:540:        if (foundGap && (*start != 0xFF)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:543:            if (*start == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:561:            if (*start == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:606:            unsigned short next = viewData_->song_->chain_->GetNext();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:608:                setChain((unsigned char)next);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:611:            mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:618:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:627:        mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:702:                updateChain(-0x10);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:704:                updateChain(0x10);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:706:                updateChain(-0x01);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:708:                updateChain(0x01);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:732:                    if (*data != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:735:                        viewData_->currentChain_ = *data;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:795:    if ((!(mask & EPBM_A)) && updatingChain_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:798:        viewData_->song_->chain_->SetUsed(*c);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:799:        updatingChain_ = false;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:847:                    if (*data != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:850:                        viewData_->currentChain_ = *data;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:1001:            if (d == 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp:1074:                if (viewData_->currentPlayChain_[i] != 0xFF) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.h:7:class SongView;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.h:9:class SongView : public View {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.h:25:    void updateChain(int offset);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.h:28:    void setChain(unsigned char);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.h:51:    bool updatingChain_; // .Flag that tells we're updating chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.h:52:                         //  so we don't allocate chains while
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.h:58:    unsigned char lastChain_; // .Last chain clipboard
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/TableView.cpp:26:        new UIBigHexVarField(pos, cmdEdit_, 4, "%4.4X", 0, 0xFFFF, 16, true);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/TableView.cpp:693:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/TableView.cpp:713:                                              false, viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/TableView.cpp:754:                                          viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/TableView.cpp:775:                                              false, viewData_->chainRow_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:8:	currentChain_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:13:	chainCol_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:14:	chainRow_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:28:unsigned char ViewData::UpdateSongChain(int offset) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:35:void ViewData::SetSongChain(unsigned char value) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:75:unsigned char ViewData::UpdateChainCursorValue(int offset,int dx,int dy) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:81:	switch (chainCol_+dx) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:83:			c=song_->chain_->data_+(16*currentChain_+chainRow_+dy) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:88:			c=song_->chain_->transpose_+(16*currentChain_+chainRow_+dy) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:89:			limit=0xFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:97:void ViewData::UpdateChainCursor(int dx,int dy) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:98:	chainCol_+=dx ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:99:	chainRow_+=dy ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:100:	if (chainCol_>1) chainCol_=1 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:101:	if (chainCol_<0) chainCol_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:102:	if (chainRow_>15) chainRow_=15 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:103:	if (chainRow_<0) chainRow_=0 ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:106:void ViewData::SetChainPhrase(unsigned char value) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:107:	unsigned char *c=song_->chain_->data_+(16*currentChain_+chainRow_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:111:unsigned char *ViewData::GetCurrentChainPointer() {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.cpp:112:	return song_->chain_->data_+(16*currentChain_+chainRow_) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:23:	unsigned char UpdateSongChain(int offset) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:26:	void SetSongChain(unsigned char) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:29:	void UpdateChainCursor(int dx,int dy) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:30:	unsigned char UpdateChainCursorValue(int offset,int dx,int dy) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:31:	void SetChainPhrase(unsigned char value) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:32:	unsigned char *GetCurrentChainPointer() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:40:		if ((v==0xFF)&&(limit!=0xFF))
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:63:	int chainRow_ ;  			// .Current row in chain editor 
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:64:	int chainCol_ ;			    // .Current column in chain editor
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:66:	int currentChain_ ;         // .Current edited chain
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:87:	unsigned char currentPlayChain_[SONG_CHANNEL_COUNT] ;    // .Current played chain for each channel
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/ViewData.h:88:	int chainPlayPos_[SONG_CHANNEL_COUNT] ;                   // .Play position in chain for each channel
+
+=== X/Y/L2/R2 masks now available ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/UIFramework/BasicDatas/GUIEvent.cpp:78:case EPBT_X:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/UIFramework/BasicDatas/GUIEvent.cpp:79:	value="EPBT_X" ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/UIFramework/BasicDatas/GUIEvent.cpp:81:case EPBT_Y:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/UIFramework/BasicDatas/GUIEvent.cpp:82:	value="EPBT_Y" ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/UIFramework/BasicDatas/GUIEvent.h:41:EPBT_X = 10,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/UIFramework/BasicDatas/GUIEvent.h:42:EPBT_Y = 11,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:29:    EPBM_X = 1024,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:30:    EPBM_Y = 2048,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:41:        case EPBT_X: return "X";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:42:        case EPBT_Y: return "Y";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:91:    if (!strcmp(name, "x")) return EPBT_X;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:92:    if (!strcmp(name, "y")) return EPBT_Y;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:190:    { EPBT_X,      "LGPT_X",      false, false },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:191:    { EPBT_Y,      "LGPT_Y",      false, false },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:258:    if (phys & PHY_BIT(PHY_X))     output_set(EPBT_X);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:261:    if (phys & PHY_BIT(PHY_Y))     output_set(EPBT_Y);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:397:    // TREEFROG_INPUT_X_DEDICATED: face-tap X usa EPBT_X.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:398:    if (rising & PHY_BIT(PHY_X)) push_face_tap(EPBT_X);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:401:    // TREEFROG_INPUT_Y_DEDICATED: face-tap Y usa EPBT_Y.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:402:    if (rising & PHY_BIT(PHY_Y)) push_face_tap(EPBT_Y);

@@ -1,0 +1,290 @@
+R36SX Song/App input debug patch
+Generated: 20260702_124218
+DEV=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT
+BACKUP_DIR=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/backups/R36SX_SONG_INPUT_DEBUG_20260702_124218
+
+=== Song debug markers ===
+187-        erase current position value
+188- ******************************************************/
+189-
+190-void SongView::cutPosition() {
+191:    // TREEFROG_SONG_CUT_ENTER_DEBUG_V1
+192-    treefrog_song_debug_snapshot(this, "cutPosition.enter", 0, true);
+193-
+194-
+195-    // prepare selection data
+196-    clipboard_.x_ = viewData_->songX_;
+197-    clipboard_.y_ = viewData_->songY_;
+198-    clipboard_.offset_ = viewData_->songOffset_;
+199-
+--
+207-    // TREEFROG_SONG_CUT_FORCE_DIRTY_V2
+208-    isDirty_ = true;
+209-    SetDirty(true);
+210-
+211:    // TREEFROG_SONG_CUT_EXIT_DEBUG_V1
+212-    isDirty_ = true;
+213-    SetDirty(true);
+214-    treefrog_song_debug_snapshot(this, "cutPosition.exit.forceDirty", 0, true);
+215-}
+216-
+217-// TREEFROG_INPUT_SONG_AB_CLEAR_YX_CUT
+218-// Clear de una celda Song sin compactar filas.
+219-// Deja la posición actual como -- usando el mismo sentinel 0xFF que ya usa SongView.
+220-void SongView::clearPosition() {
+221:    // TREEFROG_SONG_CLEAR_ENTER_DEBUG_V1
+222-    treefrog_song_debug_snapshot(this, "clearPosition.enter", 0, true);
+223-
+224-    int col = (int)viewData_->songX_;
+225-    int row = (int)viewData_->songY_ + (int)viewData_->songOffset_;
+226-
+227-    if (col < 0 || col >= SONG_CHANNEL_COUNT) return;
+228-    if (row < 0 || row >= SONG_ROW_COUNT) return;
+229-
+--
+233-    // TREEFROG_SONG_CLEAR_FORCE_DIRTY_V2
+234-    isDirty_ = true;
+235-    SetDirty(true);
+236-
+237:    // TREEFROG_SONG_CLEAR_EXIT_DEBUG_V1
+238-    isDirty_ = true;
+239-    SetDirty(true);
+240-    treefrog_song_debug_snapshot(this, "clearPosition.exit.forceDirty", 0, true);
+241-};
+242-
+243-/******************************************************
+244- pastePosition:
+245-        set current position to last chain value if
+--
+708-        application window
+709- ******************************************************/
+710-
+711-void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
+712:    // TREEFROG_SONG_PROCESS_BUTTON_ENTER_DEBUG_V1
+713-    treefrog_song_debug_snapshot(this, "ProcessButtonMask.enter", mask, pressed);
+714-
+715-
+716-    if (!pressed) {
+717-        if (viewMode_ == VM_MUTEON) {
+718-            if (mask & EPBM_R) {
+719-                toggleMute();
+720-            }
+--
+776-        viewMode_ = VM_NORMAL;
+777-        processNormalButtonMask(mask);
+778-    }
+779-
+780:    // TREEFROG_SONG_PROCESS_BUTTON_EXIT_DEBUG_V1
+781-    treefrog_song_debug_snapshot(this, "ProcessButtonMask.exit", mask, pressed);
+782-}
+783-
+784-/******************************************************
+785- processNormalButtonMask:
+786-        process button mask in the case there is no
+787-        selection active
+788- ******************************************************/
+789-
+790-void SongView::processNormalButtonMask(unsigned int mask) {
+791:    // TREEFROG_SONG_NORMAL_ENTER_DEBUG_V1
+792-    treefrog_song_debug_snapshot(this, "processNormal.enter", mask, true);
+793-    if ((mask & EPBM_B) && (mask & EPBM_A)) {
+794-        treefrog_song_debug_snapshot(this, "processNormal.AB_SEEN", mask, true);
+795-    }
+796-    if ((mask & EPBM_X) || (mask & EPBM_Y)) {
+797-        treefrog_song_debug_snapshot(this, "processNormal.XY_SEEN", mask, true);
+798-    }
+799-
+
+=== App debug markers ===
+519-    _isDirty = false;
+520-
+521-    unsigned short v = 1 << event.GetValue();
+522-
+523:    // TREEFROG_APP_EVENT_AFTER_VALUE_DEBUG_V1
+524-    treefrog_app_debug_log("onEvent.enter",
+525-                           (int)event.GetType(),
+526-                           (int)event.GetValue(),
+527-                           _mask,
+528-                           _isDirty);
+529-
+530-    MixerService *sm = MixerService::GetInstance();
+531-    sm->Lock();
+--
+563-
+564-    default:
+565-        break;
+566-    }
+567:    // TREEFROG_APP_EVENT_AFTER_SWITCH_DEBUG_V1
+568-    treefrog_app_debug_log("onEvent.afterSwitch",
+569-                           (int)event.GetType(),
+570-                           (int)event.GetValue(),
+571-                           _mask,
+572-                           _isDirty);
+573-
+574-    sm->Unlock();
+575-
+--
+587-    }
+588-#ifdef _SHOW_GP2X_
+589-    Redraw();
+590-#else
+591:    // TREEFROG_APP_EVENT_BEFORE_REDRAW_DEBUG_V1
+592-    treefrog_app_debug_log(_isDirty ? "onEvent.beforeRedraw.DIRTY" : "onEvent.beforeRedraw.NOT_DIRTY",
+593-                           (int)event.GetType(),
+594-                           (int)event.GetValue(),
+595-                           _mask,
+596-                           _isDirty);
+597-    if (_isDirty)
+598-        Redraw();
+599-#endif
+
+=== Existing Song YX/AB/clear/cut context ===
+175-        adding dx & dy parameters
+176- ******************************************************/
+177-
+178-void SongView::updateCursor(int dx, int dy) {
+179-    viewData_->UpdateSongCursor(dx, dy);
+180-    isDirty_ = true;
+181-    canDeepClone_ = false;
+182-}
+183-
+184-/******************************************************
+185- cutPosition:
+186-        copy current position content to clipboard &
+187-        erase current position value
+188- ******************************************************/
+189-
+190:void SongView::cutPosition() {
+191-    // TREEFROG_SONG_CUT_ENTER_DEBUG_V1
+192-    treefrog_song_debug_snapshot(this, "cutPosition.enter", 0, true);
+193-
+194-
+195-    // prepare selection data
+196-    clipboard_.x_ = viewData_->songX_;
+197-    clipboard_.y_ = viewData_->songY_;
+198-    clipboard_.offset_ = viewData_->songOffset_;
+199-
+200-    saveX_ = viewData_->songX_;
+201-    saveY_ = viewData_->songY_;
+202-    saveOffset_ = viewData_->songOffset_;
+203-
+204-    // cut selection
+205-    cutSelection();
+206-
+207-    // TREEFROG_SONG_CUT_FORCE_DIRTY_V2
+208-    isDirty_ = true;
+209-    SetDirty(true);
+210-
+211-    // TREEFROG_SONG_CUT_EXIT_DEBUG_V1
+212-    isDirty_ = true;
+213-    SetDirty(true);
+214-    treefrog_song_debug_snapshot(this, "cutPosition.exit.forceDirty", 0, true);
+215-}
+216-
+217-// TREEFROG_INPUT_SONG_AB_CLEAR_YX_CUT
+218-// Clear de una celda Song sin compactar filas.
+219-// Deja la posición actual como -- usando el mismo sentinel 0xFF que ya usa SongView.
+220:void SongView::clearPosition() {
+221-    // TREEFROG_SONG_CLEAR_ENTER_DEBUG_V1
+222-    treefrog_song_debug_snapshot(this, "clearPosition.enter", 0, true);
+223-
+224-    int col = (int)viewData_->songX_;
+225-    int row = (int)viewData_->songY_ + (int)viewData_->songOffset_;
+226-
+227-    if (col < 0 || col >= SONG_CHANNEL_COUNT) return;
+228-    if (row < 0 || row >= SONG_ROW_COUNT) return;
+229-
+230-    unsigned char *cell = viewData_->song_->data_ + row * SONG_CHANNEL_COUNT + col;
+231-    *cell = 0xFF;
+232-
+233-    // TREEFROG_SONG_CLEAR_FORCE_DIRTY_V2
+234-    isDirty_ = true;
+235-    SetDirty(true);
+236-
+237-    // TREEFROG_SONG_CLEAR_EXIT_DEBUG_V1
+238-    isDirty_ = true;
+239-    SetDirty(true);
+240-    treefrog_song_debug_snapshot(this, "clearPosition.exit.forceDirty", 0, true);
+241-};
+242-
+243-/******************************************************
+244- pastePosition:
+245-        set current position to last chain value if
+--
+787-        selection active
+788- ******************************************************/
+789-
+790-void SongView::processNormalButtonMask(unsigned int mask) {
+791-    // TREEFROG_SONG_NORMAL_ENTER_DEBUG_V1
+792-    treefrog_song_debug_snapshot(this, "processNormal.enter", mask, true);
+793-    if ((mask & EPBM_B) && (mask & EPBM_A)) {
+794-        treefrog_song_debug_snapshot(this, "processNormal.AB_SEEN", mask, true);
+795-    }
+796-    if ((mask & EPBM_X) || (mask & EPBM_Y)) {
+797-        treefrog_song_debug_snapshot(this, "processNormal.XY_SEEN", mask, true);
+798-    }
+799-
+800-
+801-
+802:    // TREEFROG_INPUT_SONG_YX_CUT_NORMAL_MODE_V2
+803-    // R36SX TreeFrog:
+804-    // Y+X ejecuta el cut/compact histórico de Song.
+805-    // No exigimos máscara exacta porque el runtime puede mantener otros bits latcheados.
+806-    const unsigned int treefrogSongYXMask = EPBM_Y | EPBM_X;
+807-    if ((mask & treefrogSongYXMask) == treefrogSongYXMask) {
+808:        cutPosition();
+809-        isDirty_ = true;
+810-        SetDirty(true);
+811-        return;
+812-    }
+813-
+814-    // B Modifier
+815-
+816-    if (mask & EPBM_B) {
+817-
+818-        if (mask & EPBM_DOWN)
+819-            updateSongOffset(SongView::jumpLength_);
+820-        if (mask & EPBM_UP)
+821-            updateSongOffset(-SongView::jumpLength_);
+822-        if (mask & (EPBM_RIGHT | EPBM_LEFT)) {
+823-            Player *player = Player::GetInstance();
+824-            switch (player->GetSequencerMode()) {
+825-            case SM_SONG:
+826-                player->SetSequencerMode(SM_LIVE);
+827-                break;
+828-            case SM_LIVE:
+829-                player->SetSequencerMode(SM_SONG);
+830-                break;
+831-            }
+832-            isDirty_ = true;
+833-        }
+834-        if ((mask & EPBM_A) && (!(mask & EPBM_R)))
+835-            // TREEFROG_INPUT_SONG_AB_CLEAR_YX_CUT
+836-            // A+B ahora limpia la celda actual sin compactar filas.
+837:            clearPosition();
+838-        if (mask & EPBM_L) {
+839-
+840-            viewMode_ = VM_CLONE;
+841-        };
+842-        if (mask & EPBM_R) {
+843-            toggleMute();
+844-        };
+845-        if (mask & EPBM_START) {
+846-            startImmediate();
+847-        }
+848-    } else {
+849-
+850-        // A modifier
+851-
+852-        if (mask & EPBM_A) {
+853-
+854-            if (mask & EPBM_DOWN)
+855-                updateChain(-0x10);
+856-            if (mask & EPBM_UP)
+857-                updateChain(0x10);
+858-            if (mask & EPBM_LEFT)
+859-                updateChain(-0x01);
+860-            if (mask & EPBM_RIGHT)
+861-                updateChain(0x01);
+862-            if (mask & EPBM_L && !canDeepClone_) {
+

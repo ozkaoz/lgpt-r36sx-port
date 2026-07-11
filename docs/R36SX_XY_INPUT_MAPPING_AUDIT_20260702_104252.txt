@@ -1,0 +1,1158 @@
+R36SX X/Y input mapping audit
+Generated: 20260702_104252
+DEV=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT
+
+=== EPBM definitions ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:20:    EPBM_LEFT = 1,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:21:    EPBM_DOWN = 2,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:22:    EPBM_RIGHT = 4,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:23:    EPBM_UP = 8,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:24:    EPBM_L = 16,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:25:    EPBM_B = 32,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:26:    EPBM_A = 64,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:27:    EPBM_R = 128,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:28:    EPBM_START = 256,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:29:    EPBM_SELECT = 512,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:30:    EPBM_DOUBLE_A = 1024,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:31:    EPBM_DOUBLE_B = 2048
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:58:	if (mask&EPBM_A) {  // A or A+ARROW is sent to the field
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:59:		if (mask&EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:60:			focus_->ProcessArrow(EPBM_DOWN) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:63:		if (mask&EPBM_UP){
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:64:			focus_->ProcessArrow(EPBM_UP)  ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:68:		if (mask&EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:69:			focus_->ProcessArrow(EPBM_LEFT) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:73:		if (mask&EPBM_RIGHT){
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:74:			focus_->ProcessArrow(EPBM_RIGHT)  ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:78:		if (mask==EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:83:		if (mask&EPBM_B) {  // B or B+ARROW is sent to the field
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:85:			if (mask==EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:90:			if (mask&EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:91:				focus_->ProcessBArrow(EPBM_DOWN) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:94:			if (mask&EPBM_UP){
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:95:				focus_->ProcessBArrow(EPBM_UP)  ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:99:			if (mask&EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:100:				focus_->ProcessBArrow(EPBM_LEFT) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:104:			if (mask&EPBM_RIGHT){
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:105:				focus_->ProcessBArrow(EPBM_RIGHT)  ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:111:			if (!(mask&(EPBM_A|EPBM_B|EPBM_L|EPBM_R|EPBM_SELECT|EPBM_START))) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:113:				if (mask&EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:155:				if (mask&EPBM_UP){
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:195:				if (mask&EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:236:				if (mask&EPBM_LEFT){
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:66:		case EPBM_LEFT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:71:		case EPBM_RIGHT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:76:		case EPBM_UP:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp:80:		case EPBM_DOWN:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntField.cpp:44:		case EPBM_UP:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntField.cpp:47:		case EPBM_DOWN:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntField.cpp:50:		case EPBM_LEFT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntField.cpp:53:  		case EPBM_RIGHT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarField.cpp:71:		case EPBM_UP:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarField.cpp:74:		case EPBM_DOWN:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarField.cpp:77:		case EPBM_LEFT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarField.cpp:80:  		case EPBM_RIGHT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarOffField.cpp:17:			case EPBM_UP:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarOffField.cpp:20:  			case EPBM_RIGHT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarOffField.cpp:26:			case EPBM_UP:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarOffField.cpp:29:			case EPBM_DOWN:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarOffField.cpp:32:			case EPBM_LEFT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UIIntVarOffField.cpp:35:  			case EPBM_RIGHT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UISortedVarList.cpp:12:		case EPBM_UP:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UISortedVarList.cpp:19:		case EPBM_DOWN:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UISortedVarList.cpp:22:*/		case EPBM_LEFT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UISortedVarList.cpp:25:  		case EPBM_RIGHT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UITempoField.cpp:38:		case EPBM_UP:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UITempoField.cpp:41:		case EPBM_DOWN:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UITempoField.cpp:44:		case EPBM_LEFT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UITempoField.cpp:47:  		case EPBM_RIGHT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UITempoField.cpp:65:		case EPBM_UP:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UITempoField.cpp:67:		case EPBM_DOWN:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UITempoField.cpp:69:		case EPBM_LEFT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/UITempoField.cpp:72:  		case EPBM_RIGHT:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:20:    EPBM_LEFT = 1,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:21:    EPBM_DOWN = 2,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:22:    EPBM_RIGHT = 4,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:23:    EPBM_UP = 8,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:24:    EPBM_L = 16,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:25:    EPBM_B = 32,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:26:    EPBM_A = 64,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:27:    EPBM_R = 128,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:28:    EPBM_START = 256,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:29:    EPBM_SELECT = 512,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:30:    EPBM_DOUBLE_A = 1024,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:31:    EPBM_DOUBLE_B = 2048
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:382:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:387:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:395:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:401:            mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:406:        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:408:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:441:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:442:        if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:444:        if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:446:        if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:448:        if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:450:        if (mask & EPBM_A)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:452:        if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:455:        if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:461:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:462:            if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:464:            if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:466:            if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:468:            if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:470:            if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:472:            if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:477:            if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:483:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:485:                if (mask & EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:492:                if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:506:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:510:                if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:514:                if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:518:                    if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:520:                    if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:522:                    if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:524:                    if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:526:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:534:    if ((!(mask & EPBM_A)) && updatingPhrase_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:548:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:549:        if (mask == EPBM_B)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:551:        if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:553:        if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:559:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:561:            if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:563:            if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:565:            if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:567:            if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:570:            if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:573:            if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:579:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:581:                if (mask & EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:588:                if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:599:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:604:                if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:611:                if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:613:                if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:615:                if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:617:                if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:620:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:64:	if (mask&EPBM_B) {         
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:65:			if (mask&EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:68:			if (mask&EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:71:			if (mask&EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:74:			if (mask&EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:77:			if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:83:	  if (mask&EPBM_A) {         
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:84:			if (mask&EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:87:			if (mask&EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:90:			if (mask&EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:93:			if (mask&EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:96:			if (mask==EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:102:          	if (mask&EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:103:				if (mask&EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:109:				if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:115:    			if (mask&EPBM_DOWN) updateCursor(1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:116:    			if (mask&EPBM_UP) updateCursor(-1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:117:    			if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:286:		if (mask==EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:324:			mask&=(0xFFFF-EPBM_A) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:329:        if ((mask&EPBM_A)&&(mask&EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:331:			mask&=(0xFFFF-EPBM_A) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:342:		mask&=(0xFFFF-(EPBM_A|EPBM_L)) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:355:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:356:        if (mask&EPBM_LEFT) warpToNext(-1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:357:		if (mask&EPBM_RIGHT) warpToNext(+1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:358:		if (mask&EPBM_DOWN) warpToNext(-16) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:359:		if (mask&EPBM_UP) warpToNext(+16);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:360:		if (mask&EPBM_A) { // Allow cut instrument
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:383:        if (mask&EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:390:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:400:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:401:                if (mask & EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:408:                if (mask & EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:427:                // if (mask&EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:437:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:443:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:53:	//		if (mask&EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:58:	//		if (mask&EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:102:	if (mask&EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:107:	  if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:113:          	if (mask&EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:114:				if (mask&EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:120:				if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:127:				if (mask&EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:131:					if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:134:				   if (mask&EPBM_LEFT) updateCursor(-1,0)  ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:135:				   if (mask&EPBM_RIGHT) updateCursor(1,0) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:152:	if (mask&EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:158:	  if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:164:          	if (mask&EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:165: 				if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:171:	          		if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:115:    if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:118:    } else if (mask & EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:121:    } else if (mask & EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:124:    } else if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:127:    } else if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:129:    } else if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:151:	if (mask&EPBM_B) {  
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:152:		if (mask&EPBM_UP) warpToNextSample(-LIST_SIZE) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:153:		if (mask&EPBM_DOWN) warpToNextSample(LIST_SIZE) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:154:	} else if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:156:		if (mask&EPBM_UP) warpToNextSample(-1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:157:		if (mask&EPBM_DOWN) warpToNextSample(1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:178:	} else if (mask&EPBM_START) { // START Modifier
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:179:		if (mask&EPBM_UP) warpToNextSample(-1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:180:		if (mask&EPBM_DOWN) warpToNextSample(1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:186:		if (mask&EPBM_RIGHT) { // Load sample
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:192:		if (mask&EPBM_LEFT) { // Navigate up
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:201:		if (mask==EPBM_UP) warpToNextSample(-1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:202:		if (mask==EPBM_DOWN) warpToNextSample(1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:203:		if (mask==EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:208:		if (mask==EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:234:		!(mask&EPBM_UP||mask&EPBM_DOWN)) { // Don't browse preview folders
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/MessageBox.cpp:64:	if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/MessageBox.cpp:67:	if (mask&EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/MessageBox.cpp:73:	if (mask&EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:121:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:146:        } else if (mask == EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:154:        } else if (mask == EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:159:        } else if (mask == EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:164:        } else if (mask == EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:169:        } else if (mask == EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:174:        } else if (mask == EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:178:        } else if (mask == EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:182:        } else if (mask == EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:188:    } else if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:189:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:225:        if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:230:        if (mask&EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:239:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:242:                if (mask == EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:246:                if (mask == EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:251:                if (mask == EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:266:                if (mask == EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:218:    if (mask&EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:220:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:243:        if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:245:        if (mask&EPBM_DOWN) warpToNextProject(LIST_SIZE) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:249:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:304:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:307:				if (mask==EPBM_UP) warpToNextProject(-1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:308:				if (mask==EPBM_DOWN) warpToNextProject(1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:309:				if (mask==EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:314:				if (mask==EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:205:            cmdEditField_->ProcessArrow(EPBM_RIGHT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:208:            cmdEditField_->ProcessArrow(EPBM_UP);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:211:            cmdEditField_->ProcessArrow(EPBM_LEFT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:214:            cmdEditField_->ProcessArrow(EPBM_DOWN);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:242:            cmdEditField_->ProcessArrow(EPBM_RIGHT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:245:            cmdEditField_->ProcessArrow(EPBM_UP);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:248:            cmdEditField_->ProcessArrow(EPBM_LEFT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:251:            cmdEditField_->ProcessArrow(EPBM_DOWN);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:825:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:830:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:838:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:852:                mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:864:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:878:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:887:        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:940:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:963:    if (!(mask & EPBM_A)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:970:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:971:        if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:973:        if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:975:        if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:977:        if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:979:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:982:        if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:985:        if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:991:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1002:            if (mask & EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1008:            if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1014:            if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1016:            if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1018:            if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1020:            if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1022:            if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1032:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1033:                if (mask & EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1039:                if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1057:                if (mask & EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1082:                if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1092:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1096:                if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1101:                if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1106:                    if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1108:                    if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1110:                    if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1112:                    if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1114:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1145:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1146:        if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1148:        } else if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1157:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1159:            if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1161:            if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1163:            if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1165:            if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1168:            if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1170:            if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1176:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1177:                if (mask & EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1183:                if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1199:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1203:                if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1208:                if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1213:                    if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1215:                    if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1217:                    if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1219:                    if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1221:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:202:            cmdEditField_->ProcessArrow(EPBM_RIGHT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:205:            cmdEditField_->ProcessArrow(EPBM_UP);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:208:            cmdEditField_->ProcessArrow(EPBM_LEFT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:211:            cmdEditField_->ProcessArrow(EPBM_DOWN);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:239:            cmdEditField_->ProcessArrow(EPBM_RIGHT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:242:            cmdEditField_->ProcessArrow(EPBM_UP);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:245:            cmdEditField_->ProcessArrow(EPBM_LEFT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:248:            cmdEditField_->ProcessArrow(EPBM_DOWN);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:818:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:823:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:831:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:845:                mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:857:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:871:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:880:        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:933:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:956:    if (!(mask & EPBM_A)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:963:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:964:        if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:966:        if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:968:        if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:970:        if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:972:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:975:        if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:978:        if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:984:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:993:            if (mask & EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:999:            if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1005:            if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1007:            if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1009:            if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1011:            if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1013:            if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1023:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1024:                if (mask & EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1030:                if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1048:                if (mask & EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1073:                if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1083:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1087:                if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1092:                if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1097:                    if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1099:                    if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1101:                    if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1103:                    if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1105:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1136:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1137:        if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1139:        } else if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1148:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1150:            if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1152:            if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1154:            if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1156:            if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1159:            if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1161:            if (mask & EPBM_R)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1167:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1168:                if (mask & EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1174:                if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1190:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1194:                if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1199:                if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1204:                    if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1206:                    if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1208:                    if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1210:                    if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1212:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:137:        if (mask&EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:141:        } else if (mask&EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:145:        } else if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:148:        } else if (mask&EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:271:    if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:272:        if (mask&EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:279:        if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:592:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:597:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:605:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:611:            mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:616:        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:618:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:625:    if (canDeepClone_ && (mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:627:        mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:665:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:667:        if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:669:        if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:671:        if (mask & (EPBM_RIGHT | EPBM_LEFT)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:683:        if ((mask & EPBM_A) && (!(mask & EPBM_R)))
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:685:        if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:689:        if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:692:        if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:699:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:701:            if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:703:            if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:705:            if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:707:            if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:709:            if (mask & EPBM_L && !canDeepClone_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:712:            if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:717:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:724:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:726:                if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:730:                if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:741:                if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:748:                if (mask & EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:755:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:763:                if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:764:                    if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:766:                    if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:768:                    if (mask & EPBM_START)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:770:                    if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:772:                    if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:778:                    if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:780:                    if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:782:                    if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:784:                    if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:787:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:795:    if ((!(mask & EPBM_A)) && updatingChain_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:813:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:814:        if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:817:        if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:820:        if (mask == EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:828:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:829:            if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:832:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:839:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:841:                if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:845:                if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:856:                if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:863:                if (mask & EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:870:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:878:                if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:880:                if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:882:                if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:884:                if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:886:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:413:            cmdEditField_->ProcessArrow(EPBM_RIGHT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:416:            cmdEditField_->ProcessArrow(EPBM_UP);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:419:            cmdEditField_->ProcessArrow(EPBM_LEFT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:422:            cmdEditField_->ProcessArrow(EPBM_DOWN);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:450:            cmdEditField_->ProcessArrow(EPBM_RIGHT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:453:            cmdEditField_->ProcessArrow(EPBM_UP);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:456:            cmdEditField_->ProcessArrow(EPBM_LEFT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:459:            cmdEditField_->ProcessArrow(EPBM_DOWN);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:486:            cmdEditField_->ProcessArrow(EPBM_RIGHT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:489:            cmdEditField_->ProcessArrow(EPBM_UP);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:492:            cmdEditField_->ProcessArrow(EPBM_LEFT);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:495:            cmdEditField_->ProcessArrow(EPBM_DOWN);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:624:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:625:        if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:627:        if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:629:        if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:631:        if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:633:        if (mask & EPBM_A)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:635:        if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:642:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:643:            if (mask & EPBM_DOWN) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:649:            if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:655:            if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:657:            if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:659:            if (mask == EPBM_A)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:661:            if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:667:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:668:                if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:675:                if (mask & EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:683:                if (mask & EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:691:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:698:                if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:703:                    if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:705:                    if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:707:                    if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:709:                    if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:711:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:725:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:726:        if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:728:        } else if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:737:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:738:            if (mask & EPBM_L)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:740:            //		if (mask&EPBM_R) switchSoloMode() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:745:            if (mask & EPBM_R) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:746:                if (mask & EPBM_UP) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:752:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:756:                /*			if (mask&EPBM_L) unMuteAll() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:760:                if (mask & EPBM_L) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:765:                    if (mask & EPBM_DOWN)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:767:                    if (mask & EPBM_UP)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:769:                    if (mask & EPBM_LEFT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:771:                    if (mask & EPBM_RIGHT)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:773:                    if (mask & EPBM_START) {
+
+=== TreeFrog input mapping files ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:12:#ifndef TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Audio/TreeFrogAudioDriver.cpp:13:#define TREEFROG_INPUT_DEBUG 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:9:#ifndef TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:10:#define TREEFROG_INPUT_DEBUG 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp:50:#if TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Libretro/libretro.h:15:#define RETRO_DEVICE_ID_JOYPAD_B      0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Libretro/libretro.h:16:#define RETRO_DEVICE_ID_JOYPAD_Y      1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Libretro/libretro.h:23:#define RETRO_DEVICE_ID_JOYPAD_A      8
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Libretro/libretro.h:24:#define RETRO_DEVICE_ID_JOYPAD_X      9
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:20:#ifndef TREEFROG_INPUT_PROFILE
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:21:#define TREEFROG_INPUT_PROFILE 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:24:#ifndef TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:25:#define TREEFROG_INPUT_DEBUG 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:48:#ifndef TREEFROG_ENABLE_SELECT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:49:#define TREEFROG_ENABLE_SELECT 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:84: * revisions and can be verified with TREEFROG_INPUT_DEBUG=1. */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:163:    { PHY_A,      "A",      RETRO_DEVICE_ID_JOYPAD_A,      CV_A      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:164:    { PHY_B,      "B",      RETRO_DEVICE_ID_JOYPAD_B,      CV_B      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:165:    { PHY_X,      "X",      RETRO_DEVICE_ID_JOYPAD_X,      CV_X      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:166:    { PHY_Y,      "Y",      RETRO_DEVICE_ID_JOYPAD_Y,      CV_Y      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:271:#if TREEFROG_ENABLE_SELECT
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:276:#if TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:327:    fprintf(input_log, " profile=%d\n", TREEFROG_INPUT_PROFILE);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:542:#if TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:11:#ifndef TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:12:#define TREEFROG_INPUT_DEBUG 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Timer/TreeFrogTimer.cpp:19:#if TREEFROG_INPUT_DEBUG
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/Makefile.TREEFROG:6:TREEFROG_INPUT_PROFILE ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/Makefile.TREEFROG:7:TREEFROG_INPUT_DEBUG ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/Makefile.TREEFROG:19:TREEFROG_ENABLE_SELECT ?= 0
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/Makefile.TREEFROG:27:#   TREEFROG_ENABLE_SELECT=0 keeps SELECT suppressed until it is assigned safely.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/Makefile.TREEFROG:29:# Debug is off by default to reduce SD writes. Enable with TREEFROG_INPUT_DEBUG=1.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/Makefile.TREEFROG:37:	-DTREEFROG_INPUT_PROFILE=$(TREEFROG_INPUT_PROFILE) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/Makefile.TREEFROG:38:	-DTREEFROG_INPUT_DEBUG=$(TREEFROG_INPUT_DEBUG) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/Makefile.TREEFROG:51:	-DTREEFROG_ENABLE_SELECT=$(TREEFROG_ENABLE_SELECT) \
+
+=== Any X/Y mentions outside TreeFrog ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Libretro/libretro.h:16:#define RETRO_DEVICE_ID_JOYPAD_Y      1
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Libretro/libretro.h:24:#define RETRO_DEVICE_ID_JOYPAD_X      9
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:165:    { PHY_X,      "X",      RETRO_DEVICE_ID_JOYPAD_X,      CV_X      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:166:    { PHY_Y,      "Y",      RETRO_DEVICE_ID_JOYPAD_Y,      CV_Y      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/SDL/SDL_mouse.h:125:#define SDL_BUTTON_X1		6
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/SDL/SDL_mouse.h:126:#define SDL_BUTTON_X2		7
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/SDL/SDL_mouse.h:130:#define SDL_BUTTON_X1MASK	SDL_BUTTON(SDL_BUTTON_X1)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/SDL/SDL_mouse.h:131:#define SDL_BUTTON_X2MASK	SDL_BUTTON(SDL_BUTTON_X2)
+
+=== SelectProjectDialog delete/rename context ===
+44-    if (fp) {
+45-        fprintf(fp, "TREEFROG_V40_ESTABLE_SELECT: %s shown=%d path=%s\n", where ? where : "unknown", shown ? 1 : 0, p.GetPath().c_str());
+46-        fclose(fp);
+47-    }
+48-}
+49-
+50-
+51-static void NewProjectCallback(View &v,ModalView &dialog) {
+52-
+53-	NewProjectDialog &npd=(NewProjectDialog &)dialog ;
+54-	if (dialog.GetReturnCode()>0) {
+55-		std::string selected=npd.GetName() ;
+56-		SelectProjectDialog &spd=(SelectProjectDialog&)v ;
+57-		Result result = spd.OnNewProject(selected) ;
+58-        if (result.Failed()) {
+59-            Trace::Error(result.GetDescription().c_str());
+60-        }
+61-    }
+62-}
+63-
+64:static void DeleteProjectCallback(View &v, ModalView &dialog) {
+65-    SelectProjectDialog &spd = (SelectProjectDialog&) v;
+66-	if (dialog.GetReturnCode() == MBL_YES) {
+67-        Path projectPath = spd.GetCurrentProjectPath();
+68:        Result result = spd.OnDeleteProject(projectPath);
+69-		if (result.Failed()) {
+70-			Trace::Error(result.GetDescription().c_str());
+71-		}
+72-	}
+73-}
+74-
+75-// Recursive helper to delete directory and all contents
+76-static void RecursiveDeleteDirectory(const Path &dirPath) {
+77-	FileSystem *fs = FileSystem::GetInstance();
+78-	FileType type = fs->GetFileType(dirPath.GetPath().c_str());
+79-	
+80-	if (type == FT_DIR) {
+81-		I_Dir *dir = fs->Open(dirPath.GetPath().c_str());
+82-		if (dir) {
+83-			dir->GetContent("*");
+84-			
+85-			// Collect all items first to avoid iterator invalidation
+86-			T_SimpleList<Path> itemsToDelete(false);
+87-			IteratorPtr<Path> it(dir->GetIterator());
+88-			
+89-			for (it->Begin(); !it->IsDone(); it->Next()) {
+90-				Path itemCopy = it->CurrentItem();
+91-				std::string name = itemCopy.GetName();
+92-				
+93-				// Skip . and .. entries
+94-				if (name != "." && name != "..") {
+95-					Path *ptrCopy = new Path(itemCopy);
+96-					itemsToDelete.Insert(ptrCopy);
+97-				}
+98-			}
+99-			
+100-			delete dir;
+101-			
+102-			// Now delete all collected items
+103-			IteratorPtr<Path> deleteIt(itemsToDelete.GetIterator());
+104-			for (deleteIt->Begin(); !deleteIt->IsDone(); deleteIt->Next()) {
+105-				const Path &item = deleteIt->CurrentItem();
+106-				RecursiveDeleteDirectory(item);
+107-			}
+108-		}
+109-	}
+110-
+111-    fs->Delete(dirPath.GetPath().c_str());
+112-}
+113-
+114-SelectProjectDialog::SelectProjectDialog(View &view)
+115-    : ModalView(view), content_(true) {}
+116-
+117-SelectProjectDialog::~SelectProjectDialog() {
+118-}
+119-
+120-void SelectProjectDialog::DrawView() {
+121-
+122-	SetWindow(LIST_WIDTH,LIST_SIZE+3) ;
+123-
+124-	GUITextProperties props ;
+125-
+126-	SetColor(CD_NORMAL) ;
+127-    View::EnableNotification();
+128-
+--
+199-            SetColor(CD_NORMAL) ;
+200-        }
+201-        props.invert_=false ;
+202-        DrawString(x,y,text,props) ;
+203-    }
+204-};
+205-
+206-void SelectProjectDialog::OnPlayerUpdate(PlayerEventType,
+207-                                         unsigned int currentTick) {};
+208-
+209-void SelectProjectDialog::OnFocus() {
+210-
+211-	setCurrentFolder(lastFolder_) ;
+212-    currentProject_ = lastProject_;
+213-};
+214-
+215-void SelectProjectDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
+216-	if (!pressed) return ;
+217-
+218-    if (mask&EPBM_B) {
+219:        // Handle A + B combination for delete
+220-        if (mask & EPBM_A) {
+221-            int count = 0;
+222-            Path *current = 0;
+223-
+224-            IteratorPtr<Path> it(content_.GetIterator());
+225-            for (it->Begin(); !it->IsDone(); it->Next()) {
+226-                if (count == currentProject_) {
+227-                    current = &it->CurrentItem();
+228-                    break;
+229-                }
+230-                count++;
+231-            }
+232-
+233-            if (current != 0) {
+234-                std::string message =
+235-                    "Delete project '" + current->GetName() + "' ?";
+236-                MessageBox *mb =
+237-                    new MessageBox(*this, message.c_str(), MBBF_YES | MBBF_NO);
+238:                DoModal(mb, DeleteProjectCallback);
+239-                DrawView();
+240-            }
+241-            return;
+242-        }
+243-        if (mask & EPBM_UP)
+244-            warpToNextProject(-LIST_SIZE);
+245-        if (mask&EPBM_DOWN) warpToNextProject(LIST_SIZE) ;
+246-    } else {
+247-
+248-        // A modifier
+249-        if (mask & EPBM_A) {
+250-            switch (selected_) {
+251-			case 0: // load
+252-				{
+253-                // locate folder user had selected when they hit a
+254-                int count = 0;
+255-                Path *current = 0;
+256-
+257-                IteratorPtr<Path> it(content_.GetIterator());
+258-                for (it->Begin(); !it->IsDone(); it->Next()) {
+259-                    if (count == currentProject_) {
+260-                        current = &it->CurrentItem();
+261-                        break;
+262-                    }
+263-                    count++;
+264-                }
+265-
+266-					//check if folder is a project, indicated by 'lgpt' being the first 4 characters of the folder name
+267-					std::string name = current->GetName() ;
+268-					std::string firstFourChars = name.substr(0,4);
+269-					std::transform(firstFourChars.begin(), firstFourChars.end(), firstFourChars.begin(), ::tolower);
+270-					if(firstFourChars == "lgpt" && TreeFrogV40ProjectHasSaveFile(*current)){
+271-						//ugly hack to make the "name" include subdirectories
+272-						//we pass along everything past the root dir
+273-						selection_ = *current ;
+274-						lastFolder_=currentPath_ ;
+275-						lastProject_=currentProject_ ;
+276-						//load the project
+277-						EndModal(1) ;
+278-					} else {
+279-						if (current->GetName() == "..") {
+280-							Path parent=currentPath_.GetParent() ;
+281-							setCurrentFolder(parent) ;
+282-						} else {
+283-							Path newdir=*current ;
+284-							setCurrentFolder(newdir) ;
+285-						}
+286-					}
+287-				break ;
+288-			}
+289-			case 1: // new
+290-			{
+291-                NewProjectDialog *npd =
+292-                    new NewProjectDialog(*this, currentPath_);
+293-                DoModal(npd,NewProjectCallback) ;
+294-				break ;
+295-            }
+296-            case 2: // Exit ;
+297-                EndModal(0) ;
+298-				break ;
+--
+347-    if (path.Exists()) {
+348-        Trace::Log("SelectProjectDialog:OnNewProj","path already exists %s", path.GetPath().c_str());
+349-		std::string res("Name " + name + " busy");
+350-		View::SetNotification(res.c_str(), 0);
+351-        return Result(res);
+352-    }
+353-    Trace::Log("TMP","creating project at %s",path.GetPath().c_str());
+354-	selection_ = path ;
+355-	Result result = FileSystem::GetInstance()->MakeDir(path.GetPath().c_str()) ;
+356-	RETURN_IF_FAILED(result, ("Failed to create project dir for '%s", path.GetPath().c_str()));
+357-
+358-	path = path.Descend("samples");
+359-	Trace::Log("TMP","creating samples dir at %s",path.GetPath().c_str());
+360-	result = FileSystem::GetInstance()->MakeDir(path.GetPath().c_str()) ;
+361-	RETURN_IF_FAILED(result, ("Failed to create samples dir for '%s'", path.GetPath().c_str()));
+362-
+363-	EndModal(1) ;
+364-  return Result::NoError;
+365-} ;
+366-
+367:Result SelectProjectDialog::OnDeleteProject(const Path &projectPath) {
+368-
+369-    Trace::Log("SelectProjectDialog:OnDelProj","deleting project at %s", projectPath.GetPath().c_str());
+370-	
+371-	// Make a non-const copy to check existence
+372-	Path pathCopy = projectPath;
+373-	
+374-	// Check if project exists before deletion
+375-    if (!pathCopy.Exists()) {
+376-        std::string errMsg = "Project not found";
+377-        View::SetNotification(errMsg.c_str(), 0);
+378-        return Result("Project not found");
+379-    }
+380-
+381-    // Recursively delete the project directory and all contents
+382-	RecursiveDeleteDirectory(projectPath);
+383-	
+384-	// Project deleted successfully, refresh the project list
+385-	std::string successMsg = "Project deleted: " + pathCopy.GetName();
+386-	View::SetNotification(successMsg.c_str(), 0);
+387-	
+388-	// Refresh current folder to update the list while preserving position
+389-	int savedProject = currentProject_;
+390-	int savedTopIndex = topIndex_;
+391-	Path currentPathCopy = currentPath_;
+392-	setCurrentFolder(currentPathCopy);
+393-	
+394-	// Restore position (adjust if necessary if we're at the end of list)
+395-	int listSize = content_.Size();
+396-	if (savedProject >= listSize && listSize > 0) {
+397-		currentProject_ = listSize - 1;
+398-	} else if (listSize > 0) {
+399-		currentProject_ = savedProject;
+400-	}
+401-    topIndex_ = savedTopIndex;
+402-    isDirty_ = true;
+403-		
+404-	return Result::NoError;
+405-};
+406-
+407-//copy-paste-mutilate'd from ImportSampleDialog
+408-void SelectProjectDialog::setCurrentFolder(Path &path) {
+409-
+410-	//get ready
+411-	selected_=0 ;
+412-	currentPath_=path ;
+413-	content_.Empty() ;
+414-	
+415-	// Let's read all the directory in the root
+416-
+417-	I_Dir *dir=FileSystem::GetInstance()->Open(currentPath_.GetPath().c_str()) ;
+418-
+419-  if (dir) 
+420-  {
+421-
+422-		// Get all lgpt something
+423-
+424-		dir->GetContent("*");
+425-    dir->Sort();
+426-      
+427-		IteratorPtr<Path> it(dir->GetIterator()) ;
+
+=== SongView cut/clear context ===
+75-/******************************************************
+76- updateSongOffset:
+77-        Jump from the current position up or down
+78-    by [offset] rows
+79- ******************************************************/
+80-
+81-void SongView::updateSongOffset(int offset) {
+82-    viewData_->UpdateSongOffset(offset);
+83-    isDirty_ = true;
+84-    canDeepClone_ = false;
+85-}
+86-
+87-/******************************************************
+88- updateCursor:
+89-        modify location of cursor in view by
+90-        adding dx & dy parameters
+91- ******************************************************/
+92-
+93-void SongView::updateCursor(int dx, int dy) {
+94-    viewData_->UpdateSongCursor(dx, dy);
+95-    isDirty_ = true;
+96-    canDeepClone_ = false;
+97-}
+98-
+99-/******************************************************
+100- cutPosition:
+101-        copy current position content to clipboard &
+102-        erase current position value
+103- ******************************************************/
+104-
+105:void SongView::cutPosition() {
+106-
+107-    // prepare selection data
+108-    clipboard_.x_ = viewData_->songX_;
+109-    clipboard_.y_ = viewData_->songY_;
+110-    clipboard_.offset_ = viewData_->songOffset_;
+111-
+112-    saveX_ = viewData_->songX_;
+113-    saveY_ = viewData_->songY_;
+114-    saveOffset_ = viewData_->songOffset_;
+115-
+116-    // cut selection
+117-    cutSelection();
+118-};
+119-
+120-/******************************************************
+121- pastePosition:
+122-        set current position to last chain value if
+123-        current step is empty
+124- ******************************************************/
+125-
+126-void SongView::pasteLast() {
+127-
+128-    // If we're on an empty spot, we past the last chain
+129-    // otherwise we take the current chain as last
+130-
+131-    unsigned char *c = viewData_->GetCurrentSongPointer();
+132-    if (*c == 0xFF) {
+133-        *c = lastChain_;
+134-        viewData_->song_->chain_->SetUsed(*c);
+135-        isDirty_ = true;
+136-    } else {
+137-        lastChain_ = *c;
+138-    }
+139-};
+140-
+141-/******************************************************
+142- clonePosition:
+143-        slim clone current position
+144- ******************************************************/
+145-
+146-void SongView::clonePosition() {
+147-
+148-    unsigned char *pos = viewData_->GetCurrentSongPointer();
+149-    unsigned char current = *pos;
+150-    if (current == 255)
+151-        return;
+152-
+153-    unsigned short next = viewData_->song_->chain_->GetNext();
+154-    if (next == NO_MORE_CHAIN)
+155-        return;
+156-
+157-    unsigned char *src = viewData_->song_->chain_->data_ + 16 * current;
+158-    unsigned char *dst = viewData_->song_->chain_->data_ + 16 * next;
+159-
+160-    for (int i = 0; i < 16; i++) {
+161-        *dst++ = *src++;
+162-    };
+163-
+164-    src = viewData_->song_->chain_->transpose_ + 16 * current;
+165-    dst = viewData_->song_->chain_->transpose_ + 16 * next;
+166-
+167-    for (int i = 0; i < 16; i++) {
+168-        *dst++ = *src++;
+169-    };
+170-    setChain((unsigned char)next);
+171-    isDirty_ = true;
+172-};
+173-
+174-/******************************************************
+175- deepClonePosition:
+176-        deep clone chain and all phrases within
+177-        made by koisignal (https://github.com/koi-ikeno)
+178- ******************************************************/
+179-
+180-void SongView::deepClonePosition() {
+181-    Phrase *ph = viewData_->song_->phrase_;
+182-    Chain *ch = viewData_->song_->chain_;
+183-    unsigned char *pos = viewData_->GetCurrentSongPointer();
+184-    unsigned char curChainNum = *pos;
+185-
+--
+320-
+321-    for (int j = 0; j < clipboard_.height_; j++) {
+322-        for (int i = 0; i < clipboard_.width_; i++) {
+323-            *dst++ = *src++;
+324-        }
+325-        src += (SONG_CHANNEL_COUNT - clipboard_.width_);
+326-    }
+327-};
+328-
+329-/******************************************************
+330- copySelection:
+331-        copy current selection to clipboard
+332- ******************************************************/
+333-
+334-void SongView::copySelection() {
+335-
+336-    fillClipboardData();
+337-    clipboard_.active_ = false;
+338-    viewMode_ = VM_NORMAL;
+339-    viewData_->songX_ = saveX_;
+340-    viewData_->songY_ = saveY_;
+341-    viewData_->songOffset_ = saveOffset_;
+342-    View::SetNotification("copied selection");
+343-}
+344-
+345-/******************************************************
+346- cutSelection:
+347-        cut current selection to clipboard
+348- ******************************************************/
+349-
+350:void SongView::cutSelection() {
+351-
+352-    // first copy the data to clipboard
+353-
+354-    fillClipboardData();
+355-    GUIRect selRect = getSelectionRect();
+356-
+357-    // now move all rows up for cut
+358-
+359-    unsigned char *dst = viewData_->song_->data_ + selRect.Left() +
+360-                         SONG_CHANNEL_COUNT * (selRect.Top());
+361-    unsigned char *src = dst + SONG_CHANNEL_COUNT * clipboard_.height_;
+362-
+363-    int rowCount = SONG_ROW_COUNT - selRect.Bottom() - 1;
+364-
+365-    for (int j = 0; j < rowCount; j++) {
+366-
+367-        for (int i = 0; i < clipboard_.width_; i++) {
+368-            *dst++ = *src++;
+369-        }
+370-        src += (SONG_CHANNEL_COUNT - clipboard_.width_);
+371-        dst += (SONG_CHANNEL_COUNT - clipboard_.width_);
+372-    }
+373-
+374-    for (int j = 0; j > clipboard_.height_; j++) {
+375-        for (int i = 0; i < clipboard_.width_; i++) {
+376-            *dst++ = 0xFF;
+377-        }
+378-        dst += (SONG_CHANNEL_COUNT - clipboard_.width_);
+379-    };
+380-
+381-    clipboard_.active_ = false;
+382-    viewMode_ = VM_NORMAL;
+383-    viewData_->songX_ = saveX_;
+384-    viewData_->songY_ = saveY_;
+385-    viewData_->songOffset_ = saveOffset_;
+386-
+387-    isDirty_ = true;
+388-}
+389-
+390-/******************************************************
+391- pasteSelection:
+392-        paste clipboard content to song
+393- ******************************************************/
+394-
+395-void SongView::pasteClipboard() {
+396-
+397-    if (!clipboard_.data_)
+398-        return;
+399-
+400-    // Check we're not out of scope
+401-
+402-    int width = clipboard_.width_;
+403-    int height = clipboard_.height_;
+404-
+405-    if (viewData_->songX_ + width > SONG_CHANNEL_COUNT) {
+406-        width = SONG_CHANNEL_COUNT - viewData_->songX_;
+407-    }
+408-    if (viewData_->songY_ + viewData_->songOffset_ + height > SONG_ROW_COUNT) {
+409-        height = SONG_ROW_COUNT - viewData_->songY_ - viewData_->songOffset_;
+410-    } else {
+411-
+412-        // Move down from insert point
+413-
+414-        unsigned char *dst = viewData_->song_->data_ + viewData_->songX_ +
+415-                             (SONG_ROW_COUNT - 1) * SONG_CHANNEL_COUNT;
+416-        unsigned char *src = dst - height * SONG_CHANNEL_COUNT;
+417-
+418-        int rowCount =
+419-            SONG_ROW_COUNT - (viewData_->songY_ + viewData_->songOffset_);
+420-
+421-        for (int j = 0; j < rowCount; j++) {
+422-            for (int i = 0; i < width; i++) {
+423-                *dst++ = *src++;
+424-            }
+425-            dst -= (SONG_CHANNEL_COUNT + width);
+426-            src -= (SONG_CHANNEL_COUNT + width);
+427-        }
+428-    }
+429-
+430-    // Prepare copy pointer
+--
+553-        }
+554-    }
+555-    // If we go backwards, we stil have to go to the beginning of the block
+556-
+557-    if (direction < 0) {
+558-        while (current > 0) {
+559-            unsigned char *start = viewData_->song_->data_ + viewData_->songX_ +
+560-                                   SONG_CHANNEL_COUNT * current;
+561-            if (*start == 0xFF) {
+562-                current++;
+563-                break;
+564-            };
+565-            current--;
+566-        };
+567-    }
+568-
+569-    // Update viewdata position from current
+570-
+571-    if ((current - viewData_->songOffset_ > 0x17) ||
+572-        (current - viewData_->songOffset_ < 0)) {
+573-        viewData_->songOffset_ = current - 4;
+574-        if (viewData_->songOffset_ < 0) {
+575-            viewData_->songOffset_ = 0;
+576-        }
+577-    }
+578-    viewData_->songY_ = current - viewData_->songOffset_;
+579-    isDirty_ = true;
+580-}
+581-
+582-/******************************************************
+583: ProcessButtonMask:
+584-        process button mask even coming from the main
+585-        application window
+586- ******************************************************/
+587-
+588:void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
+589-
+590-    if (!pressed) {
+591-        if (viewMode_ == VM_MUTEON) {
+592-            if (mask & EPBM_R) {
+593-                toggleMute();
+594-            }
+595-        };
+596-        if (viewMode_ == VM_SOLOON) {
+597-            if (mask & EPBM_R) {
+598-                switchSoloMode();
+599-            }
+600-        };
+601-        return;
+602-    };
+603-
+604-    if (viewMode_ == VM_NEW) {
+605-        if (mask == EPBM_A) {
+606-            unsigned short next = viewData_->song_->chain_->GetNext();
+607-            if (next != NO_MORE_CHAIN) {
+608-                setChain((unsigned char)next);
+609-                isDirty_ = true;
+610-            }
+611-            mask &= (0xFFFF - EPBM_A);
+612-        }
+613-    }
+614-
+615-    if (viewMode_ == VM_CLONE) {
+616-        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+617-            clonePosition();
+618-            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+619-            canDeepClone_ = true;
+620-        } else {
+621-            viewMode_ = VM_SELECTION;
+622-        }
+623-    };
+624-
+625-    if (canDeepClone_ && (mask & EPBM_A) && (mask & EPBM_L)) {
+626-        deepClonePosition();
+627-        mask &= (0xFFFF - (EPBM_A | EPBM_L));
+628-        canDeepClone_ = false;
+629-    }
+630-    if (clipboard_.active_) {
+631-        viewMode_ = VM_SELECTION;
+632-    };
+633-    // Process selection related keys
+634-
+635-    if (viewMode_ == VM_SELECTION) {
+636-        if (clipboard_.active_ == false) {
+637-            clipboard_.active_ = true;
+638-            clipboard_.x_ = viewData_->songX_;
+639-            clipboard_.y_ = viewData_->songY_;
+640-            clipboard_.offset_ = viewData_->songOffset_;
+641-            saveX_ = clipboard_.x_;
+642-            saveY_ = clipboard_.y_;
+643-            saveOffset_ = clipboard_.offset_;
+644-        }
+645-        processSelectionButtonMask(mask);
+646-    } else {
+647-
+648-        // Switch back to normal mode
+649-
+650-        viewMode_ = VM_NORMAL;
+651-        processNormalButtonMask(mask);
+652-    }
+653-}
+654-
+655-/******************************************************
+656- processNormalButtonMask:
+657-        process button mask in the case there is no
+658-        selection active
+659- ******************************************************/
+660-
+661-void SongView::processNormalButtonMask(unsigned int mask) {
+662-
+663-    // B Modifier
+664-
+665-    if (mask & EPBM_B) {
+666-
+667-        if (mask & EPBM_DOWN)
+668-            updateSongOffset(SongView::jumpLength_);

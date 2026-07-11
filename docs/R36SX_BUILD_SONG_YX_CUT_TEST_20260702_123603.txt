@@ -1,0 +1,44 @@
+R36SX LGPT Song Y+X cut test build
+Generated: 20260702_123603
+
+DEV=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT
+BUILD_SCRIPT=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/BUILD_TREEFROG_R36SX_BADGE_OFF_SELECT_OFF.sh
+LOG=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/docs/R36SX_BUILD_SONG_YX_CUT_TEST_20260702_123603.log
+
+Patch marker:
+681- ******************************************************/
+682-
+683-void SongView::processNormalButtonMask(unsigned int mask) {
+684-
+685-
+686:    // TREEFROG_INPUT_SONG_YX_CUT_NORMAL_MODE_V2
+687-    // R36SX TreeFrog:
+688-    // Y+X ejecuta el cut/compact histórico de Song.
+689-    // No exigimos máscara exacta porque el runtime puede mantener otros bits latcheados.
+690-    const unsigned int treefrogSongYXMask = EPBM_Y | EPBM_X;
+691-    if ((mask & treefrogSongYXMask) == treefrogSongYXMask) {
+692-        cutPosition();
+693-        isDirty_ = true;
+694-        SetDirty(true);
+695-        return;
+696-    }
+
+Core source:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/dist/lgpt_libretro.so
+-rwxr-xr-x 1 dafunknoise dafunknoise 854K Jul  2 12:36 /home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/dist/lgpt_libretro.so
+
+Core copied to:
+/mnt/d/R36S/PORT LPTRACKER/TEST/LGPT_PORT_V102_SongYXCut_Test_20260702_123603/cubegm/cores/lgpt_libretro.so
+-rwxrwxrwx 1 dafunknoise dafunknoise 854K Jul  2 12:36 /mnt/d/R36S/PORT LPTRACKER/TEST/LGPT_PORT_V102_SongYXCut_Test_20260702_123603/cubegm/cores/lgpt_libretro.so
+
+SHA256 source:
+f6fcb0ab1fd9ef7403dd5d8a20090ddb6d2d0016514c2c833c4ced156235902d  /home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/dist/lgpt_libretro.so
+
+SHA256 copied:
+f6fcb0ab1fd9ef7403dd5d8a20090ddb6d2d0016514c2c833c4ced156235902d  /mnt/d/R36S/PORT LPTRACKER/TEST/LGPT_PORT_V102_SongYXCut_Test_20260702_123603/cubegm/cores/lgpt_libretro.so
+
+Runtime target on SD:
+F:\cubegm\cores\lgpt_libretro.so
+
+Do not use:
+F:\roms\gme

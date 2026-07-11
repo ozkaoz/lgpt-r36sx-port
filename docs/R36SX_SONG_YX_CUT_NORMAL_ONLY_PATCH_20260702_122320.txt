@@ -1,0 +1,98 @@
+R36SX Song Y+X cut normal-only patch
+Generated: 20260702_122320
+DEV=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT
+SONG=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp
+BACKUP=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/backups/R36SX_SONG_YX_CUT_NORMAL_ONLY_20260702_122320/SongView.cpp.20260702_122320.bak
+
+=== Patch marker context ===
+669-/******************************************************
+670- processNormalButtonMask:
+671-        process button mask in the case there is no
+672-        selection active
+673- ******************************************************/
+674-
+675-void SongView::processNormalButtonMask(unsigned int mask) {
+676-
+677:    // TREEFROG_INPUT_SONG_YX_CUT_NORMAL_MODE
+678-    // R36SX TreeFrog: physical Y+X keeps the historical Song cut/compact behavior.
+679-    // Exact combo only. A+B remains clearPosition().
+680-    const unsigned int treefrogSongYXMask = EPBM_Y | EPBM_X;
+681-    if ((mask & treefrogSongYXMask) == treefrogSongYXMask &&
+682-        (mask & ~treefrogSongYXMask) == 0) {
+683-        cutPosition();
+684-        mask = 0;
+685-    }
+686-
+687-    // B Modifier
+688-
+689-    if (mask & EPBM_B) {
+690-
+691-        if (mask & EPBM_DOWN)
+692-            updateSongOffset(SongView::jumpLength_);
+693-        if (mask & EPBM_UP)
+694-            updateSongOffset(-SongView::jumpLength_);
+695-        if (mask & (EPBM_RIGHT | EPBM_LEFT)) {
+696-            Player *player = Player::GetInstance();
+697-            switch (player->GetSequencerMode()) {
+698-            case SM_SONG:
+699-                player->SetSequencerMode(SM_LIVE);
+700-                break;
+701-            case SM_LIVE:
+
+=== A+B clear confirmation ===
+702-                player->SetSequencerMode(SM_SONG);
+703-                break;
+704-            }
+705-            isDirty_ = true;
+706-        }
+707-        if ((mask & EPBM_A) && (!(mask & EPBM_R)))
+708-            // TREEFROG_INPUT_SONG_AB_CLEAR_YX_CUT
+709-            // A+B ahora limpia la celda actual sin compactar filas.
+710:            clearPosition();
+711-        if (mask & EPBM_L) {
+712-
+713-            viewMode_ = VM_CLONE;
+714-        };
+715-        if (mask & EPBM_R) {
+716-            toggleMute();
+717-        };
+718-        if (mask & EPBM_START) {
+
+=== X/Y mask confirmation ===
+25-    EPBM_B = 32,
+26-    EPBM_A = 64,
+27-    // TREEFROG_INPUT_XY_EVENT_MASKS
+28-    // Reservados para separar X/Y de A/B en pasos posteriores.
+29:    EPBM_X = 1024,
+30:    EPBM_Y = 2048,
+31-    // TREEFROG_INPUT_L2_R2_RESERVED_MASKS
+32-    // Reservados para acciones futuras. No consumidos por vistas todavía.
+33-    EPBM_L2 = 4096,
+34-    EPBM_R2 = 8192,
+35-    EPBM_R = 128,
+36-    EPBM_START = 256,
+37-    EPBM_SELECT = 512,
+38-    EPBM_DOUBLE_A = 1024,
+
+=== EPBM_DOUBLE_A/B usage audit ===
+
+=== Diff ===
+--- /home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/backups/R36SX_SONG_YX_CUT_NORMAL_ONLY_20260702_122320/SongView.cpp.20260702_122320.bak	2026-07-02 11:15:06.866061600 -0500
++++ /home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V101_DEV_NEXT/sources/Application/Views/SongView.cpp	2026-07-02 12:23:20.498818000 -0500
+@@ -674,6 +674,16 @@
+ 
+ void SongView::processNormalButtonMask(unsigned int mask) {
+ 
++    // TREEFROG_INPUT_SONG_YX_CUT_NORMAL_MODE
++    // R36SX TreeFrog: physical Y+X keeps the historical Song cut/compact behavior.
++    // Exact combo only. A+B remains clearPosition().
++    const unsigned int treefrogSongYXMask = EPBM_Y | EPBM_X;
++    if ((mask & treefrogSongYXMask) == treefrogSongYXMask &&
++        (mask & ~treefrogSongYXMask) == 0) {
++        cutPosition();
++        mask = 0;
++    }
++
+     // B Modifier
+ 
+     if (mask & EPBM_B) {

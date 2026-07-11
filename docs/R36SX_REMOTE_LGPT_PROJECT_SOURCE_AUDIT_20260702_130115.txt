@@ -1,0 +1,24 @@
+R36SX remote LGPT project source audit
+Generated: 20260702_130115
+
+Goal:
+- Buscar proyectos LGPT públicos descargables.
+- Prioridad: repos con lgptsav.dat.
+- No integrar nada automáticamente.
+
+=== Remote search queries ===
+
+QUERY FAILED: lgptsav.dat
+HTTP Error 503: Service Temporarily Unavailable
+
+QUERY FAILED: "lgptsav.dat" "LGPT"
+HTTP Error 503: Service Temporarily Unavailable
+
+QUERY FAILED: "lgptsav.dat" "LittleGPTracker"
+HTTP Error 503: Service Temporarily Unavailable
+
+QUERY FAILED: "LittleGPTracker" "projects"
+HTTP Error 503: Service Temporarily Unavailable
+
+=== Result ===
+No remote repos found containing lgptsav.dat via grep.app.

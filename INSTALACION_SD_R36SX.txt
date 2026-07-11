@@ -1,0 +1,33 @@
+Instalación de LGPT PORT V 100_Estable en SD:
+
+1. Copiar:
+dist/lgpt_libretro.so
+
+a:
+
+F:\cubegm\cores\lgpt_libretro.so
+
+2. Copiar o mantener:
+
+dist/lgpt\config.xml -> F:\lgpt\config.xml
+
+3. Estructura runtime:
+
+F:\lgpt
+F:\lgpt\projects
+F:\lgpt\samples
+F:\lgpt\instruments
+
+4. No crear:
+
+F:\roms\gme
+
+5. Prueba mínima:
+
+- Iniciar LGPT.
+- Confirmar que abre directamente en projects.
+- Confirmar que no aparece la marca V arriba a la derecha.
+- Cargar proyecto.
+- START reproduce/detiene.
+- Revisar Song, Groove, Chain, Phrase, Table.
+- Revisar Listen, Import, Exit.

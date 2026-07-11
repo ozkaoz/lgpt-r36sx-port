@@ -1,0 +1,1208 @@
+R36SX CV -> EPBM mapping audit
+Generated: 20260702_104347
+DEV=/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT
+
+=== CV enum / definitions ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.cpp:11:// Prueba controlada: interpretar font.h con cero = tinta y limpiar fondo oscuro.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:96:#define CV_X     12
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:97:#define CV_A     13
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:98:#define CV_B     14
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:99:#define CV_Y     15
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:163:    { PHY_A,      "A",      RETRO_DEVICE_ID_JOYPAD_A,      CV_A      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:164:    { PHY_B,      "B",      RETRO_DEVICE_ID_JOYPAD_B,      CV_B      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:165:    { PHY_X,      "X",      RETRO_DEVICE_ID_JOYPAD_X,      CV_X      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:166:    { PHY_Y,      "Y",      RETRO_DEVICE_ID_JOYPAD_Y,      CV_Y      },
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/AppWindow.cpp:371:    // Create the controller
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/AppWindow.cpp:372:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/AppWindow.cpp:373:    controller->Init(project, _viewData);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/AppWindow.cpp:452:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/AppWindow.cpp:453:    controller->Reset();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Controllers/ControlRoom.cpp:46:bool ControlRoom::Attach(const char *nodeUrl,const char *controllerUrl) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Controllers/ControlRoom.cpp:48:  if (controllerUrl[0] ==0) return true;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Controllers/ControlRoom.cpp:66:	Channel *channel=ControllerService::GetInstance()->GetChannel(controllerUrl) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Controllers/ControlRoom.cpp:70:		Trace::Log("MAPPING","Attached %s to %s",nodeUrl,controllerUrl) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Controllers/ControlRoom.cpp:72:		Trace::Debug("Failed to attach %s to %s",nodeUrl,controllerUrl) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Controllers/ControlRoom.h:17:	bool Attach(const char *nodeUrl,const char *controllerUrl) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:358:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:359:    controller->UnMuteAll();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:364:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:365:    controller->ToggleMute(viewData_->songX_, viewData_->songX_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:371:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:372:    controller->SwitchSoloMode(viewData_->songX_, viewData_->songX_,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:795:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:796:    controller->UnMuteAll();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:801:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:802:    controller->ToggleMute(viewData_->songX_, viewData_->songX_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:808:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:809:    controller->SwitchSoloMode(viewData_->songX_, viewData_->songX_,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:788:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:789:    controller->UnMuteAll();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:794:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:795:    controller->ToggleMute(viewData_->songX_, viewData_->songX_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:801:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:802:    controller->SwitchSoloMode(viewData_->songX_, viewData_->songX_,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:448:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:449:    controller->UnMuteAll();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:454:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:463:    controller->ToggleMute(from, to);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:469:    UIController *controller = UIController::GetInstance();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:477:    controller->SwitchSoloMode(from, to, (viewMode_ != VM_SOLOON));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/asio.cpp:235:	return theAsioDriver->controlPanel();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/asio.h:37:  control sequencer sync accuracy
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/asio.h:868:	  request the driver to start a control panel component
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/asio.h:922:	//	and control of the DSD subsystem.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/asiodrvr.h:72:	virtual ASIOError controlPanel();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/dsound.h:1945:// The control (vol, pan, etc.) requested by the caller is not available
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/iasiodrv.h:34:	virtual ASIOError controlPanel() = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/iasiothiscallresolver.cpp:97:    84	virtual ASIOError (*controlPanel)() = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/iasiothiscallresolver.cpp:517:ASIOError IASIOThiscallResolver::controlPanel()
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/iasiothiscallresolver.h:178:	virtual ASIOError controlPanel();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:8: * Modifications to this file are NOT allowed. This header file controls the
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:156:#define SNDCTL_SYNTH_CONTROL		__SIOWR('Q',21, struct synth_control)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:162:typedef struct synth_control
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:166:} synth_control;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:340: *	Midi controller numbers	    *
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:345: * controllers.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:346: * In the MIDI 1.0 these controllers are sent using
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:348: * to send the MSB and the controller numbers 32 to 63
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:375:/* The controller numbers 0x21 to 0x3f are reserved for the */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:376:/* least significant bytes of the controllers 0x00 to 0x1f. */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:377:/* These controllers are not recognised by the driver. */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:411:/* Pseudo controllers (not midi compatible) */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:770:#define SEQ_CONTROL(dev, chn, controller, value) \
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:771:		_CHN_COMMON(dev, MIDI_CTL_CHANGE, chn, controller, 0, value)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:776:#define SEQ_V2_X_CONTROL(dev, voice, controller, value)	\
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:782:				_seqbuf[_seqbufptr+4] = (controller);\
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:789: * Use SEQ_BENDER and SEQ_CONTROL (with proper controller) instead.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:825: * Local control events
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:954:#define MIDI_EV_DEVCTL			8	/* Device control read/write */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1043: * control and user bits) are included in the data stream. Each sample
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1046: * where full access to the control/user bits is required (real time control).
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1115:/* Analog/digital control capabilities */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1123: * digital/analog interface control features are not supported by the 
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1231: * Digital interface (S/PDIF) control interface
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1234:typedef struct oss_digital_control
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1320:} oss_digital_control;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1322:#define SNDCTL_DSP_READCTL		__SIOWR('P', 26, oss_digital_control)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1323:#define SNDCTL_DSP_WRITECTL		__SIOWR('P', 27, oss_digital_control)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1373: * Low water level control
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1460: * Mixer controls
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1509: *          They are both assigned to the same mixer control. Don't
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1510: *          use both control names in the same program/driver.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1683:/* The following two controls were never implemented and they should not be used. */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1709: * recording source. These calls automatically map to the right control.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1804:#	define MIXF_LEGACY	0x00000080	/* Legacy mixer control group */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1807:#	define MIXF_MAINVOL	0x00000400	/* Main volume control */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1808:#	define MIXF_PCMVOL	0x00000800	/* PCM output volume control */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1809:#	define MIXF_RECVOL	0x00001000	/* PCM recording volume control */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1819:  int control_no;		/* SOUND_MIXER_VOLUME..SOUND_MIXER_MIDI */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/include/soundcard.h:1950:#define MIDI_CAP_MTC		0x00000400	/* MTC/SMPTE (control) device */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.cpp:79:  // The order here will control the order of RtAudio's API search in
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.cpp:4866:      errorStream_ << "RtApiAlsa::getDeviceCount: control open, card = " << card << ", " << snd_strerror( result ) << ".";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.cpp:4875:        errorStream_ << "RtApiAlsa::getDeviceCount: control next device, card = " << card << ", " << snd_strerror( result ) << ".";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.cpp:4909:      errorStream_ << "RtApiAlsa::getDeviceInfo: control open, card = " << card << ", " << snd_strerror( result ) << ".";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.cpp:4918:        errorStream_ << "RtApiAlsa::getDeviceInfo: control next device, card = " << card << ", " << snd_strerror( result ) << ".";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.cpp:5188:      errorStream_ << "RtApiAlsa::probeDeviceOpen: control open, card = " << card << ", " << snd_strerror( result ) << ".";
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.cpp:6914:// This method can be modified to control the behavior of error
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.h:182:// RtAudio is a "controller" used to select an available audio i/o
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.h:271:    The \c numberOfBuffers parameter can be used to control stream
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.h:395:           control stream latency.  More buffers typically result in more
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/RTAudio/RtAudio.h:657:  //! Protected common error method to allow global control over error handling.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/SDL/SDL_cdrom.h:23:/* This is the CD-audio control API for Simple DirectMedia Layer */
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/SDL/SDL_joystick.h:80: * Get the number of general axis controls on a joystick
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/SDL/SDL_joystick.h:118: * Get the current state of an axis control on a joystick
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/SDL/SDL_video.h:429: * SDL_LOGPAL  -- set logical palette, which controls how blits are mapped
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/SDL/SDL_video.h:431: * SDL_PHYSPAL -- set physical palette, which controls how pixels look on
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/Soundfont/ENABDRV.CPP:917:// Set the gobal pageSize if present, controls how many output lines before
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/Soundfont/SFNAV.CPP:592:  // This means one oscillator controls the pitch amounts and pitch
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Externals/Soundfont/SFNAV.CPP:599:  // In a stereo or linked sample list, the RIGHT sample controls the pitch,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Services/Controllers/ControllerService.cpp:20:	// Look for the controller source class
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Services/Midi/MidiChannel.cpp:7:	controllerType_=MCT_NONE ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Services/Midi/MidiChannel.cpp:18:	controllerType_=type ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Services/Midi/MidiChannel.cpp:22:	return controllerType_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Services/Midi/MidiChannel.h:31:	MidiControllerType controllerType_ ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Services/Midi/MidiInDevice.cpp:400:					   // MIDI controllers to 0.5,0.25, etc, we map differently if data
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:25:void GUIParentGraphics::SetControl(I_GUIControl &control) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:26:  _control=&control ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:30:// Returns the Graphic device used to render the control
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:34:		_graphicDC=_control->GetParent()->GetDC() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:39:// Returns the Event service available to the control
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:43:		_eventService=_control->GetParent()->GetEventService() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:48:// I_GUIGraphics implementation: The control can draw on the graphical
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:57:		GUIPoint p=_control->GetParent()->GetOffset() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:58:		p.Add(_control->GetPosition()) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:84:		p.Add(_control->GetOffset()) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:95:		p.Add(_control->GetOffset()) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:108:		GUIPoint offset=_control->GetOffset();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:110:	//	srcRect.Translate(_control->GetOffset()) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:123:		GUIPoint offset=_control->GetOffset();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:125:	//	srcRect.Translate(_control->GetOffset()) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:159:		p.Add(_control->GetOffset()) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:172:		p.Add(_control->GetOffset()) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:184:	return _control->GetRect() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.cpp:219:		I_GUIControl *parent=_control->GetParent() ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.h:16:	void SetControl(I_GUIControl &control) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.h:21:	// with respect to the local control.
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.h:38:	// Returns the event services associated to the control
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.h:42:	// Returns the graphics used to render the control
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/Framework/GUIParentGraphics.h:59:	I_GUIControl *_control ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/SimpleBaseClasses/GUIWindow.cpp:85:// Redifine the event Dispatcher to handle focused controll
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/SimpleBaseClasses/GUIWindow.h:12:// Abstract top class for all windows. Windows are control containers and
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/SimpleBaseClasses/GUIWindow.h:53:	// When a local event has reached the control and could
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/UIFramework/SimpleBaseClasses/GUIWindow.h:61:	// Returns the offset of the control with respect to the
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/resources/DEB/mapping.xml:4:    -=-=These keys might not match your controller!=-=-
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/resources/RASPI/mapping.xml:4:    -=-=These keys might not match your controller!=-=-
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/resources/RG35XXPLUS/mapping.xml:4:    -=-=These keys might not match your controller!=-=-
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/resources/STEAM/mapping.xml:4:    -=-=These keys might not match your controller!=-=-
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/resources/X64/mapping.xml:4:    -=-=These keys might not match your controller!=-=-
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/projects/resources/X86/mapping.xml:4:    -=-=These keys might not match your controller!=-=-
+
+=== EPBM writes / conversions ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:231:        if (lr) lr_mask |= PHY_BIT(physical_sources[i].phy);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp:232:        if (lr || cvp) mask |= PHY_BIT(physical_sources[i].phy);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/AppWindow.cpp:491:        _mask |= v;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Instruments/SampleInstrument.cpp:536:	     fixed mask=0xFFFFFFFF ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:48:void FieldView::ProcessButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:58:	if (mask&EPBM_A) {  // A or A+ARROW is sent to the field
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:78:		if (mask==EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:83:		if (mask&EPBM_B) {  // B or B+ARROW is sent to the field
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:85:			if (mask==EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:111:			if (!(mask&(EPBM_A|EPBM_B|EPBM_L|EPBM_R|EPBM_SELECT|EPBM_START))) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.h:13:	virtual void ProcessButtonMask(unsigned short mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.cpp:231:		ProcessButtonMask(mask,pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:19:enum GUIEventPadButtonMasks {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:25:    EPBM_B = 32,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:26:    EPBM_A = 64,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:28:    EPBM_START = 256,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:29:    EPBM_SELECT = 512,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:125:    virtual void ProcessButtonMask(unsigned short mask, bool pressed) = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:378:void ChainView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:395:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:401:            mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:406:        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:408:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:425:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:431:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:435:void ChainView::processNormalButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:441:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:450:        if (mask & EPBM_A)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:461:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:472:            if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:506:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:526:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:534:    if ((!(mask & EPBM_A)) && updatingPhrase_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:542:void ChainView::processSelectionButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:548:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:549:        if (mask == EPBM_B)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:559:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:599:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:620:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.h:11:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.h:38:    void processNormalButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.h:39:    void processSelectionButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ConsoleView.cpp:13:void ConsoleView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ConsoleView.h:17:	virtual void ProcessButtonMask(unsigned short mask,bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:58:void GrooveView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:64:	if (mask&EPBM_B) {         
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:77:			if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:83:	  if (mask&EPBM_A) {         
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:96:			if (mask==EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:109:				if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:117:    			if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.h:11:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.h:22:	void processNormalButtonMask(unsigned short mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.h:23:	void processSelectionButtonMask(unsigned short mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:279:void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:286:		if (mask==EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:324:			mask&=(0xFFFF-EPBM_A) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:329:        if ((mask&EPBM_A)&&(mask&EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:331:			mask&=(0xFFFF-EPBM_A) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:342:		mask&=(0xFFFF-(EPBM_A|EPBM_L)) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:350:	FieldView::ProcessButtonMask(mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:355:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:360:		if (mask&EPBM_A) { // Allow cut instrument
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:390:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:437:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:443:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.h:14:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ListSelectView.cpp:18:void ListSelectView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ListSelectView.cpp:19:	FieldView::ProcessButtonMask(mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ListSelectView.h:12:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:50:void MixerView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:81:        processSelectionButtonMask(mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:87:        processNormalButtonMask(mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:93: processNormalButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:98:void MixerView::processNormalButtonMask(unsigned int mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:102:	if (mask&EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:107:	  if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:120:				if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:131:					if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:143: processSelectionButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:148:void MixerView::processSelectionButtonMask(unsigned int mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:152:	if (mask&EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:158:	  if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:165: 				if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:171:	          		if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.h:11:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.h:16:	void processNormalButtonMask(unsigned int mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.h:17:    void processSelectionButtonMask(unsigned int mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:110:void CommandSelectorModal::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:127:    } else if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:129:    } else if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.h:15:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:147:void ImportSampleDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:151:	if (mask&EPBM_B) {  
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:154:	} else if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:178:	} else if (mask&EPBM_START) { // START Modifier
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:201:		if (mask==EPBM_UP) warpToNextSample(-1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:202:		if (mask==EPBM_DOWN) warpToNextSample(1);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:203:		if (mask==EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:208:		if (mask==EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.h:17:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/MessageBox.cpp:63:void MessageBox::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/MessageBox.cpp:64:	if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/MessageBox.h:34:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:114:void NewProjectDialog::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:121:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:146:        } else if (mask == EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:182:        } else if (mask == EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:188:    } else if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:189:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.h:19:  virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:215:void SelectProjectDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:218:    if (mask&EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:220:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:249:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:307:				if (mask==EPBM_UP) warpToNextProject(-1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:308:				if (mask==EPBM_DOWN) warpToNextProject(1) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:309:				if (mask==EPBM_LEFT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:314:				if (mask==EPBM_RIGHT) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.h:16:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/NullView.cpp:9:void NullView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/NullView.h:11:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:821:void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:838:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:852:                mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:864:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:878:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:887:        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:940:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:954:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:957:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:961:void PhraseView::processNormalButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:963:    if (!(mask & EPBM_A)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:970:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:979:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:991:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1022:            if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1092:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1114:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1139:void PhraseView::processSelectionButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1145:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1157:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1199:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1221:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:814:void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:831:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:845:                mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:857:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:871:                        mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:880:        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:933:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:947:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:950:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:954:void PhraseView::processNormalButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:956:    if (!(mask & EPBM_A)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:963:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:972:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:984:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1013:            if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1083:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1105:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1130:void PhraseView::processSelectionButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1136:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1148:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1190:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1212:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.h:16:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.h:49:    void processNormalButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.h:50:    void processSelectionButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:135:    virtual void ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:145:        } else if (mask&EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:148:        } else if (mask&EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:264:void ProjectView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:269:    FieldView::ProcessButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:279:        if (mask&EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.h:14:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:583: ProcessButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:588:void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:605:        if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:611:            mask &= (0xFFFF - EPBM_A);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:616:        if ((mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:618:            mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:625:    if (canDeepClone_ && (mask & EPBM_A) && (mask & EPBM_L)) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:627:        mask &= (0xFFFF - (EPBM_A | EPBM_L));
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:645:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:651:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:656: processNormalButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:661:void SongView::processNormalButtonMask(unsigned int mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:665:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:683:        if ((mask & EPBM_A) && (!(mask & EPBM_R)))
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:692:        if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:699:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:712:            if (mask == EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:755:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:768:                    if (mask & EPBM_START)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:787:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:795:    if ((!(mask & EPBM_A)) && updatingChain_) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:804: processSelectionButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:809:void SongView::processSelectionButtonMask(unsigned int mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:813:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:820:        if (mask == EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:828:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:870:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:886:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.h:15:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.h:21:    void processNormalButtonMask(unsigned int mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.h:22:    void processSelectionButtonMask(unsigned int mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:601:void TableView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:614:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:616:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:620:void TableView::processNormalButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:624:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:633:        if (mask & EPBM_A)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:642:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:659:            if (mask == EPBM_A)
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:691:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:711:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:721:void TableView::processSelectionButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:725:    if (mask & EPBM_B) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:737:        if (mask & EPBM_A) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:752:                if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:773:                    if (mask & EPBM_START) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.h:13:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.h:21:    void processNormalButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.h:22:    void processSelectionButtonMask(unsigned short mask);
+
+=== TreeFrogLibretro input sections ===
+33-#define TREEFROG_MODIFIER_RETRIGGER 0
+34-#endif
+35-
+36-#ifndef TREEFROG_VIDEO_MODE
+37-#define TREEFROG_VIDEO_MODE 0
+38-#endif
+39-
+40-#ifndef TREEFROG_VIDEO_PROBE
+41-#define TREEFROG_VIDEO_PROBE 0
+42-#endif
+43-
+44-#ifndef TREEFROG_ENABLE_START
+45-#define TREEFROG_ENABLE_START 1
+46-#endif
+47-
+48-#ifndef TREEFROG_ENABLE_SELECT
+49-#define TREEFROG_ENABLE_SELECT 0
+50-#endif
+51-
+52-#ifndef TREEFROG_PORT_VERSION_BADGE
+53-#define TREEFROG_PORT_VERSION_BADGE 1
+54-#endif
+55-
+56-#ifndef TREEFROG_PORT_VERSION_BADGE_COLOR
+57-#define TREEFROG_PORT_VERSION_BADGE_COLOR 0xd99b
+58-#endif
+59-
+60-static retro_environment_t environ_cb = 0;
+61-static retro_video_refresh_t video_cb = 0;
+62-static retro_audio_sample_batch_t audio_batch_cb = 0;
+63:static retro_input_poll_t input_poll_cb = 0;
+64:static retro_input_state_t input_state_cb = 0;
+65-
+66-static uint16_t framebuffer[TREEFROG_LGPT_WIDTH * TREEFROG_LGPT_HEIGHT];
+67-#if TREEFROG_VIDEO_MODE == 1
+68-/* Squeeze 320x240 into 240x240. */
+69-static uint16_t video_squeeze_buffer[240 * 240];
+70-#elif TREEFROG_VIDEO_MODE == 2
+71-/* Right-edge diagnostic: copy the right 240px of the logical 320px framebuffer
+72- * to a 240x240 output, so missing right-side HUD pixels should appear on the
+73- * device even if the frontend crops the original left/right edge. */
+74-static uint16_t video_right_probe_buffer[240 * 240];
+75-#endif
+76-static int16_t audio_buffer[2048 * 2];
+77-static bool app_ready = false;
+78-static double audio_accum = 0.0;
+79-static uint32_t last_phys_for_taps = 0;
+80-static uint32_t last_phys_for_combo = 0;
+81-
+82-/* Cubevol shared-memory fallback used by FrogUI/TreeFrogUI on SF3000/GB300/R36SX.
+83- * Known bits match FrogUI. The L2/R2/FN bits are best-effort for R36SX
+84- * revisions and can be verified with TREEFROG_INPUT_DEBUG=1. */
+85-#define CV_SEL   0
+86-#define CV_FN    2
+87-#define CV_START 3
+88-#define CV_UP    4
+89-#define CV_RIGHT 5
+90-#define CV_DOWN  6
+91-#define CV_LEFT  7
+92-#define CV_L2    8
+93-#define CV_R2    9
+94-#define CV_L1    10
+95-#define CV_R1    11
+96:#define CV_X     12
+97:#define CV_A     13
+98-#define CV_B     14
+99-#define CV_Y     15
+100-
+101-static volatile uint32_t *cv_keys = 0;
+102-static int cv_shmid = -1;
+103-
+104-static void cv_detach(void) {
+105-    if (cv_keys) {
+106-        shmdt((const void *)cv_keys);
+107-        cv_keys = 0;
+108-    }
+109-    cv_shmid = -1;
+110-}
+111-
+112-static void cv_init(void) {
+113-    if (cv_keys) return;
+114-    key_t key = ftok("/tmp/joy_key", 'a');
+115-    if (key == (key_t)-1) return;
+116-    cv_shmid = shmget(key, 4, 0666);
+117-    if (cv_shmid < 0) return;
+118-    cv_keys = (volatile uint32_t *)shmat(cv_shmid, 0, 0);
+119-    if (cv_keys == (void *)-1) {
+120-        cv_keys = 0;
+121-        cv_shmid = -1;
+122-    }
+123-}
+124-
+125-static bool cv_btn(uint32_t state, int bit) { return ((state >> bit) & 1) != 0; }
+126-static bool lr_btn(unsigned id) {
+127:    return input_state_cb && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, id);
+128-}
+129-
+130-enum PhysicalButton {
+131-    PHY_LEFT = 0,
+132-    PHY_RIGHT,
+133-    PHY_UP,
+134-    PHY_DOWN,
+135:    PHY_A,
+136-    PHY_B,
+137:    PHY_X,
+138-    PHY_Y,
+139-    PHY_L1,
+140-    PHY_R1,
+141-    PHY_L2,
+142-    PHY_R2,
+143-    PHY_START,
+144-    PHY_SELECT,
+145-    PHY_FN,
+146-    PHY_COUNT
+147-};
+148-
+149-#define PHY_BIT(p) (1u << (unsigned)(p))
+150-
+151-typedef struct PhysicalSource {
+152-    PhysicalButton phy;
+153-    const char *name;
+154-    unsigned lr;
+155-    int cv;
+156-} PhysicalSource;
+157-
+158-static const PhysicalSource physical_sources[] = {
+159-    { PHY_LEFT,   "LEFT",   RETRO_DEVICE_ID_JOYPAD_LEFT,   CV_LEFT   },
+160-    { PHY_RIGHT,  "RIGHT",  RETRO_DEVICE_ID_JOYPAD_RIGHT,  CV_RIGHT  },
+161-    { PHY_UP,     "UP",     RETRO_DEVICE_ID_JOYPAD_UP,     CV_UP     },
+162-    { PHY_DOWN,   "DOWN",   RETRO_DEVICE_ID_JOYPAD_DOWN,   CV_DOWN   },
+163:    { PHY_A,      "A",      RETRO_DEVICE_ID_JOYPAD_A,      CV_A      },
+164-    { PHY_B,      "B",      RETRO_DEVICE_ID_JOYPAD_B,      CV_B      },
+165:    { PHY_X,      "X",      RETRO_DEVICE_ID_JOYPAD_X,      CV_X      },
+166-    { PHY_Y,      "Y",      RETRO_DEVICE_ID_JOYPAD_Y,      CV_Y      },
+167-    { PHY_L1,     "L1",     RETRO_DEVICE_ID_JOYPAD_L,      CV_L1     },
+168-    { PHY_R1,     "R1",     RETRO_DEVICE_ID_JOYPAD_R,      CV_R1     },
+169-    { PHY_L2,     "L2",     RETRO_DEVICE_ID_JOYPAD_L2,     CV_L2     },
+170-    { PHY_R2,     "R2",     RETRO_DEVICE_ID_JOYPAD_R2,     CV_R2     },
+171-    { PHY_START,  "START",  RETRO_DEVICE_ID_JOYPAD_START,  CV_START  },
+172-    { PHY_SELECT, "SELECT", RETRO_DEVICE_ID_JOYPAD_SELECT, CV_SEL    },
+173-    { PHY_FN,     "FN",     RETRO_DEVICE_ID_JOYPAD_L3,     CV_FN     }
+174-};
+175-
+176-typedef struct OutputState {
+177-    GUIEventPadButtonType lgpt;
+178-    const char *name;
+179-    bool pressed;
+180-    bool last;
+181-} OutputState;
+182-
+183-static OutputState output_states[] = {
+184-    { EPBT_LEFT,   "LGPT_LEFT",   false, false },
+185-    { EPBT_RIGHT,  "LGPT_RIGHT",  false, false },
+186-    { EPBT_UP,     "LGPT_UP",     false, false },
+187-    { EPBT_DOWN,   "LGPT_DOWN",   false, false },
+188-    { EPBT_A,      "LGPT_A",      false, false },
+189-    { EPBT_B,      "LGPT_B",      false, false },
+190-    { EPBT_L,      "LGPT_L",      false, false },
+191-    { EPBT_R,      "LGPT_R",      false, false },
+192-    { EPBT_START,  "LGPT_START",  false, false },
+193-    { EPBT_SELECT, "LGPT_SELECT", false, false }
+194-};
+195-
+196-static void output_set(GUIEventPadButtonType lgpt) {
+197-    for (unsigned i = 0; i < sizeof(output_states) / sizeof(output_states[0]); ++i) {
+198-        if (output_states[i].lgpt == lgpt) {
+199-            output_states[i].pressed = true;
+200-            return;
+201-        }
+202-    }
+203-}
+204-
+205-static void clear_outputs(void) {
+206-    for (unsigned i = 0; i < sizeof(output_states) / sizeof(output_states[0]); ++i) {
+207-        output_states[i].pressed = false;
+208-    }
+209-}
+210-
+211:static void reset_input_latches(bool send_releases) {
+212-    TreeFrogEventManager *em = TreeFrogEventManager::GetInstance();
+213-    for (unsigned i = 0; i < sizeof(output_states) / sizeof(output_states[0]); ++i) {
+214-        if (send_releases && output_states[i].last && em) {
+215-            em->PushPad(output_states[i].lgpt, false);
+216-        }
+217-        output_states[i].pressed = false;
+218-        output_states[i].last = false;
+219-    }
+220-    if (send_releases && em) em->Flush();
+221-    if (em) em->ClearQueue();
+222-    last_phys_for_taps = 0;
+223-}
+224-
+225-static uint32_t read_physical_mask(uint32_t cv, uint32_t *lr_mask_out) {
+226-    uint32_t mask = 0;
+227-    uint32_t lr_mask = 0;
+228-    for (unsigned i = 0; i < sizeof(physical_sources) / sizeof(physical_sources[0]); ++i) {
+229-        bool lr = lr_btn(physical_sources[i].lr);
+230-        bool cvp = cv_btn(cv, physical_sources[i].cv);
+231-        if (lr) lr_mask |= PHY_BIT(physical_sources[i].phy);
+232-        if (lr || cvp) mask |= PHY_BIT(physical_sources[i].phy);
+233-    }
+234-    if (lr_mask_out) *lr_mask_out = lr_mask;
+235-    return mask;
+236-}
+237-
+238-static void map_physical_to_lgpt(uint32_t phys) {
+239-    clear_outputs();
+240-
+241-    if (phys & PHY_BIT(PHY_LEFT))  output_set(EPBT_LEFT);
+242-    if (phys & PHY_BIT(PHY_RIGHT)) output_set(EPBT_RIGHT);
+243-    if (phys & PHY_BIT(PHY_UP))    output_set(EPBT_UP);
+244-    if (phys & PHY_BIT(PHY_DOWN))  output_set(EPBT_DOWN);
+245-
+246-#if TREEFROG_FACE_TAP_MODE == 0
+247:    if (phys & PHY_BIT(PHY_A))     output_set(EPBT_A);
+248-    if (phys & PHY_BIT(PHY_B))     output_set(EPBT_B);
+249-
+250-    /* R36SX-friendly safe duplicates.  On this hardware the right-stick lines
+251-     * are digital face-button aliases on some revisions, so duplicates are
+252-     * aggregated before dispatch and cannot create double down/up events. */
+253:    if (phys & PHY_BIT(PHY_X))     output_set(EPBT_A);
+254-    if (phys & PHY_BIT(PHY_Y))     output_set(EPBT_B);
+255-#else
+256-    /* Diagnostic mode: face buttons are injected as rising-edge taps after
+257-     * latched direction/shoulder state has been updated.  This avoids leaving
+258-     * PhraseView in an A-held state and isolates A-down crashes. */
+259-#endif
+260-    if (phys & PHY_BIT(PHY_L1))    output_set(EPBT_L);
+261-    if (phys & PHY_BIT(PHY_R1))    output_set(EPBT_R);
+262-    if (phys & PHY_BIT(PHY_L2))    output_set(EPBT_L);
+263-    if (phys & PHY_BIT(PHY_R2))    output_set(EPBT_R);
+264-
+265-#if TREEFROG_ENABLE_START
+266-    /* V1 stable: START is forwarded only after the Player empty-channel
+267-     * playback guard is applied by patch_player_start_guard.py. */
+268-    if (phys & PHY_BIT(PHY_START))  output_set(EPBT_START);
+269-#endif
+270-
+271-#if TREEFROG_ENABLE_SELECT
+272-    if (phys & PHY_BIT(PHY_SELECT)) output_set(EPBT_SELECT);
+273-#endif
+274-}
+275-
+276-#if TREEFROG_INPUT_DEBUG
+277:static FILE *input_log = 0;
+278-static uint32_t last_logged_phys = 0xffffffffu;
+279-static uint32_t last_logged_cv = 0xffffffffu;
+280-static uint32_t last_logged_lr = 0xffffffffu;
+281-
+282-static void append_button_names(FILE *f, uint32_t phys) {
+283-    bool any = false;
+284-    for (unsigned i = 0; i < sizeof(physical_sources) / sizeof(physical_sources[0]); ++i) {
+285-        if (phys & PHY_BIT(physical_sources[i].phy)) {
+286-            if (any) fputc('+', f);
+287-            fputs(physical_sources[i].name, f);
+288-            any = true;
+289-        }
+290-    }
+291-    if (!any) fputs("none", f);
+292-}
+293-
+294:static void close_input_log(void) {
+295:    if (input_log) {
+296:        fclose(input_log);
+297:        input_log = 0;
+298-    }
+299-}
+300-
+301-static void truncate_debug_logs(void) {
+302-    const char *paths[] = {
+303:        "/mnt/sdcard/lgpt/input_debug.log",
+304-        "/mnt/sdcard/lgpt/event_debug.log",
+305-        "/mnt/sdcard/lgpt/audio_debug.log"
+306-    };
+307-    for (unsigned i = 0; i < sizeof(paths) / sizeof(paths[0]); ++i) {
+308-        FILE *f = fopen(paths[i], "w");
+309-        if (f) fclose(f);
+310-    }
+311-    last_logged_phys = 0xffffffffu;
+312-    last_logged_cv = 0xffffffffu;
+313-    last_logged_lr = 0xffffffffu;
+314-}
+315-
+316:static void log_input_change(uint32_t cv, uint32_t lr_mask, uint32_t phys) {
+317-    if (phys == last_logged_phys && cv == last_logged_cv && lr_mask == last_logged_lr) return;
+318-    last_logged_phys = phys;
+319-    last_logged_cv = cv;
+320-    last_logged_lr = lr_mask;
+321-
+322:    if (!input_log) input_log = fopen("/mnt/sdcard/lgpt/input_debug.log", "a");
+323:    if (!input_log) return;
+324-
+325:    fprintf(input_log, "cv=0x%04x lr=0x%04x phys=", (unsigned)(cv & 0xffff), (unsigned)lr_mask);
+326:    append_button_names(input_log, phys);
+327:    fprintf(input_log, " profile=%d\n", TREEFROG_INPUT_PROFILE);
+328:    fflush(input_log);
+329-}
+330-#else
+331:static void close_input_log(void) {}
+332-static void truncate_debug_logs(void) {}
+333:static void log_input_change(uint32_t cv, uint32_t lr_mask, uint32_t phys) { (void)cv; (void)lr_mask; (void)phys; }
+334-#endif
+335-
+336-static void dispatch_outputs(void) {
+337-    TreeFrogEventManager *em = TreeFrogEventManager::GetInstance();
+338-    for (unsigned i = 0; i < sizeof(output_states) / sizeof(output_states[0]); ++i) {
+339-        if (output_states[i].pressed != output_states[i].last) {
+340-            em->PushPad(output_states[i].lgpt, output_states[i].pressed);
+341-            output_states[i].last = output_states[i].pressed;
+342-        }
+343-    }
+344-}
+345-
+346-static void push_face_tap(GUIEventPadButtonType button) {
+347-    TreeFrogEventManager *em = TreeFrogEventManager::GetInstance();
+348-    if (!em) return;
+349-    em->PushPad(button, true);
+350-    em->PushPad(button, false);
+351-}
+352-
+353-static void dispatch_modifier_retrigger(uint32_t phys) {
+354-#if TREEFROG_MODIFIER_RETRIGGER
+355-    TreeFrogEventManager *em = TreeFrogEventManager::GetInstance();
+356-    if (!em) {
+357-        last_phys_for_combo = phys;
+358-        return;
+359-    }
+360-
+361-    const uint32_t dirs =
+362-        PHY_BIT(PHY_LEFT) | PHY_BIT(PHY_RIGHT) | PHY_BIT(PHY_UP) | PHY_BIT(PHY_DOWN);
+363-
+364-    uint32_t rising_dirs = (phys & dirs) & ~(last_phys_for_combo & dirs);
+365-
+366-    /* LGPT on this target edits reliably when it receives the modifier down
+367-     * after the direction down. This preserves normal held A/B behavior and
+368-     * fixes the user-facing order A-then-direction / B-then-direction.
+369-     */
+370-    if (rising_dirs) {
+371:        if (phys & PHY_BIT(PHY_A)) {
+372-            em->PushPad(EPBT_A, true);
+373-        }
+374-        if (phys & PHY_BIT(PHY_B)) {
+375-            em->PushPad(EPBT_B, true);
+376-        }
+377-    }
+378-#else
+379-    (void)phys;
+380-#endif
+381-    last_phys_for_combo = phys;
+382-}
+383-
+384-static void dispatch_face_taps(uint32_t phys) {
+385-#if TREEFROG_FACE_TAP_MODE == 1
+386-    uint32_t rising = phys & ~last_phys_for_taps;
+387:    if (rising & PHY_BIT(PHY_A)) push_face_tap(EPBT_A);
+388:    if (rising & PHY_BIT(PHY_X)) push_face_tap(EPBT_A);
+389-    if (rising & PHY_BIT(PHY_B)) push_face_tap(EPBT_B);
+390-    if (rising & PHY_BIT(PHY_Y)) push_face_tap(EPBT_B);
+391-#else
+392-    (void)phys;
+393-#endif
+394-    last_phys_for_taps = phys;
+395-}
+396-
+397:static void poll_input(void) {
+398-    if (!app_ready) return;
+399:    if (input_poll_cb) input_poll_cb();
+400-    cv_init();
+401-
+402-    uint32_t cv = cv_keys ? (*cv_keys & 0xffff) : 0;
+403-    uint32_t lr_mask = 0;
+404-    uint32_t phys = read_physical_mask(cv, &lr_mask);
+405-
+406:    log_input_change(cv, lr_mask, phys);
+407-    map_physical_to_lgpt(phys);
+408-    dispatch_outputs();
+409-    dispatch_modifier_retrigger(phys);
+410-    dispatch_face_taps(phys);
+411-}
+412-
+413-static void stop_audio_and_clear(void) {
+414-    TreeFrogAudioDriver *drv = TreeFrogGetAudioDriver();
+415-    if (drv) drv->ResetPlaybackState();
+416-    memset(audio_buffer, 0, sizeof(audio_buffer));
+417-    audio_accum = 0.0;
+418-}
+419-
+420-static void reset_runtime_state(bool send_releases) {
+421:    reset_input_latches(send_releases);
+422-    stop_audio_and_clear();
+423-    TreeFrogSetQuitRequested(false);
+424-}
+425-
+426-static void draw_probe_digit(uint16_t *dst, int ox, int oy, const unsigned char rows[7], uint16_t color) {
+427-    for (int y = 0; y < 7; ++y) {
+428-        for (int x = 0; x < 5; ++x) {
+429-            if ((rows[y] >> (4 - x)) & 1) {
+430-                int px = ox + x;
+431-                int py = oy + y;
+432-                if (px >= 0 && py >= 0 && px < TREEFROG_LGPT_WIDTH && py < TREEFROG_LGPT_HEIGHT) {
+433-                    dst[py * TREEFROG_LGPT_WIDTH + px] = color;
+434-                }
+435-            }
+436-        }
+437-    }
+438-}
+439-
+440-static void draw_video_probe_overlay(uint16_t *dst) {
+441-#if TREEFROG_VIDEO_PROBE
+442-    const uint16_t white = 0xffff;
+443-    const uint16_t red   = 0xf800;
+444-    const uint16_t green = 0x07e0;
+445-    const uint16_t mag   = 0xf81f;
+446-    const uint16_t cyan  = 0x07ff;
+447-    const uint16_t black = 0x0000;
+448-
+449-    /* Full logical-frame border. If the right border is absent on device, the
+450-     * frontend/display path is cropping the logical 320px image. */
+451-    for (int x = 0; x < TREEFROG_LGPT_WIDTH; ++x) {
+452-        dst[0 * TREEFROG_LGPT_WIDTH + x] = white;
+453-        dst[(TREEFROG_LGPT_HEIGHT - 1) * TREEFROG_LGPT_WIDTH + x] = white;
+454-    }
+455-    for (int y = 0; y < TREEFROG_LGPT_HEIGHT; ++y) {
+456-        dst[y * TREEFROG_LGPT_WIDTH + 0] = white;
+457-        dst[y * TREEFROG_LGPT_WIDTH + (TREEFROG_LGPT_WIDTH - 1)] = red;
+458-        dst[y * TREEFROG_LGPT_WIDTH + 239] = mag;
+459-        dst[y * TREEFROG_LGPT_WIDTH + 279] = green;
+460-    }
+461-
+462-    /* Small unavoidable marker in top-left so the tester knows the probe build
+463-     * is actually running. It draws block text V15. */
+464-    for (int y = 2; y < 14; ++y) for (int x = 2; x < 34; ++x) dst[y * TREEFROG_LGPT_WIDTH + x] = black;
+465-    static const unsigned char V[7] = {0x11,0x11,0x11,0x11,0x11,0x0a,0x04};
+466-    static const unsigned char one[7] = {0x04,0x0c,0x04,0x04,0x04,0x04,0x0e};
+467-    static const unsigned char five[7] = {0x1f,0x10,0x1e,0x01,0x01,0x11,0x0e};
+468-    draw_probe_digit(dst, 4, 4, V, cyan);
+469-    draw_probe_digit(dst, 12, 4, one, cyan);
+470-    draw_probe_digit(dst, 20, 4, five, cyan);
+471-#else
+472-    (void)dst;
+473-#endif
+474-}
+475-
+476-static void draw_badge_glyph(uint16_t *dst, int ox, int oy, const unsigned char rows[7], uint16_t color) {
+477-    for (int y = 0; y < 7; ++y) {
+478-        for (int x = 0; x < 5; ++x) {
+479-            if ((rows[y] >> (4 - x)) & 1) {
+480-                int px = ox + x;
+481-                int py = oy + y;
+482-                if (px >= 0 && py >= 0 && px < TREEFROG_LGPT_WIDTH && py < TREEFROG_LGPT_HEIGHT) {
+483-                    dst[py * TREEFROG_LGPT_WIDTH + px] = color;
+484-                }
+485-            }
+486-        }
+487-    }
+488-}
+489-
+490-static void draw_port_version_badge(uint16_t *dst) {
+491-#if TREEFROG_PORT_VERSION_BADGE
+492-    /* PORT LGPT TRACKER V4.0 SourceRooted. Badge no intrusivo en esquina superior derecha. */
+493-    static const unsigned char V[7]     = {0x11,0x11,0x11,0x11,0x11,0x0a,0x04};
+494-    static const unsigned char four[7]  = {0x02,0x06,0x0a,0x12,0x1f,0x02,0x02};
+495-    static const unsigned char zero[7]  = {0x0e,0x11,0x13,0x15,0x19,0x11,0x0e};
+496-    const uint16_t color = (uint16_t)TREEFROG_PORT_VERSION_BADGE_COLOR;
+497-    const int y = 2;
+498-    const int x = TREEFROG_LGPT_WIDTH - 22;
+499-    draw_badge_glyph(dst, x, y, V, color);
+500-    draw_badge_glyph(dst, x + 7, y, four, color);
+501-    draw_badge_glyph(dst, x + 14, y, zero, color);
+502-#else
+503-    (void)dst;
+504-#endif
+505-}
+506-
+507-static uint16_t *make_video_output(uint16_t *src, unsigned *w, unsigned *h, size_t *pitch) {
+508-    draw_video_probe_overlay(src);
+509-    draw_port_version_badge(src);
+510-#if TREEFROG_VIDEO_MODE == 1
+511-    for (unsigned y = 0; y < 240; ++y) {
+--
+542-#if TREEFROG_INPUT_DEBUG
+543-#define TREEFROG_V133_RETRO_TRACE 1
+544-static void v11_log_retro(const char *msg) {
+545-    FILE *f = fopen("/mnt/sdcard/lgpt/retro_debug.log", "a");
+546-    if (!f) return;
+547-    fprintf(f, "%lu %s\n", treefrog_v11_frame_counter, msg ? msg : "retro");
+548-    fclose(f);
+549-}
+550-#else
+551-static void v11_log_retro(const char *msg) { (void)msg; }
+552-#endif
+553-
+554-
+555-static const char *treefrog_v40_source_rooted_marker = "TREEFROG_PORT_LGPT_TRACKER_V4_0_SOURCE_ROOTED";
+556-extern "C" {
+557-
+558-unsigned retro_api_version(void) { return RETRO_API_VERSION; }
+559-
+560-void retro_set_environment(retro_environment_t cb) {
+561-    environ_cb = cb;
+562-    enum { RETRO_PIXEL_FORMAT_RGB565_LOCAL = RETRO_PIXEL_FORMAT_RGB565 };
+563-    unsigned fmt = RETRO_PIXEL_FORMAT_RGB565_LOCAL;
+564-    if (environ_cb) environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt);
+565-    bool no_game = true;
+566-    if (environ_cb) environ_cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &no_game);
+567-}
+568-
+569-void retro_set_video_refresh(retro_video_refresh_t cb) { video_cb = cb; }
+570-void retro_set_audio_sample(retro_audio_sample_t cb) { (void)cb; }
+571-void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) { audio_batch_cb = cb; }
+572:void retro_set_input_poll(retro_input_poll_t cb) { input_poll_cb = cb; }
+573:void retro_set_input_state(retro_input_state_t cb) { input_state_cb = cb; }
+574-
+575-void retro_get_system_info(struct retro_system_info *info) {
+576-    memset(info, 0, sizeof(*info));
+577-    info->library_name = "Little Piggy Tracker";
+578-    info->library_version = "PORT LGPT TRACKER V4.0 SourceRooted";
+579-    info->valid_extensions = "lgpt|xml|txt";
+580-    info->need_fullpath = true;
+581-    info->block_extract = false;
+582-}
+583-
+584-void retro_get_system_av_info(struct retro_system_av_info *info) {
+585-    memset(info, 0, sizeof(*info));
+586-#if TREEFROG_VIDEO_MODE == 1 || TREEFROG_VIDEO_MODE == 2
+587-    info->geometry.base_width = 240;
+588-    info->geometry.base_height = 240;
+589-    info->geometry.max_width = 240;
+590-    info->geometry.max_height = 240;
+591-    info->geometry.aspect_ratio = 4.0f / 3.0f;
+592-#else
+593-    info->geometry.base_width = TREEFROG_LGPT_WIDTH;
+594-    info->geometry.base_height = TREEFROG_LGPT_HEIGHT;
+595-    info->geometry.max_width = TREEFROG_LGPT_WIDTH;
+596-    info->geometry.max_height = TREEFROG_LGPT_HEIGHT;
+597-    info->geometry.aspect_ratio = 4.0f / 3.0f;
+598-#endif
+599-    info->timing.fps = 60.0;
+600-    info->timing.sample_rate = 44100.0;
+601-}
+602-
+603-
+604-
+605-// TREEFROG_V51_ESTABLE
+606-// V4.0 Estable - Project Persistence Fix diagnostics.
+607-// Hallazgo V32: borrar last_project no basta. La carpeta lgpt_* incompleta,
+608-// listada como proyecto aunque no tenga lgptsav.dat, dispara SIG=11 en el
+609-// primer retro_run() de una reentrada. V4.0 NO borra ni mueve carpetas: filtra
+610-// proyectos incompletos en SelectProjectDialog y autosalva proyectos nuevos.
+611-static char g_treefrog_v40_game_path[1024];
+612-static unsigned g_treefrog_v40_run_count = 0;
+613-
+614-static void TreeFrogV51Log(const char *where, const char *detail) {
+615-    FILE *fp = fopen("/mnt/sdcard/lgpt/reentry_debug.log", "a");
+616-    if (fp) {
+617-        fprintf(fp, "TREEFROG_V51_ESTABLE: %s %s\n", where ? where : "unknown", detail ? detail : "");
+618-        fclose(fp);
+619-    }
+620-}
+621-
+622-static int TreeFrogV51IsDir(const char *path) {
+623-    struct stat st;
+624-    return (path && stat(path, &st) == 0 && S_ISDIR(st.st_mode));
+625-}
+626-
+627-static int TreeFrogV51IsRegularFile(const char *path) {
+628-    struct stat st;
+629-    return (path && stat(path, &st) == 0 && S_ISREG(st.st_mode));
+630-}
+631-
+632-static void TreeFrogV51LogProjectRoot(const char *where) {
+633-    FILE *fp = fopen("/mnt/sdcard/lgpt/reentry_debug.log", "a");
+634-    if (!fp) return;
+635-    fprintf(fp, "TREEFROG_V51_ESTABLE: project-root %s\n", where ? where : "unknown");
+636-
+637-    FILE *lp = fopen("/mnt/sdcard/lgpt/last_project", "r");
+638-    if (lp) {
+639-        char buf[1024];
+640-        if (fgets(buf, sizeof(buf), lp)) {
+641-            buf[strcspn(buf, "\r\n")] = 0;
+642-            fprintf(fp, "  last_project=%s exists=%d\n", buf, TreeFrogV51IsDir(buf));
+643-        } else {
+644-            fprintf(fp, "  last_project=<empty>\n");
+645-        }
+646-        fclose(lp);
+647-    } else {
+648-        fprintf(fp, "  last_project=<missing>\n");
+649-    }
+650-
+651-    DIR *d = opendir("/mnt/sdcard/lgpt/projects");
+652-    if (!d) {
+653-        fprintf(fp, "  projects: opendir failed\n");
+654-        fclose(fp);
+655-        return;
+656-    }
+657-    struct dirent *de;
+658-    while ((de = readdir(d)) != 0) {
+659-        if (!de->d_name || de->d_name[0] == '.') continue;
+660-        char path[1536];
+661-        char save[1536];
+662-        snprintf(path, sizeof(path), "/mnt/sdcard/lgpt/projects/%s", de->d_name);
+663-        snprintf(save, sizeof(save), "%s/lgptsav.dat", path);
+--
+688-    reset_runtime_state(false);
+689-}
+690-
+691-bool retro_load_game(const struct retro_game_info *game) {
+692-    g_treefrog_v40_game_path[0] = '\0';
+693-    if (game && game->path) {
+694-        snprintf(g_treefrog_v40_game_path, sizeof(g_treefrog_v40_game_path), "%s", game->path);
+695-        g_treefrog_v40_game_path[sizeof(g_treefrog_v40_game_path) - 1] = '\0';
+696-    }
+697-    g_treefrog_v40_run_count = 0;
+698-    TreeFrogV51Log("retro_load_game.enter", g_treefrog_v40_game_path);
+699-    TreeFrogV51LogProjectRoot("retro_load_game.before-ui");
+700-
+701-    const char *path = game ? game->path : 0;
+702-    truncate_debug_logs();
+703-    reset_runtime_state(false);
+704-    TreeFrogSystem::Boot(path);
+705-
+706-    TreeFrogCreateWindowParams params;
+707-    params.framebuffer_ = framebuffer;
+708-    app_ready = Application::GetInstance()->Init(params);
+709-    return app_ready;
+710-}
+711-
+712-void retro_unload_game(void) {
+713-    TreeFrogV51Log("retro_unload_game.enter", g_treefrog_v40_game_path);
+714-    TreeFrogV51LogProjectRoot("retro_unload_game.enter");
+715-
+716-    reset_runtime_state(true);
+717-    app_ready = false;
+718:    close_input_log();
+719-    cv_detach();
+720-}
+721-
+722-void retro_deinit(void) {
+723-    TreeFrogV51Log("retro_deinit.enter", g_treefrog_v40_game_path);
+724-    TreeFrogV51LogProjectRoot("retro_deinit.enter");
+725-
+726-    reset_runtime_state(false);
+727-    app_ready = false;
+728:    close_input_log();
+729-    cv_detach();
+730-}
+731-
+732-void retro_run(void) {
+733-    ++treefrog_v11_frame_counter;
+734-    if (g_treefrog_v40_run_count < 32) {
+735-        char msg[128];
+736-        snprintf(msg, sizeof(msg), "frame=%u path=%s", g_treefrog_v40_run_count, g_treefrog_v40_game_path);
+737-        TreeFrogV51Log("retro_run.enter", msg);
+738-    }
+739-    ++g_treefrog_v40_run_count;
+740-
+741-    if (!app_ready) {
+742-        memset(audio_buffer, 0, 735 * 2 * sizeof(int16_t));
+743-        if (audio_batch_cb) audio_batch_cb(audio_buffer, 735);
+744-        if (video_cb) {
+745-            unsigned vw, vh; size_t vp;
+746-            uint16_t *vf = make_video_output(framebuffer, &vw, &vh, &vp);
+747-            video_cb(vf, vw, vh, vp);
+748-        }
+749-        return;
+750-    }
+751-
+752:    poll_input();
+753-
+754-    TreeFrogEventManager::GetInstance()->Flush();
+755-
+756-    TreeFrogTimerService *ts = TreeFrogGetTimerService();
+757-    if (ts) ts->Tick();
+758-
+759-    GUIWindow *w = Application::GetInstance()->GetWindow();
+760-    if (w) w->Update();
+761-
+762-    audio_accum += 44100.0 / 60.0;
+763-    int frames = (int)audio_accum;
+764-    audio_accum -= frames;
+765-    if (frames < 0) frames = 0;
+766-    if (frames > 2048) frames = 2048;
+767-
+768-    if ((treefrog_v11_frame_counter % 60) == 0) v11_log_retro("retro.audio.render.enter");
+769-    TreeFrogAudioDriver *drv = TreeFrogGetAudioDriver();
+770-    if (drv) drv->Render(audio_buffer, frames);
+771-    else memset(audio_buffer, 0, frames * 2 * sizeof(int16_t));
+772-
+773-    if ((treefrog_v11_frame_counter % 60) == 0) v11_log_retro("retro.audio.render.leave");
+774-    if (audio_batch_cb && frames > 0) audio_batch_cb(audio_buffer, frames);
+775-    if (video_cb) {
+776-        unsigned vw, vh; size_t vp;
+777-        uint16_t *vf = make_video_output(TreeFrogGetFramebuffer(), &vw, &vh, &vp);
+778-        video_cb(vf, vw, vh, vp);
+779-    }
+780-
+781-    if (TreeFrogQuitRequested() && environ_cb) {
+782-        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, 0);
+783-    }
+784-}
+785-
+786-void retro_reset(void) {
+787-    reset_runtime_state(true);
+788-}
+789-
+790-unsigned retro_get_region(void) { return RETRO_REGION_NTSC; }
+791-size_t retro_serialize_size(void) { return 0; }
+792-bool retro_serialize(void *data, size_t size) { (void)data; (void)size; return false; }
+793-bool retro_unserialize(const void *data, size_t size) { (void)data; (void)size; return false; }
+794-void *retro_get_memory_data(unsigned id) { (void)id; return 0; }
+795-size_t retro_get_memory_size(unsigned id) { (void)id; return 0; }
+796-void retro_cheat_reset(void) {}
+797-void retro_cheat_set(unsigned index, bool enabled, const char *code) { (void)index; (void)enabled; (void)code; }
+798-bool retro_load_game_special(unsigned type, const struct retro_game_info *info, size_t num) { (void)type; (void)info; (void)num; return false; }
+799-
+800-} /* extern C */
+
+=== Application controller / event dispatch ===
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Application.cpp:18:void Application::initMidiInput()
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Application.cpp:53:  initMidiInput();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Application.h:16:  void initMidiInput();
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Instruments/SoundFontPreset.cpp:51:		tbu.wVal=vect_->shOrigKeyAndCorr ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Instruments/SoundFontSample.cpp:26:	return sfHeader_.byOriginalKey ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Utils/KeyboardLayout.h:6:// Keyboard layout configuration
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Utils/KeyboardLayout.h:34:inline char getKeyAtPosition(int row, int col) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Utils/KeyboardLayout.h:53:inline void findCharacterInKeyboard(char ch, int &outRow, int &outCol) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Utils/KeyboardLayout.h:72:inline void clampKeyboardColumn(int row, int& col) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Utils/KeyboardLayout.h:84:inline void cycleKeyboardColumn(int row, int direction, int& col) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.cpp:48:void FieldView::ProcessButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/FieldView.h:13:	virtual void ProcessButtonMask(unsigned short mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.cpp:231:		ProcessButtonMask(mask,pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:19:enum GUIEventPadButtonMasks {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/BaseClasses/View.h:125:    virtual void ProcessButtonMask(unsigned short mask, bool pressed) = 0;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:378:void ChainView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:425:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:431:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:435:void ChainView::processNormalButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.cpp:542:void ChainView::processSelectionButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.h:11:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.h:38:    void processNormalButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ChainView.h:39:    void processSelectionButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ConsoleView.cpp:13:void ConsoleView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ConsoleView.h:17:	virtual void ProcessButtonMask(unsigned short mask,bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.cpp:58:void GrooveView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.h:11:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.h:22:	void processNormalButtonMask(unsigned short mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/GrooveView.h:23:	void processSelectionButtonMask(unsigned short mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:279:void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.cpp:350:	FieldView::ProcessButtonMask(mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/InstrumentView.h:14:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ListSelectView.cpp:18:void ListSelectView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ListSelectView.cpp:19:	FieldView::ProcessButtonMask(mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ListSelectView.h:12:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:50:void MixerView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:81:        processSelectionButtonMask(mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:87:        processNormalButtonMask(mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:93: processNormalButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:98:void MixerView::processNormalButtonMask(unsigned int mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:143: processSelectionButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.cpp:148:void MixerView::processSelectionButtonMask(unsigned int mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.h:11:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.h:16:	void processNormalButtonMask(unsigned int mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/MixerView.h:17:    void processSelectionButtonMask(unsigned int mask) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.cpp:110:void CommandSelectorModal::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/CommandSelectorModal.h:15:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp:147:void ImportSampleDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/ImportSampleDialog.h:17:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/MessageBox.cpp:63:void MessageBox::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/MessageBox.h:34:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:3:#include "Application/Utils/KeyboardLayout.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:21:        findCharacterInKeyboard(name_[currentChar_], keyboardRow_,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:114:void NewProjectDialog::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:123:            char ch = getKeyAtPosition(keyboardRow_, keyboardCol_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:140:                    findCharacterInKeyboard(name_[currentChar_], keyboardRow_,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:166:            clampKeyboardColumn(keyboardRow_, keyboardCol_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:171:            clampKeyboardColumn(keyboardRow_, keyboardCol_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:175:            cycleKeyboardColumn(keyboardRow_, -1, keyboardCol_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:179:            cycleKeyboardColumn(keyboardRow_, 1, keyboardCol_);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.cpp:197:                    findCharacterInKeyboard(name_[currentChar_], keyboardRow_,
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.h:4:#include "Application/Utils/KeyboardLayout.h"
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/NewProjectDialog.h:19:  virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.cpp:215:void SelectProjectDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ModalDialogs/SelectProjectDialog.h:16:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/NullView.cpp:9:void NullView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/NullView.h:11:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:821:void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:954:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:957:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:961:void PhraseView::processNormalButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp:1139:void PhraseView::processSelectionButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:814:void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:947:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:950:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:954:void PhraseView::processNormalButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.cpp.treefrog_v12_bak:1130:void PhraseView::processSelectionButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.h:16:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.h:49:    void processNormalButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/PhraseView.h:50:    void processSelectionButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:135:    virtual void ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:264:void ProjectView::ProcessButtonMask(unsigned short mask,bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.cpp:269:    FieldView::ProcessButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/ProjectView.h:14:	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:583: ProcessButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:588:void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:645:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:651:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:656: processNormalButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:661:void SongView::processNormalButtonMask(unsigned int mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:804: processSelectionButtonMask:
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.cpp:809:void SongView::processSelectionButtonMask(unsigned int mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.h:15:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.h:21:    void processNormalButtonMask(unsigned int mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/SongView.h:22:    void processSelectionButtonMask(unsigned int mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:601:void TableView::ProcessButtonMask(unsigned short mask, bool pressed) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:614:        processSelectionButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:616:        processNormalButtonMask(mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:620:void TableView::processNormalButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.cpp:721:void TableView::processSelectionButtonMask(unsigned short mask) {
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.h:13:    virtual void ProcessButtonMask(unsigned short mask, bool pressed);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.h:21:    void processNormalButtonMask(unsigned short mask);
+/home/dafunknoise/r36sx-lgpt-port/dev_sources/LGPT_PORT_V100_DEV_NEXT/sources/Application/Views/TableView.h:22:    void processSelectionButtonMask(unsigned short mask);

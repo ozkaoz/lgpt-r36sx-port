@@ -1,0 +1,243 @@
+diff -ruN u245_base/sources/Application/Views/PhraseView.cpp u245_work/sources/Application/Views/PhraseView.cpp
+--- u245_base/sources/Application/Views/PhraseView.cpp	2026-07-07 06:52:28.881616223 +0000
++++ u245_work/sources/Application/Views/PhraseView.cpp	2026-07-07 07:07:46.052445599 +0000
+@@ -1053,9 +1053,16 @@
+ 
+     if ((mask & EPBM_L2) && (mask & (EPBM_LEFT | EPBM_RIGHT | EPBM_UP | EPBM_DOWN)) &&
+         !(mask & (EPBM_A | EPBM_B | EPBM_X | EPBM_Y | EPBM_L | EPBM_R | EPBM_R2 | EPBM_START | EPBM_SELECT))) {
+-        int delta = ((mask & EPBM_RIGHT) || (mask & EPBM_DOWN)) ? 1 : -1;
+-        navigateAssignedPhrase(delta);
+-        return;
++        /* U2.45 TEST:
++           L2+UP/DOWN walks the phrase list. L2+DOWN creates the next free
++           phrase when there is no later allocated phrase.
++           L2+LEFT/RIGHT walks phrase assignments in the current Song channel,
++           so the user can jump from phrase 00 to the next assigned phrase
++           without returning to Song/Chain first. */
++        if (mask & EPBM_UP) { navigatePhraseList(-1); return; }
++        if (mask & EPBM_DOWN) { navigatePhraseList(1); return; }
++        if (mask & EPBM_LEFT) { navigateSongAssignment(-1); return; }
++        if (mask & EPBM_RIGHT) { navigateSongAssignment(1); return; }
+     }
+ 
+     if (mask & EPBM_B) {
+@@ -1403,11 +1410,9 @@
+ }
+ 
+ bool PhraseView::openAssignedChopPitchEnvelope() {
+-    Player *player = Player::GetInstance();
+-    if (player && (player->IsRunning() || player->IsStreaming())) {
+-        View::SetNotification("Stop playback first");
+-        return true;
+-    }
++    /* U2.45 TEST: allow double-A access even while playback is running.
++       The Pitch/Envelope modal can be opened for inspection/editing without
++       forcing the user to stop the project first. */
+     int offset = 16 * viewData_->currentPhrase_ + row_;
+     int instrIndex = phrase_->instr_[offset];
+     int noteValue = phrase_->note_[offset];
+@@ -1443,7 +1448,79 @@
+ }
+ 
+ 
+-bool PhraseView::navigateAssignedPhrase(int delta) {
++bool PhraseView::linkCreatedPhraseToNextChainSlot(int phraseIndex) {
++    if (!viewData_ || !viewData_->song_ || !viewData_->song_->chain_) return false;
++    if (phraseIndex < 0 || phraseIndex >= PHRASE_COUNT) return false;
++    int chain = viewData_->currentChain_;
++    if (chain < 0 || chain >= CHAIN_COUNT) return false;
++
++    unsigned char *chainData = viewData_->song_->chain_->data_ + (16 * chain);
++    int startRow = viewData_->chainRow_;
++    if (startRow < 0) startRow = 0;
++    if (startRow > 15) startRow = 15;
++
++    for (int pass = 0; pass < 2; pass++) {
++        int from = (pass == 0) ? startRow + 1 : 0;
++        int to = (pass == 0) ? 15 : startRow;
++        for (int r = from; r <= to; r++) {
++            if (chainData[r] == 0xFF) {
++                chainData[r] = (unsigned char)phraseIndex;
++                viewData_->chainRow_ = r;
++                return true;
++            }
++        }
++    }
++    return false;
++}
++
++bool PhraseView::navigatePhraseList(int delta) {
++    if (!viewData_ || !viewData_->song_ || !viewData_->song_->phrase_) {
++        View::SetNotification("No phrase data");
++        return false;
++    }
++    if (delta == 0) return false;
++
++    Phrase *phrases = viewData_->song_->phrase_;
++    int current = viewData_->currentPhrase_;
++    if (current < 0 || current >= PHRASE_COUNT) current = 0;
++
++    int next = -1;
++    if (delta > 0) {
++        for (int p = current + 1; p < PHRASE_COUNT; p++) {
++            if (phrases->IsUsed((uchar)p)) { next = p; break; }
++        }
++        if (next < 0) {
++            unsigned short created = phrases->GetNext();
++            if (created != NO_MORE_PHRASE && created < PHRASE_COUNT) {
++                next = (int)created;
++                bool linked = linkCreatedPhraseToNextChainSlot(next);
++                char msg[64];
++                snprintf(msg, sizeof(msg), linked ? "New phrase %02X linked" : "New phrase %02X", next);
++                View::SetNotification(msg);
++            }
++        }
++    } else {
++        for (int p = current - 1; p >= 0; p--) {
++            if (phrases->IsUsed((uchar)p)) { next = p; break; }
++        }
++    }
++
++    if (next < 0 || next >= PHRASE_COUNT) {
++        View::SetNotification(delta > 0 ? "No free phrase" : "No previous phrase");
++        return false;
++    }
++
++    viewData_->currentPhrase_ = next;
++    row_ = 0;
++    updateCursor(0, 0);
++    char msg[48];
++    snprintf(msg, sizeof(msg), "Phrase %02X", next);
++    View::SetNotification(msg);
++    isDirty_ = true;
++    return true;
++}
++
++bool PhraseView::navigateSongAssignment(int delta) {
+     if (!viewData_ || !viewData_->song_ || !viewData_->song_->data_ ||
+         !viewData_->song_->chain_ || !viewData_->song_->chain_->data_) {
+         View::SetNotification("No song data");
+@@ -1451,45 +1528,87 @@
+     }
+     if (delta == 0) return false;
+ 
+-    bool used[PHRASE_COUNT];
+-    for (int i = 0; i < PHRASE_COUNT; i++) used[i] = false;
+-
+     int channel = viewData_->songX_;
+     if (channel < 0) channel = 0;
+     if (channel >= SONG_CHANNEL_COUNT) channel = SONG_CHANNEL_COUNT - 1;
+ 
+-    /* U2.44: L2+arrows from Phrase navigates through phrases that are
+-       actually reachable from the current Song channel. This matches the
+-       phrase numbers assigned in Song/Chain, instead of walking every allocated
+-       phrase in the project. */
++    struct AssignmentRef {
++        int songRow;
++        int chain;
++        int chainRow;
++        int phrase;
++    };
++
++    AssignmentRef refs[SONG_ROW_COUNT * 16];
++    int count = 0;
++    int currentIndex = -1;
++    int currentSongRow = viewData_->songOffset_ + viewData_->songY_;
++
+     for (int songRow = 0; songRow < SONG_ROW_COUNT; songRow++) {
+         unsigned char chainIndex = viewData_->song_->data_[songRow * SONG_CHANNEL_COUNT + channel];
+         if (chainIndex == 0xFF || chainIndex >= CHAIN_COUNT) continue;
+         for (int chainRow = 0; chainRow < 16; chainRow++) {
+             unsigned char phraseIndex = viewData_->song_->chain_->data_[chainIndex * 16 + chainRow];
+-            if (phraseIndex != 0xFF && phraseIndex < PHRASE_COUNT) used[phraseIndex] = true;
++            if (phraseIndex == 0xFF || phraseIndex >= PHRASE_COUNT) continue;
++            refs[count].songRow = songRow;
++            refs[count].chain = chainIndex;
++            refs[count].chainRow = chainRow;
++            refs[count].phrase = phraseIndex;
++            if (phraseIndex == viewData_->currentPhrase_ &&
++                chainIndex == viewData_->currentChain_ &&
++                chainRow == viewData_->chainRow_ &&
++                songRow == currentSongRow) {
++                currentIndex = count;
++            }
++            count++;
+         }
+     }
+ 
+-    int current = viewData_->currentPhrase_;
+-    int next = -1;
+-    if (delta > 0) {
+-        for (int p = current + 1; p < PHRASE_COUNT; p++) { if (used[p]) { next = p; break; } }
+-        if (next < 0) { for (int p = 0; p <= current && p < PHRASE_COUNT; p++) { if (used[p]) { next = p; break; } } }
+-    } else {
+-        for (int p = current - 1; p >= 0; p--) { if (used[p]) { next = p; break; } }
+-        if (next < 0) { for (int p = PHRASE_COUNT - 1; p >= current && p >= 0; p--) { if (used[p]) { next = p; break; } } }
++    if (count <= 0) {
++        View::SetNotification("No song assignments");
++        return false;
+     }
+ 
+-    if (next < 0 || next == current) {
+-        View::SetNotification("No other song phrase");
+-        return false;
++    if (currentIndex < 0) {
++        int bestScore = 999999;
++        for (int i = 0; i < count; i++) {
++            int score = 0;
++            if (refs[i].phrase != viewData_->currentPhrase_) score += 10000;
++            if (refs[i].chain != viewData_->currentChain_) score += 1000;
++            if (refs[i].chainRow != viewData_->chainRow_) score += 100;
++            int d = refs[i].songRow - currentSongRow;
++            if (d < 0) d = -d;
++            score += d;
++            if (score < bestScore) { bestScore = score; currentIndex = i; }
++        }
+     }
+ 
+-    viewData_->currentPhrase_ = next;
++    int nextIndex = currentIndex + (delta > 0 ? 1 : -1);
++    if (nextIndex < 0) nextIndex = count - 1;
++    if (nextIndex >= count) nextIndex = 0;
++
++    AssignmentRef &dst = refs[nextIndex];
++    viewData_->currentChain_ = dst.chain;
++    viewData_->currentPhrase_ = dst.phrase;
++    viewData_->chainRow_ = dst.chainRow;
++    viewData_->songX_ = channel;
++    if (dst.songRow < 0) dst.songRow = 0;
++    if (dst.songRow >= SONG_ROW_COUNT) dst.songRow = SONG_ROW_COUNT - 1;
++    if (dst.songRow < viewData_->songOffset_ ||
++        dst.songRow >= viewData_->songOffset_ + View::songRowCount_) {
++        int off = dst.songRow - (View::songRowCount_ / 2);
++        if (off < 0) off = 0;
++        if (off > 232) off = 232;
++        viewData_->songOffset_ = off;
++    }
++    viewData_->songY_ = dst.songRow - viewData_->songOffset_;
++    if (viewData_->songY_ < 0) viewData_->songY_ = 0;
++    if (viewData_->songY_ >= View::songRowCount_) viewData_->songY_ = View::songRowCount_ - 1;
++
++    row_ = 0;
+     updateCursor(0, 0);
+-    char msg[48];
+-    snprintf(msg, sizeof(msg), "Phrase %02X", next);
++    char msg[80];
++    snprintf(msg, sizeof(msg), "Song %02X Ch%02X P%02X", dst.songRow, channel, dst.phrase);
+     View::SetNotification(msg);
+     isDirty_ = true;
+     return true;
+diff -ruN u245_base/sources/Application/Views/PhraseView.h u245_work/sources/Application/Views/PhraseView.h
+--- u245_base/sources/Application/Views/PhraseView.h	2026-07-07 06:52:28.880407506 +0000
++++ u245_work/sources/Application/Views/PhraseView.h	2026-07-07 07:07:46.051682168 +0000
+@@ -78,7 +78,9 @@
+     bool assignChopFromPhrase(int delta, bool advanceRow);
+     bool previewCurrentPhraseRow();
+     bool openAssignedChopPitchEnvelope();
+-    bool navigateAssignedPhrase(int delta);
++    bool navigatePhraseList(int delta);
++    bool navigateSongAssignment(int delta);
++    bool linkCreatedPhraseToNextChainSlot(int phraseIndex);
+     bool handlePlainADoubleTap();
+     void phraseUndoRedo();
+     unsigned long lastPlainATime_;

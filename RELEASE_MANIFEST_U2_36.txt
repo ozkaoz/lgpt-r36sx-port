@@ -1,0 +1,26 @@
+LGPT_PORT_U2_36_ESTABLE_INDEPENDIENTE
+
+Release: U2.36 estable independiente
+Estado: validado en hardware R36S por usuario
+Fecha de empaquetado: 2026-07-04
+
+Contenido principal:
+- Árbol fuente completo U2.36
+- README_ESTABLE_INDEPENDIENTE_U2_36_ES.md
+- INSTALACION_DESDE_CERO_TREEFROGUI_R36S_U2_36_ES.md
+- COMANDOS_WSL_BUILD_COPY_SD_U2_36_ES.md
+- TEST_PROTOCOL_ESTABLE_U2_36_FINAL_ES.md
+- PROMPT_CONTINUAR_DESARROLLO_DESDE_U2_36_ES.md
+- release_assets/port_outputs_u2_36.zip
+- release_assets/U2_36_RELEASE_SHA256SUMS.txt
+
+Core compilado:
+- No incluido. Compilar localmente en WSL Ubuntu 24 con BUILD_TREEFROG_R36SX_BADGE_OFF_SELECT_OFF.sh.
+
+Marcadores obligatorios:
+- Graphical Chopper U2.36
+- PITCH/ENV U2.36
+- TREEFROG_U2_36_IMPORT_DEDUP_LISTEN_LAYOUT_USAGE
+
+Próxima fase recomendada:
+- U2.37: chops renderizados/exportables a carpeta de proyecto.

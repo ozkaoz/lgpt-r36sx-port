@@ -1,0 +1,36 @@
+INPUT MAP VALIDADO - LGPT PORT V101_InputReserved_Estable
+
+Botones funcionales:
+- D-pad: navegación.
+- A: acción primaria / carga proyecto / edición con flechas.
+- B: modificador/cancelación según contexto.
+- L1: conserva función L.
+- R1: conserva función R.
+- START: reproduce/detiene.
+
+Botones reservados/inactivos:
+- X: dedicado, ya no duplica A.
+- Y: dedicado, ya no duplica B.
+- L2: dedicado, ya no duplica L1/L.
+- R2: dedicado, ya no duplica R1/R.
+- Select: implementado pero inactivo por TREEFROG_ENABLE_SELECT=0.
+
+Estado por vistas:
+- Selector de proyectos:
+  A carga proyecto.
+  X no carga proyecto.
+  B funciona como antes.
+  Y no hace nada visible.
+- Song:
+  START reproduce/detiene.
+  A + flechas funciona donde aplica.
+  A + B todavía conserva comportamiento histórico cut/compact en esta release.
+- Groove, Chain, Phrase, Table:
+  Funcionamiento validado.
+- Import Sample:
+  Listen e Import funcionan con samples desde F:\lgpt\samples.
+
+Pendiente de desarrollo posterior:
+- Cambiar en Song:
+  A + B = clear cell, deja --
+  Y + X = cut/compact, equivalente al A+B histórico

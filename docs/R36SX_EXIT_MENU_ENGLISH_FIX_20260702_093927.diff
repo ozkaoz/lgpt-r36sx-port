@@ -1,0 +1,14 @@
+--- /home/dafunknoise/r36sx-lgpt-port/backups/source_backups_20260702_093927/ProjectView.cpp.before_exit_menu_english_fix	2026-07-02 09:38:22.356027000 -0500
++++ /home/dafunknoise/r36sx-lgpt-port/dev_sources/PORT_LGPT_V2_DEV_UI_REFACTOR/sources/Application/Views/ProjectView.cpp	2026-07-02 09:39:27.906498100 -0500
+@@ -120,9 +120,9 @@
+         DrawString(1,0,"Project Exit",props);
+ 
+         static const char *items[3] = {
+-            "Volver menu principal",
++            "Return to Main Menu",
+             "Exit to TreeFrogUI",
+-            "Cancelar"
++            "Cancel"
+         };
+         for (int i=0;i<3;i++) {
+             props.invert_ = (i==selected_);
