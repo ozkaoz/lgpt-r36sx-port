@@ -1,0 +1,89 @@
+#include "AudioDriverModal.h"
+
+#include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
+#include <stdio.h>
+
+AudioDriverModal::AudioDriverModal(View &view)
+    : ModalView(view),
+      selected_(TreeFrogUac2Bridge_GetDriverMode()),
+      waitForRelease_(true) {
+    if (selected_ < 0 || selected_ >= 2) selected_ = 0;
+}
+
+AudioDriverModal::~AudioDriverModal() {}
+
+void AudioDriverModal::DrawView() {
+    SetWindow(36, 16);
+    GUITextProperties props;
+    char line[64];
+
+    SetColor(CD_HILITE1);
+    props.invert_ = true;
+    DrawString(0, 0, "           AUDIO DRIVER             ", props);
+    props.invert_ = false;
+
+    SetColor(CD_NORMAL);
+    snprintf(line, sizeof(line), "USB: %-29.29s",
+             TreeFrogUac2Bridge_GetUsbStateText());
+    DrawString(1, 2, line, props);
+
+    for (int i = 0; i < 2; ++i) {
+        props.invert_ = (i == selected_);
+        SetColor(i == selected_ ? CD_HILITE2 : CD_NORMAL);
+        snprintf(line, sizeof(line), "%c %-30.30s",
+                 i == selected_ ? '>' : ' ',
+                 TreeFrogUac2Bridge_GetDriverModeNameByIndex(i));
+        DrawString(1, 5 + i * 3, line, props);
+        props.invert_ = false;
+        SetColor(CD_NORMAL);
+        DrawString(3, 6 + i * 3,
+                   TreeFrogUac2Bridge_GetDriverModeDescriptionByIndex(i),
+                   props);
+    }
+
+    SetColor(CD_NORMAL);
+    if (waitForRelease_) {
+        DrawString(1, 12, "Release SELECT/R2 or opening keys", props);
+    } else {
+        DrawString(1, 12, "A apply   B cancel   UP/DOWN", props);
+    }
+    DrawString(1, 13, "Global shortcut: SELECT + R2", props);
+    DrawString(1, 14, "Sampler: Instrument R1 + RIGHT", props);
+}
+
+void AudioDriverModal::ProcessButtonMask(unsigned short mask, bool pressed) {
+    if (waitForRelease_) {
+        if (!pressed && mask == 0) {
+            waitForRelease_ = false;
+            isDirty_ = true;
+        }
+        return;
+    }
+
+    if (!pressed) return;
+
+    if (mask & EPBM_UP) {
+        selected_ = selected_ == 0 ? 1 : 0;
+        isDirty_ = true;
+    } else if (mask & EPBM_DOWN) {
+        selected_ = selected_ == 0 ? 1 : 0;
+        isDirty_ = true;
+    } else if (mask & EPBM_A) {
+        EndModal(selected_);
+    } else if (mask & EPBM_B) {
+        EndModal(-1);
+    }
+}
+
+void AudioDriverModal::OnPlayerUpdate(PlayerEventType, unsigned int) {}
+void AudioDriverModal::OnFocus() { isDirty_ = true; }
+
+void AudioDriverModalApplyCallback(View &view, ModalView &dialog) {
+    int mode = dialog.GetReturnCode();
+    if (mode < 0) return;
+
+    const char *name = TreeFrogUac2Bridge_SetDriverMode(mode);
+    char message[64];
+    snprintf(message, sizeof(message), "Audio Driver: %s", name ? name : "");
+    view.SetNotification(message);
+}

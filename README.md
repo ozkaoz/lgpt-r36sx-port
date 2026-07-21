@@ -1,68 +1,45 @@
-# lgpt-r36sx-port
+# LGPT for R36SX
 
-Port de **LittleGPTracker / Little Piggy Tracker** para **R36SX v2.6** sobre **TreeFrogUI**.
+Little Piggy Tracker port for the R36SX handheld, integrated with TreeFrogUI and bidirectional USB-C OTG audio.
 
-Este repositorio parte de la fuente estable `AU11Z6` revisada para TreeFrogUI. La estrategia técnica actual es compilar LGPT como **core libretro** (`lgpt_libretro.so`) para que TreeFrogUI/picoarch pueda cargarlo en la R36SX.
+**Current stable version: U2.52.3**
 
-## Estado del port
+## Main features
 
-- Base upstream: LittleGPTracker.
-- Plataforma objetivo: R36SX v2.6 con Stock OS + TreeFrogUI.
-- Salida esperada: `lgpt_libretro.so`.
-- Frontend objetivo: TreeFrogUI.
-- Tipo de integración actual: libretro core, no aplicación standalone.
-- Rama recomendada de desarrollo: `r36sx-v2.6-treefrog-au11z6`.
+- LGPT audio output to Windows through USB Audio at 48 kHz.
+- Windows audio capture from the LGPT Record screen.
+- Input monitoring only while Record is open.
+- Transactional recording with Preview, Save and Discard.
+- Safe sample rename and deletion from the sample browser.
+- Chopper global Undo/Redo with `L1+X` and `R1+X`.
+- Chord-aware input handling for the R36SX controls.
+- TreeFrogUI integration for kernel `4.4.186-release`.
 
-## Estructura relevante
+## Download
 
-```text
-projects/Makefile.TREEFROG                 # Makefile principal del port TreeFrog/libretro
-sources/Adapters/TREEFROG/                 # Adaptador TreeFrog: audio, GUI, eventos, timer, libretro
-r36sx_package/source_overrides/            # Fuentes auxiliares del paquete R36SX
-tools/wsl/                                 # Scripts limpios para WSL Ubuntu 24
-docs/                                      # Auditoría y guía de desarrollo
-```
+Use the latest GitHub Release to install the precompiled port. The repository contains source code; release assets contain the compiled core and SD installer.
 
-## Flujo corto en WSL Ubuntu 24
+- [Installation guide — English](docs/INSTALL_EN.md)
+- [Guía de instalación — Español](docs/INSTALL_ES.md)
+- [Build guide — English](docs/BUILD_EN.md)
+- [Guía de compilación — Español](docs/BUILD_ES.md)
+- [Controls — English](docs/CONTROLS_EN.md)
+- [Controles — Español](docs/CONTROLS_ES.md)
+- [USB audio architecture](docs/AUDIO_OTG.md)
+- [Troubleshooting — English](docs/TROUBLESHOOTING_EN.md)
+- [Solución de problemas — Español](docs/TROUBLESHOOTING_ES.md)
 
-Desde Windows, el desarrollo debe quedar en:
+## Repository layout
 
-```text
-D:\R36S\PORT LPTRACKER\GITHUB\lgpt-r36sx-port
-```
+- `source/`: current LGPT/TreeFrog source.
+- `device/`: R36SX launcher, USB Audio daemon and OTG scripts.
+- `deployment/`: files installed on the SD card.
+- `recovery/`: validated UAC2 kernel module.
+- `kernel_module_tools/`: module rebuild and verification tools.
+- `scripts/`: current build, install, verification and recovery commands.
+- `tests/`: current regression tests.
+- `docs/`: consolidated user and developer documentation.
 
-En WSL Ubuntu 24 esa ruta se ve así:
+## License
 
-```bash
-cd "/mnt/d/R36S/PORT LPTRACKER/GITHUB/lgpt-r36sx-port"
-```
-
-Primeros comandos:
-
-```bash
-git status
-bash tools/wsl/02_verify_treefrog_sd.sh F
-bash tools/wsl/00_build_install_r36sx_v26.sh "/mnt/d/R36S/PORT LPTRACKER" F /tmp/lgpt_r36sx_v26
-```
-
-Cambia `F` por la letra real de la SD en Windows.
-
-## Publicación inicial en GitHub
-
-Crea primero un repositorio vacío en GitHub llamado:
-
-```text
-lgpt-r36sx-port
-```
-
-Luego ejecuta:
-
-```bash
-cd "/mnt/d/R36S/PORT LPTRACKER/GITHUB/lgpt-r36sx-port"
-bash tools/wsl/01_git_first_push.sh https://github.com/ozkaoz/lgpt-r36sx-port.git
-```
-
-## Nota técnica importante
-
-Los scripts originales incluidos en el paquete fuente estable tenían referencias internas a carpetas `bin/`, `device/`, `src/` y `source_full/` que no estaban presentes en la versión `SOURCE_ONLY`. Para este repositorio se agregaron scripts nuevos en `tools/wsl/` que usan la estructura real del paquete fuente.
-
+See [LICENSE](LICENSE). TreeFrogUI and `picoarch` are not redistributed in this repository or in the binary release.

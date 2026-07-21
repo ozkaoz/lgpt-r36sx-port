@@ -1,4 +1,0 @@
-PORT LGPT/R36SX U2.23 SOURCE CANDIDATE
-Base: PORT Versión estable con CHOP integrado / U2.22 validado
-Change: SongView Y+X cut/compact tail clear fix
-Core binary: not included; build locally in WSL Ubuntu 24

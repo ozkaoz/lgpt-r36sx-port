@@ -1,0 +1,33 @@
+{
+  "patch": "U2414_AU8_SYNC_REPLICA",
+  "source": "/home/dafunknoise/r36sx-kernel-u2414/linux-4.4.186/drivers/usb/gadget/function/f_uac2.c",
+  "original_sha256": "b77713192226388e744486328b9c64e0a0d978fe88b936ce063fe921683dfd65",
+  "patched_sha256": "ac568c5bd6c248a0d4b131f65d9315bd185dea5018820763439936c7d8e007d3",
+  "endpoint_changes": {
+    "async_before": 4,
+    "sync_after": 4,
+    "mode": "USB_ENDPOINT_SYNC_SYNC",
+    "applied_to": [
+      "Full-Speed OUT",
+      "High-Speed OUT",
+      "Full-Speed IN",
+      "High-Speed IN"
+    ]
+  },
+  "string_changes": {
+    "\"Source/Sink\"": "\"R36SX USB AUDIO\"",
+    "\"Topology Control\"": "\"R36SX USB AUDIO\"",
+    "\"USBH Out\"": "\"R36SX USB AUDIO\"",
+    "\"USBD Out\"": "\"R36SX USB AUDIO\"",
+    "\"USBH In\"": "\"R36SX USB AUDIO\"",
+    "\"USBD In\"": "\"R36SX USB AUDIO\"",
+    "\"Playback Inactive\"": "\"R36SX USB AUDIO\"",
+    "\"Playback Active\"": "\"R36SX USB AUDIO\"",
+    "\"Capture Inactive\"": "\"R36SX USB AUDIO\"",
+    "\"Capture Active\"": "\"R36SX USB AUDIO\""
+  },
+  "marker": "R36SX_U2414_AU8_SYNC_REPLICA",
+  "clock_handler_modified": false,
+  "clock_topology_modified": false,
+  "packet_sizes_modified": false
+}

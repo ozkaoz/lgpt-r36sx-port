@@ -1,0 +1,34 @@
+# Build outputs
+build/
+dist/
+*.o
+*.a
+*.so
+*.elf
+*.map
+
+# Generated packages
+*.zip
+*.sha256
+*.log
+
+# Logs and temporary files
+logs/
+LOGS/
+tmp/
+temp/
+
+# Windows / macOS / editors
+Thumbs.db
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Backups
+*.bak
+*.tmp
+dist/lgpt_libretro.so
+projects/buildTREEFROG/
+SHA256SUMS*.txt
+_backup_lgpt_u2_36_docs_cleanup_*/

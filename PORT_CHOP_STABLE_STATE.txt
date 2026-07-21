@@ -1,3 +1,0 @@
-PORT Versión estable con CHOP integrado
-Base funcional: U2.22 — Pitch Screen + Clean Operation UI + Persistent Chops
-Validación reportada: regresión general OK, CROP SAMPLE OK, overlay OK, PITCH SAMPLE OK.
