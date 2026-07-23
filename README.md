@@ -1,6 +1,6 @@
 # LGPT for R36SX
 
-Little Piggy Tracker port for the R36SX handheld, integrated with TreeFrogUI and bidirectional USB-C OTG audio.
+Little Piggy Tracker port for the R36SX V2.6 handheld, integrated with TreeFrogUI and bidirectional USB-C OTG audio.
 
 **Current stable version: U2.52.3**
 
