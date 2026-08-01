@@ -925,6 +925,11 @@ void AppWindow::onUpdate() {
     if (_currentView) {
         _currentView->UpdateActiveModalFrame(
             (unsigned long)System::GetInstance()->GetClock());
+        // TREEFROG_MIXER_LIVE_VU_V2 (H38.6): forward the same frame cadence
+        // to the active view so live meters (Mixer VU) keep moving even while
+        // the player is stopped, mirroring the USB-C record meter behavior.
+        _currentView->OnFrameUpdate(
+            (unsigned long)System::GetInstance()->GetClock());
     }
 
     if (_isDirty) {

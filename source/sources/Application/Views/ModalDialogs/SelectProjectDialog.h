@@ -14,12 +14,20 @@ public:
 	virtual void OnPlayerUpdate(PlayerEventType ,unsigned int currentTick) ;
 	virtual void OnFocus() ;
 	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
+	// TREEFROG_PROJECT_RENAME_V2 (H38.6): forwards the frame cadence to the
+	// nested rename editor modal.
+	virtual void OnFrameUpdate(unsigned long frameClock) ;
 
 	Result OnNewProject(std::string &name) ;
     Result OnDeleteProject(const Path &projectPath);
+    // TREEFROG_PROJECT_RENAME_V2 (H38.6): renames the selected project
+    // directory in place (no project is loaded at the startup menu, so the
+    // rename can never corrupt a running session).
+    Result OnRenameProject(const char *newBaseName);
 
     Path GetSelection();
     Path GetCurrentProjectPath();
+    std::string GetCurrentProjectBaseName();
 
   protected:
     void warpToNextProject(int amount) ;

@@ -1,5 +1,13 @@
 # Changelog
 
+## H38.6
+
+- Phrase volume fix: every value 0-100 now maps linearly (100 = full, 1 = ~2%, 0/0xFF = silent), no clipping or distortion at any level; new notes default to volume 100.
+- Mixer VU meters now refresh in real time even while the player is stopped (same frame cadence as the USB-C Record meter).
+- Rename Project moved from the in-project menu (crash when re-entering TreeFrogUI) to the startup menu: R1+A on a selected project.
+- Unified text editor input everywhere (USB-C Record, project rename, new project, sample rename): X+UP/DOWN fast, L1+X case, A confirms, B erases, R1+LEFT cancels.
+- New project and Save As use the same Record-style text editor (QWERTY keyboard removed).
+
 ## H38.5
 
 - Removed FX3 from phrase editing and playback (Phrase: `00 N V I FX1 P FX2 P`; Table: `F1 P1 F2 P2`).

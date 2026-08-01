@@ -2,10 +2,12 @@
 // TREEFROG_V42_NO_WHITE_BOX_UI
 #include "SelectProjectDialog.h"
 #include "NewProjectDialog.h"
+#include "TreeFrogTextEditor.h"
 #include "System/Console/Trace.h"
 #include "Application/Views/ModalDialogs/MessageBox.h"
 
 #include <algorithm>
+#include <ctype.h>
 #include <stdio.h>
 
 #define LIST_SIZE 20
@@ -72,6 +74,19 @@ static void DeleteProjectCallback(View &v, ModalView &dialog) {
 	}
 }
 
+// TREEFROG_PROJECT_RENAME_V2 (H38.6): the generic text editor confirms with
+// A and cancels with R1+LEFT; the project directory is renamed on disk.
+static void RenameProjectCallback(View &v, ModalView &dialog) {
+    if (dialog.GetReturnCode() == 1) {
+        TreeFrogTextEditor &editor = (TreeFrogTextEditor &)dialog;
+        SelectProjectDialog &spd = (SelectProjectDialog &)v;
+        Result result = spd.OnRenameProject(editor.GetName());
+        if (result.Failed()) {
+            Trace::Error(result.GetDescription().c_str());
+        }
+    }
+}
+
 // Recursive helper to delete directory and all contents
 static void RecursiveDeleteDirectory(const Path &dirPath) {
 	FileSystem *fs = FileSystem::GetInstance();
@@ -109,6 +124,55 @@ static void RecursiveDeleteDirectory(const Path &dirPath) {
 	}
 
     fs->Delete(dirPath.GetPath().c_str());
+}
+
+// TREEFROG_PROJECT_RENAME_V2 (H38.6): recursive copy used to rename a
+// project directory on disk (no native Rename exists in FileSystem).
+static bool RecursiveCopyDirectory(const Path &srcPath, Path &dstPath) {
+	FileSystem *fs = FileSystem::GetInstance();
+	FileType type = fs->GetFileType(srcPath.GetPath().c_str());
+
+	if (type != FT_DIR) return false;
+
+	if (fs->MakeDir(dstPath.GetPath().c_str()).Failed()) {
+		Trace::Log("SelectProjectDialog:Rename", "copy mkdir failed %s",
+		           dstPath.GetPath().c_str());
+		return false;
+	}
+
+	FileSystemService FSS;
+	I_Dir *dir = fs->Open(srcPath.GetPath().c_str());
+	if (!dir) return false;
+
+	T_SimpleList<Path> items(false);
+	dir->GetContent("*");
+	IteratorPtr<Path> it(dir->GetIterator());
+	for (it->Begin(); !it->IsDone(); it->Next()) {
+		Path itemCopy = it->CurrentItem();
+		std::string name = itemCopy.GetName();
+		if (name != "." && name != "..") {
+			Path *ptrCopy = new Path(itemCopy);
+			items.Insert(ptrCopy);
+		}
+	}
+	delete dir;
+
+	bool ok = true;
+	IteratorPtr<Path> copyIt(items.GetIterator());
+	for (copyIt->Begin(); !copyIt->IsDone(); copyIt->Next()) {
+		Path &item = copyIt->CurrentItem();
+		Path dstItem = dstPath.Descend(item.GetName());
+		if (item.IsDirectory()) {
+			if (!RecursiveCopyDirectory(item, dstItem)) ok = false;
+		} else {
+			if (FSS.Copy(item.GetPath(), dstItem.GetPath()) < 0) {
+				Trace::Log("SelectProjectDialog:Rename", "copy failed %s -> %s",
+				           item.GetPath().c_str(), dstItem.GetPath().c_str());
+				ok = false;
+			}
+		}
+	}
+	return ok;
 }
 
 SelectProjectDialog::SelectProjectDialog(View &view)
@@ -206,6 +270,14 @@ void SelectProjectDialog::DrawView() {
 void SelectProjectDialog::OnPlayerUpdate(PlayerEventType,
                                          unsigned int currentTick) {};
 
+// TREEFROG_PROJECT_RENAME_V2 (H38.6): SelectProjectDialog is itself a modal
+// hosted by the app window. The rename editor is a second-level modal, so
+// forward the retro-frame tick to the nested modal (same pattern as
+// ImportSampleDialog); without this the editor's input FSM never runs.
+void SelectProjectDialog::OnFrameUpdate(unsigned long frameClock) {
+    if (HasModal()) UpdateActiveModalFrame(frameClock);
+}
+
 void SelectProjectDialog::OnFocus() {
 
 	setCurrentFolder(lastFolder_) ;
@@ -214,6 +286,19 @@ void SelectProjectDialog::OnFocus() {
 
 void SelectProjectDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
 	if (!pressed) return ;
+
+    // TREEFROG_PROJECT_RENAME_V2 (H38.6): R1+A on the startup menu opens the
+    // rename editor pre-filled with the selected project name. Must be
+    // checked before the plain A branch below (Load/New/Exit).
+    if ((mask & EPBM_R) && (mask & EPBM_A)) {
+        if (currentProject_ >= 0 && currentProject_ < content_.Size()) {
+            TreeFrogTextEditor *editor = new TreeFrogTextEditor(
+                *this, "RENAME PROJECT",
+                GetCurrentProjectBaseName().c_str(), 24);
+            DoModal(editor, RenameProjectCallback);
+        }
+        return;
+    }
 
     if (mask&EPBM_B) {
         // Handle A + B combination for delete
@@ -461,4 +546,82 @@ Path SelectProjectDialog::GetCurrentProjectPath() {
 		count++;
 	}
 	return Path();
+}
+
+// TREEFROG_PROJECT_RENAME_V2 (H38.6): visible project base name, i.e. the
+// directory name without the "lgpt_" prefix, used to pre-fill the editor.
+std::string SelectProjectDialog::GetCurrentProjectBaseName() {
+    Path current = GetCurrentProjectPath();
+    std::string name = current.GetName();
+    std::string firstFourChars = name.substr(0, 4);
+    std::transform(firstFourChars.begin(), firstFourChars.end(),
+                   firstFourChars.begin(), ::tolower);
+    if (firstFourChars == "lgpt" && name.size() > 4) {
+        int namestart = 4;
+        if ((!isalnum(name[4])) && (name.size() > 4)) {
+            namestart++;
+        }
+        return name.substr(namestart);
+    }
+    return name;
+}
+
+// TREEFROG_PROJECT_RENAME_V2 (H38.6): renames the selected project
+// directory on disk. The startup menu has no loaded project, so this cannot
+// corrupt a running session the way the old in-project save-as rename did.
+Result SelectProjectDialog::OnRenameProject(const char *newBaseName) {
+
+    if (!newBaseName || !newBaseName[0]) {
+        View::SetNotification("Name cannot be empty", 0);
+        return Result("Name cannot be empty");
+    }
+
+    Path oldPath = GetCurrentProjectPath();
+    std::string oldName = oldPath.GetName();
+    std::string newFullName = "lgpt_";
+    newFullName += newBaseName;
+
+    if (oldName == newFullName) {
+        View::SetNotification("Name unchanged", 0);
+        isDirty_ = true;
+        return Result::NoError;
+    }
+
+    Path newPath = currentPath_.Descend(newFullName);
+    if (newPath.Exists()) {
+        View::SetNotification("Name busy", 0);
+        isDirty_ = true;
+        return Result("Name busy");
+    }
+
+    Trace::Log("SelectProjectDialog:Rename", "renaming %s to %s",
+               oldPath.GetPath().c_str(), newPath.GetPath().c_str());
+
+    if (!RecursiveCopyDirectory(oldPath, newPath)) {
+        View::SetNotification("Rename failed", 0);
+        RecursiveDeleteDirectory(newPath);
+        return Result("Rename failed");
+    }
+    RecursiveDeleteDirectory(oldPath);
+
+    // Refresh the list and keep the cursor on the renamed project.
+    std::string successMsg = "Project renamed: " + std::string(newBaseName);
+    View::SetNotification(successMsg.c_str(), 0);
+    setCurrentFolder(currentPath_);
+    int listSize = content_.Size();
+    for (int i = 0; i < listSize; ++i) {
+        IteratorPtr<Path> it(content_.GetIterator());
+        it->Begin();
+        for (int j = 0; j <= i; ++j) {
+            Path &p = it->CurrentItem();
+            if (p.GetName() == newFullName) {
+                currentProject_ = i;
+                break;
+            }
+            it->Next();
+        }
+        if (currentProject_ == i) break;
+    }
+    isDirty_ = true;
+    return Result::NoError;
 }

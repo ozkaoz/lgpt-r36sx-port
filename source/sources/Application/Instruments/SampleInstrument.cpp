@@ -214,6 +214,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 	 int rootNote=(rootNote_->GetInt()-60)+source_->GetRootNote(rp->midiNote_) ;
 
 	 rp->volume_=rp->baseVolume_=i2fp(volume_->GetInt()) ;
+	 rp->rowGain_=FP_ONE ;
 	 rp->attenuate_=i2fp(attenuate_->GetInt()) ;	 rp->pan_=rp->basePan_=i2fp(pan_->GetInt()) ;
 
 	 if (!source_->IsMulti()) {
@@ -523,7 +524,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 					current->UpdateSRP(rup) ;
 				}
 
-				rp->volume_=rp->baseVolume_+rup.volumeOffset_ ;
+				rp->volume_=fp_mul(rp->baseVolume_+rup.volumeOffset_,rp->rowGain_) ;
 				rp->speed_=fp_mul(rp->baseSpeed_,rup.speedOffset_) ;
 				rp->pan_=rp->basePan_+rup.panOffset_ ;
 			}
@@ -791,7 +792,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 							current->UpdateSRP(rup) ;
 						}
 						
-						rp->volume_=rp->baseVolume_+rup.volumeOffset_ ;
+						rp->volume_=fp_mul(rp->baseVolume_+rup.volumeOffset_,rp->rowGain_) ;
 						rp->pan_=rp->basePan_+rup.panOffset_ ;
 						rp->speed_=fp_mul(rp->baseSpeed_,rup.speedOffset_) ;
 						rp->cutoff_=rp->baseFCut_+rup.cutOffset_ ;
@@ -1036,7 +1037,10 @@ void SampleInstrument::SetRowVolume(int channel,unsigned char vol) {
 	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return ;
 	renderParams *rp=renderParams_+channel ;
 	if (!rp->sampleBuffer_) return ;
+	// TREEFROG_PHRASE_VOL_V3: row gain is stored persistently and applied to
+	// every tick (base volume + automation offset), so it is never overwritten.
 	fixed rowGain=i2fp(((int)vol<<8)/0xFE) ;
+	rp->rowGain_=rowGain ;
 	rp->volume_=fp_mul(rp->baseVolume_,rowGain) ;
 } ;
 

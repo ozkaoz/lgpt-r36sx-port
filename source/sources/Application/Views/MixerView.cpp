@@ -386,3 +386,18 @@ void MixerView::OnPlayerUpdate(PlayerEventType ,unsigned int tick) {
     drawNotes() ;
 
 } ;
+
+void MixerView::OnFrameUpdate(unsigned long frameClock) {
+	(void)frameClock ;
+
+	// TREEFROG_MIXER_LIVE_VU_V2 (H38.6):
+	// Frame updates are independent of Player transport (same as the USB-C
+	// record meter): request a redraw every few frames so the VU bars keep
+	// moving even while the player is stopped (recent buffer levels decay).
+	++frameRefreshDivider_ ;
+	if (frameRefreshDivider_ >= 3) {
+		frameRefreshDivider_ = 0 ;
+		isDirty_ = true ;
+		((AppWindow &)w_).SetDirty() ;
+	}
+} ;

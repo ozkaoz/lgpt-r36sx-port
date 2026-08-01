@@ -27,6 +27,7 @@ struct renderParams {
     fixed speed_ ;      // speed at which we currently travel the stream
 	fixed baseVolume_ ;  // Base volume the instrument was triggered with
 	fixed volume_ ;     // Current volume
+	fixed rowGain_ ;    // TREEFROG_PHRASE_VOL_V3: row volume gain (FP_ONE = full)
 	bool reverse_ ;     // true if we we go backwards in stream
 
 	bool retrig_ ;       // true if we're retriggering

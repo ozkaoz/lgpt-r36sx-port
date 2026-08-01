@@ -299,6 +299,7 @@
     <ClCompile Include="..\sources\Application\Views\ModalDialogs\ImportSampleDialog.cpp" />
     <ClCompile Include="..\sources\Application\Views\ModalDialogs\MessageBox.cpp" />
     <ClCompile Include="..\sources\Application\Views\ModalDialogs\NewProjectDialog.cpp" />
+    <ClCompile Include="..\sources\Application\Views\ModalDialogs\TreeFrogTextEditor.cpp" />
     <ClCompile Include="..\sources\Application\Views\ModalDialogs\SelectProjectDialog.cpp" />
     <ClCompile Include="..\sources\Application\utils\assert.cpp" />
     <ClCompile Include="..\sources\Application\utils\char.cpp" />
@@ -436,6 +437,7 @@
     <ClInclude Include="..\sources\Application\Views\ModalDialogs\ImportSampleDialog.h" />
     <ClInclude Include="..\sources\Application\Views\ModalDialogs\MessageBox.h" />
     <ClInclude Include="..\sources\Application\Views\ModalDialogs\NewProjectDialog.h" />
+    <ClInclude Include="..\sources\Application\Views\ModalDialogs\TreeFrogTextEditor.h" />
     <ClInclude Include="..\sources\Application\Views\ModalDialogs\SelectProjectDialog.h" />
     <ClInclude Include="..\sources\Application\utils\fixed.h" />
     <ClInclude Include="..\sources\Application\utils\HexBuffers.h" />

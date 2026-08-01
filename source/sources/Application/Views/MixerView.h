@@ -11,6 +11,7 @@ public:
 	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
 	virtual void DrawView() ;
 	virtual void OnPlayerUpdate(PlayerEventType ,unsigned int tick=0) ;
+	virtual void OnFrameUpdate(unsigned long frameClock) ;
 	virtual void OnFocus() ;
 protected:
 	void processNormalButtonMask(unsigned int mask) ;
@@ -42,5 +43,6 @@ private:
 	int saveOffset_ ;
 	bool invertBatt_ ;
 	bool soloMode_ ;
+	int frameRefreshDivider_ ;
 } ;
 #endif

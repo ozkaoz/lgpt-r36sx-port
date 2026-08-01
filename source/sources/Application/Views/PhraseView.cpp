@@ -51,7 +51,7 @@ PhraseView::PhraseView(GUIWindow &w, ViewData *viewData)
     viewData->phraseCurPos_ = 0;
     col_ = 0;
     lastNote_ = 60;
-    lastVol_ = 0xFF;
+    lastVol_ = 0x64;
     lastInstr_ = 0;
     lastCmd_ = I_CMD_NONE;
     lastParam_ = 0;
@@ -290,11 +290,12 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
         if (editCol == 0 && updateChopNoteValueForRow(row_ + yOffset, direction)) {
             lastNote_ = *c;
         } else {
-            // TREEFROG_PHRASE_VOL_V2 (H38.5): empty volume cells start at 1,
-            // the level that represents 100% volume (the player assigns full
-            // gain when a note is placed).
+            // TREEFROG_PHRASE_VOL_V3 (H38.6): new note rows get volume 100
+            // automatically, and an empty volume cell edited directly starts
+            // at 100 (the full-volume level).
+            bool noteWasEmpty = (editCol == 0) && (*c == 0xFF);
             if ((editCol == 1) && (*c == 0xFF)) {
-                *c = 0x01;
+                *c = 0x64;
                 isDirty_ = true;
             }
             int offset = offsets_[editCol == 2 ? 2 : (editCol == 1 ? 1 : 0)][direction];
@@ -310,6 +311,13 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
                 }
             }
             updateData(c, offset, limit, wrap);
+            if (noteWasEmpty && (*c != 0xFF)) {
+                uchar *vc = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
+                if (*vc == 0xFF) {
+                    *vc = 0x64;
+                    isDirty_ = true;
+                }
+            }
             switch (editCol) {
             case 0:
                 lastNote_ = *c;

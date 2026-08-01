@@ -1,5 +1,6 @@
 // TREEFROG_V42_NO_WHITE_BOX_UI
 #include "ImportSampleDialog.h"
+#include "TreeFrogTextEditor.h"
 #include "Adapters/TREEFROG/GUI/TreeFrogEventManager.h"
 #include "Adapters/TREEFROG/Main/TreeFrogSamplerInput.h"
 #include "Application/Instruments/SamplePool.h"
@@ -82,245 +83,12 @@ static void ImportBrowserDeleteCallback(View &view, ModalView &dialog) {
 }
 
 
-static const char kBrowserRenameCharactersUpper[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
-static const char kBrowserRenameCharactersLower[] =
-    "abcdefghijklmnopqrstuvwxyz0123456789_-";
-static const int kBrowserRenameCharacterCount =
-    sizeof(kBrowserRenameCharactersUpper) - 1;
-static const int kBrowserRenameMaxStem = 24;
-
-class ImportBrowserRenameModal : public ModalView {
-public:
-    ImportBrowserRenameModal(View &view, const char *name)
-        : ModalView(view), cursor_(0), lowercase_(false), armed_(false),
-          physicalMask_(0), neutralFrames_(0) {
-        stem_[0] = 0;
-        status_[0] = 0;
-        const char *source = name ? name : "SAMPLE.wav";
-        size_t length = strlen(source);
-        if (length > 4 && strcasecmp(source + length - 4, ".wav") == 0)
-            length -= 4;
-        if (length > (size_t)kBrowserRenameMaxStem)
-            length = (size_t)kBrowserRenameMaxStem;
-        memcpy(stem_, source, length);
-        stem_[length] = 0;
-        if (!stem_[0]) snprintf(stem_, sizeof(stem_), "SAMPLE");
-        cursor_ = (int)strlen(stem_) - 1;
-        for (int i=0; stem_[i]; ++i) {
-            if (stem_[i] >= 'a' && stem_[i] <= 'z') {
-                lowercase_ = true;
-                break;
-            }
-        }
-        snprintf(status_, sizeof(status_), "Release controls");
-    }
-
-    virtual ~ImportBrowserRenameModal() {
-        TreeFrogEventManager::GetInstance()->ClearQueue();
-    }
-
-    const char *GetFinalName() {
-        snprintf(finalName_, sizeof(finalName_), "%s.wav", stem_);
-        finalName_[sizeof(finalName_) - 1] = 0;
-        return finalName_;
-    }
-
-    virtual void DrawView() {
-        SetWindow(38, 9);
-        GUITextProperties props;
-        props.invert_ = false;
-        SetColor(CD_HILITE2);
-        props.invert_ = true;
-        DrawString(0, 0, "          RENAME SAMPLE          ", props);
-        props.invert_ = false;
-
-        char line[40];
-        snprintf(line, sizeof(line), "Name: %-24.24s", stem_);
-        SetColor(CD_HILITE2);
-        DrawString(1, 2, line, props);
-
-        char cursorLine[40];
-        memset(cursorLine, ' ', sizeof(cursorLine));
-        cursorLine[sizeof(cursorLine)-1] = 0;
-        // U2.52.3: DrawString starts at x=1 and "Name: " is 6 columns.
-        // Therefore the first sample character and its caret both begin at x=7.
-        int caret = 6 + cursor_;
-        if (caret < 1) caret = 1;
-        if (caret > 35) caret = 35;
-        cursorLine[caret] = '^';
-        DrawString(1, 3, cursorLine, props);
-
-        SetColor(CD_NORMAL);
-        DrawString(1, 5, "UP/DOWN char   X+UP/DOWN +/-5", props);
-        DrawString(1, 6, "LEFT/RIGHT cursor   L1+X case", props);
-        DrawString(1, 7, "A confirm  B erase  R1+LEFT cancel", props);
-        SetColor(CD_HILITE1);
-        DrawString(1, 8, status_, props);
-    }
-
-    virtual void OnFocus() {
-        armed_ = false;
-        physicalMask_ = 0;
-        neutralFrames_ = 0;
-        TreeFrogEventManager::GetInstance()->ClearQueue();
-    }
-
-    virtual void OnPlayerUpdate(PlayerEventType, unsigned int) {}
-
-    virtual void OnFrameUpdate(unsigned long) {
-        processPhysicalInput();
-    }
-
-    virtual void ProcessButtonMask(unsigned short, bool) {
-        /* Physical-edge input is authoritative while this editor is open. */
-    }
-
-private:
-    void setStatus(const char *text) {
-        snprintf(status_, sizeof(status_), "%s", text ? text : "");
-        status_[sizeof(status_) - 1] = 0;
-        isDirty_ = true;
-    }
-
-    void moveCursor(int delta) {
-        int length = (int)strlen(stem_);
-        if (length <= 0) {
-            snprintf(stem_, sizeof(stem_), "%c", lowercase_ ? 'a' : 'A');
-            length = 1;
-        }
-        cursor_ += delta;
-        if (cursor_ < 0) cursor_ = 0;
-        if (cursor_ >= length) {
-            if (delta > 0 && length < kBrowserRenameMaxStem) {
-                stem_[length] = lowercase_ ? 'a' : 'A';
-                stem_[length + 1] = 0;
-                cursor_ = length;
-            } else cursor_ = length - 1;
-        }
-        isDirty_ = true;
-    }
-
-    void cycleCharacter(int delta) {
-        int length = (int)strlen(stem_);
-        if (length <= 0) {
-            snprintf(stem_, sizeof(stem_), "%c", lowercase_ ? 'a' : 'A');
-            length = 1;
-            cursor_ = 0;
-        }
-        if (cursor_ < 0) cursor_ = 0;
-        if (cursor_ >= length) cursor_ = length - 1;
-        const char *characters = lowercase_ ?
-            kBrowserRenameCharactersLower : kBrowserRenameCharactersUpper;
-        int index = 0;
-        for (int i=0; i<kBrowserRenameCharacterCount; ++i) {
-            if (characters[i] == stem_[cursor_]) { index = i; break; }
-        }
-        index += delta;
-        while (index < 0) index += kBrowserRenameCharacterCount;
-        while (index >= kBrowserRenameCharacterCount)
-            index -= kBrowserRenameCharacterCount;
-        stem_[cursor_] = characters[index];
-        isDirty_ = true;
-    }
-
-    void toggleCase() {
-        int length = (int)strlen(stem_);
-        if (length <= 0) return;
-        if (cursor_ < 0) cursor_ = 0;
-        if (cursor_ >= length) cursor_ = length - 1;
-        unsigned char value = (unsigned char)stem_[cursor_];
-        if (value >= 'A' && value <= 'Z') {
-            stem_[cursor_] = (char)tolower(value);
-            lowercase_ = true;
-        } else if (value >= 'a' && value <= 'z') {
-            stem_[cursor_] = (char)toupper(value);
-            lowercase_ = false;
-        } else lowercase_ = !lowercase_;
-        setStatus(lowercase_ ? "Lowercase mode" : "Uppercase mode");
-    }
-
-    void eraseCharacter() {
-        int length = (int)strlen(stem_);
-        if (length <= 1) { setStatus("Name cannot be empty"); return; }
-        if (cursor_ < 0) cursor_ = 0;
-        if (cursor_ >= length) cursor_ = length - 1;
-        memmove(stem_ + cursor_, stem_ + cursor_ + 1,
-                (size_t)(length - cursor_));
-        --length;
-        if (cursor_ >= length) cursor_ = length - 1;
-        isDirty_ = true;
-    }
-
-    void processPhysicalInput() {
-        TreeFrogSamplerInputSnapshot snapshot;
-        memset(&snapshot, 0, sizeof(snapshot));
-        TreeFrogSamplerInput_Read(&snapshot);
-        const unsigned int current = snapshot.selectedPhysical;
-        if (!armed_) {
-            physicalMask_ = current;
-            if (current == 0) {
-                if (neutralFrames_ < 8) ++neutralFrames_;
-            } else neutralFrames_ = 0;
-            if (neutralFrames_ >= 2) {
-                armed_ = true;
-                physicalMask_ = 0;
-                setStatus("Rename ready");
-            }
-            return;
-        }
-
-        const unsigned int previous = physicalMask_;
-        const unsigned int newBits = current & ~previous;
-        physicalMask_ = current;
-        if (!newBits) return;
-
-        if ((current & TFSP_R1) && (newBits & TFSP_LEFT)) {
-            EndModal(0);
-            return;
-        }
-        if ((current & TFSP_L1) && (newBits & TFSP_X)) {
-            toggleCase();
-            return;
-        }
-        if (current & TFSP_X) {
-            if (newBits & TFSP_UP) { cycleCharacter(5); return; }
-            if (newBits & TFSP_DOWN) { cycleCharacter(-5); return; }
-        }
-
-        const unsigned int actions = newBits &
-            (TFSP_UP | TFSP_DOWN | TFSP_LEFT | TFSP_RIGHT |
-             TFSP_A | TFSP_B | TFSP_X | TFSP_Y);
-        if (!actions) return;
-        unsigned int bits = actions;
-        int count = 0;
-        while (bits) { bits &= bits - 1; ++count; }
-        if (count != 1) { setStatus("Release and press one action"); return; }
-
-        if (actions == TFSP_LEFT) moveCursor(-1);
-        else if (actions == TFSP_RIGHT) moveCursor(1);
-        else if (actions == TFSP_UP) cycleCharacter(1);
-        else if (actions == TFSP_DOWN) cycleCharacter(-1);
-        else if (actions == TFSP_A) EndModal(1);
-        else if (actions == TFSP_B) eraseCharacter();
-        else if (actions == TFSP_X) setStatus("Hold X + UP/DOWN for +/-5");
-        else if (actions == TFSP_Y) setStatus("Y unused; R1+LEFT cancels");
-    }
-
-    char stem_[32];
-    char finalName_[40];
-    char status_[40];
-    int cursor_;
-    bool lowercase_;
-    bool armed_;
-    unsigned int physicalMask_;
-    int neutralFrames_;
-};
-
+// TREEFROG_TEXT_EDITOR_V1 (H38.6): the sample rename editor is now the
+// generic TreeFrogTextEditor used everywhere in the port (USB-C Record,
+// project rename, new project). Suffix ".wav" is appended by GetFinalName().
 static void ImportBrowserRenameCallback(View &view, ModalView &dialog) {
     if (dialog.GetReturnCode() == 1) {
-        ImportBrowserRenameModal &renameDialog =
-            (ImportBrowserRenameModal &)dialog;
+        TreeFrogTextEditor &renameDialog = (TreeFrogTextEditor &)dialog;
         ((ImportSampleDialog &)view).ConfirmPendingBrowserRename(
             renameDialog.GetFinalName());
     }
@@ -695,7 +463,8 @@ void ImportSampleDialog::requestBrowserRename(Path &element) {
         pendingRenameName_.clear();
         return;
     }
-    DoModal(new ImportBrowserRenameModal(*this,pendingRenameName_.c_str()),
+    DoModal(new TreeFrogTextEditor(*this, "RENAME SAMPLE",
+                                   pendingRenameName_.c_str(), 24, ".wav"),
             ImportBrowserRenameCallback);
     isDirty_=true;
 }
