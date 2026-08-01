@@ -204,12 +204,19 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	DrawString(x,y,hex,props) ;
 	props.invert_=false ;
 
-	// TREEFROG_VU_METERS_V1:
-	// Dynamic VU: the bar shows the volume setting as a solid fill and the
-	// live channel level as a bright bounce above it (plus a peak tip inside
-	// the fill), so it rises and falls with the music.
+	// TREEFROG_VU_METERS_V2:
+	// Segmented LED meter: cells light up in pairs (1-2, 4-5, 7-8...) with a
+	// dark gap every third cell, so the bar reads as several small bars that
+	// rise and fall live with the channel level (style of the record meter).
 	for (int row=0;row<height;row++) {
 		int cellFromBottom=height-row ;
+		bool gap=(((cellFromBottom-1)%3)==2) ;
+		if (gap) {
+			SetColor(muted?CD_BORDER:CD_HILITE1) ;
+			props.invert_=false ;
+			DrawString(x,y+1+row,"  ",props) ;
+			continue ;
+		}
 		bool on=(cellFromBottom<=filled) ;
 		bool vu=((!on)&&(cellFromBottom<=peakFilled)) ;
 		bool tip=((on)&&(cellFromBottom==peakFilled)&&(peakFilled>0)&&(peakFilled<=filled)) ;
@@ -223,8 +230,6 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 			SetColor(muted?CD_BORDER:CD_HILITE1) ;
 			props.invert_=false ;
 		}
-		// Filled cells are drawn as inverted spaces so the bar is solid,
-		// not as text made of hash characters.
 		DrawString(x,y+1+row,"  ",props) ;
 	}
 
@@ -255,9 +260,16 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	props.invert_=false ;
 	DrawString(x-1,y,"MST",props) ;
 
-	// Same dynamic VU drawing as the channel bars, master-wide.
+	// TREEFROG_VU_METERS_V2: segmented LED meter, master-wide.
 	for (int row=0;row<height;row++) {
 		int cellFromBottom=height-row ;
+		bool gap=(((cellFromBottom-1)%3)==2) ;
+		if (gap) {
+			SetColor(CD_HILITE1) ;
+			props.invert_=false ;
+			DrawString(x,y+1+row,"  ",props) ;
+			continue ;
+		}
 		bool on=(cellFromBottom<=filled) ;
 		bool vu=((!on)&&(cellFromBottom<=peakFilled)) ;
 		bool tip=((on)&&(cellFromBottom==peakFilled)&&(peakFilled>0)&&(peakFilled<=filled)) ;

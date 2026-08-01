@@ -955,10 +955,15 @@ void Player::playCursorPosition(int channel) {
 				if (note<128) {
 					mixer_->StartInstrument(channel,instrument,note,newInstrument) ;
 
-					// Row volume override: 0xFF = no override, 0x00-0xFE = proportional gain
-
-					if (rowVol!=0xFF) {
-						instrument->SetRowVolume(channel,rowVol) ;
+					// Row volume: -- (0xFF) and 00 are silent; 01-100 (0x64) map
+					// proportionally to the instrument volume (100 = full gain).
+					// TREEFROG_PHRASE_VOL_V1
+					if (rowVol==0xFF||rowVol==0x00) {
+						instrument->SetRowVolume(channel,0) ;
+					} else if (rowVol<=0x64) {
+						instrument->SetRowVolume(channel,(unsigned char)((rowVol*0xFE)/100)) ;
+					} else {
+						instrument->SetRowVolume(channel,0xFE) ;
 					}
 					int instrTable=instrument->GetTable() ;
 	

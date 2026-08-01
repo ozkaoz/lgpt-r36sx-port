@@ -1258,7 +1258,11 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 
 		case I_CMD_FRES:
 			{
-				float target=float(value&0xFF)/255.0f ;
+				// TREEFROG_FX_SAFE_RANGES_V1: resonance capped at 50% so the
+				// filter never self-oscillates into a sustained ring/buzz.
+				unsigned char resRaw=(value&0xFF) ;
+				if (resRaw>0x80) resRaw=0x80 ;
+				float target=float(resRaw)/255.0f ;
 				float speed=float(value>>8) ;
                 float start=fp2fl(rp->reso_) ;
 				float baseRes=fp2fl(rp->baseFRes_) ;                
@@ -1276,7 +1280,11 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 
 		case I_CMD_FBMX:
 			{
-				float target=float(value&0xFF)/255.0f ;
+				// TREEFROG_FX_SAFE_RANGES_V1: feedback mix capped at 50% so
+				// the reverb loop can never build into an infinite buzz.
+				unsigned char mixRaw=(value&0xFF) ;
+				if (mixRaw>0x80) mixRaw=0x80 ;
+				float target=float(mixRaw)/255.0f ;
 				float speed=float(value>>8) ;
                 float start=fp2fl(rp->fbMix_) ;
 				float baseMix=fp2fl(rp->baseFbMix_) ;                
@@ -1294,7 +1302,11 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 
 		case I_CMD_FBTN:
 			{
-				float target=float(value&0xFF)/255.0f ;
+				// TREEFROG_FX_SAFE_RANGES_V1: feedback tune capped at 50% to
+				// keep the delayed loop within a stable pitch range.
+				unsigned char tunRaw=(value&0xFF) ;
+				if (tunRaw>0x80) tunRaw=0x80 ;
+				float target=float(tunRaw)/255.0f ;
 				float speed=float(value>>8) ;
                 float start=fp2fl(rp->fbTun_) ;
 				float baseTune=fp2fl(rp->baseFbTun_) ;                
@@ -1412,9 +1424,13 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
             }
             break ;
 		case I_CMD_FLTR:
-    		{
-    			float cut=(value>>8)/255.0f;	// cutoff frequency (FF=all pass, 0=none pass)
-    			float res=(value&0xFF)/255.0f;	// resonance, aka Q (0=none) so default is FF00
+			{
+				float cut=(value>>8)/255.0f;	// cutoff frequency (FF=all pass, 0=none pass)
+				// TREEFROG_FX_SAFE_RANGES_V1: resonance capped at 50% so the
+				// filter can never ring into a sustained buzz.
+				unsigned char resRaw=(value&0xFF) ;
+				if (resRaw>0x80) resRaw=0x80 ;
+				float res=resRaw/255.0f ;	// resonance, aka Q (0=none) so default is FF00
 				rp->cutoff_=rp->baseFCut_=fl2fp(cut) ;
 				rp->reso_=rp->baseFRes_=fl2fp(res) ;
 				if (rp->cutRamp_.Enabled()) {
@@ -1450,6 +1466,10 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				// Any non-zero parameter applies both drive and crush, so a
 				// zero crush nibble now disables crush (drive-only). Value
 				// 0x0000 still means "no change" for old-project safety.
+				// TREEFROG_FX_SAFE_RANGES_V1: drive capped at 0x80 (50%) and
+				// crush at 8 bits so the effect distorts without harsh noise.
+				if (drive>0x80) drive=0x80 ;
+				if (crush>0x08) crush=0x08 ;
 				if (value != 0) {
 					rp->drive_=drive ;
 					rp->crush_=crush ;

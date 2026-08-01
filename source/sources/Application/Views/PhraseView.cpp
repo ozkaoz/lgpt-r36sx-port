@@ -18,7 +18,7 @@
 // centered: row# at cells 2-3, play cursor at cell 4, data columns start at
 // cell 5. Last column P3 ends at cell 37, leaving a symmetric 2-cell margin
 // on both sides (the drawMap sidebar now lives at the bottom-right).
-const int PhraseView::kColX[kColCount] = {5, 9, 11, 14, 18, 22, 26, 30, 34};
+const int PhraseView::kColX[kColCount] = {5, 8, 11, 14, 18, 22, 26, 30, 34};
 
 // Offsets for note(0), volume(1) and instrument(2) value stepping: L, R, U, D.
 // TREEFROG_PHRASE_VOL_EDIT_V1: the volume column steps by 1 in every
@@ -202,7 +202,8 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
         break;
     case 1:
         c = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
-        limit = 0xFE;
+        // TREEFROG_PHRASE_VOL_V1: row volume is 0..100 (0x64), 0xFF = empty.
+        limit = 0x64;
         wrap = false;
         break;
     case 2:
@@ -1734,9 +1735,10 @@ void PhraseView::DrawView() {
                                                 : SetColor(CD_NORMAL);
         setTextProps(props, 1, j, false);
         if (d == 0xFF) {
-            DrawString(pos._x, pos._y, "--", props);
+            DrawString(pos._x, pos._y, " --", props);
         } else {
-            hex2char(d, buffer);
+            // TREEFROG_PHRASE_VOL_V1: volumes display as 0..100 decimal.
+            sprintf(buffer, "%3d", d);
             DrawString(pos._x, pos._y, buffer, props);
         }
         setTextProps(props, 1, j, true);

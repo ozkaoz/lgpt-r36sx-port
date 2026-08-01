@@ -137,7 +137,9 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
          if (peak > peakValue_) {
              peakValue_ = peak;
          } else {
-             peakValue_ *= 0.90f;
+             // TREEFROG_VU_METERS_V2: slower decay so the level stays visible
+             // between audio buffers and the mixer bars read as live meters.
+             peakValue_ *= 0.97f;
          }
      }
 

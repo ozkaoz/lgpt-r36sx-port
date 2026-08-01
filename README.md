@@ -2,7 +2,7 @@
 
 Little Piggy Tracker port for the R36SX V2.6 handheld, integrated with TreeFrogUI and bidirectional USB-C OTG audio.
 
-**Current stable version: H38.3 (ABI7, three-mode audio: Local / Windows / Android)**
+**Current stable version: H38.4 (ABI7, three-mode audio: Local / Windows / Android)**
 
 ## Main features
 

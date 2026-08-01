@@ -57,7 +57,8 @@ static inline std::string* getHelpLegend(FourCC command) {
 			break;
 		case I_CMD_PTCH:
 			result[0].assign("PiTCH:aabb");
-			result[1].assign("approach pitch");
+			result[1].assign("ramp pitch to aa");
+			result[2].assign("at speed bb");
 			break;
 		case I_CMD_HOP:
 			result[0].assign("HOP:aabb");
@@ -100,8 +101,8 @@ static inline std::string* getHelpLegend(FourCC command) {
 			break;
 		case I_CMD_FLTR:
 			result[0].assign("FiLTer:aa bb");
-			result[1].assign("cutoff aa");
-			result[2].assign("resonance bb");
+			result[1].assign("cutoff aa, res bb");
+			result[2].assign("res max 50% (safe)");
 			break;
 		case I_CMD_TABL:
 			result[0].assign("TABLe:--bb");
@@ -110,16 +111,18 @@ static inline std::string* getHelpLegend(FourCC command) {
 			break;
 		case I_CMD_CRSH:
 			result[0].assign("ComPress:aa-b");
-			result[1].assign("drive aa, crush -b");
-			result[2].assign("bb=0 disables crush");
+			result[1].assign("drive aa (max 80)");
+			result[2].assign("crush -b (max 8)");
 			break;
 		case I_CMD_FCUT:
 			result[0].assign("EQ CUToff:aa bb");
-			result[1].assign("set cutoff to");
+			result[1].assign("ramp cutoff to aa");
+			result[2].assign("bb = ramp speed");
 			break;
 		case I_CMD_FRES:
 			result[0].assign("RESonance:aa bb");
-			result[1].assign("set resonance to");
+			result[1].assign("ramp resonance to aa");
+			result[2].assign("max 50% (no ring)");
 			break;
 		case I_CMD_PAN_:
 			result[0].assign("PAN:aabb");
@@ -136,20 +139,23 @@ static inline std::string* getHelpLegend(FourCC command) {
 			break;
 		case I_CMD_PFIN:
 			result[0].assign("PitchFINe:aa bb");
-			result[1].assign("fine tune to ");
+			result[1].assign("fine tune to aa");
+			result[2].assign("at speed bb");
 			break;
 		case I_CMD_DLAY:
 			result[0].assign("DeLAY:--bb");
-			result[1].assign("delay bb tics");
+			result[1].assign("delay note bb tics");
 			result[2].assign("");
 			break;
 		case I_CMD_FBMX:
 			result[0].assign("REVerB mix:aa bb");
-			result[1].assign("feedback mix to");
+			result[1].assign("feedback wetness aa");
+			result[2].assign("max 50% (no buzz)");
 			break;
 		case I_CMD_FBTN:
 			result[0].assign("REVerB tune:aa bb");
-			result[1].assign("feedback tune to");
+			result[1].assign("feedback pitch aa");
+			result[2].assign("max 50% (no buzz)");
 			break;
 		case I_CMD_STOP:
 			result[0].assign("STOP playing song");

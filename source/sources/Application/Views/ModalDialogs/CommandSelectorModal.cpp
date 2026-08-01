@@ -140,10 +140,8 @@ void CommandSelectorModal::DrawView() {
     int width = GRID_COLUMNS * 5;
 
     SetWindow(width, rows);
-
-    // TREEFROG_PHRASE_MENU_V1:
-    // Center the command grid a bit lower than the default modal position.
-    SetWindowOffset(2);
+    // TREEFROG_PHRASE_MENU_V2: the grid now sits exactly centered thanks to
+    // ModalView::SetWindow computing (20 - height) / 2; no extra offset.
 
     GUITextProperties props;
 

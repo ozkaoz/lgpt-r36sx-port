@@ -38,7 +38,9 @@ void ModalView::SetWindow(int width, int height) {
     };
 
     left_ = 20 - width / 2;
-    top_ = 10 - height / 2 + topOffset_;
+    // TREEFROG_MODAL_CENTER_V1: exact vertical centering on the 40x20 grid
+    // so odd-height dialogs (command grid) sit truly centered.
+    top_ = (20 - height) / 2 + topOffset_;
     if (top_ < 2) {
         top_ = 2;
     }
