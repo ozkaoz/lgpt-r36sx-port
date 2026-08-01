@@ -229,9 +229,12 @@ build_asset() {
   bash "$REPO_ROOT/scripts/build_from_full_clone.sh" "$asset"
   sha256sum "$asset" > "$asset.sha256"
   unzip -t "$asset" >/dev/null
-  unzip -l "$asset" | grep -q 'ANDROID/LGPTUsbAudioBridge-H36-debug.apk' ||
+  if ! unzip -l "$asset" > "$TMP_ROOT/asset.list"; then
+    fail "cannot list release ZIP"
+  fi
+  grep -q 'ANDROID/LGPTUsbAudioBridge-H36-debug.apk' "$TMP_ROOT/asset.list" ||
     fail "release ZIP does not contain the Android APK"
-  unzip -l "$asset" | grep -q '^.* cubegm/lgpt$' ||
+  grep -q 'cubegm/lgpt' "$TMP_ROOT/asset.list" ||
     fail "release ZIP is not copy-to-SD-root (cubegm/lgpt missing at root)"
   echo "RELEASE_ASSET=$asset"
   echo "RELEASE_ASSET_SHA256=$(cat "$asset.sha256")"
