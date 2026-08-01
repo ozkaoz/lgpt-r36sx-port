@@ -184,18 +184,18 @@ void Project::Purge() {
 	song_->chain_->ClearAllocation() ;
 	song_->phrase_->ClearAllocation() ;
 
-		
+
 	unsigned char *data=song_->data_ ;
 	for (int i=0;i<256*SONG_CHANNEL_COUNT;i++) {
 		if (*data!=0xFF) {
 			song_->chain_->SetUsed(*data) ;
-		} 
+		}
 		data++ ;
 	}
-                
-    data=song_->chain_->data_ ;        
+
+    data=song_->chain_->data_ ;
     unsigned char *data2=song_->chain_->transpose_ ;
-    
+
 	for (int i=0;i<CHAIN_COUNT;i++) {
 
 		if (song_->chain_->IsUsed(i)) {
@@ -211,7 +211,7 @@ void Project::Purge() {
 			for (int j=0;j<16;j++) {
 				*data++=0xFF ;
 				*data2++=0x00 ;
-			} 
+			}
 		}
     }
 
@@ -222,7 +222,7 @@ void Project::Purge() {
 	FourCC *cmd1=song_->phrase_->cmd1_ ;
 	ushort *param1=song_->phrase_->param1_ ;
 	FourCC *cmd2=song_->phrase_->cmd2_ ;
-	ushort *param2=song_->phrase_->param2_ ;    
+	ushort *param2=song_->phrase_->param2_ ;
 	FourCC *cmd3=song_->phrase_->cmd3_ ;
 	ushort *param3=song_->phrase_->param3_ ;
 
@@ -248,11 +248,11 @@ void Project::Purge() {
 			param2++ ;
 			cmd3++ ;
 			param3++ ;
-        } ;	
-    }	
+        } ;
+    }
 } ;
 
- 
+
 void Project::PurgeInstruments(bool removeFromDisk) {
 
     bool used[MAX_INSTRUMENT_COUNT] = {false};
@@ -324,7 +324,7 @@ void Project::RestoreContent(TiXmlElement *element) {
 	};
 
 	// Get table ratio
-	
+
 	int tableRatio ;
 	if (!element->Attribute("TABLERATIO",&tableRatio)) {
 		tableRatio=(doc->version_<=32)?2:1 ;
@@ -360,7 +360,7 @@ void Project::SaveContent(TiXmlNode *node) {
 		element->SetAttribute("TABLERATIO",tableRatio) ;
 	}
 	// save all of the project's parameters
-	
+
 	IteratorPtr<Variable> it(GetIterator()) ;
 	for (it->Begin();!it->IsDone();it->Next()) {
 		TiXmlElement param("PARAMETER") ;
@@ -414,16 +414,16 @@ void Project::LoadFirstGen(const char *root) {
 		delete file ;
 
 		// Restore chain & phrase allocation table
-		
+
 		unsigned char *data=song_->data_ ;
 		for (int i=0;i<256*SONG_CHANNEL_COUNT;i++) {
 			if (*data!=0xFF) {
 				song_->chain_->SetUsed(*data) ;
-			} 
+			}
 		    data++ ;
 		}
-                
-        data=song_->chain_->data_ ;        
+
+        data=song_->chain_->data_ ;
 
 		for (int i=0;i<CHAIN_COUNT;i++) {
             for (int j=0;j<16;j++) {
@@ -432,33 +432,33 @@ void Project::LoadFirstGen(const char *root) {
                     song_->phrase_->SetUsed(*data) ;
                 }
                 data++ ;
-            } ;	
+            } ;
         }
 
         data=song_->phrase_->note_ ;
-             
+
 		for (int i=0;i<PHRASE_COUNT;i++) {
             for (int j=0;j<16;j++) {
                 if (*data!=0xFF) {
                     song_->phrase_->SetUsed(i) ;
                 }
                 data++ ;
-            } ;	
-        }	
-        
+            } ;
+        }
+
         // TEMP: clear out Phrase 0xFE
-        
+
 		data=song_->phrase_->note_+0xFE*16 ;
 		for (int i=0;i<16;i++) {
 			*data++=0xFF ;
 		} ;
         // Trace output unused instruments to the console
-        
+
         bool used[MAX_INSTRUMENT_COUNT] ;
         for (int i=0;i<MAX_INSTRUMENT_COUNT;i++) {
             used[i]=false ;
-        } ;	
-        
+        } ;
+
         data=song_->phrase_->instr_ ;
         for (int i=0;i<PHRASE_COUNT;i++) {
             for (int j=0;j<16;j++) {
@@ -468,12 +468,12 @@ void Project::LoadFirstGen(const char *root) {
                 data++ ;
             } ;
         } ;
-        
+
         //for (int i=0;i<MAX_INSTRUMENT_COUNT;i++) {
         //    if ((!used[i])&&(song_->instrument_[i]->IsInitialized())) {
         //        Trace::Dump("Instrument %x not used",i) ;
         //    }
-        //} ;	
+        //} ;
 	}
 }
 
@@ -483,7 +483,7 @@ void Project::buildMidiDeviceList() {
 			SAFE_FREE(midiDeviceList_[i]) ;
 		}
 		SAFE_FREE(midiDeviceList_) ;
-	} 
+	}
 	midiDeviceListSize_=MidiService::GetInstance()->Size() ;
 	midiDeviceList_=(char **)SYS_MALLOC(midiDeviceListSize_*sizeof(char *)) ;
 	IteratorPtr<MidiOutDevice> it(MidiService::GetInstance()->GetIterator()) ;
@@ -508,7 +508,7 @@ void Project::OnTempoTap() {
 			if (tempoTapCount_==MAX_TAP) {
 				for (int i=0;i<int(tempoTapCount_)-1;i++)  {
 					lastTap_[i]=lastTap_[i+1] ;
-				}				
+				}
 			} else {
 				tempoTapCount_++ ;
 			}

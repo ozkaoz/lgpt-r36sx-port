@@ -14,6 +14,8 @@ class ModalView : public View {
 
   protected:
     void SetWindow(int width, int height);
+    // TREEFROG_MODAL_OFFSET_V1: shifts the centered window vertically.
+    void SetWindowOffset(int dy);
     virtual void ClearRect(int x, int y, int w, int h);
     virtual void DrawString(int x, int y, const char *txt,
                             GUITextProperties &props);
@@ -24,5 +26,6 @@ class ModalView : public View {
     int returnCode_;
     int left_;
     int top_;
+    int topOffset_;
 };
 #endif

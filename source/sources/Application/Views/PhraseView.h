@@ -24,7 +24,7 @@ class PhraseView : public View {
     void updateCursor(int dx, int dy);
     void stopAudition();
     void updateCursorValue(ViewUpdateDirection offset, int xOffset = 0,
-                           int yOffset = 0);
+                           int yOffset = 0, int bigStep = 0);
     bool isCommandColumn() const;
     FourCC *getCurrentCommandPointer();
     void updateSelectionValue(ViewUpdateDirection direction);

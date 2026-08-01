@@ -6,6 +6,7 @@
 #include "Application/Views/UIController.h"
 #include "Application/Views/ModalDialogs/InstrumentFxModal.h"
 #include "Application/Utils/char.h"
+#include "Application/AppWindow.h"
 #include <stdio.h>
 #include <string>
 #include <iostream>
@@ -92,17 +93,17 @@ void MixerView::ProcessButtonMask(unsigned short mask,bool pressed) {
 
 void MixerView::processNormalButtonMask(unsigned int mask) {
 
-	// R modifier: keep the port-wide convention.
-	// R+B toggles mute on the selected channel.
-	// R+A opens the instrument FX menu for the hovered channel bar
-	// (TREEFROG_MIXER_FX_MENU_V1: FX apply to the whole instrument).
+	// R1 modifier: keep the port-wide convention.
+	// R1+B toggles mute on the selected channel.
+	// R1+A toggles Solo on the selected channel
+	// (TREEFROG_MIXER_SOLO_V1: solo follows the hovered channel bar).
 	if (mask&EPBM_R) {
 		if (mask&EPBM_B) {
 			toggleMute() ;
 			return ;
 		}
 		if (mask&EPBM_A) {
-			showInstrumentFxMenu() ;
+			switchSoloMode() ;
 			return ;
 		}
 		if (mask&EPBM_UP) {
@@ -113,6 +114,16 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 		}
 		if (mask&EPBM_START) {
 			onStop() ;
+		}
+		return ;
+	}
+
+	// R2 modifier: opens the instrument FX menu for the hovered channel bar
+	// (TREEFROG_MIXER_FX_MENU_V2: FX apply to the whole instrument).
+	if (mask&EPBM_R2) {
+		if (mask&EPBM_A) {
+			showInstrumentFxMenu() ;
+			return ;
 		}
 		return ;
 	}
@@ -301,10 +312,11 @@ void MixerView::DrawView() {
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
 	DrawString(4,y0+height+4,"A+UP/DN x10  A+L/R x1",props) ;
-	DrawString(4,y0+height+5,"L/R channel  R+B mute",props) ;
-	DrawString(4,y0+height+6,"START play  R+A FX menu",props) ;
+	DrawString(4,y0+height+5,"L/R channel  R1+B mute",props) ;
+	DrawString(4,y0+height+6,"START play  R1+A solo  R2+A FX",props) ;
 
 	drawNotes() ;
+	drawMap() ;
     
 	if (player->IsRunning()) {
 		OnPlayerUpdate(PET_UPDATE) ;
@@ -315,6 +327,14 @@ void MixerView::OnPlayerUpdate(PlayerEventType ,unsigned int tick) {
 	(void)tick ;
 
 	Player *player=Player::GetInstance() ;
+
+	// TREEFROG_MIXER_LIVE_VU_V1:
+	// While the player is running, every transport tick requests a redraw so
+	// the VU bars bounce in real time (AppWindow only flushes when dirty).
+	if (player->IsRunning()) {
+		isDirty_ = true;
+		((AppWindow &)w_).SetDirty() ;
+	}
 
 	GUITextProperties props ;
 	SetColor(CD_NORMAL) ;

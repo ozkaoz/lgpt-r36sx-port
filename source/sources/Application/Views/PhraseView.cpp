@@ -21,8 +21,10 @@
 const int PhraseView::kColX[kColCount] = {5, 9, 11, 14, 18, 22, 26, 30, 34};
 
 // Offsets for note(0), volume(1) and instrument(2) value stepping: L, R, U, D.
+// TREEFROG_PHRASE_VOL_EDIT_V1: the volume column steps by 1 in every
+// direction (A+UP/DOWN steps by 10 inside updateCursorValue).
 short PhraseView::offsets_[3][4] = {{-1, 1, 12, -12},
-                                    {-1, 1, 16, -16},
+                                    {-1, 1, 1, -1},
                                     {-1, 1, 16, -16}};
 
 static void CommandSelectorCallback(View &v, ModalView &d) {
@@ -185,7 +187,7 @@ void PhraseView::onCommandSelectorPreview(ModalView &) {
 }
 
 void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
-                                   int yOffset) {
+                                   int yOffset, int bigStep) {
 
     unsigned char *c = 0;
     unsigned char limit = 0;
@@ -323,12 +325,23 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
         lastParam_ = cmdEdit_.GetInt();
         break;
     }
-    if ((c) && (*c != 0xFF)) {
+    if (c) {
         int editCol = col_ + xOffset;
         if (editCol == 0 && updateChopNoteValueForRow(row_ + yOffset, direction)) {
             lastNote_ = *c;
         } else {
+            // TREEFROG_PHRASE_VOL_EDIT_V1:
+            // Empty volume cells start at 99 (the level the player assigns
+            // when a note is placed) so the column is always editable.
+            if ((editCol == 1) && (*c == 0xFF)) {
+                *c = 0x63;
+                isDirty_ = true;
+            }
             int offset = offsets_[editCol == 2 ? 2 : (editCol == 1 ? 1 : 0)][direction];
+            if (editCol == 1 && (direction == VUD_UP || direction == VUD_DOWN)) {
+                int step = bigStep ? 10 : 1;
+                offset = (direction == VUD_UP) ? step : -step;
+            }
             // If note column apply the selected musical scale only for normal, non-chopped instruments.
             if (editCol == 0) {
                 int scale = viewData_->project_->GetScale();
@@ -1200,13 +1213,13 @@ void PhraseView::processNormalButtonMask(unsigned short mask) {
                 if (isCommandColumn())
                     enterCommandSelector();
                 else
-                    updateCursorValue(VUD_DOWN);
+                    updateCursorValue(VUD_DOWN, 0, 0, (col_ == 1) ? 10 : 0);
             }
             if (mask & EPBM_UP) {
                 if (isCommandColumn())
                     enterCommandSelector();
                 else
-                    updateCursorValue(VUD_UP);
+                    updateCursorValue(VUD_UP, 0, 0, (col_ == 1) ? 10 : 0);
             }
             if (mask & EPBM_LEFT)
                 updateCursorValue(VUD_LEFT);

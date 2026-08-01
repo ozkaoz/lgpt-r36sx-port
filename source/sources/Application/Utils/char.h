@@ -36,13 +36,12 @@ inline void note2char(unsigned char d,char *s) {
 	int oct=d/12-2 ;
 	int note=d%12 ;
 	strcpy(s,notes__[note]) ;
-	if (oct<0) {
-		s[2]='-' ;
-        oct=-oct ;
-    } else {		
-		s[2]=' ' ;
-    }
-	s[3]='0'+oct ;
+	// TREEFROG_NOTE_3CHARS_V1:
+	// Compact tracker format: exactly 3 characters (C-3, C#3, B-1). The
+	// natural-note dash comes from notes__[]; the octave is a single digit
+	// with its sign folded into the note name for negative octaves.
+	s[2]='0'+(oct<0?-oct:oct) ;
+	s[3]=0 ;
 } ;
 
 inline void note2visualizer(unsigned char d,char *s) {

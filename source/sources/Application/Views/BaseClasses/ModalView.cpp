@@ -2,9 +2,14 @@
 #include "ModalView.h"
 
 ModalView::ModalView(View &v)
-    : View(v.w_, v.viewData_), finished_(false), returnCode_(0){};
+    : View(v.w_, v.viewData_), finished_(false), returnCode_(0), topOffset_(0){};
 
 ModalView::~ModalView(){};
+
+void ModalView::SetWindowOffset(int dy) {
+    topOffset_ = dy;
+    isDirty_ = true;
+};
 
 int ModalView::GetReturnCode() { return returnCode_; };
 
@@ -33,7 +38,7 @@ void ModalView::SetWindow(int width, int height) {
     };
 
     left_ = 20 - width / 2;
-    top_ = 10 - height / 2;
+    top_ = 10 - height / 2 + topOffset_;
     if (top_ < 2) {
         top_ = 2;
     }

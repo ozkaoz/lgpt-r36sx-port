@@ -78,13 +78,14 @@ void View::drawMap() {
 
         GUIPoint anchor = GetAnchor();
         (void)anchor;
-        // TREEFROG_UI_MAP_LAYOUT_V2:
-        // Sidebar moved from the top-left (x=0-3, y=4-6) to the bottom-right
-        // corner (x=36-39, y=27-29). The area is collision-free on every view:
-        // drawNotes() occupies x=10-33 at y=27-29, all grids stay inside the
-        // anchor area (x=7-33, y<=25), and the Song status block sits at the
-        // top-right. Leaves the entire top-left area free for centered content.
-        const int baseX = 36;
+        // TREEFROG_UI_MAP_LAYOUT_V3:
+        // Sidebar moved to the bottom-left corner (x=1-4, y=27-29) with a
+        // two-column margin so it is not glued to the edge. The area is
+        // collision-free on every view: drawNotes() occupies x=10-33 at
+        // y=27-29, all grids stay inside the anchor area (x=7-33, y<=25),
+        // the Song status block sits at the top-right and MixerView keeps
+        // its channel bars and legend above y=26.
+        const int baseX = 2;
         const int baseY = 27;
 
         GUITextProperties props;

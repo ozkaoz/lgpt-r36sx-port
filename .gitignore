@@ -27,3 +27,6 @@ previous_diagnostics/
 MANIFEST_PACKAGE_CONTENTS.txt
 SOURCE_FILE_MANIFEST.json
 SHA256SUMS.txt
+
+# Windows Visual Studio build artifacts inside the synced source tree
+source/build/

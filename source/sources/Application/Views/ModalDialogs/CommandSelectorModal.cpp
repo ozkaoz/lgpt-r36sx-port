@@ -141,6 +141,10 @@ void CommandSelectorModal::DrawView() {
 
     SetWindow(width, rows);
 
+    // TREEFROG_PHRASE_MENU_V1:
+    // Center the command grid a bit lower than the default modal position.
+    SetWindowOffset(2);
+
     GUITextProperties props;
 
     // Draw grid
