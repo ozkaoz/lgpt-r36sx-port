@@ -51,7 +51,7 @@ PhraseView::PhraseView(GUIWindow &w, ViewData *viewData)
     viewData->phraseCurPos_ = 0;
     col_ = 0;
     lastNote_ = 60;
-    lastVol_ = 0x64;
+    lastVol_ = 0x10;
     lastInstr_ = 0;
     lastCmd_ = I_CMD_NONE;
     lastParam_ = 0;
@@ -199,8 +199,9 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
         break;
     case 1:
         c = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
-        // TREEFROG_PHRASE_VOL_V1: row volume is 0..100 (0x64), 0xFF = empty.
-        limit = 0x64;
+        // TREEFROG_PHRASE_VOL_V2: row volume is 0..0x10 (16), 0xFF = empty.
+        // 0x10 = full scale (100%), matches user expectation: "10" on hex display = max clean volume.
+        limit = 0x10;
         wrap = false;
         break;
     case 2:
@@ -290,14 +291,14 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
         if (editCol == 0 && updateChopNoteValueForRow(row_ + yOffset, direction)) {
             lastNote_ = *c;
         } else {
-            // TREEFROG_PHRASE_VOL_V3 (H38.6): new note rows get volume 100
-            // automatically, and an empty volume cell edited directly starts
-            // at 100 (the full-volume level).
-            bool noteWasEmpty = (editCol == 0) && (*c == 0xFF);
-            if ((editCol == 1) && (*c == 0xFF)) {
-                *c = 0x64;
-                isDirty_ = true;
-            }
+// TREEFROG_PHRASE_VOL_V2: new note rows get volume 0x10 (full scale)
+// automatically, and an empty volume cell edited directly starts
+// at 0x10 (the full-volume level).
+bool noteWasEmpty = (editCol == 0) && (*c == 0xFF);
+if ((editCol == 1) && (*c == 0xFF)) {
+    *c = 0x10;
+    isDirty_ = true;
+}
             int offset = offsets_[editCol == 2 ? 2 : (editCol == 1 ? 1 : 0)][direction];
             if (editCol == 1 && (direction == VUD_UP || direction == VUD_DOWN)) {
                 int step = bigStep ? 10 : 1;
@@ -314,7 +315,7 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
             if (noteWasEmpty && (*c != 0xFF)) {
                 uchar *vc = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
                 if (*vc == 0xFF) {
-                    *vc = 0x64;
+                    *vc = 0x10;
                     isDirty_ = true;
                 }
             }
@@ -369,6 +370,11 @@ void PhraseView::pasteLast() {
             *c = lastNote_;
             c = phrase_->instr_ + (16 * viewData_->currentPhrase_ + row_);
             *c = lastInstr_;
+            // Auto-set volume to full scale (0x10) when placing a note in empty row
+            c = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_);
+            if (*c == 0xFF) {
+                *c = 0x10;
+            }
             isDirty_ = true;
         } else {
             lastNote_ = *c;

@@ -937,18 +937,17 @@ void Player::playCursorPosition(int channel) {
 				if (note<128) {
 					mixer_->StartInstrument(channel,instrument,note,newInstrument) ;
 
-					// TREEFROG_PHRASE_VOL_V4_ROUNDED_MAP:
-					// -- (0xFF) and 00 are silent. Values 01..100 are a linear
-					// percentage, with 100 = full level. Round to the nearest 0..254
-					// internal gain step before SampleInstrument converts it to Q15.
-					if (rowVol==0xFF||rowVol==0x00) {
-						instrument->SetRowVolume(channel,0) ;
-					} else if (rowVol<=0x64) {
-						unsigned int mapped=((unsigned int)rowVol*0xFEu+50u)/100u ;
-						instrument->SetRowVolume(channel,(unsigned char)mapped) ;
-					} else {
-						instrument->SetRowVolume(channel,0xFE) ;
-					}
+// TREEFROG_PHRASE_VOL_V5 (H38.6 fix):
+// -- (0xFF) and 00 are silent. Values 01..0x10 (16) are a linear
+// percentage, with 0x10 = full level (100%). Map to 0..0xFE internal gain.
+if (rowVol == 0xFF || rowVol == 0x00) {
+    instrument->SetRowVolume(channel, 0);
+} else if (rowVol <= 0x10) {
+    unsigned int mapped = ((unsigned int)rowVol * 0xFEu + 8u) / 0x10u;
+    instrument->SetRowVolume(channel, (unsigned char)mapped);
+} else {
+    instrument->SetRowVolume(channel, 0xFE);
+}
 					int instrTable=instrument->GetTable() ;
 	
 					// If an instrument number has been specified && instrument has table,
