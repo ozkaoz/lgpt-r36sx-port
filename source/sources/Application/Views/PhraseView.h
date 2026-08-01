@@ -55,6 +55,7 @@ class PhraseView : public View {
     int row_;
     int col_;
     int lastNote_;
+    int lastVol_;
     int lastInstr_;
     int lastCmd_;
     int lastParam_;
@@ -83,16 +84,21 @@ class PhraseView : public View {
         int height_;
         uchar note_[16];
         uchar instr_[16];
+        uchar vol_[16];
         uint cmd1_[16];
         ushort param1_[16];
         uint cmd2_[16];
         ushort param2_[16];
+        uint cmd3_[16];
+        ushort param3_[16];
     } clipboard_;
 
     int saveCol_;
     int saveRow_;
 
-    static short offsets_[2][4];
+    static short offsets_[3][4];
+    static const int kColCount = 9;
+    static const int kColX[kColCount];
 };
 
 #endif

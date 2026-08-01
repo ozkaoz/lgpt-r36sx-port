@@ -217,28 +217,37 @@ void Project::Purge() {
 
     data=song_->phrase_->note_ ;
     data2=song_->phrase_->instr_ ;
+    unsigned char *data3=song_->phrase_->vol_ ;
 
 	FourCC *cmd1=song_->phrase_->cmd1_ ;
 	ushort *param1=song_->phrase_->param1_ ;
 	FourCC *cmd2=song_->phrase_->cmd2_ ;
 	ushort *param2=song_->phrase_->param2_ ;    
+	FourCC *cmd3=song_->phrase_->cmd3_ ;
+	ushort *param3=song_->phrase_->param3_ ;
 
 	for (int i=0;i<PHRASE_COUNT;i++) {
 		for (int j=0;j<16;j++) {
 			if (!song_->phrase_->IsUsed(i)) {
 				*data=0xFF ;
 				*data2=0xFF ;
+				*data3=0xFF ;
 				*cmd1='----' ;
 				*param1=0 ;
 				*cmd2='----' ;
 				*param2=0 ;
+				*cmd3='----' ;
+				*param3=0 ;
 			}
             data++ ;
             data2++ ;
+            data3++ ;
 			cmd1++ ;
 			param1++ ;
 			cmd2++ ;
 			param2++ ;
+			cmd3++ ;
+			param3++ ;
         } ;	
     }	
 } ;

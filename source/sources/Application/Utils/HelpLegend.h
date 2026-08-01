@@ -5,6 +5,33 @@
 #include <stdlib.h>
 #include <string.h>
 
+// TREEFROG_BEATMAKING_FX_V1:
+// Display names for the phrase commands, shown in the phrase grid, the table
+// editor and the command selector. The stored FourCC is never changed, so
+// projects stay compatible; only the on-screen name follows the expected
+// beatmaking labels (RVB/DLY/FLT/EQ/CMP/PIT).
+static inline void getCommandDisplayName(FourCC command, char *out) {
+	switch (command) {
+		case I_CMD_FBMX: strcpy(out, "RVB "); break;
+		case I_CMD_FBTN: strcpy(out, "RVT "); break;
+		case I_CMD_DLAY: strcpy(out, "DLY "); break;
+		case I_CMD_FLTR: strcpy(out, "FLT "); break;
+		case I_CMD_FCUT: strcpy(out, "EQ  "); break;
+		case I_CMD_FRES: strcpy(out, "RES "); break;
+		case I_CMD_CRSH: strcpy(out, "CMP "); break;
+		case I_CMD_PTCH: strcpy(out, "PIT "); break;
+		case I_CMD_PFIN: strcpy(out, "PFI "); break;
+		default: {
+			const char *src = (const char *)&command;
+			out[0] = src[0];
+			out[1] = src[1];
+			out[2] = src[2];
+			out[3] = src[3];
+			break;
+		}
+	}
+}
+
 static inline std::string* getHelpLegend(FourCC command) {
 	std::string* result = new std::string[3];
 	result[2].assign("bb at speed aa");
@@ -72,7 +99,7 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[2].assign("move rel bb chunks");
 			break;
 		case I_CMD_FLTR:
-			result[0].assign("FiLTer&Resonance:aabb");
+			result[0].assign("FiLTer:aa bb");
 			result[1].assign("cutoff aa");
 			result[2].assign("resonance bb");
 			break;
@@ -82,16 +109,16 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[2].assign("");
 			break;
 		case I_CMD_CRSH:
-			result[0].assign("drive&CRuSH:aa-b");
-			result[1].assign("drive aa");
-			result[2].assign("crush -b");
+			result[0].assign("ComPress:aa-b");
+			result[1].assign("drive aa, crush -b");
+			result[2].assign("bb=0 disables crush");
 			break;
 		case I_CMD_FCUT:
-			result[0].assign("FilterCUToff:aabb");
+			result[0].assign("EQ CUToff:aa bb");
 			result[1].assign("set cutoff to");
 			break;
 		case I_CMD_FRES:
-			result[0].assign("FilterRESonance:aabb");
+			result[0].assign("RESonance:aa bb");
 			result[1].assign("set resonance to");
 			break;
 		case I_CMD_PAN_:
@@ -108,7 +135,7 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[1].assign("retrig and transpose to");
 			break;
 		case I_CMD_PFIN:
-			result[0].assign("PitchFINetune:aabb");
+			result[0].assign("PitchFINe:aa bb");
 			result[1].assign("fine tune to ");
 			break;
 		case I_CMD_DLAY:
@@ -117,11 +144,11 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[2].assign("");
 			break;
 		case I_CMD_FBMX:
-			result[0].assign("FeedBack MiX:aabb");
+			result[0].assign("REVerB mix:aa bb");
 			result[1].assign("feedback mix to");
 			break;
 		case I_CMD_FBTN:
-			result[0].assign("FeedBack TuNe:aabb");
+			result[0].assign("REVerB tune:aa bb");
 			result[1].assign("feedback tune to");
 			break;
 		case I_CMD_STOP:

@@ -86,6 +86,7 @@ public:
 	   int GetSampleIndex() ;
 	   int GetVolume() ;
 	   void SetVolume(int) ;
+	   void SetRowVolume(int channel,unsigned char vol) ;
 	   int GetSampleSize(int channel=-1) ;
        int GetLoopEnd();
        virtual const char *GetName();

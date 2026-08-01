@@ -60,7 +60,10 @@ bool TreeFrogSystem::Boot(const char *contentPath) {
     Path::SetAlias("bin", LGPT_TREEFROG_ROOT);
     Path::SetAlias("root", LGPT_TREEFROG_ROOT);
 
-    Path logPath("bin:lgpt.log");
+    /* H32: runtime logs stay in tmpfs. Repeated small writes to lgpt.log on
+     * FAT32 were among the entries repeatedly truncated by CHKDSK. */
+    mkdir_if_missing("/tmp/r36sx_lgpt_logs");
+    Path logPath("/tmp/r36sx_lgpt_logs/lgpt.log");
     FileLogger *fileLogger = new FileLogger(logPath);
     if (fileLogger->Init().Succeeded()) Trace::GetInstance()->SetLogger(*fileLogger);
 

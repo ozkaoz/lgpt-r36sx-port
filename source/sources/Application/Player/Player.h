@@ -87,6 +87,7 @@ public:
 	bool IsChannelPlaying(int channel) ;
 	void SetChannelMute(int channel,bool mute) ;
 	bool IsChannelMuted(int channel) ;
+	I_Instrument *GetChannelInstrument(int channel) { return mixer_->GetInstrument(channel) ; }
 	
 	// Live queuing
 

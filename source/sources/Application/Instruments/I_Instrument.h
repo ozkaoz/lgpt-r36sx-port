@@ -48,6 +48,10 @@ public:
 
 	  virtual void Purge()=0 ;
 
+	  // Row volume override (0xFF = no override, 0x00-0xFE = proportional gain)
+
+	  virtual void SetRowVolume(int channel,unsigned char vol) { (void)channel; (void)vol; } ;
+
 	  virtual int GetTable()=0 ;
 	  virtual bool GetTableAutomation()=0 ;
 

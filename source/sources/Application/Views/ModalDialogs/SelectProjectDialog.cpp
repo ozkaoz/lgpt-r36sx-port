@@ -40,7 +40,7 @@ static bool TreeFrogV40ProjectHasSaveFile(Path projectPath) {
 }
 
 static void TreeFrogV40SelectLog(const char *where, const Path &p, bool shown) {
-    FILE *fp = fopen("/mnt/sdcard/lgpt/reentry_debug.log", "a");
+    FILE *fp = fopen("/tmp/r36sx_lgpt_logs/reentry_debug.log", "a");
     if (fp) {
         fprintf(fp, "TREEFROG_V40_ESTABLE_SELECT: %s shown=%d path=%s\n", where ? where : "unknown", shown ? 1 : 0, p.GetPath().c_str());
         fclose(fp);

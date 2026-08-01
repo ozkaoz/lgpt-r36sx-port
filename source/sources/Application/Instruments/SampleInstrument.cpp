@@ -214,9 +214,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 	 int rootNote=(rootNote_->GetInt()-60)+source_->GetRootNote(rp->midiNote_) ;
 
 	 rp->volume_=rp->baseVolume_=i2fp(volume_->GetInt()) ;
-	 rp->attenuate_=i2fp(attenuate_->GetInt()) ;
-
-	 rp->pan_=rp->basePan_=i2fp(pan_->GetInt()) ;
+	 rp->attenuate_=i2fp(attenuate_->GetInt()) ;	 rp->pan_=rp->basePan_=i2fp(pan_->GetInt()) ;
 
 	 if (!source_->IsMulti()) {
 		 rp->rendLoopStart_=loopStart_->GetInt();
@@ -1034,6 +1032,14 @@ int SampleInstrument::GetVolume() {
 	return v->GetInt() ;
 } ;
 
+void SampleInstrument::SetRowVolume(int channel,unsigned char vol) {
+	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return ;
+	renderParams *rp=renderParams_+channel ;
+	if (!rp->sampleBuffer_) return ;
+	fixed rowGain=i2fp(((int)vol<<8)/0xFE) ;
+	rp->volume_=fp_mul(rp->baseVolume_,rowGain) ;
+} ;
+
 int SampleInstrument::GetSampleSize(int channel) {
 	if (source_) {
 		 renderParams *rp=renderParams_+channel ;
@@ -1440,8 +1446,14 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 			{
     			unsigned char drive=(value>>8);
     			unsigned char crush=(value&0x0F);
-				if (drive >0 ) rp->drive_=drive ;
-				if (crush >0 ) rp->crush_=crush ;
+				// TREEFROG_BEATMAKING_FX_V1:
+				// Any non-zero parameter applies both drive and crush, so a
+				// zero crush nibble now disables crush (drive-only). Value
+				// 0x0000 still means "no change" for old-project safety.
+				if (value != 0) {
+					rp->drive_=drive ;
+					rp->crush_=crush ;
+				}
 			}
 		default:
 			break;

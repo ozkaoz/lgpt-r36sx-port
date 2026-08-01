@@ -848,18 +848,18 @@ static void tf_vline(int x, int y0, int y1, unsigned short color) {
 extern "C" void TreeFrogChopperOverlayDraw(void) {
     if (!g_chopperOverlayActive) return;
 
-    const unsigned short bg       = tf_rgb565(4, 3, 8);
-    const unsigned short border   = tf_rgb565(232, 76, 212);
-    const unsigned short axis     = tf_rgb565(90, 90, 100);
-    const unsigned short waveDim  = tf_rgb565(52, 78, 96);
-    const unsigned short waveMid  = tf_rgb565(150, 185, 210);
-    const unsigned short waveHot  = tf_rgb565(240, 248, 255);
-    const unsigned short cursor   = tf_rgb565(255, 0, 0);
-    const unsigned short marker   = tf_rgb565(255, 212, 255);
-    const unsigned short chop     = tf_rgb565(0, 255, 190);
-    const unsigned short selected = tf_rgb565(255, 226, 0);
-    const unsigned short selectedBg = tf_rgb565(76, 54, 8);
-    const unsigned short trimSelected = tf_rgb565(255, 128, 24);
+    const unsigned short bg       = tf_rgb565(10, 10, 24);
+    const unsigned short border   = tf_rgb565(63, 95, 191);
+    const unsigned short axis     = tf_rgb565(70, 74, 92);
+    const unsigned short waveDim  = tf_rgb565(40, 55, 100);
+    const unsigned short waveMid  = tf_rgb565(110, 140, 205);
+    const unsigned short waveHot  = tf_rgb565(235, 244, 255);
+    const unsigned short cursor   = tf_rgb565(74, 216, 255);
+    const unsigned short marker   = tf_rgb565(168, 107, 255);
+    const unsigned short chop     = tf_rgb565(80, 230, 170);
+    const unsigned short selected = tf_rgb565(140, 190, 255);
+    const unsigned short selectedBg = tf_rgb565(28, 40, 86);
+    const unsigned short trimSelected = tf_rgb565(210, 150, 255);
 
     tf_rect(TF_WAVE_X - 2, TF_WAVE_Y - 2, TF_WAVE_W + 4, TF_WAVE_H + 4, border);
     tf_rect(TF_WAVE_X, TF_WAVE_Y, TF_WAVE_W, TF_WAVE_H, bg);
@@ -2204,8 +2204,8 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
        waveform band, not only the former narrow panel. This removes the right
        side bars visible in U2.28 and avoids drawing over the Frame line. */
     g_chopperOverlayActive = 0;
-    tf_rect(0, 60, 320, 112, tf_rgb565(4, 3, 8));
-    tf_rect(0, 188, 320, 44, tf_rgb565(4, 3, 8));
+    tf_rect(0, 60, 320, 112, tf_rgb565(10, 10, 24));
+    tf_rect(0, 188, 320, 44, tf_rgb565(10, 10, 24));
 #endif
 
     const int x = 1;

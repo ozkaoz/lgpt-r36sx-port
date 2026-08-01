@@ -22,6 +22,8 @@ protected:
 	void toggleMute() ;
 	void switchSoloMode() ;
 	void drawVolumeBar(int channel,int x,int y,int height) ;
+	void drawMasterBar(int x,int y,int height) ;
+	void showInstrumentFxMenu() ;
 private:
 	const char *song_ ;
 

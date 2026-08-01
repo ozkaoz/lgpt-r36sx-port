@@ -24,6 +24,12 @@ public:
     virtual void SetSoftclip(int clip, int gain);
     virtual void SetMasterVolume(int volume) ;
 	virtual bool Clipped() ;
+    // TREEFROG_VU_METERS_V1:
+    // Smoothed peak of the last rendered buffers, 0..1. Each MixBus instance
+    // reports its own channel level; the AudioOut instance reports the master
+    // level, so the Mixer and Record views can draw live VU bars.
+    float GetPeakValue() const { return peakValue_; }
+    void ResetPeak() { peakValue_ = 0.0f; }
 	
 private:
   fixed hardClip(fixed sample);
@@ -38,5 +44,6 @@ private:
   int softclipGain_;
   int masterVolume_;
   bool clipped_;
+  float peakValue_;
 } ;
 #endif

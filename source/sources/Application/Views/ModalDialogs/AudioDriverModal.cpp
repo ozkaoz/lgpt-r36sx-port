@@ -1,4 +1,7 @@
 #include "AudioDriverModal.h"
+#include "Application/Persistency/PersistencyService.h"
+#include "Application/Mixer/MixerService.h"
+#include <unistd.h>
 
 #include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
 #include <stdio.h>
@@ -7,13 +10,14 @@ AudioDriverModal::AudioDriverModal(View &view)
     : ModalView(view),
       selected_(TreeFrogUac2Bridge_GetDriverMode()),
       waitForRelease_(true) {
-    if (selected_ < 0 || selected_ >= 2) selected_ = 0;
+    const int count = TreeFrogUac2Bridge_GetDriverModeCount();
+    if (selected_ < 0 || selected_ >= count) selected_ = 0;
 }
 
 AudioDriverModal::~AudioDriverModal() {}
 
 void AudioDriverModal::DrawView() {
-    SetWindow(36, 16);
+    SetWindow(36, 19);
     GUITextProperties props;
     char line[64];
 
@@ -27,28 +31,29 @@ void AudioDriverModal::DrawView() {
              TreeFrogUac2Bridge_GetUsbStateText());
     DrawString(1, 2, line, props);
 
-    for (int i = 0; i < 2; ++i) {
+    const int count = TreeFrogUac2Bridge_GetDriverModeCount();
+    for (int i = 0; i < count; ++i) {
         props.invert_ = (i == selected_);
         SetColor(i == selected_ ? CD_HILITE2 : CD_NORMAL);
         snprintf(line, sizeof(line), "%c %-30.30s",
                  i == selected_ ? '>' : ' ',
                  TreeFrogUac2Bridge_GetDriverModeNameByIndex(i));
-        DrawString(1, 5 + i * 3, line, props);
+        DrawString(1, 4 + i * 3, line, props);
         props.invert_ = false;
         SetColor(CD_NORMAL);
-        DrawString(3, 6 + i * 3,
+        DrawString(3, 5 + i * 3,
                    TreeFrogUac2Bridge_GetDriverModeDescriptionByIndex(i),
                    props);
     }
 
     SetColor(CD_NORMAL);
     if (waitForRelease_) {
-        DrawString(1, 12, "Release SELECT/R2 or opening keys", props);
+        DrawString(1, 14, "Release SELECT/R2 or opening keys", props);
     } else {
-        DrawString(1, 12, "A apply   B cancel   UP/DOWN", props);
+        DrawString(1, 14, "A apply+restart   B cancel", props);
     }
-    DrawString(1, 13, "Global shortcut: SELECT + R2", props);
-    DrawString(1, 14, "Sampler: Instrument R1 + RIGHT", props);
+    DrawString(1, 15, "Restart is automatic; stay in LGPT", props);
+    DrawString(1, 16, "Sampler: Instrument R1 + RIGHT", props);
 }
 
 void AudioDriverModal::ProcessButtonMask(unsigned short mask, bool pressed) {
@@ -62,11 +67,12 @@ void AudioDriverModal::ProcessButtonMask(unsigned short mask, bool pressed) {
 
     if (!pressed) return;
 
+    const int count = TreeFrogUac2Bridge_GetDriverModeCount();
     if (mask & EPBM_UP) {
-        selected_ = selected_ == 0 ? 1 : 0;
+        selected_ = (selected_ + count - 1) % count;
         isDirty_ = true;
     } else if (mask & EPBM_DOWN) {
-        selected_ = selected_ == 0 ? 1 : 0;
+        selected_ = (selected_ + 1) % count;
         isDirty_ = true;
     } else if (mask & EPBM_A) {
         EndModal(selected_);
@@ -82,8 +88,15 @@ void AudioDriverModalApplyCallback(View &view, ModalView &dialog) {
     int mode = dialog.GetReturnCode();
     if (mode < 0) return;
 
+    const int activeMode = TreeFrogUac2Bridge_GetDriverMode();
+    if (mode != activeMode) {
+        MixerService::GetInstance()->SetRenderMode(0);
+        PersistencyService::GetInstance()->Save();
+        sync();
+        view.SetNotification("Project saved; changing Audio Driver");
+    }
     const char *name = TreeFrogUac2Bridge_SetDriverMode(mode);
-    char message[64];
-    snprintf(message, sizeof(message), "Audio Driver: %s", name ? name : "");
+    char message[96];
+    snprintf(message, sizeof(message), "Saved; Audio Driver: %s", name ? name : "");
     view.SetNotification(message);
 }

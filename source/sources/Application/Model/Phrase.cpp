@@ -11,6 +11,9 @@ Phrase::Phrase() {
 	instr_=(unsigned char *)SYS_MALLOC(size) ;
 	memset(instr_,0xFF,size) ;
 
+	vol_=(unsigned char *)SYS_MALLOC(size) ;
+	memset(vol_,0xFF,size) ;
+
 	cmd1_=(FourCC *)SYS_MALLOC(size*sizeof(FourCC)) ;
 	memset(cmd1_,'-',size*sizeof(FourCC)) ;
 	param1_=(unsigned short *)SYS_MALLOC(size*sizeof(short)) ;
@@ -21,6 +24,11 @@ Phrase::Phrase() {
 	param2_=(unsigned short *)SYS_MALLOC(size*sizeof(short)) ;
 	memset(param2_,0x00,size*sizeof(short)) ;
 
+	cmd3_=(FourCC *)SYS_MALLOC(size*sizeof(FourCC)) ;
+	memset(cmd3_,'-',size*sizeof(FourCC)) ;
+	param3_=(unsigned short *)SYS_MALLOC(size*sizeof(short)) ;
+	memset(param3_,0x00,size*sizeof(short)) ;
+
 	for (int i=0;i<PHRASE_COUNT;i++) {
 		isUsed_[i]=false ;
 	}
@@ -29,6 +37,13 @@ Phrase::Phrase() {
 Phrase::~Phrase() {
 	if (note_) SYS_FREE(note_) ;
 	if (instr_) SYS_FREE(instr_) ;
+	if (vol_) SYS_FREE(vol_) ;
+	if (cmd1_) SYS_FREE(cmd1_) ;
+	if (param1_) SYS_FREE(param1_) ;
+	if (cmd2_) SYS_FREE(cmd2_) ;
+	if (param2_) SYS_FREE(param2_) ;
+	if (cmd3_) SYS_FREE(cmd3_) ;
+	if (param3_) SYS_FREE(param3_) ;
     /* CMDS_HERE
 	if (cmd_) SYS_FREE(cmd_) ;
 	if (cmdData_) SYS_FREE(cmdData_) ;

@@ -4,7 +4,7 @@
 #define TREEFROG_STARTTRACE_REAL_LOGGER_V133 1
 #include <stdio.h>
 static void TreeFrogStartTrace(const char *msg) {
-    FILE *f = fopen("/mnt/sdcard/lgpt/start_debug.log", "a");
+    FILE *f = fopen("/tmp/r36sx_lgpt_logs/start_debug.log", "a");
     if (!f) return;
     fprintf(f, "%s\n", msg ? msg : "start");
     fclose(f);
@@ -702,6 +702,23 @@ void Player::ProcessCommands() {
 							}
 						} ;
 					} ;
+
+					// Now process third command row
+
+					cc=viewData_->song_->phrase_->cmd3_[phrase*16+pos] ;
+					param=viewData_->song_->phrase_->param3_[phrase*16+pos] ;
+
+					// if there's any command to trigger, first pass it on the player
+					// then pass it on to the instrument
+
+					if (cc!=I_CMD_NONE) {
+						if (!ProcessChannelCommand(i,cc,param)) {
+							I_Instrument *instrument=mixer_->GetInstrument(i) ;
+							if (instrument) {
+								instrument->ProcessCommand(i,cc,param) ;
+							}
+						} ;
+					} ;
 				}
 			}
 		}
@@ -870,7 +887,13 @@ void Player::updatePhrasePos(int pos,int channel) {
 
 	cc=viewData_->song_->phrase_->cmd2_[phrase*16+pos] ;
 	if (cc==I_CMD_DLAY) {
-		ushort param=viewData_->song_->phrase_->param1_[phrase*16+pos] ;
+		ushort param=viewData_->song_->phrase_->param2_[phrase*16+pos] ;
+		timeToStart_[channel]=(param&0x0F)+1 ;
+	}
+
+	cc=viewData_->song_->phrase_->cmd3_[phrase*16+pos] ;
+	if (cc==I_CMD_DLAY) {
+		ushort param=viewData_->song_->phrase_->param3_[phrase*16+pos] ;
 		timeToStart_[channel]=(param&0x0F)+1 ;
 	}
 }
@@ -888,6 +911,7 @@ void Player::playCursorPosition(int channel) {
 		Phrase *phrase=song->phrase_ ;
 		unsigned char note=phrase->note_[16*currentPhrase+pos]  ;
 		unsigned char instr=phrase->instr_[16*currentPhrase+pos]  ;
+		unsigned char rowVol=phrase->vol_[16*currentPhrase+pos]  ;
 
 		TableHolder *th=TableHolder::GetInstance() ;
 		TablePlayback &tpb=TablePlayback::GetTablePlayback(channel) ;
@@ -930,6 +954,12 @@ void Player::playCursorPosition(int channel) {
 
 				if (note<128) {
 					mixer_->StartInstrument(channel,instrument,note,newInstrument) ;
+
+					// Row volume override: 0xFF = no override, 0x00-0xFE = proportional gain
+
+					if (rowVol!=0xFF) {
+						instrument->SetRowVolume(channel,rowVol) ;
+					}
 					int instrTable=instrument->GetTable() ;
 	
 					// If an instrument number has been specified && instrument has table,
@@ -976,6 +1006,10 @@ int Player::getChannelHop(int channel,int pos) {
 	cc=viewData_->song_->phrase_->cmd2_[phrase*16+pos] ;
   if (cc==I_CMD_HOP) {
       return (viewData_->song_->phrase_->param2_[phrase*16+pos])&0xF ;
+  }
+	cc=viewData_->song_->phrase_->cmd3_[phrase*16+pos] ;
+  if (cc==I_CMD_HOP) {
+      return (viewData_->song_->phrase_->param3_[phrase*16+pos])&0xF ;
   }
   return -1 ;
 }

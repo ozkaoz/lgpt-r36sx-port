@@ -17,7 +17,7 @@ static std::vector<TreeFrogTimer *> g_timers;
 
 static void treefrog_timer_log(const char *msg) {
 #if TREEFROG_INPUT_DEBUG
-    FILE *f = fopen("/mnt/sdcard/lgpt/timer_debug.log", "a");
+    FILE *f = fopen("/tmp/r36sx_lgpt_logs/timer_debug.log", "a");
     if (!f) return;
     fprintf(f, "%lu %s timers=%u mode=%d\n",
             (unsigned long)System::GetInstance()->GetClock(),

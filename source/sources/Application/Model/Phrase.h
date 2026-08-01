@@ -16,10 +16,13 @@ public:
 
 	uchar *note_ ;
 	uchar *instr_ ;
+	uchar *vol_ ;
 	FourCC *cmd1_ ;
 	ushort *param1_ ;
 	FourCC *cmd2_ ;
 	ushort *param2_ ;
+	FourCC *cmd3_ ;
+	ushort *param3_ ;
 	
 private:
 	bool isUsed_[PHRASE_COUNT] ;

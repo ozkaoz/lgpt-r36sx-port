@@ -52,6 +52,11 @@ public:
     void SetRenderMode(int);
     bool IsRendering();
     int GetPlayedBufferPercentage() ;
+
+    // TREEFROG_VU_METERS_V1:
+    // Live per-channel and master levels (0..1) for VU bars in the views.
+    float GetChannelPeak(int channel) { return bus_[channel].GetPeakValue(); }
+    float GetMasterPeak() { return out_ ? out_->GetPeakValue() : 0.0f; }
 	
 	virtual void Execute(FourCC id,float value) ;
 

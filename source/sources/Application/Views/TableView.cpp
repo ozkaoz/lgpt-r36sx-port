@@ -856,7 +856,7 @@ void TableView::DrawView() {
 
     for (int j = 0; j < 16; j++) {
         FourCC command = *f++;
-        fourCC2char(command, buffer);
+        getCommandDisplayName(command, buffer);
         setTextProps(props, 0, j, false);
         DrawString(pos._x, pos._y, buffer, props);
         setTextProps(props, 0, j, true);
@@ -894,7 +894,7 @@ void TableView::DrawView() {
 
     for (int j = 0; j < 16; j++) {
         FourCC command = *f++;
-        fourCC2char(command, buffer);
+        getCommandDisplayName(command, buffer);
         setTextProps(props, 2, j, false);
         DrawString(pos._x, pos._y, buffer, props);
         setTextProps(props, 2, j, true);
@@ -932,7 +932,7 @@ void TableView::DrawView() {
 
     for (int j = 0; j < 16; j++) {
         FourCC command = *f++;
-        fourCC2char(command, buffer);
+        getCommandDisplayName(command, buffer);
         setTextProps(props, 4, j, false);
         DrawString(pos._x, pos._y, buffer, props);
         setTextProps(props, 4, j, true);

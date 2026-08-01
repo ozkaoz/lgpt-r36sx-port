@@ -17,6 +17,10 @@
 #include "Views/UIController.h"
 #include <string.h>
 #include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <time.h>
 
 #if defined(PLATFORM_TREEFROG)
 extern "C" void TreeFrogChopperOverlayDraw(void);
@@ -30,7 +34,7 @@ static void treefrog_app_debug_log(const char *where,
                                    unsigned short mask,
                                    bool dirty) {
 #if TREEFROG_INPUT_DEBUG
-    FILE *f = fopen("/mnt/sdcard/lgpt/app_debug.log", "a");
+    FILE *f = fopen("/tmp/r36sx_lgpt_logs/app_debug.log", "a");
     if (!f) return;
 
     fprintf(f,
@@ -73,6 +77,42 @@ extern "C" const char *TreeFrogU2440FrameTickBuildMarker(void) {
     return "U2440_ACTIVE_MODAL_FRAME_TICK";
 }
 
+
+#if defined(PLATFORM_TREEFROG)
+static const char *kH35ExportRequest = "/tmp/r36sx_lgpt_usb/export_request";
+static unsigned long long h35ExportNowMs() {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
+    return (unsigned long long)ts.tv_sec * 1000ULL +
+           (unsigned long long)ts.tv_nsec / 1000000ULL;
+}
+static bool h35AtomicText(const char *path, const char *text) {
+    char temp[512];
+    snprintf(temp, sizeof(temp), "%s.tmp.%ld", path, (long)getpid());
+    int fd = open(temp, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) return false;
+    size_t len = text ? strlen(text) : 0;
+    ssize_t n = len ? write(fd, text, len) : 0;
+    bool ok = (size_t)(n < 0 ? 0 : n) == len && fsync(fd) == 0;
+    close(fd);
+    if (!ok || rename(temp, path) != 0) { unlink(temp); return false; }
+    return true;
+}
+static bool h35FileExists(const char *path) {
+    struct stat st; return path && stat(path, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 44;
+}
+static bool h35ReadText(const char *path, char *buffer, size_t size) {
+    if (!path || !buffer || size < 2) return false;
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return false;
+    ssize_t n = read(fd, buffer, size - 1);
+    close(fd);
+    if (n <= 0) return false;
+    buffer[n] = 0;
+    return true;
+}
+#endif
+
 AppWindow *instance = 0;
 
 extern "C" void TreeFrogInputTrace_LogView(
@@ -84,21 +124,21 @@ extern "C" void TreeFrogInputTrace_LogView(
     int pressed,
     int audioLatched);
 
-GUIColor AppWindow::backgroundColor_(0x1D, 0x0A, 0x1F);
-GUIColor AppWindow::normalColor_(0xF5, 0xEB, 0xFF);
-GUIColor AppWindow::borderColor_(0xFF, 0x00, 0x8C);
-GUIColor AppWindow::songviewfeColor_(0xA5, 0x5B, 0x8F);
-GUIColor AppWindow::songview00Color_(0x85, 0x3B, 0x6F);
-GUIColor AppWindow::highlightColor_(0xB7, 0x50, 0xD1);
-GUIColor AppWindow::highlight2Color_(0xDB, 0x33, 0xDB);
-GUIColor AppWindow::consoleColor_(0x00, 0xFF, 0x00);
-GUIColor AppWindow::cursorColor_(0xFF, 0x00, 0x8C);
-GUIColor AppWindow::playColor_(0xFF, 0x00, 0x8C);
-GUIColor AppWindow::recordColor_(0xFF, 0x20, 0x20);
-GUIColor AppWindow::muteColor_(0xF5, 0xEB, 0xFF);
-GUIColor AppWindow::rownumberColor_(0xBA, 0x28, 0xF9);
-GUIColor AppWindow::rownumber2Color_(0xFF, 0x00, 0xFF);
-GUIColor AppWindow::majorbeatColor_(0xBA, 0x28, 0xF9);
+GUIColor AppWindow::backgroundColor_(0x0A, 0x0A, 0x18);
+GUIColor AppWindow::normalColor_(0xE8, 0xE4, 0xF8);
+GUIColor AppWindow::borderColor_(0x3F, 0x5F, 0xBF);
+GUIColor AppWindow::songviewfeColor_(0x2A, 0x3E, 0x8F);
+GUIColor AppWindow::songview00Color_(0x1E, 0x2B, 0x66);
+GUIColor AppWindow::highlightColor_(0x5B, 0x8C, 0xFF);
+GUIColor AppWindow::highlight2Color_(0x9D, 0x5B, 0xFF);
+GUIColor AppWindow::consoleColor_(0x40, 0xC8, 0x78);
+GUIColor AppWindow::cursorColor_(0x7F, 0xB8, 0xFF);
+GUIColor AppWindow::playColor_(0x4A, 0xD8, 0xFF);
+GUIColor AppWindow::recordColor_(0xFF, 0x40, 0x40);
+GUIColor AppWindow::muteColor_(0x88, 0x90, 0xB0);
+GUIColor AppWindow::rownumberColor_(0x5A, 0x7D, 0xF0);
+GUIColor AppWindow::rownumber2Color_(0xA8, 0x6B, 0xFF);
+GUIColor AppWindow::majorbeatColor_(0x4A, 0x8C, 0xFF);
 
 int AppWindow::charWidth_ = 8;
 int AppWindow::charHeight_ = 8;
@@ -468,7 +508,7 @@ void AppWindow::LoadProject(const Path &p) {
     if (!succeeded) {
         PersistencyService::GetInstance()->Save();
         Trace::Log("TREEFROG_V40_ESTABLE", "autosaved initial project: %s", _root.GetPath().c_str());
-        FILE *fp = fopen("/mnt/sdcard/lgpt/reentry_debug.log", "a");
+        FILE *fp = fopen("/tmp/r36sx_lgpt_logs/reentry_debug.log", "a");
         if (fp) {
             fprintf(fp, "TREEFROG_V40_ESTABLE_APPWINDOW: autosaved_initial_project path=%s\n", _root.GetPath().c_str());
             fclose(fp);
@@ -760,7 +800,108 @@ bool AppWindow::onEvent(GUIEvent &event) {
     return false;
 };
 
+
+void AppWindow::H35PollExternalExport() {
+    /* H35_EXPORT_CORE_POLL_TMPFS_SESSION */
+#if defined(PLATFORM_TREEFROG)
+    enum { IDLE=0, RENDERING=1 };
+    static int state=IDLE, command=0, session=0;
+    static int oldSongX=0, oldSongY=0, oldSongOffset=0;
+    static unsigned long long started=0;
+    if (!_viewData || !_viewData->project_) return;
+
+    if (state == IDLE) {
+        unsigned format=1, sess=0, cmd=0;
+        char line[256]={0};
+        if (!h35ReadText(kH35ExportRequest, line, sizeof(line))) return;
+        sscanf(line,"REQUEST command=%u format=%u session=%u",&cmd,&format,&sess);
+        unlink(kH35ExportRequest); /* consume once; receiver waits on session file */
+        command=(int)cmd; session=(int)sess;
+        PersistencyService::GetInstance()->Save();
+        sync();
+        char ready[256], error[256], body[1024];
+        snprintf(ready,sizeof(ready),"/tmp/r36sx_lgpt_usb/export_ready.%d",session);
+        snprintf(error,sizeof(error),"/tmp/r36sx_lgpt_usb/export_error.%d",session);
+        unlink(ready); unlink(error);
+        if (command == 1) {
+            /* Persist the current in-memory project before exporting its tree.
+             * This is a bounded user-requested FAT32 write, not a live runtime log. */
+            PersistencyService::GetInstance()->Save();
+            sync();
+            snprintf(body,sizeof(body),"ROOT=%s\nMODE=PROJECT\nFORMAT=%u\n",
+                     _root.GetPath().c_str(),format);
+            h35AtomicText(ready,body);
+            if (_currentView) _currentView->SetNotification("Android project export ready");
+            return;
+        }
+        if (command != 2 && command != 3) {
+            h35AtomicText(error,"ERROR=UNSUPPORTED_COMMAND\n"); return;
+        }
+        Player *player=Player::GetInstance();
+        if (player->IsRunning() || MixerService::GetInstance()->IsRendering()) {
+            h35AtomicText(error,"ERROR=PLAYER_BUSY\n");
+            if (_currentView) _currentView->SetNotification("Stop playback before Android export");
+            return;
+        }
+        int mode=(command==2)?1:2;
+        char stale[1024];
+        if (command==2) {
+            snprintf(stale,sizeof(stale),"%s/mixdown.wav",_root.GetPath().c_str());
+            unlink(stale);
+        } else {
+            for (int i=0;i<8;i++) {
+                snprintf(stale,sizeof(stale),"%s/channel%d.wav",_root.GetPath().c_str(),i);
+                unlink(stale);
+            }
+        }
+        Variable *render=_viewData->project_->FindVariable(VAR_RENDER);
+        if (render) render->SetInt(mode,false);
+        _viewData->renderMode_=mode;
+        MixerService::GetInstance()->SetRenderMode(mode);
+        oldSongX=_viewData->songX_; oldSongY=_viewData->songY_;
+        oldSongOffset=_viewData->songOffset_;
+        _viewData->songX_=0; _viewData->songY_=0; _viewData->songOffset_=0;
+        player->Start(PM_SONG,false);
+        started=h35ExportNowMs(); state=RENDERING;
+        if (_currentView) _currentView->SetNotification(command==2 ? "Rendering mixdown for Android" : "Rendering stems for Android");
+        return;
+    }
+
+    Player *player=Player::GetInstance();
+    unsigned long long now=h35ExportNowMs();
+    if (state==RENDERING && !player->IsRunning() && now-started>250) {
+        char ready[256], error[256], body[1024], test[1024];
+        snprintf(ready,sizeof(ready),"/tmp/r36sx_lgpt_usb/export_ready.%d",session);
+        snprintf(error,sizeof(error),"/tmp/r36sx_lgpt_usb/export_error.%d",session);
+        bool ok=true;
+        if (command==2) { snprintf(test,sizeof(test),"%s/mixdown.wav",_root.GetPath().c_str()); ok=h35FileExists(test); }
+        else { for(int i=0;i<8;i++){ snprintf(test,sizeof(test),"%s/channel%d.wav",_root.GetPath().c_str(),i); if(!h35FileExists(test)){ok=false;break;} } }
+        if (ok) {
+            snprintf(body,sizeof(body),"ROOT=%s\nMODE=%s\nFORMAT=WAV\n",
+                     _root.GetPath().c_str(),command==2?"MIXDOWN":"STEMS");
+            h35AtomicText(ready,body);
+            if (_currentView) _currentView->SetNotification("Android audio export ready");
+        } else {
+            h35AtomicText(error,"ERROR=RENDER_OUTPUT_MISSING\n");
+            if (_currentView) _currentView->SetNotification("Export render failed or song is empty");
+        }
+        Variable *render=_viewData->project_->FindVariable(VAR_RENDER);
+        if (render) render->SetInt(0,false);
+        _viewData->renderMode_=0; MixerService::GetInstance()->SetRenderMode(0);
+        _viewData->songX_=oldSongX; _viewData->songY_=oldSongY; _viewData->songOffset_=oldSongOffset;
+        state=IDLE; command=0; session=0;
+    } else if (state==RENDERING && now-started>1200000ULL) {
+        player->Stop();
+        char error[256]; snprintf(error,sizeof(error),"/tmp/r36sx_lgpt_usb/export_error.%d",session);
+        h35AtomicText(error,"ERROR=RENDER_TIMEOUT\n");
+        MixerService::GetInstance()->SetRenderMode(0); state=IDLE;
+        if (_currentView) _currentView->SetNotification("Android export timed out");
+    }
+#endif
+}
+
 void AppWindow::onUpdate() {
+    H35PollExternalExport();
     if (_loadAfterResume) {
         _loadAfterResume = false;
         _isDirty = true;
@@ -880,6 +1021,13 @@ void AppWindow::onQuitApp() {
     Player *player = Player::GetInstance();
     player->Stop();
     player->RemoveObserver(*this);
+
+    /* H35: a normal user exit is an explicit persistence boundary. Flush the
+     * project and FAT metadata before picoarch is terminated by the launcher.
+     * Runtime logs and state remain in tmpfs. */
+    PersistencyService::GetInstance()->Save();
+    sync();
+    usleep(200000);
 
     player->Reset();
     System::GetInstance()->PostQuitMessage();

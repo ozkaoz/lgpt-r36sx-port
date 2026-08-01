@@ -47,7 +47,7 @@ static void logMaskEvent(
     unsigned qcount) {
 #if TREEFROG_INPUT_DEBUG
     FILE *file =
-        fopen("/mnt/sdcard/lgpt/atomic_input_events.log", "a");
+        fopen("/tmp/r36sx_lgpt_logs/atomic_input_events.log", "a");
     if (!file) return;
 
     fprintf(

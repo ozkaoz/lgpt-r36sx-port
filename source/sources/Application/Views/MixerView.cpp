@@ -1,7 +1,10 @@
 // TREEFROG_V42_NO_WHITE_BOX_UI
 #include "MixerView.h"
 #include "Application/Model/Mixer.h"
+#include "Application/Mixer/MixerService.h"
+#include "Application/Model/Project.h"
 #include "Application/Views/UIController.h"
+#include "Application/Views/ModalDialogs/InstrumentFxModal.h"
 #include "Application/Utils/char.h"
 #include <stdio.h>
 #include <string>
@@ -91,14 +94,15 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 
 	// R modifier: keep the port-wide convention.
 	// R+B toggles mute on the selected channel.
-	// R+A toggles solo on the selected channel.
+	// R+A opens the instrument FX menu for the hovered channel bar
+	// (TREEFROG_MIXER_FX_MENU_V1: FX apply to the whole instrument).
 	if (mask&EPBM_R) {
 		if (mask&EPBM_B) {
 			toggleMute() ;
 			return ;
 		}
 		if (mask&EPBM_A) {
-			switchSoloMode() ;
+			showInstrumentFxMenu() ;
 			return ;
 		}
 		if (mask&EPBM_UP) {
@@ -155,11 +159,20 @@ void MixerView::processSelectionButtonMask(unsigned int mask) {
 	}
 }
 
+void MixerView::showInstrumentFxMenu() {
+	InstrumentFxModal *modal=new InstrumentFxModal(*this,viewData_->mixerCol_) ;
+	DoModal(modal) ;
+}
+
 void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	Mixer *mixer=Mixer::GetInstance() ;
 	Player *player=Player::GetInstance() ;
 	int volume=mixer->GetChannelVolume(channel) ;
 	int filled=(volume*height+99)/100 ;
+	MixerService *ms=MixerService::GetInstance() ;
+	float peak=ms->GetChannelPeak(channel) ;
+	int peakFilled=int(peak*float(height)) ;
+	if (peakFilled>height) peakFilled=height ;
 	bool selected=(channel==viewData_->mixerCol_) ;
 	bool muted=player->IsChannelMuted(channel) ;
 	GUITextProperties props ;
@@ -180,9 +193,19 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	DrawString(x,y,hex,props) ;
 	props.invert_=false ;
 
+	// TREEFROG_VU_METERS_V1:
+	// Dynamic VU: the bar shows the volume setting as a solid fill and the
+	// live channel level as a bright bounce above it (plus a peak tip inside
+	// the fill), so it rises and falls with the music.
 	for (int row=0;row<height;row++) {
-		bool on=((height-row)<=filled) ;
-		if (on) {
+		int cellFromBottom=height-row ;
+		bool on=(cellFromBottom<=filled) ;
+		bool vu=((!on)&&(cellFromBottom<=peakFilled)) ;
+		bool tip=((on)&&(cellFromBottom==peakFilled)&&(peakFilled>0)&&(peakFilled<=filled)) ;
+		if (vu||tip) {
+			SetColor(selected?CD_HILITE1:CD_HILITE2) ;
+			props.invert_=true ;
+		} else if (on) {
 			SetColor(selected?CD_HILITE2:CD_NORMAL) ;
 			props.invert_=true ;
 		} else {
@@ -204,6 +227,46 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 		SetColor(CD_HILITE2) ;
 		DrawString(x,y+height+3,"M",props) ;
 	}
+}
+
+void MixerView::drawMasterBar(int x,int y,int height) {
+	Project *project=viewData_->project_ ;
+	int volume=project?project->GetMasterVolume():100 ;
+	int filled=(volume*height+99)/100 ;
+	MixerService *ms=MixerService::GetInstance() ;
+	float peak=ms->GetMasterPeak() ;
+	int peakFilled=int(peak*float(height)) ;
+	if (peakFilled>height) peakFilled=height ;
+	GUITextProperties props ;
+	char buffer[8] ;
+
+	SetColor(CD_NORMAL) ;
+	props.invert_=false ;
+	DrawString(x-1,y,"MST",props) ;
+
+	// Same dynamic VU drawing as the channel bars, master-wide.
+	for (int row=0;row<height;row++) {
+		int cellFromBottom=height-row ;
+		bool on=(cellFromBottom<=filled) ;
+		bool vu=((!on)&&(cellFromBottom<=peakFilled)) ;
+		bool tip=((on)&&(cellFromBottom==peakFilled)&&(peakFilled>0)&&(peakFilled<=filled)) ;
+		if (vu||tip) {
+			SetColor(CD_HILITE2) ;
+			props.invert_=true ;
+		} else if (on) {
+			SetColor(CD_NORMAL) ;
+			props.invert_=true ;
+		} else {
+			SetColor(CD_HILITE1) ;
+			props.invert_=false ;
+		}
+		DrawString(x,y+1+row,"  ",props) ;
+	}
+
+	SetColor(CD_NORMAL) ;
+	props.invert_=false ;
+	sprintf(buffer,"%3d",volume) ;
+	DrawString(x-1,y+height+2,buffer,props) ;
 }
 
 void MixerView::DrawView() {
@@ -233,12 +296,13 @@ void MixerView::DrawView() {
 	for (int i=0;i<8;i++) {
 		drawVolumeBar(i,x0+i*dx,y0,height) ;
 	}
+	drawMasterBar(x0+8*dx,y0,height) ;
 
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
 	DrawString(4,y0+height+4,"A+UP/DN x10  A+L/R x1",props) ;
 	DrawString(4,y0+height+5,"L/R channel  R+B mute",props) ;
-	DrawString(4,y0+height+6,"START play  R+A solo",props) ;
+	DrawString(4,y0+height+6,"START play  R+A FX menu",props) ;
 
 	drawNotes() ;
     

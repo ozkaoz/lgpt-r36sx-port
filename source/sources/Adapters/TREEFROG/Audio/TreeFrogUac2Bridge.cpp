@@ -22,6 +22,42 @@ extern "C" const char *TreeFrogU241OtgBuildMarker(void) {
     return "R36SX U2.51.7 MONITOR FIFO HANDSHAKE FILENAME EDITOR";
 }
 
+extern "C" const char *TreeFrogH25DualRateRuntimeMarker(void) {
+    return "H25_RUNTIME_ACCEPTS_44100_AND_48000";
+}
+
+extern "C" const char *TreeFrogH26ThreeDriverMarker(void) {
+    return "H26_AUDIO_DRIVERS_LOCAL_WINDOWS_ANDROID";
+}
+
+extern "C" const char *TreeFrogH27BackendSafetyMarker(void) {
+    return "H27_ANDROID_READY_MODE_AWARE_WINDOWS_RESTART_SAFE";
+}
+
+extern "C" const char *TreeFrogH28ManagedRestartMarker(void) {
+    return "H28_MANAGED_IN_PORT_AUDIO_BACKEND_RESTART_FAILSAFE";
+}
+
+extern "C" const char *TreeFrogH29SingleOwnerRestartMarker(void) {
+    return "H29_SINGLE_OWNER_PID_SCOPED_FRAMEBUFFER_SAFE_RESTART";
+}
+
+extern "C" const char *TreeFrogH30AudioQualityMarker(void) {
+    return "H30_ADAPTIVE_MONITOR_ASRC_ANTIJITTER_FAST_RELAUNCH";
+}
+
+extern "C" const char *TreeFrogH32RecordStabilityMarker(void) {
+    return "H35_WINDOWS_FRESH_ENUM_MONO48_INLINE_EXPORT_ABI5";
+}
+
+extern "C" const char *TreeFrogH35LifecycleDuplexMarker(void) {
+    return "H35_WINDOWS_FRESH_ENUM_INLINE_EXPORT_STABLE_BASE";
+}
+
+extern "C" const char *TreeFrogH371WindowsIsolationMarker(void) {
+    return "H38_2_ABI7_THREE_MODE_LOCAL_WINDOWS_ANDROID_SAFE_FRONTEND";
+}
+
 extern "C" const char *TreeFrogU2510CaptureProtocolMarker(void) {
     return "U2510_CAPTURE_ABI2_STEREO_TOKEN_META_PROTOCOL";
 }
@@ -33,11 +69,15 @@ extern "C" const char *TreeFrogU2517RecordRuntimeMarker(void) {
         "U2514_ALSA_CLOCKED_PLAYBACK_ENGINE "
         "U2515_RECORD_SESSION_STATE_MACHINE U2517_MONITOR_FIFO_HANDSHAKE_CONTROL "
         "U2515_CAPTURE_SNAPSHOT_CACHE U2517_FILENAME_EDITOR_FAST_CASE_DUPLICATE_GUARD "
-        "U2517_RUNTIME_ABI7_DAEMON_ONLY_RECOVERY";
+        "U2517_RUNTIME_ABI7_DAEMON_ONLY_RECOVERY "
+        "H38_2_THREE_MODE_ABI7_LOCAL_WINDOWS_ANDROID";
 }
 enum {
     U241_LOCAL_CONSOLE = 0,
-    U241_USB_DUPLEX = 1
+    U241_WINDOWS = 1,
+    U241_ANDROID = 2,
+    /* Backward-compatible alias retained for older call sites and logs. */
+    U241_USB_DUPLEX = U241_WINDOWS
 };
 
 static int g_fifo_fd = -1;
@@ -126,8 +166,18 @@ static const char *kBranchRoot = "/mnt/sdcard/lgpt/otg/branches";
 static const char *kActiveBranch = "/mnt/sdcard/lgpt/otg/active_audio_branch";
 static const char *kPhysicalVolumeTmp = "/tmp/r36sx_physical_volume_percent";
 static const char *kPhysicalVolumePersist = "/mnt/sdcard/lgpt/otg/physical_master_volume_percent";
+static const char *kPolicy = "/mnt/sdcard/lgpt/otg/audio_driver_policy";
+static const char *kAoaState = "/tmp/r36sx_lgpt_usb/aoa_state";
+static const char *kAoaResult = "/tmp/r36sx_lgpt_usb/aoa_result";
+static const char *kAoaAccessory = "/tmp/r36sx_lgpt_usb/aoa_bulk_accessory_present";
+static const char *kAoaStream = "/tmp/r36sx_lgpt_usb/aoa_bulk_stream_ready";
+static const char *kAoaPcmFifo = "/tmp/r36sx_aoa_bulk_pcm_fifo";
+static const char *kH32TransitionStatus =
+    "/tmp/r36sx_lgpt_usb/h35_transition_status";
 static time_t g_physical_volume_mtime = 0;
 static int g_physical_volume_percent = -1;
+static int g_pending_driver_mode = -1;
+static int g_android_managed_logged = 0;
 
 static void log_msg(const char *msg);
 static const char *runtime_contract_reason(int code);
@@ -314,16 +364,40 @@ static int marker_fresh(const char *p, int max_age_sec) {
 }
 
 static const char *mode_name(int mode) {
-    return mode == U241_USB_DUPLEX ? "USB_DUPLEX" : "LOCAL_CONSOLE";
+    switch (mode) {
+    case U241_WINDOWS: return "Windows";
+    case U241_ANDROID: return "Android";
+    case U241_LOCAL_CONSOLE:
+    default: return "Local console";
+    }
 }
 
+static const char *mode_token(int mode) {
+    switch (mode) {
+    case U241_WINDOWS: return "WINDOWS";
+    case U241_ANDROID: return "ANDROID";
+    case U241_LOCAL_CONSOLE:
+    default: return "LOCAL_CONSOLE";
+    }
+}
 
+static const char *policy_token(int mode) {
+    switch (mode) {
+    case U241_WINDOWS: return "WINDOWS_OTG";
+    case U241_ANDROID: return "ANDROID_OTG";
+    case U241_LOCAL_CONSOLE:
+    default: return "LOCAL_CONSOLE";
+    }
+}
 
 static const char *branch_name_for_mode(int mode) {
-    return mode == U241_USB_DUPLEX ?
-        "audio_driver_usb_duplex" : "audio_driver_local_console";
+    switch (mode) {
+    case U241_WINDOWS: return "audio_driver_windows";
+    case U241_ANDROID: return "audio_driver_android";
+    case U241_LOCAL_CONSOLE:
+    default: return "audio_driver_local_console";
+    }
 }
-
 
 static void write_active_branch_file(int mode) {
     mkdir(kBranchRoot, 0777);
@@ -341,7 +415,7 @@ static void write_active_branch_file(int mode) {
     snprintf(branch_mode, sizeof(branch_mode), "%s/MODE", dir);
     fd = open(branch_mode, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) {
-        const char *mn = mode_name(mode);
+        const char *mn = mode_token(mode);
         write(fd, mn, strlen(mn));
         write(fd, "\n", 1);
         close(fd);
@@ -349,23 +423,32 @@ static void write_active_branch_file(int mode) {
 }
 
 static const char *mode_desc(int mode) {
-    return mode == U241_USB_DUPLEX ?
-        "USB out + PC input sampler" :
-        "Console sound, OTG may stay connected";
+    switch (mode) {
+    case U241_WINDOWS:
+        return "UAC2 duplex with Windows";
+    case U241_ANDROID:
+        return "Android AOA audio capture";
+    case U241_LOCAL_CONSOLE:
+    default:
+        return "Console sound, OTG may stay connected";
+    }
 }
-
 
 static int selectable_mode(int mode) {
-    return mode == U241_LOCAL_CONSOLE || mode == U241_USB_DUPLEX;
+    return mode == U241_LOCAL_CONSOLE ||
+        mode == U241_WINDOWS ||
+        mode == U241_ANDROID;
 }
-
 
 static int mode_from_text(const char *s) {
     if (!s) return U241_LOCAL_CONSOLE;
-    if (strstr(s, "USB_DUPLEX") || strstr(s, "USB_IN_OUT") ||
-        strstr(s, "USB_INPUT_OUTPUT") || strstr(s, "FULL_DUPLEX") ||
-        strstr(s, "USB_OUT_AUTO_MUTE") || strstr(s, "USB_IN_CAPTURE") ||
-        strstr(s, "EXTERNAL_RECORD")) return U241_USB_DUPLEX;
+    if (strstr(s, "ANDROID") || strstr(s, "AOA"))
+        return U241_ANDROID;
+    if (strstr(s, "WINDOWS") || strstr(s, "USB_DUPLEX") ||
+        strstr(s, "USB_IN_OUT") || strstr(s, "USB_INPUT_OUTPUT") ||
+        strstr(s, "FULL_DUPLEX") || strstr(s, "USB_OUT_AUTO_MUTE") ||
+        strstr(s, "USB_IN_CAPTURE") || strstr(s, "EXTERNAL_RECORD"))
+        return U241_WINDOWS;
     return U241_LOCAL_CONSOLE;
 }
 
@@ -434,7 +517,7 @@ static void launch_apply_profile_label(const char *label) {
 }
 
 static void launch_apply_profile_once(int mode) {
-    launch_apply_profile_label(mode_name(mode));
+    launch_apply_profile_label(mode_token(mode));
 }
 
 static int file_contains(const char *p, const char *needle) {
@@ -481,7 +564,29 @@ static int requested_audio_channels(void) {
         : 1;
 }
 
+static int android_stream_ready_raw(void) {
+    if (!exists_file(kAoaStream)) return 0;
+    if (file_contains(kAoaResult, "FAILED")) return 0;
+    return 1;
+}
+
+static int android_runtime_contract_code(void) {
+    if (!exists_file(kAoaPcmFifo)) return 21;
+    if (!daemon_pid_alive()) return 22;
+    if (!file_contains(kDaemonVersion, "R36SX_AOA_BULK_AUDIO_DAEMON_ABI=4"))
+        return 23;
+    if (!file_contains(kCaptureAbi, "R36SX_CAPTURE_ABI=4"))
+        return 24;
+    if (!file_contains(kAudioChannels, "2")) return 25;
+    if (!file_contains(kAudioRate, "44100")) return 26;
+    if (!exists_file(kAoaState) && !exists_file(kAoaResult)) return 27;
+    return 0;
+}
+
 static int runtime_contract_code(void) {
+    if (g_driver_mode == U241_LOCAL_CONSOLE) return 0;
+    if (g_driver_mode == U241_ANDROID)
+        return android_runtime_contract_code();
     /*
      * U2.51.4 WAIT_HOST_READY CONTRACT
      *
@@ -522,7 +627,11 @@ static int runtime_contract_code(void) {
 
 static const char *runtime_contract_reason(int code) {
     switch (code) {
-    case 0: return udc_configured_raw() ? "ready-configured" : "ready-wait-host";
+    case 0:
+        if (g_driver_mode == U241_ANDROID)
+            return android_stream_ready_raw() ?
+                "android-ready-stream" : "android-ready-wait-app";
+        return udc_configured_raw() ? "ready-configured" : "ready-wait-host";
     case 1: return "fifo-missing";
     case 2: return "daemon-not-alive";
     case 3: return "daemon-version-mismatch";
@@ -531,6 +640,13 @@ static const char *runtime_contract_reason(int code) {
     case 6: return "runtime-not-stereo";
     case 7: return "runtime-rate-mismatch";
     case 8: return "gadget-not-bound";
+    case 21: return "android-pcm-fifo-missing";
+    case 22: return "android-daemon-not-alive";
+    case 23: return "android-daemon-version-mismatch";
+    case 24: return "android-capture-abi-mismatch";
+    case 25: return "android-runtime-not-stereo";
+    case 26: return "android-runtime-rate-mismatch";
+    case 27: return "android-receiver-state-missing";
     default: return "unknown";
     }
 }
@@ -556,7 +672,7 @@ static void write_mode_file(int mode) {
     mkdir(kRuntimeDir, 0777);
     int fd = open(kMode, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) {
-        const char *m = mode_name(mode);
+        const char *m = mode_token(mode);
         write(fd, m, strlen(m));
         write(fd, "\n", 1);
         /*
@@ -567,6 +683,7 @@ static void write_mode_file(int mode) {
          */
         close(fd);
     }
+    write_runtime_file_atomic(kPolicy, policy_token(mode));
     write_active_branch_file(mode);
     struct stat st;
     if (stat(kMode, &st) == 0) g_mode_mtime = st.st_mtime;
@@ -639,14 +756,23 @@ static void refresh_usb_state(void) {
         g_last_usb_refresh_ms > 0) return;
     g_last_usb_refresh_ms = now_ms;
     g_last_usb_check_submit = g_submit_count;
-    int raw = udc_configured_raw();
+    /*
+     * Android AOA is the opposite topology: R36SX is USB host.  Its readiness
+     * must be derived from the AOA stream marker, never from /sys/class/udc.
+     */
+    const int raw = (g_driver_mode == U241_ANDROID) ?
+        android_stream_ready_raw() : udc_configured_raw();
     if (raw != g_usb_raw) {
         g_usb_raw = raw;
         g_raw_configured_since = raw ? (g_submit_count ? g_submit_count : 1) : 0;
-        log_msg(raw ? "udc configured raw" : "udc not configured raw");
+        log_msg(raw ?
+            (g_driver_mode == U241_ANDROID ?
+                "android AOA stream ready raw" : "udc configured raw") :
+            (g_driver_mode == U241_ANDROID ?
+                "android AOA stream stopped raw" : "udc not configured raw"));
     }
     int marker = marker_fresh(kActiveMarker, 2);
-    int out_now = raw || marker;
+    int out_now = (g_driver_mode == U241_ANDROID) ? raw : (raw || marker);
     if (out_now != g_usb_out_allowed) {
         g_usb_out_allowed = out_now;
         log_msg(out_now ? "usb out allowed" : "usb out stopped");
@@ -728,6 +854,18 @@ static void ensure_setup_started(void) {
 
     refresh_mode_from_file(1);
     reap_setup_child_nonblocking();
+
+    if (g_driver_mode == U241_ANDROID) {
+        /* The Android AOA runtime is owned by the SD apply script and the
+         * AOA supervisor.  The core never forks the Windows gadget setup for
+         * Android, otherwise it would fight the host-role runtime. */
+        if (!g_android_managed_logged) {
+            g_android_managed_logged = 1;
+            log_msg("android runtime managed by SD apply script");
+        }
+        g_setup_started = 1;
+        return;
+    }
 
     /*
      * U2.51.5 single-owner recovery contract.
@@ -1457,6 +1595,41 @@ void TreeFrogUac2Bridge_Close(void) {
 #endif
 }
 
+int TreeFrogUac2Bridge_ShouldRequestManagedRestartShutdown(void) {
+    /* This build never shuts down the frontend; mode changes apply in-app
+     * through the SD apply script. */
+    return 0;
+}
+
+void TreeFrogUac2Bridge_MarkCoreStarted(void) {
+#if TREEFROG_UAC2_BRIDGE
+    mkdir(kRuntimeDir, 0777);
+    char text[160];
+    snprintf(
+        text,
+        sizeof(text),
+        "CORE_STARTED mode=%s child_pid=%ld\n",
+        mode_token(g_driver_mode),
+        (long)getpid());
+    write_runtime_file_atomic(kH32TransitionStatus, text);
+#endif
+}
+
+void TreeFrogUac2Bridge_MarkCoreUnloaded(void) {
+#if TREEFROG_UAC2_BRIDGE
+    close_fifo_if_open("fifo closed on core unload");
+    mkdir(kRuntimeDir, 0777);
+    char text[192];
+    snprintf(text, sizeof(text),
+        "CORE_UNLOADED reason=NORMAL_EXIT active=%s pending=%s child_pid=%ld\n",
+        mode_token(g_driver_mode),
+        g_pending_driver_mode >= 0 ? mode_token(g_pending_driver_mode) : "NONE",
+        (long)getpid());
+    write_runtime_file_atomic(kH32TransitionStatus, text);
+    log_msg("core unloaded normally; frontend untouched");
+#endif
+}
+
 int TreeFrogUac2Bridge_GetDriverMode(void) {
 #if TREEFROG_UAC2_BRIDGE
     return g_driver_mode;
@@ -1489,6 +1662,7 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
     g_last_mode_change_ms = now_ms;
 
     g_driver_mode = mode;
+    g_pending_driver_mode = mode;
     log_msg("driver mode changed");
     write_mode_file(g_driver_mode);
 
@@ -1500,6 +1674,8 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
     if (runtime_ready_fast()) {
         if (g_driver_mode == U241_LOCAL_CONSOLE)
             close_fifo_if_open("fifo closed fast local-console switch");
+        if (g_driver_mode == U241_ANDROID)
+            close_fifo_if_open("fifo closed fast android switch");
         log_msg("driver mode fast apply runtime-ready");
     } else {
         launch_apply_profile_once(g_driver_mode);
@@ -1515,15 +1691,14 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
 
 const char *TreeFrogUac2Bridge_CycleDriverMode(void) {
 #if TREEFROG_UAC2_BRIDGE
-    int next = (g_driver_mode == U241_LOCAL_CONSOLE) ?
-        U241_USB_DUPLEX : U241_LOCAL_CONSOLE;
+    int next = (g_driver_mode + 1) % 3;
     return TreeFrogUac2Bridge_SetDriverMode(next);
 #else
     return "DISABLED";
 #endif
 }
 
-int TreeFrogUac2Bridge_GetDriverModeCount(void) { return 2; }
+int TreeFrogUac2Bridge_GetDriverModeCount(void) { return 3; }
 
 const char *TreeFrogUac2Bridge_GetDriverModeNameByIndex(int mode) {
 #if TREEFROG_UAC2_BRIDGE
@@ -1555,6 +1730,16 @@ int TreeFrogUac2Bridge_IsDriverModeSelectable(int mode) {
 const char *TreeFrogUac2Bridge_GetUsbStateText(void) {
 #if TREEFROG_UAC2_BRIDGE
     refresh_usb_state();
+    if (g_driver_mode == U241_LOCAL_CONSOLE) return "Local active";
+    if (g_driver_mode == U241_ANDROID) {
+        if (android_stream_ready_raw() && marker_fresh(kActiveMarker, 2))
+            return "Android active";
+        if (android_stream_ready_raw()) return "Android stream ready";
+        if (exists_file(kAoaAccessory)) return "Android ready";
+        if (file_contains(kAoaState, "WAIT")) return "Android waiting";
+        if (file_contains(kAoaResult, "FAILED")) return "Android warning";
+        return "Android starting";
+    }
     if (g_usb_raw && marker_fresh(kActiveMarker, 2)) return "USB active";
     if (g_usb_raw) return "USB warming";
     if (marker_fresh(kActiveMarker, 2)) return "USB marker";
@@ -1598,8 +1783,18 @@ int TreeFrogUac2Bridge_StartUsbCapture(
 #if TREEFROG_UAC2_BRIDGE
     if (!wav_path || !wav_path[0]) return 0;
 
-    if (g_driver_mode != U241_USB_DUPLEX)
-        TreeFrogUac2Bridge_SetDriverMode(U241_USB_DUPLEX);
+    if (g_driver_mode == U241_LOCAL_CONSOLE) {
+        snprintf(
+            g_capture_status,
+            sizeof(g_capture_status),
+            "Select Windows in Audio Driver");
+        g_capture_state = TREEFROG_USB_CAPTURE_ERROR;
+        snprintf(
+            g_capture_error,
+            sizeof(g_capture_error),
+            "select external audio driver");
+        return 0;
+    }
 
     if (seconds <= 0) seconds = 10;
     if (seconds > 120) seconds = 120;
@@ -1791,7 +1986,10 @@ const char *TreeFrogUac2Bridge_GetUsbCaptureErrorText(void) {
 
 int TreeFrogUac2Bridge_IsUsbReady(void) {
 #if TREEFROG_UAC2_BRIDGE
+    if (g_driver_mode == U241_LOCAL_CONSOLE) return 0;
     refresh_usb_state();
+    if (g_driver_mode == U241_ANDROID)
+        return android_stream_ready_raw() && runtime_ready_fast();
     return g_usb_raw && runtime_ready_fast();
 #else
     return 0;
@@ -1822,9 +2020,26 @@ int TreeFrogUac2Bridge_IsRecordingDaemonReady(void) {
     char *newline = strchr(g_capture_abi, '\n');
     if (newline) *newline = 0;
 
-    return strcmp(
-        g_capture_abi,
-        "R36SX_CAPTURE_ABI=2") == 0;
+    if (!daemon_pid_alive()) return 0;
+    if (g_driver_mode == U241_ANDROID) {
+        if (strcmp(g_capture_abi, "R36SX_CAPTURE_ABI=4") != 0)
+            return 0;
+        if (!file_contains(
+                kDaemonVersion,
+                "R36SX_AOA_BULK_AUDIO_DAEMON_ABI=4"))
+            return 0;
+        return exists_file(kAoaPcmFifo) && android_stream_ready_raw();
+    }
+    if (g_driver_mode == U241_WINDOWS) {
+        if (strcmp(g_capture_abi, "R36SX_CAPTURE_ABI=2") != 0)
+            return 0;
+        if (!file_contains(
+                kDaemonVersion,
+                "R36SX_USB_AUDIO_DAEMON_ABI=7"))
+            return 0;
+        return exists_file(kFifo);
+    }
+    return 0;
 #else
     return 0;
 #endif

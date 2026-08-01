@@ -13,7 +13,7 @@
 #define TREEFROG_FONT_ZERO_IS_INK 1
 #endif
 #ifndef TREEFROG_TEXT_INVERT_BG_RGB565
-#define TREEFROG_TEXT_INVERT_BG_RGB565 0xd99b
+#define TREEFROG_TEXT_INVERT_BG_RGB565 0x9dbf
 #endif
 #ifndef TREEFROG_TEXT_INVERT_FG_RGB565
 #define TREEFROG_TEXT_INVERT_FG_RGB565 0xffff
@@ -28,7 +28,7 @@
 #endif
 
 #ifndef TREEFROG_PURPLE_FOCUS_RGB565
-#define TREEFROG_PURPLE_FOCUS_RGB565 0xd99b
+#define TREEFROG_PURPLE_FOCUS_RGB565 0x9dbf
 #endif
 
 static const unsigned char treefrog_font[] = {

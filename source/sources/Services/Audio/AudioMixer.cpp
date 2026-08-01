@@ -16,6 +16,7 @@ AudioMixer::AudioMixer(const char *name):
     softclipGain_ = 0 ;
 	masterVolume_ = 100 ;
 	clipped_ = false ;
+    peakValue_ = 0.0f ;
 	
 	// Precalculate constant values for softclipping algorithm
 	softClipData_[0].alpha = 1.45f; // -1.5db (approx.)
@@ -118,6 +119,28 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
 		} ;
 		writer_->AddBuffer(buffer,samplecount) ;
 	}
+
+     // TREEFROG_VU_METERS_V1:
+     // Track the smoothed peak of the post-volume output (audible level).
+     // Fast attack, slow decay, so the mixer bars bounce with the music.
+     {
+         float peak = 0.0f;
+         if (gotData) {
+             fixed *c = buffer;
+             for (int i = 0; i < samplecount * 2; i++) {
+                 float v = fp2fl(*c);
+                 if (v < 0.0f) v = -v;
+                 if (v > peak) peak = v;
+                 c++;
+             }
+         }
+         if (peak > peakValue_) {
+             peakValue_ = peak;
+         } else {
+             peakValue_ *= 0.90f;
+         }
+     }
+
      SAFE_FREE(mixBuffer) ;
      return gotData ;
 } ;

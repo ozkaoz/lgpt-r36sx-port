@@ -33,7 +33,7 @@ static const int kMaxFileStemLength = 24;
 static const char *kRecordDirectory =
     "/mnt/sdcard/lgpt/samples/records";
 static const char *kRecordTempDirectory =
-    "/mnt/sdcard/lgpt/tmp/record";
+    "/tmp/r36sx_lgpt_record";
 static const unsigned short kExitChord = EPBM_R | EPBM_LEFT;
 
 static unsigned long long recordNowMs() {
@@ -56,6 +56,14 @@ static uint32_t readLe32(const unsigned char *data) {
 
 extern "C" const char *TreeFrogU2520RecordBuildMarker(void) {
     return "U2520_PENDING_TAKE_RECORD_EDITOR_PHYSICAL_EDGE_READY";
+}
+
+extern "C" const char *TreeFrogH25AndroidRecordBuildMarker(void) {
+    return "H25_RECORD_WAV_44100_48000_PREVIEW_SAVE_READY";
+}
+
+static bool isSupportedUsbRecordRate(uint32_t rate) {
+    return rate == 44100U || rate == 48000U;
 }
 
 UsbRecordModal::UsbRecordModal(View &view, int instrumentIndex)
@@ -405,15 +413,15 @@ void UsbRecordModal::toggleMonitor() {
         return;
     }
     monitorRequested_ = requested;
-    setStatus(monitorRequested_ ? "Windows input monitor ON" :
-                                  "Windows input monitor OFF");
+    setStatus(monitorRequested_ ? "USB input monitor ON" :
+                                  "USB input monitor OFF");
 }
 
 void UsbRecordModal::ensureRecordDirectory() {
     mkdir("/mnt/sdcard/lgpt", 0777);
     mkdir("/mnt/sdcard/lgpt/samples", 0777);
     mkdir(kRecordDirectory, 0777);
-    mkdir("/mnt/sdcard/lgpt/tmp", 0777);
+    mkdir("/tmp/r36sx_lgpt_record", 0777);
     mkdir(kRecordTempDirectory, 0777);
 }
 
@@ -456,6 +464,13 @@ bool UsbRecordModal::promoteCaptureToFinalPath(
     /* A recovered pre-U2518 take can already be in its final location. */
     if (strcmp(sourcePath, destinationPath) == 0) return true;
 
+    struct stat existing;
+    if (stat(destinationPath, &existing) == 0) {
+        if (reason && reasonLength > 0)
+            snprintf(reason, reasonLength, "Duplicate name blocked; edit File name");
+        return false;
+    }
+
     int source = open(sourcePath, O_RDONLY);
     if (source < 0) {
         if (reason && reasonLength > 0)
@@ -463,18 +478,26 @@ bool UsbRecordModal::promoteCaptureToFinalPath(
         return false;
     }
 
-    int destination = open(
+    /* H32 FAT32 safety: write and validate a same-directory staging file,
+     * then publish it with one rename.  Runtime recording remains in tmpfs;
+     * FAT32 is touched only when the user explicitly chooses Save. */
+    char stagingPath[1024];
+    snprintf(
+        stagingPath,
+        sizeof(stagingPath),
+        "%s.h32part.%ld",
         destinationPath,
+        (long)getpid());
+    unlink(stagingPath);
+
+    int destination = open(
+        stagingPath,
         O_WRONLY | O_CREAT | O_EXCL,
         0666);
     if (destination < 0) {
         close(source);
-        if (reason && reasonLength > 0) {
-            if (errno == EEXIST)
-                snprintf(reason, reasonLength, "Duplicate name blocked; edit File name");
-            else
-                snprintf(reason, reasonLength, "Final WAV cannot be created");
-        }
+        if (reason && reasonLength > 0)
+            snprintf(reason, reasonLength, "Final WAV staging file cannot be created");
         return false;
     }
 
@@ -510,9 +533,9 @@ bool UsbRecordModal::promoteCaptureToFinalPath(
     close(destination);
 
     if (!copied) {
-        unlink(destinationPath);
+        unlink(stagingPath);
         if (reason && reasonLength > 0)
-            snprintf(reason, reasonLength, "Final WAV copy failed");
+            snprintf(reason, reasonLength, "Final WAV staging copy failed");
         return false;
     }
 
@@ -520,23 +543,42 @@ bool UsbRecordModal::promoteCaptureToFinalPath(
     int frames = 0;
     char validation[96];
     if (!validateCaptureWav(
-            destinationPath,
+            stagingPath,
             &bytes,
             &frames,
             validation,
             sizeof(validation))) {
-        unlink(destinationPath);
+        unlink(stagingPath);
         if (reason && reasonLength > 0)
             snprintf(reason, reasonLength, "%s", validation);
         return false;
     }
 
-    if (unlink(sourcePath) != 0 && errno != ENOENT) {
-        unlink(destinationPath);
+    if (rename(stagingPath, destinationPath) != 0) {
+        unlink(stagingPath);
         if (reason && reasonLength > 0)
-            snprintf(reason, reasonLength, "Temporary take cleanup failed");
+            snprintf(reason, reasonLength, "Final WAV atomic publish failed");
         return false;
     }
+
+    /* Best-effort directory sync. Some FAT/DrvFs implementations return
+     * EINVAL for directory fsync; the published WAV remains valid in that
+     * case and the launcher performs a bounded sync on session exit. */
+    int dirfd = open(kRecordDirectory, O_RDONLY);
+    if (dirfd >= 0) {
+        if (fsync(dirfd) != 0 && errno != EINVAL && errno != EROFS) {
+            close(dirfd);
+            if (reason && reasonLength > 0)
+                snprintf(reason, reasonLength, "WAV saved; directory sync warning");
+            unlink(sourcePath);
+            return true;
+        }
+        close(dirfd);
+    }
+
+    /* A valid committed file must never be deleted because tmpfs cleanup
+     * failed.  The cleanup script can safely remove a residual source take. */
+    unlink(sourcePath);
 
     if (reason && reasonLength > 0)
         snprintf(reason, reasonLength, "saved");
@@ -888,14 +930,14 @@ bool UsbRecordModal::validateCaptureWav(
 
     if (format != 1 ||
         (channels != 1 && channels != 2) ||
-        rate != 48000 ||
+        !isSupportedUsbRecordRate(rate) ||
         bits != 16 ||
         blockAlign != (uint16_t)(channels * 2) ||
         payload == 0 ||
         (long)payload > available ||
         (payload % blockAlign) != 0U) {
         if (reason && reasonLength > 0)
-            snprintf(reason, reasonLength, "Recording must be PCM 48kHz 16-bit");
+            snprintf(reason, reasonLength, "Recording must be PCM 44.1/48kHz 16-bit");
         return false;
     }
 
@@ -957,7 +999,7 @@ bool UsbRecordModal::preparePreview(
 
     if (decoderFrames <= 0 ||
         (decoderChannels != 1 && decoderChannels != 2) ||
-        decoderRate != 48000) {
+        !isSupportedUsbRecordRate((uint32_t)decoderRate)) {
         if (reason && reasonLength > 0)
             snprintf(reason, reasonLength, "Preview decoder rejected WAV format");
         return false;
@@ -995,12 +1037,14 @@ void UsbRecordModal::startRecording() {
         return;
     }
     if (!TreeFrogUac2Bridge_IsRecordingDaemonReady()) {
-        TreeFrogUac2Bridge_Prime();
-        setSessionState(SESSION_ERROR, "Recording daemon is recovering; retry shortly");
+        /* H32: Record must never restart an active Android USB session. */
+        setSessionState(
+            SESSION_ERROR,
+            "Recording runtime is not ready; wait or restart LGPT");
         return;
     }
     if (!TreeFrogUac2Bridge_IsUsbReady()) {
-        setSessionState(SESSION_ERROR, "USB audio is not configured in Windows");
+        setSessionState(SESSION_ERROR, "USB audio source is not active");
         return;
     }
 
@@ -1091,7 +1135,7 @@ void UsbRecordModal::previewRecording() {
     Path source(path);
     player->StartStreamingRangeAt(source, 0, frames - 1);
     previewing_ = true;
-    setSessionState(SESSION_PREVIEWING, "Preview to Windows; B stops");
+    setSessionState(SESSION_PREVIEWING, "Preview on console; B stops");
 }
 
 void UsbRecordModal::saveRecording() {
@@ -1403,7 +1447,7 @@ void UsbRecordModal::DrawView() {
         DrawString(1, 20, "R1+LEFT back; B stops Preview", props);
     }
 
-    DrawString(1, 22, "Project/Preview -> Windows via OTG", props);
+    DrawString(1, 22, "Preview follows the active audio driver", props);
     DrawString(1, 23, "Unsaved take is temporary until Save", props);
 }
 

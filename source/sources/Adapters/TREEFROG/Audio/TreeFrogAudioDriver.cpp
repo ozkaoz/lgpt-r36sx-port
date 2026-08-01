@@ -18,6 +18,8 @@
 #define TREEFROG_AUDIO_DEBUG 0
 #endif
 
+
+
 #define TREEFROG_AUDIO_FRAME_BYTES ((int)(2 * sizeof(int16_t)))
 #define TREEFROG_AUDIO_MAX_LAZY_REQUESTS 2
 #define TREEFROG_AUDIO_MAX_BUFFER_BYTES (512 * 1024)
@@ -44,7 +46,7 @@ TreeFrogAudioDriver::~TreeFrogAudioDriver() {
 
 void TreeFrogAudioDriver::logAudio(const char *msg) {
 #if TREEFROG_AUDIO_DEBUG
-    FILE *f = fopen("/mnt/sdcard/lgpt/audio_debug.log", "a");
+    FILE *f = fopen("/tmp/r36sx_lgpt_logs/audio_debug.log", "a");
     if (!f) return;
     fprintf(f, "%lu %s q=%d p=%d off=%d playing=%d rendering=%d lazy=%d\n",
             (unsigned long)System::GetInstance()->GetClock(),

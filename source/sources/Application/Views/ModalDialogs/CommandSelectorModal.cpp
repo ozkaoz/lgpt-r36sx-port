@@ -26,7 +26,7 @@ CommandSelectorModal::CommandSelectorModal(View &parentView,
     if (initial != I_CMD_NONE) {
         moveToCommand(initial);
     } else {
-        moveToCommand(I_CMD_ARPG);
+        moveToCommand(CommandList::GetAt(1));
     }
 }
 
@@ -60,7 +60,7 @@ FourCC CommandSelectorModal::cellAtGridPos(int row, int col) const {
 void CommandSelectorModal::moveToCommand(FourCC command) {
     int idx = CommandList::IndexOf(command);
     if (idx < 0) {
-        command = I_CMD_ARPG;
+        command = CommandList::GetAt(1);
     }
     selectedCommand_ = command;
     selectedRow_ = commandToRow(command);
@@ -153,7 +153,7 @@ void CommandSelectorModal::DrawView() {
             }
             bool isSelected = (r == selectedRow_ && c == selectedCol_);
 
-            fourCC2char(cmd, cellStr);
+            getCommandDisplayName(cmd, cellStr);
             cellStr[4] = 0;
 
             props.invert_ = isSelected;

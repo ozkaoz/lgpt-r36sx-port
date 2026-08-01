@@ -7,6 +7,7 @@
 #include <sys/shm.h>
 
 #include "Adapters/TREEFROG/Audio/TreeFrogAudioDriver.h"
+#include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
 #include "Adapters/TREEFROG/GUI/TreeFrogEventManager.h"
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
 #include "Adapters/TREEFROG/Main/TreeFrogSamplerInput.h"
@@ -58,7 +59,7 @@ extern "C" void TreeFrogAppWindow_SynchronizeInputMask(
 #endif
 
 #ifndef TREEFROG_PORT_VERSION_BADGE_COLOR
-#define TREEFROG_PORT_VERSION_BADGE_COLOR 0xd99b
+#define TREEFROG_PORT_VERSION_BADGE_COLOR 0x9dbf
 #endif
 
 #ifndef TREEFROG_RETRO_LIFECYCLE_DEBUG
@@ -458,11 +459,11 @@ static void close_input_log(void) {
 
 static void truncate_debug_logs(void) {
     const char *paths[] = {
-        "/mnt/sdcard/lgpt/input_debug.log",
-        "/mnt/sdcard/lgpt/input_semantics.log",
-        "/mnt/sdcard/lgpt/input_view.log",
-        "/mnt/sdcard/lgpt/event_debug.log",
-        "/mnt/sdcard/lgpt/audio_debug.log"
+        "/tmp/r36sx_lgpt_logs/input_debug.log",
+        "/tmp/r36sx_lgpt_logs/input_semantics.log",
+        "/tmp/r36sx_lgpt_logs/input_view.log",
+        "/tmp/r36sx_lgpt_logs/event_debug.log",
+        "/tmp/r36sx_lgpt_logs/audio_debug.log"
     };
     for (unsigned i = 0; i < sizeof(paths) / sizeof(paths[0]); ++i) {
         FILE *f = fopen(paths[i], "w");
@@ -486,7 +487,7 @@ static void log_input_change(
     last_logged_cv = cv;
     last_logged_lr = lr_mask;
 
-    if (!input_log) input_log = fopen("/mnt/sdcard/lgpt/input_debug.log", "a");
+    if (!input_log) input_log = fopen("/tmp/r36sx_lgpt_logs/input_debug.log", "a");
     if (!input_log) return;
 
     fprintf(
@@ -512,7 +513,7 @@ static void log_semantic_state(
     unsigned short emittedMask,
     int pressed) {
     FILE *file =
-        fopen("/mnt/sdcard/lgpt/input_semantics.log", "a");
+        fopen("/tmp/r36sx_lgpt_logs/input_semantics.log", "a");
     if (!file) return;
     fprintf(
         file,
@@ -538,7 +539,7 @@ extern "C" void TreeFrogInputTrace_LogView(
     int pressed,
     int audioLatched) {
     FILE *file =
-        fopen("/mnt/sdcard/lgpt/input_view.log", "a");
+        fopen("/tmp/r36sx_lgpt_logs/input_view.log", "a");
     if (!file) return;
     fprintf(
         file,
@@ -979,7 +980,7 @@ static unsigned long treefrog_v11_frame_counter = 0;
 #if TREEFROG_INPUT_DEBUG
 #define TREEFROG_V133_RETRO_TRACE 1
 static void v11_log_retro(const char *msg) {
-    FILE *f = fopen("/mnt/sdcard/lgpt/retro_debug.log", "a");
+    FILE *f = fopen("/tmp/r36sx_lgpt_logs/retro_debug.log", "a");
     if (!f) return;
     fprintf(f, "%lu %s\n", treefrog_v11_frame_counter, msg ? msg : "retro");
     fclose(f);
@@ -1064,7 +1065,7 @@ static unsigned g_treefrog_v40_run_count = 0;
 
 #if TREEFROG_RETRO_LIFECYCLE_DEBUG
 static void TreeFrogV51Log(const char *where, const char *detail) {
-    FILE *fp = fopen("/mnt/sdcard/lgpt/reentry_debug.log", "a");
+    FILE *fp = fopen("/tmp/r36sx_lgpt_logs/reentry_debug.log", "a");
     if (fp) {
         fprintf(fp, "TREEFROG_LIFECYCLE: %s %s\n", where ? where : "unknown", detail ? detail : "");
         fclose(fp);
@@ -1082,7 +1083,7 @@ static int TreeFrogV51IsRegularFile(const char *path) {
 }
 
 static void TreeFrogV51LogProjectRoot(const char *where) {
-    FILE *fp = fopen("/mnt/sdcard/lgpt/reentry_debug.log", "a");
+    FILE *fp = fopen("/tmp/r36sx_lgpt_logs/reentry_debug.log", "a");
     if (!fp) return;
     fprintf(fp, "TREEFROG_LIFECYCLE: project-root %s\n", where ? where : "unknown");
 
@@ -1164,6 +1165,8 @@ void retro_unload_game(void) {
     app_ready = false;
     close_input_log();
     cv_detach();
+    /* H33: stop only after audio/input/video cleanup has completed. */
+    TreeFrogUac2Bridge_MarkCoreUnloaded();
 }
 
 void retro_deinit(void) {
@@ -1174,6 +1177,8 @@ void retro_deinit(void) {
     app_ready = false;
     close_input_log();
     cv_detach();
+    /* H33: stop only after audio/input/video cleanup has completed. */
+    TreeFrogUac2Bridge_MarkCoreUnloaded();
 }
 
 void retro_run(void) {
@@ -1223,6 +1228,10 @@ void retro_run(void) {
         unsigned vw, vh; size_t vp;
         uint16_t *vf = make_video_output(TreeFrogGetFramebuffer(), &vw, &vh, &vp);
         video_cb(vf, vw, vh, vp);
+    }
+
+    if (TreeFrogUac2Bridge_ShouldRequestManagedRestartShutdown()) {
+        TreeFrogSetQuitRequested(true);
     }
 
     if (TreeFrogQuitRequested() && environ_cb) {

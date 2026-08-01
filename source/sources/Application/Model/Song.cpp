@@ -28,16 +28,20 @@ void Song::SaveContent(TiXmlNode *node) {
 	{
 		phrase_->param1_[i] = Swap16(phrase_->param1_[i]);
 		phrase_->param2_[i] = Swap16(phrase_->param2_[i]);
+		phrase_->param3_[i] = Swap16(phrase_->param3_[i]);
 	}	
 	saveHexBuffer(node,"SONG",data_,SONG_ROW_COUNT*SONG_CHANNEL_COUNT) ;
 	saveHexBuffer(node,"CHAINS",chain_->data_,CHAIN_COUNT*16) ;
 	saveHexBuffer(node,"TRANSPOSES",chain_->transpose_,CHAIN_COUNT*16) ;
 	saveHexBuffer(node,"NOTES",phrase_->note_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"INSTRUMENTS",phrase_->instr_,PHRASE_COUNT*16) ;
+	saveHexBuffer(node,"VOLUME",phrase_->vol_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"COMMAND1",phrase_->cmd1_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"PARAM1",phrase_->param1_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"COMMAND2",phrase_->cmd2_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"PARAM2",phrase_->param2_,PHRASE_COUNT*16) ;
+	saveHexBuffer(node,"COMMAND3",phrase_->cmd3_,PHRASE_COUNT*16) ;
+	saveHexBuffer(node,"PARAM3",phrase_->param3_,PHRASE_COUNT*16) ;
 
 } ;
 
@@ -61,6 +65,9 @@ void Song::RestoreContent(TiXmlElement *element) {
 		if (!strcmp("INSTRUMENTS",value)) {
 			restoreHexBuffer(current,phrase_->instr_) ;
 		} ;
+		if (!strcmp("VOLUME",value)) {
+			restoreHexBuffer(current,phrase_->vol_) ;
+		} ;
 		if (!strcmp("COMMAND1",value)) {
 			restoreHexBuffer(current,(uchar *)phrase_->cmd1_) ;
 		} ;
@@ -73,12 +80,19 @@ void Song::RestoreContent(TiXmlElement *element) {
 		if (!strcmp("PARAM2",value)) {
 			restoreHexBuffer(current,(uchar *)phrase_->param2_) ;
 		} ;
+		if (!strcmp("COMMAND3",value)) {
+			restoreHexBuffer(current,(uchar *)phrase_->cmd3_) ;
+		} ;
+		if (!strcmp("PARAM3",value)) {
+			restoreHexBuffer(current,(uchar *)phrase_->param3_) ;
+		} ;
 		
 		
 		for (int i=0; i<PHRASE_COUNT*16; i++)
 		{
 			phrase_->param1_[i] = Swap16(phrase_->param1_[i]);
 			phrase_->param2_[i] = Swap16(phrase_->param2_[i]);
+			phrase_->param3_[i] = Swap16(phrase_->param3_[i]);
 		}
 		
 		current=current->NextSiblingElement() ;
@@ -114,9 +128,11 @@ void Song::RestoreContent(TiXmlElement *element) {
 
 	FourCC *table1=phrase_->cmd1_ ;
 	FourCC *table2=phrase_->cmd2_ ;
+	FourCC *table3=phrase_->cmd3_ ;
 
 	ushort *param1=phrase_->param1_ ;
 	ushort *param2=phrase_->param2_ ;
+	ushort *param3=phrase_->param3_ ;
 
 	TableHolder *th=TableHolder::GetInstance() ;
 
@@ -133,10 +149,16 @@ void Song::RestoreContent(TiXmlElement *element) {
 				*param2&=0x7F ;
 				th->SetUsed((*param2)) ;
 			} ;
+			if (*table3==I_CMD_TABL) {
+				*param3&=0x7F ;
+				th->SetUsed((*param3)) ;
+			} ;
 			table1++ ;
 			table2++ ;
+			table3++ ;
 			param1++ ;
 			param2++ ;
+			param3++ ;
             data++ ;
     	} ;
     }

@@ -60,6 +60,7 @@ class AppWindow : public GUIWindow, I_Observer, Status {
     void defineColor(const char *colorName, GUIColor &color);
 
     void onQuitApp();
+    void H35PollExternalExport();
 
   private:
     View *_currentView;

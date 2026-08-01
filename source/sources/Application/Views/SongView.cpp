@@ -29,7 +29,7 @@ static void treefrog_song_debug_log(const char *where,
                                     int songOffset,
                                     int currentValue) {
 #if TREEFROG_INPUT_DEBUG
-    FILE *f = fopen("/mnt/sdcard/lgpt/song_debug.log", "a");
+    FILE *f = fopen("/tmp/r36sx_lgpt_logs/song_debug.log", "a");
     if (!f) return;
 
     fprintf(f,

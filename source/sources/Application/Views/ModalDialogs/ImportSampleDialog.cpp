@@ -26,7 +26,7 @@
 #define LIST_WIDTH 34
 
 static const char *kListenPreviewTemporaryPath =
-    "/mnt/sdcard/lgpt/tmp/__u2_listen_preview.wav";
+    "/tmp/r36sx_lgpt_record/__u2_listen_preview.wav";
 
 extern void LGPTChopperOnSamplePoolDelete(int deletedIndex);
 
@@ -503,8 +503,7 @@ void ImportSampleDialog::OnFocus() {
 
 bool ImportSampleDialog::buildListenPreviewWav(Path &element, std::string &logicalPath, int &frames) {
     // TREEFROG_U2_51_8_LISTEN_PREVIEW_OUTSIDE_SAMPLE_POOL
-    mkdir("/mnt/sdcard/lgpt", 0777);
-    mkdir("/mnt/sdcard/lgpt/tmp", 0777);
+    mkdir("/tmp/r36sx_lgpt_record", 0777);
     logicalPath = kListenPreviewTemporaryPath;
     unlink(kListenPreviewTemporaryPath);
     frames = 0;

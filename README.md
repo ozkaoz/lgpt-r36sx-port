@@ -2,13 +2,18 @@
 
 Little Piggy Tracker port for the R36SX V2.6 handheld, integrated with TreeFrogUI and bidirectional USB-C OTG audio.
 
-**Current stable version: U2.52.3**
+**Current stable version: H38.2 (ABI7, three-mode audio: Local / Windows / Android)**
 
 ## Main features
 
+- Three selectable USB audio driver modes: Local, Windows (UAC2) and Android (h36 AOA bulk).
 - LGPT audio output to Windows through USB Audio at 48 kHz.
 - Windows audio capture from the LGPT Record screen.
+- Android bidirectional audio bridge with the LGPTUsbAudioBridge APK.
 - Input monitoring only while Record is open.
+- Mixer view with dynamic VU meters and per-instrument FX menu (`R2 + A`).
+- Sidebar pattern table at bottom-right.
+- Phrase FX commands reduced to beatmaking essentials.
 - Transactional recording with Preview, Save and Discard.
 - Safe sample rename and deletion from the sample browser.
 - Chopper global Undo/Redo with `L1+X` and `R1+X`.
