@@ -13,12 +13,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Column layout (10 columns): row# | N | V | I | FX1 | P1 | FX2 | P2 | FX3 | P3
-// X positions in character cells (each cell = 8px). The 36-cell data grid is
-// centered: row# at cells 2-3, play cursor at cell 4, data columns start at
-// cell 5. Last column P3 ends at cell 37, leaving a symmetric 2-cell margin
-// on both sides (the drawMap sidebar now lives at the bottom-right).
-const int PhraseView::kColX[kColCount] = {5, 8, 11, 14, 18, 22, 26, 30, 34};
+// Column layout (7 columns): row# | N | V | I | FX1 | P1 | FX2 | P2
+// TREEFROG_PHRASE_COLUMNS_V1: FX3 column removed (user decision, H38.5).
+// X positions in character cells (each cell = 8px). The 40-cell screen is
+// centered: row# at cells 6-7, play cursor at cell 5, data columns start at
+// cell 9. Block spans cells 5..33, leaving symmetric ~6-cell margins.
+const int PhraseView::kColX[kColCount] = {9, 12, 15, 18, 22, 26, 30};
+
+// Header center positions over each data column:
+// N(9-11)->10, V(12-14)->13, I(15-17)->16, FX1(18-20)->18,
+// P1(22-25)->23, FX2(26-28)->26, P2(30-33)->31.
+const int PhraseView::kColHeaderX[kColCount] = {10, 13, 16, 18, 23, 26, 31};
 
 // Offsets for note(0), volume(1) and instrument(2) value stepping: L, R, U, D.
 // TREEFROG_PHRASE_VOL_EDIT_V1: the volume column steps by 1 in every
@@ -125,13 +130,6 @@ void PhraseView::updateCursor(int dx, int dy) {
         cmdEdit_.SetInt(
             *(phrase_->param2_ + (16 * viewData_->currentPhrase_ + row_)));
         break;
-    case 8:
-        p._x = kColX[8];
-        p._y += row_;
-        cmdEditField_->SetPosition(p);
-        cmdEdit_.SetInt(
-            *(phrase_->param3_ + (16 * viewData_->currentPhrase_ + row_)));
-        break;
     };
     viewData_->phraseCurPos_ = row_;
     isDirty_ = true;
@@ -144,14 +142,13 @@ void PhraseView::stopAudition() {
 }
 
 bool PhraseView::isCommandColumn() const {
-    return CommandSelectorCommon::isCommandColumn(col_, 3, 5, 7);
+    return CommandSelectorCommon::isCommandColumn(col_, 3, 5);
 }
 
 FourCC *PhraseView::getCurrentCommandPointer() {
     return CommandSelectorCommon::getCommandPointerByCol(
         col_, 3, phrase_->cmd1_ + (16 * viewData_->currentPhrase_ + row_), 5,
-        phrase_->cmd2_ + (16 * viewData_->currentPhrase_ + row_), 7,
-        phrase_->cmd3_ + (16 * viewData_->currentPhrase_ + row_));
+        phrase_->cmd2_ + (16 * viewData_->currentPhrase_ + row_));
 }
 
 void PhraseView::enterCommandSelector() {
@@ -287,55 +284,17 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
                               yOffset)) = cmdEdit_.GetInt();
         lastParam_ = cmdEdit_.GetInt();
         break;
-    case 7:
-        cc = phrase_->cmd3_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
-        switch (direction) {
-        case VUD_RIGHT:
-            *cc = CommandList::GetNext(*cc);
-            break;
-        case VUD_UP:
-            *cc = CommandList::GetNextAlpha(*cc);
-            break;
-        case VUD_LEFT:
-            *cc = CommandList::GetPrev(*cc);
-            break;
-        case VUD_DOWN:
-            *cc = CommandList::GetPrevAlpha(*cc);
-            break;
-        }
-        lastCmd_ = *cc;
-        break;
-    case 8:
-        if (adjustPtchParamForRow(row_ + yOffset, 8, direction)) break;
-        switch (direction) {
-        case VUD_RIGHT:
-            cmdEditField_->ProcessArrow(EPBM_RIGHT);
-            break;
-        case VUD_UP:
-            cmdEditField_->ProcessArrow(EPBM_UP);
-            break;
-        case VUD_LEFT:
-            cmdEditField_->ProcessArrow(EPBM_LEFT);
-            break;
-        case VUD_DOWN:
-            cmdEditField_->ProcessArrow(EPBM_DOWN);
-            break;
-        }
-        *(phrase_->param3_ + (16 * viewData_->currentPhrase_ + row_ +
-                              yOffset)) = cmdEdit_.GetInt();
-        lastParam_ = cmdEdit_.GetInt();
-        break;
     }
     if (c) {
         int editCol = col_ + xOffset;
         if (editCol == 0 && updateChopNoteValueForRow(row_ + yOffset, direction)) {
             lastNote_ = *c;
         } else {
-            // TREEFROG_PHRASE_VOL_EDIT_V1:
-            // Empty volume cells start at 99 (the level the player assigns
-            // when a note is placed) so the column is always editable.
+            // TREEFROG_PHRASE_VOL_V2 (H38.5): empty volume cells start at 1,
+            // the level that represents 100% volume (the player assigns full
+            // gain when a note is placed).
             if ((editCol == 1) && (*c == 0xFF)) {
-                *c = 0x63;
+                *c = 0x01;
                 isDirty_ = true;
             }
             int offset = offsets_[editCol == 2 ? 2 : (editCol == 1 ? 1 : 0)][direction];
@@ -367,7 +326,7 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
 
     Player *player = Player::GetInstance();
     // Phrase FX params are currently not applied to preview
-    if (col_ >= 0 && col_ <= 8) {
+    if (col_ >= 0 && col_ <= 6) {
         if (player->IsRunning()) {
             if ((viewData_->playMode_ == PM_AUDITION)) {
                 player->Stop();
@@ -466,26 +425,6 @@ void PhraseView::pasteLast() {
                     }
         */
         break;
-
-    case 7:
-        i = phrase_->cmd3_ + (16 * viewData_->currentPhrase_ + row_);
-        if (*i == I_CMD_NONE) {
-            *i = lastCmd_;
-            isDirty_ = true;
-        } else {
-            lastCmd_ = *i;
-        }
-        break;
-
-    case 8:
-        /*			s=phrase_->param3_+(16*viewData_->currentPhrase_+row_) ;
-                    if (*s==0) {
-                        *s=lastParam_ ;
-                        isDirty_=true ;
-                        cmdEdit_.SetInt(lastParam_) ;
-                    }
-        */
-        break;
     }
 }
 
@@ -500,7 +439,7 @@ void PhraseView::cutPosition() {
     if (col_ == 0)
         col_ = 2; // This way, A+B on note cuts
                   // the volume and instrument too
-    else if (col_ == 3 || col_ == 5 || col_ == 7)
+    else if (col_ == 3 || col_ == 5)
         col_ += 1; // parameters get cut with their command
     cutSelection();
 };
@@ -520,10 +459,6 @@ void PhraseView::warpInChain(int offset) {
                 break;
             case 6:
                 cmdEdit_.SetInt(*(phrase_->param2_ +
-                                  (16 * viewData_->currentPhrase_ + row_)));
-                break;
-            case 8:
-                cmdEdit_.SetInt(*(phrase_->param3_ +
                                   (16 * viewData_->currentPhrase_ + row_)));
                 break;
             };
@@ -634,12 +569,6 @@ void PhraseView::fillClipboardData() {
     ushort *src7 =
         viewData_->song_->phrase_->param2_ + 16 * viewData_->currentPhrase_;
     ushort *dst7 = clipboard_.param2_;
-    uint *src8 =
-        viewData_->song_->phrase_->cmd3_ + 16 * viewData_->currentPhrase_;
-    uint *dst8 = clipboard_.cmd3_;
-    ushort *src9 =
-        viewData_->song_->phrase_->param3_ + 16 * viewData_->currentPhrase_;
-    ushort *dst9 = clipboard_.param3_;
 
     for (int i = 0; i < clipboard_.height_; i++) {
         dst1[i] = src1[clipboard_.row_ + i];
@@ -649,8 +578,6 @@ void PhraseView::fillClipboardData() {
         dst5[i] = src5[clipboard_.row_ + i];
         dst6[i] = src6[clipboard_.row_ + i];
         dst7[i] = src7[clipboard_.row_ + i];
-        dst8[i] = src8[clipboard_.row_ + i];
-        dst9[i] = src9[clipboard_.row_ + i];
     };
     updateCursor(0, 0);
 };
@@ -677,12 +604,12 @@ void PhraseView::updateSelectionValue(ViewUpdateDirection direction) { // HERE
 
 void PhraseView::extendSelection() {
     GUIRect rect = getSelectionRect();
-    if (rect.Left() > 0 || rect.Right() < 8) {
+    if (rect.Left() > 0 || rect.Right() < 6) {
         if (col_ < clipboard_.col_) {
             col_ = 0;
-            clipboard_.col_ = 8;
+            clipboard_.col_ = 6;
         } else {
-            col_ = 8;
+            col_ = 6;
             clipboard_.col_ = 0;
         }
         isDirty_ = true;
@@ -708,9 +635,9 @@ void PhraseView::interpolateSelection() {
     }
 
     GUIRect rect = getSelectionRect();
-    // Only interpolate if we're in note (0) or param (4, 6, 8) columns
+    // Only interpolate if we're in note (0) or param (4, 6) columns
     int col = rect.Left();
-    if (col != rect.Right() || (col != 0 && col != 4 && col != 6 && col != 8)) {
+    if (col != rect.Right() || (col != 0 && col != 4 && col != 6)) {
         return;
     }
 
@@ -743,12 +670,10 @@ void PhraseView::interpolateSelection() {
             noteData[row] = (uchar)value;
         }
     } else {
-        // Parameter columns (4, 6 or 8)
+        // Parameter columns (4 or 6)
         ushort *paramData = (col == 4)
                                 ? phrase_->param1_ + (16 * viewData_->currentPhrase_)
-                                : (col == 6)
-                                      ? phrase_->param2_ + (16 * viewData_->currentPhrase_)
-                                      : phrase_->param3_ + (16 * viewData_->currentPhrase_);
+                                : phrase_->param2_ + (16 * viewData_->currentPhrase_);
 
         ushort startParam = paramData[startRow];
         ushort endParam = paramData[endRow];
@@ -815,10 +740,6 @@ void PhraseView::cutSelection() {
         viewData_->song_->phrase_->cmd2_ + 16 * viewData_->currentPhrase_;
     ushort *dst7 =
         viewData_->song_->phrase_->param2_ + 16 * viewData_->currentPhrase_;
-    uint *dst8 =
-        viewData_->song_->phrase_->cmd3_ + 16 * viewData_->currentPhrase_;
-    ushort *dst9 =
-        viewData_->song_->phrase_->param3_ + 16 * viewData_->currentPhrase_;
 
     for (int i = 0; i < clipboard_.width_; i++) {
         for (int j = 0; j < clipboard_.height_; j++) {
@@ -843,12 +764,6 @@ void PhraseView::cutSelection() {
                 break;
             case 6:
                 dst7[j + clipboard_.row_] = 0x0000;
-                break;
-            case 7:
-                dst8[j + clipboard_.row_] = I_CMD_NONE;
-                break;
-            case 8:
-                dst9[j + clipboard_.row_] = 0x0000;
                 break;
             }
         }
@@ -899,19 +814,13 @@ void PhraseView::pasteClipboard() {
     ushort *dst7 =
         viewData_->song_->phrase_->param2_ + 16 * viewData_->currentPhrase_;
     ushort *src7 = clipboard_.param2_;
-    uint *dst8 =
-        viewData_->song_->phrase_->cmd3_ + 16 * viewData_->currentPhrase_;
-    uint *src8 = clipboard_.cmd3_;
-    ushort *dst9 =
-        viewData_->song_->phrase_->param3_ + 16 * viewData_->currentPhrase_;
-    ushort *src9 = clipboard_.param3_;
 
     uint *noCmd = (uint *)-1;
     ushort *noPrm = (ushort *)-1;
-    uint *srcCmd[9] = {noCmd, noCmd, noCmd, src4, noCmd, src6, noCmd, src8, noCmd};
-    ushort *srcPrm[9] = {noPrm, noPrm, noPrm, noPrm, src5, noPrm, src7, noPrm, src9};
-    uint *dstCmd[9] = {noCmd, noCmd, noCmd, dst4, noCmd, dst6, noCmd, dst8, noCmd};
-    ushort *dstPrm[9] = {noPrm, noPrm, noPrm, noPrm, dst5, noPrm, dst7, noPrm, dst9};
+    uint *srcCmd[7] = {noCmd, noCmd, noCmd, src4, noCmd, src6, noCmd};
+    ushort *srcPrm[7] = {noPrm, noPrm, noPrm, noPrm, src5, noPrm, src7};
+    uint *dstCmd[7] = {noCmd, noCmd, noCmd, dst4, noCmd, dst6, noCmd};
+    ushort *dstPrm[7] = {noPrm, noPrm, noPrm, noPrm, dst5, noPrm, dst7};
 
     bool wasUpdated = false;
 
@@ -933,8 +842,7 @@ void PhraseView::pasteClipboard() {
                 break;
             case 3:
             case 5:
-            case 7:
-                if (pasteCol == 3 || pasteCol == 5 || pasteCol == 7) {
+                if (pasteCol == 3 || pasteCol == 5) {
                     // Don't allow commands in notes, etc
                     dstCmd[pasteCol][(row_ + j) % 16] =
                         srcCmd[clipboard_.col_ + i][j];
@@ -943,8 +851,7 @@ void PhraseView::pasteClipboard() {
                 break;
             case 4:
             case 6:
-            case 8:
-                if (pasteCol == 4 || pasteCol == 6 || pasteCol == 8) {
+                if (pasteCol == 4 || pasteCol == 6) {
                     dstPrm[pasteCol][(row_ + j) % 16] =
                         srcPrm[clipboard_.col_ + i][j];
                     wasUpdated = true;
@@ -1048,20 +955,6 @@ void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
                         cmdEdit_.SetInt(next);
                     }
                 }
-                if ((col_ == 8) &&
-                    (*(phrase_->cmd3_ + (16 * viewData_->currentPhrase_ +
-                                         row_))) == I_CMD_TABL) {
-                    TableHolder *th = TableHolder::GetInstance();
-                    unsigned short next = th->GetNext();
-                    if (next != NO_MORE_TABLE) {
-                        ushort *c = phrase_->param3_ +
-                                    (16 * viewData_->currentPhrase_ + row_);
-                        *c = next;
-                        isDirty_ = true;
-                        mask &= (0xFFFF - EPBM_A);
-                        cmdEdit_.SetInt(next);
-                    }
-                }
             };
         }
     }
@@ -1111,23 +1004,6 @@ void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
                                     (16 * viewData_->currentPhrase_ + row_)));
                     if (next != NO_MORE_TABLE) {
                         ushort *c = phrase_->param2_ +
-                                    (16 * viewData_->currentPhrase_ + row_);
-                        *c = next;
-                        isDirty_ = true;
-                        cmdEdit_.SetInt(next);
-                    } else {
-                        View::SetNotification("No more tables");
-                    }
-                }
-                if ((col_ == 8) &&
-                    (*(phrase_->cmd3_ + (16 * viewData_->currentPhrase_ +
-                                         row_))) == I_CMD_TABL) {
-                    TableHolder *th = TableHolder::GetInstance();
-                    unsigned short next =
-                        th->Clone(*(phrase_->param3_ +
-                                    (16 * viewData_->currentPhrase_ + row_)));
-                    if (next != NO_MORE_TABLE) {
-                        ushort *c = phrase_->param3_ +
                                     (16 * viewData_->currentPhrase_ + row_);
                         *c = next;
                         isDirty_ = true;
@@ -1232,7 +1108,7 @@ void PhraseView::processNormalButtonMask(unsigned short mask) {
                 switchSoloMode();
             if (mask == EPBM_A) {
                 pasteLast();
-                if ((col_ == 2) || (col_ == 4) || (col_ == 6) || (col_ == 8))
+                if ((col_ == 2) || (col_ == 4) || (col_ == 6))
                     viewMode_ = VM_NEW;
             }
 
@@ -1280,12 +1156,6 @@ void PhraseView::processNormalButtonMask(unsigned short mask) {
                         cmd = phrase_->cmd2_ +
                               (16 * viewData_->currentPhrase_ + row_);
                         param = phrase_->param2_ +
-                                (16 * viewData_->currentPhrase_ + row_);
-                    }
-                    if (*cmd != I_CMD_TABL) {
-                        cmd = phrase_->cmd3_ +
-                              (16 * viewData_->currentPhrase_ + row_);
-                        param = phrase_->param3_ +
                                 (16 * viewData_->currentPhrase_ + row_);
                     }
                     if (*cmd == I_CMD_TABL) {
@@ -1426,9 +1296,6 @@ bool PhraseView::adjustPtchParamForRow(int row, int paramCol, ViewUpdateDirectio
     } else if (paramCol == 6) {
         cmd = phrase_->cmd2_[offset];
         param = phrase_->param2_ + offset;
-    } else if (paramCol == 8) {
-        cmd = phrase_->cmd3_[offset];
-        param = phrase_->param3_ + offset;
     }
     if (cmd != I_CMD_PTCH || !param) return false;
 
@@ -1475,7 +1342,6 @@ bool PhraseView::isPtchParamCell(int row, int col) const {
     int offset = 16 * viewData_->currentPhrase_ + row;
     if (col == 4) return phrase_->cmd1_[offset] == I_CMD_PTCH;
     if (col == 6) return phrase_->cmd2_[offset] == I_CMD_PTCH;
-    if (col == 8) return phrase_->cmd3_[offset] == I_CMD_PTCH;
     return false;
 }
 
@@ -1663,19 +1529,18 @@ void PhraseView::DrawView() {
 
     GUIPoint anchor = GetAnchor();
 
-    // Column headers (1 letter per column; params 4/6/8 have none)
-    static const char *headers[kColCount] = {"N", "V", "I",  "FX1", "",
-                                             "FX2", "",  "FX3", ""};
+    // Column headers, centered over their columns (TREEFROG_PHRASE_COLUMNS_V1)
+    static const char *headers[kColCount] = {"N", "V", "I", "FX1",
+                                             "P1", "FX2", "P2"};
     for (int c = 0; c < kColCount; c++) {
-        if (headers[c][0] == 0) continue;
         (c == col_) ? SetColor(CD_HILITE2) : SetColor(CD_NORMAL);
-        DrawString(kColX[c], anchor._y - 1, headers[c], props);
+        DrawString(kColHeaderX[c], anchor._y - 1, headers[c], props);
     }
 
-    // Display row numbers (cells 2-3, grid centered with 2-cell margins)
+    // Display row numbers (cells 6-7, grid centered with 6-cell margins)
 
     char buffer[6];
-    pos._x = 2;
+    pos._x = 6;
     pos._y = anchor._y;
     for (int j = 0; j < 16; j++) {
         ((j / altRowNumber_) % 2) ? SetColor(CD_ROW) : SetColor(CD_ROW2);
@@ -1874,52 +1739,6 @@ void PhraseView::DrawView() {
         pos._y++;
     }
 
-    // Draw command 3
-
-    pos._x = kColX[7];
-    pos._y = anchor._y;
-
-    f = phrase_->cmd3_ + (16 * viewData_->currentPhrase_);
-
-    buffer[4] = 0;
-
-    for (int j = 0; j < 16; j++) {
-        FourCC command = *f++;
-        getCommandDisplayName(command, buffer);
-        (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
-                                                : SetColor(CD_NORMAL);
-        setTextProps(props, 7, j, false);
-        DrawString(pos._x, pos._y, buffer, props);
-        setTextProps(props, 7, j, true);
-        pos._y++;
-        if (j == row_ && col_ == 7) {
-            printHelpLegend(command, props);
-        }
-    }
-
-    // Draw commands params 3
-
-    pos._x = kColX[8];
-    pos._y = anchor._y;
-
-    param = phrase_->param3_ + (16 * viewData_->currentPhrase_);
-    buffer[5] = 0;
-
-    for (int j = 0; j < 16; j++) {
-        ushort p = *param++;
-        (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
-                                                 : SetColor(CD_NORMAL);
-        setTextProps(props, 8, j, false);
-        if (phrase_->cmd3_[16 * viewData_->currentPhrase_ + j] == I_CMD_PTCH) {
-            formatPtchParam(p, buffer, sizeof(buffer));
-        } else {
-            hexshort2char(p, buffer);
-        }
-        DrawString(pos._x, pos._y, buffer, props);
-        setTextProps(props, 8, j, true);
-        pos._y++;
-    }
-
     drawMap();
     drawNotes();
 
@@ -1929,7 +1748,7 @@ void PhraseView::DrawView() {
     };
 
     if ((viewMode_ != VM_SELECTION) &&
-        ((col_ == 4) || (col_ == 6) || (col_ == 8))) {
+        ((col_ == 4) || (col_ == 6))) {
         if (!isPtchParamCell(row_, col_)) {
             cmdEditField_->SetFocus();
             cmdEditField_->Draw(w_);
@@ -1944,7 +1763,7 @@ void PhraseView::OnPlayerUpdate(PlayerEventType eventType, unsigned int tick) {
 
     GUIPoint anchor = GetAnchor();
     GUIPoint pos = anchor;
-    pos._x = 4;
+    pos._x = 5;
 
     SetColor(CD_NORMAL);
 

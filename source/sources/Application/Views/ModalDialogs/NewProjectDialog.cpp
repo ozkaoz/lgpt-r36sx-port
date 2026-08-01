@@ -109,7 +109,26 @@ void NewProjectDialog::OnFocus() {
     keyboardMode_ = false;
     keyboardRow_ = 2;
     keyboardCol_ = 0;
+    // TREEFROG_PROJECT_RENAME_V1 (H38.5): when a name was pre-set, seed the
+    // editor with it instead of a blank name.
+    if (!initialName_.empty()) {
+        int len = (int)initialName_.size();
+        if (len > MAX_NAME_LENGTH) {
+            len = MAX_NAME_LENGTH;
+        }
+        for (int i = 0; i < len; i++) {
+            name_[i] = initialName_[i];
+        }
+        name_[len] = ' ';
+        currentChar_ = len;
+        lastChar_ = (len > 0) ? name_[len - 1] : 'A';
+    }
 };
+
+// TREEFROG_PROJECT_RENAME_V1 (H38.5)
+void NewProjectDialog::SetInitialName(const std::string &name) {
+    initialName_ = name;
+}
 
 void NewProjectDialog::ProcessButtonMask(unsigned short mask, bool pressed) {
 

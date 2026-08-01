@@ -97,8 +97,10 @@ class PhraseView : public View {
     int saveRow_;
 
     static short offsets_[3][4];
-    static const int kColCount = 9;
+    static const int kColCount = 7;
     static const int kColX[kColCount];
+    // Header center X per column (headers centered over their column).
+    static const int kColHeaderX[kColCount];
 };
 
 #endif

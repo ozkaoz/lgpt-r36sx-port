@@ -19,6 +19,9 @@ public:
   virtual void ProcessButtonMask(unsigned short mask, bool pressed);
 
   std::string GetName();
+  // TREEFROG_PROJECT_RENAME_V1 (H38.5): pre-fills the name editor so the
+  // dialog can act as a project renamer instead of a blank name picker.
+  void SetInitialName(const std::string &name);
 
 private:
   Path currentPath_;
@@ -29,6 +32,7 @@ private:
   bool keyboardMode_;
   int keyboardRow_;
   int keyboardCol_ ;
+  std::string initialName_;
   void moveCursor(int direction);
 };
 #endif

@@ -55,7 +55,7 @@ extern "C" const char *TreeFrogH35LifecycleDuplexMarker(void) {
 }
 
 extern "C" const char *TreeFrogH371WindowsIsolationMarker(void) {
-    return "H38_4_ABI7_THREE_MODE_LOCAL_WINDOWS_ANDROID_SAFE_FRONTEND";
+    return "H38_5_ABI7_THREE_MODE_LOCAL_WINDOWS_ANDROID_SAFE_FRONTEND";
 }
 
 extern "C" const char *TreeFrogU2510CaptureProtocolMarker(void) {
@@ -70,7 +70,7 @@ extern "C" const char *TreeFrogU2517RecordRuntimeMarker(void) {
         "U2515_RECORD_SESSION_STATE_MACHINE U2517_MONITOR_FIFO_HANDSHAKE_CONTROL "
         "U2515_CAPTURE_SNAPSHOT_CACHE U2517_FILENAME_EDITOR_FAST_CASE_DUPLICATE_GUARD "
         "U2517_RUNTIME_ABI7_DAEMON_ONLY_RECOVERY "
-        "H38_4_THREE_MODE_ABI7_LOCAL_WINDOWS_ANDROID";
+        "H38_5_THREE_MODE_ABI7_LOCAL_WINDOWS_ANDROID";
 }
 enum {
     U241_LOCAL_CONSOLE = 0,

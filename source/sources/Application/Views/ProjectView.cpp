@@ -16,10 +16,40 @@
 #include "System/System/System.h"
 #include "Application/Player/Player.h"
 #include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
+#include "Application/AppWindow.h"
+
+// TREEFROG_PROJECT_RENAME_V1 (H38.5): returns the base name (without the
+// "lgpt_" prefix and ".dat" extension) of the last saved/loaded project,
+// used to pre-fill the rename dialog. Empty when no name is available.
+static std::string treefrogCurrentProjectBaseName() {
+    AppWindow *app = AppWindow::GetInstance();
+    if (!app) {
+        return std::string();
+    }
+    Path last = app->GetLastProjectPath();
+    std::string name = last.GetPath();
+    size_t pos = name.rfind(':');
+    if (pos != std::string::npos) {
+        name = name.substr(pos + 1);
+    }
+    pos = name.rfind('/');
+    if (pos != std::string::npos) {
+        name = name.substr(pos + 1);
+    }
+    if (name.find("lgpt_") == 0) {
+        name = name.substr(5);
+    }
+    pos = name.rfind(".dat");
+    if (pos != std::string::npos) {
+        name = name.substr(0, pos);
+    }
+    return name;
+}
 
 #define ACTION_PURGE            MAKE_FOURCC('P','U','R','G')
 #define ACTION_SAVE             MAKE_FOURCC('S','A','V','E')
 #define ACTION_SAVE_AS          MAKE_FOURCC('S','V','A','S')
+#define ACTION_RENAME           MAKE_FOURCC('R','N','A','M')
 #define ACTION_LOAD             MAKE_FOURCC('L','O','A','D')
 #define ACTION_QUIT             MAKE_FOURCC('Q','U','I','T')
 #define ACTION_PURGE_INSTRUMENT MAKE_FOURCC('P','R','G','I')
@@ -242,6 +272,11 @@ ProjectView::ProjectView(GUIWindow &w,ViewData *data):FieldView(w,data) {
     a1->AddObserver(*this);
     T_SimpleList<UIField>::Insert(a1);
 
+    position._y += 1;
+    a1 = new UIActionField("Rename Project", ACTION_RENAME, position);
+    a1->AddObserver(*this);
+    T_SimpleList<UIField>::Insert(a1);
+
     v = project_->FindVariable(VAR_MIDIDEVICE);
     NAssert(v);
     position._y += 2;
@@ -375,6 +410,16 @@ void ProjectView::Update(Observable &,I_ObservableData *data) {
             PersistencyService *service = PersistencyService::GetInstance();
             service->Save("project:lgptsav_tmp.dat");
             NewProjectDialog *mb = new NewProjectDialog(*this, "root:");
+            DoModal(mb, SaveAsProjectCallback);
+            break;
+        }
+        case ACTION_RENAME: {
+            // TREEFROG_PROJECT_RENAME_V1 (H38.5): same save-as flow but the
+            // name editor opens pre-filled with the current project name.
+            PersistencyService *service = PersistencyService::GetInstance();
+            service->Save("project:lgptsav_tmp.dat");
+            NewProjectDialog *mb = new NewProjectDialog(*this, "root:");
+            mb->SetInitialName(treefrogCurrentProjectBaseName());
             DoModal(mb, SaveAsProjectCallback);
             break;
         }

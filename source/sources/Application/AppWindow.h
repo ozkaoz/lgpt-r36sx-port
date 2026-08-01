@@ -27,8 +27,12 @@ class AppWindow : public GUIWindow, I_Observer, Status {
 
   public:
     static AppWindow *Create(GUICreateWindowParams &);
+    // TREEFROG_PROJECT_RENAME_V1 (H38.5): singleton accessor used by
+    // ProjectView to pre-fill the rename dialog with the current name.
+    static AppWindow *GetInstance();
     void LoadProject(const Path &path);
     void SaveLastProject(const Path &p);
+    Path GetLastProjectPath();
     void CloseProject();
 
     virtual void Clear(bool all = false);
@@ -104,6 +108,7 @@ class AppWindow : public GUIWindow, I_Observer, Status {
     static GUIColor cursorColor_;
     static GUIColor playColor_;
     static GUIColor recordColor_;
+    static AppWindow *instance_;
     static GUIColor muteColor_;
     static GUIColor rownumberColor_;
     static GUIColor rownumber2Color_;
@@ -117,7 +122,6 @@ class AppWindow : public GUIWindow, I_Observer, Status {
 
     SysMutex drawMutex_;
 
-    Path GetLastProjectPath();
 };
 
 #endif

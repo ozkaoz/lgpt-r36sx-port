@@ -703,22 +703,9 @@ void Player::ProcessCommands() {
 						} ;
 					} ;
 
-					// Now process third command row
-
-					cc=viewData_->song_->phrase_->cmd3_[phrase*16+pos] ;
-					param=viewData_->song_->phrase_->param3_[phrase*16+pos] ;
-
-					// if there's any command to trigger, first pass it on the player
-					// then pass it on to the instrument
-
-					if (cc!=I_CMD_NONE) {
-						if (!ProcessChannelCommand(i,cc,param)) {
-							I_Instrument *instrument=mixer_->GetInstrument(i) ;
-							if (instrument) {
-								instrument->ProcessCommand(i,cc,param) ;
-							}
-						} ;
-					} ;
+					// TREEFROG_PHRASE_COLUMNS_V1 (H38.5): the third command row
+					// (cmd3_/param3_) is no longer edited nor executed. Data is
+					// preserved in the model for project compatibility only.
 				}
 			}
 		}
@@ -890,12 +877,7 @@ void Player::updatePhrasePos(int pos,int channel) {
 		ushort param=viewData_->song_->phrase_->param2_[phrase*16+pos] ;
 		timeToStart_[channel]=(param&0x0F)+1 ;
 	}
-
-	cc=viewData_->song_->phrase_->cmd3_[phrase*16+pos] ;
-	if (cc==I_CMD_DLAY) {
-		ushort param=viewData_->song_->phrase_->param3_[phrase*16+pos] ;
-		timeToStart_[channel]=(param&0x0F)+1 ;
-	}
+	// TREEFROG_PHRASE_COLUMNS_V1 (H38.5): third command row no longer used.
 }
 
 void Player::playCursorPosition(int channel) {
@@ -956,12 +938,13 @@ void Player::playCursorPosition(int channel) {
 					mixer_->StartInstrument(channel,instrument,note,newInstrument) ;
 
 					// Row volume: -- (0xFF) and 00 are silent; 01-100 (0x64) map
-					// proportionally to the instrument volume (100 = full gain).
-					// TREEFROG_PHRASE_VOL_V1
+					// with 1 = 100% full volume and higher values attenuating:
+					// gain = (101 - v) * 0xFE / 100 (v=1 -> 0xFE, v=100 -> ~2).
+					// TREEFROG_PHRASE_VOL_V2
 					if (rowVol==0xFF||rowVol==0x00) {
 						instrument->SetRowVolume(channel,0) ;
 					} else if (rowVol<=0x64) {
-						instrument->SetRowVolume(channel,(unsigned char)((rowVol*0xFE)/100)) ;
+						instrument->SetRowVolume(channel,(unsigned char)(((101-rowVol)*0xFE)/100)) ;
 					} else {
 						instrument->SetRowVolume(channel,0xFE) ;
 					}
@@ -1012,10 +995,7 @@ int Player::getChannelHop(int channel,int pos) {
   if (cc==I_CMD_HOP) {
       return (viewData_->song_->phrase_->param2_[phrase*16+pos])&0xF ;
   }
-	cc=viewData_->song_->phrase_->cmd3_[phrase*16+pos] ;
-  if (cc==I_CMD_HOP) {
-      return (viewData_->song_->phrase_->param3_[phrase*16+pos])&0xF ;
-  }
+	// TREEFROG_PHRASE_COLUMNS_V1 (H38.5): third command row no longer used.
   return -1 ;
 }
 

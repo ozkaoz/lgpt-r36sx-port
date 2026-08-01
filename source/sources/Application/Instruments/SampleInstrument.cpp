@@ -1108,6 +1108,19 @@ void SampleInstrument::Update(Observable &o,I_ObservableData *d)
 	};
 } ;
 
+// TREEFROG_FX_INTENSITY_V1 (H38.5): intensity-type FX parameters are
+// inverted so that 1 = 100% (maximum safe effect) and higher values
+// attenuate, matching the row volume scale (1 = full volume):
+//   v == 0        -> no effect (0)
+//   1 <= v <= 100 -> (101 - v) * maxCap / 100  (v=1 -> maxCap, v=100 -> ~1%)
+//   v > 100       -> no effect (legacy project data safety)
+static unsigned char treefrogFxIntensity(unsigned int v, unsigned char maxCap) {
+    if ((v == 0) || (v > 100)) {
+        return 0;
+    }
+    return (unsigned char)(((101 - v) * (int)maxCap) / 100);
+}
+
 void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 	
  	renderParams *rp=renderParams_+channel ;
@@ -1260,8 +1273,9 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 			{
 				// TREEFROG_FX_SAFE_RANGES_V1: resonance capped at 50% so the
 				// filter never self-oscillates into a sustained ring/buzz.
-				unsigned char resRaw=(value&0xFF) ;
-				if (resRaw>0x80) resRaw=0x80 ;
+				// TREEFROG_FX_INTENSITY_V1: 1 = 100% (max resonance), higher
+				// values attenuate; 0 = no resonance, >100 = effect off.
+				unsigned char resRaw=treefrogFxIntensity(value&0xFF,0x80) ;
 				float target=float(resRaw)/255.0f ;
 				float speed=float(value>>8) ;
                 float start=fp2fl(rp->reso_) ;
@@ -1282,8 +1296,9 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 			{
 				// TREEFROG_FX_SAFE_RANGES_V1: feedback mix capped at 50% so
 				// the reverb loop can never build into an infinite buzz.
-				unsigned char mixRaw=(value&0xFF) ;
-				if (mixRaw>0x80) mixRaw=0x80 ;
+				// TREEFROG_FX_INTENSITY_V1: 1 = 100% (max feedback mix),
+				// higher values attenuate; 0 = no mix, >100 = effect off.
+				unsigned char mixRaw=treefrogFxIntensity(value&0xFF,0x80) ;
 				float target=float(mixRaw)/255.0f ;
 				float speed=float(value>>8) ;
                 float start=fp2fl(rp->fbMix_) ;
@@ -1304,8 +1319,9 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 			{
 				// TREEFROG_FX_SAFE_RANGES_V1: feedback tune capped at 50% to
 				// keep the delayed loop within a stable pitch range.
-				unsigned char tunRaw=(value&0xFF) ;
-				if (tunRaw>0x80) tunRaw=0x80 ;
+				// TREEFROG_FX_INTENSITY_V1: 1 = 100% (max tune), higher values
+				// attenuate; 0 = no tune, >100 = effect off.
+				unsigned char tunRaw=treefrogFxIntensity(value&0xFF,0x80) ;
 				float target=float(tunRaw)/255.0f ;
 				float speed=float(value>>8) ;
                 float start=fp2fl(rp->fbTun_) ;
@@ -1428,8 +1444,9 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				float cut=(value>>8)/255.0f;	// cutoff frequency (FF=all pass, 0=none pass)
 				// TREEFROG_FX_SAFE_RANGES_V1: resonance capped at 50% so the
 				// filter can never ring into a sustained buzz.
-				unsigned char resRaw=(value&0xFF) ;
-				if (resRaw>0x80) resRaw=0x80 ;
+				// TREEFROG_FX_INTENSITY_V1: 1 = 100% (max resonance), higher
+				// values attenuate; 0 = no resonance, >100 = effect off.
+				unsigned char resRaw=treefrogFxIntensity(value&0xFF,0x80) ;
 				float res=resRaw/255.0f ;	// resonance, aka Q (0=none) so default is FF00
 				rp->cutoff_=rp->baseFCut_=fl2fp(cut) ;
 				rp->reso_=rp->baseFRes_=fl2fp(res) ;
@@ -1460,17 +1477,17 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 			break ;
 		case I_CMD_CRSH:
 			{
-    			unsigned char drive=(value>>8);
-    			unsigned char crush=(value&0x0F);
 				// TREEFROG_BEATMAKING_FX_V1:
 				// Any non-zero parameter applies both drive and crush, so a
 				// zero crush nibble now disables crush (drive-only). Value
 				// 0x0000 still means "no change" for old-project safety.
 				// TREEFROG_FX_SAFE_RANGES_V1: drive capped at 0x80 (50%) and
 				// crush at 8 bits so the effect distorts without harsh noise.
-				if (drive>0x80) drive=0x80 ;
-				if (crush>0x08) crush=0x08 ;
-				if (value != 0) {
+				// TREEFROG_FX_INTENSITY_V1: 1 = 100% (max drive/crush),
+				// higher values attenuate; >100 = effect off.
+				unsigned char drive=treefrogFxIntensity(value>>8,0x80);
+				unsigned char crush=treefrogFxIntensity(value&0x0F,0x08);
+				if ((value != 0) && (drive || crush)) {
 					rp->drive_=drive ;
 					rp->crush_=crush ;
 				}

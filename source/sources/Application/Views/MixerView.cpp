@@ -179,11 +179,8 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	Mixer *mixer=Mixer::GetInstance() ;
 	Player *player=Player::GetInstance() ;
 	int volume=mixer->GetChannelVolume(channel) ;
-	int filled=(volume*height+99)/100 ;
 	MixerService *ms=MixerService::GetInstance() ;
 	float peak=ms->GetChannelPeak(channel) ;
-	int peakFilled=int(peak*float(height)) ;
-	if (peakFilled>height) peakFilled=height ;
 	bool selected=(channel==viewData_->mixerCol_) ;
 	bool muted=player->IsChannelMuted(channel) ;
 	GUITextProperties props ;
@@ -204,33 +201,34 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	DrawString(x,y,hex,props) ;
 	props.invert_=false ;
 
-	// TREEFROG_VU_METERS_V2:
-	// Segmented LED meter: cells light up in pairs (1-2, 4-5, 7-8...) with a
-	// dark gap every third cell, so the bar reads as several small bars that
-	// rise and fall live with the channel level (style of the record meter).
+	// TREEFROG_VU_METERS_V3 (H38.5): dense contiguous LED segments, one per
+	// character cell (2 per row, no gaps), in the style of the USB-C record
+	// meter. The bar reacts in real time to the actual channel output
+	// (MixerService::GetChannelPeak): the tip lights in accent color above
+	// the sustained volume fill.
+	int totalCells=2*height ;
+	int filledCells=(volume*totalCells+99)/100 ;
+	if (filledCells>totalCells) filledCells=totalCells ;
+	int peakCells=int(peak*float(totalCells)) ;
+	if (peakCells>totalCells) peakCells=totalCells ;
 	for (int row=0;row<height;row++) {
-		int cellFromBottom=height-row ;
-		bool gap=(((cellFromBottom-1)%3)==2) ;
-		if (gap) {
-			SetColor(muted?CD_BORDER:CD_HILITE1) ;
-			props.invert_=false ;
-			DrawString(x,y+1+row,"  ",props) ;
-			continue ;
+		for (int c=0;c<2;c++) {
+			int cellFromBottom=totalCells-(2*row+c) ;
+			bool on=(cellFromBottom<=filledCells) ;
+			bool vu=((!on)&&(cellFromBottom<=peakCells)) ;
+			bool tip=((on)&&(cellFromBottom==peakCells)&&(peakCells>0)&&(peakCells<=filledCells)) ;
+			if (vu||tip) {
+				SetColor(selected?CD_HILITE1:CD_HILITE2) ;
+				props.invert_=true ;
+			} else if (on) {
+				SetColor(selected?CD_HILITE2:CD_NORMAL) ;
+				props.invert_=true ;
+			} else {
+				SetColor(muted?CD_BORDER:CD_HILITE1) ;
+				props.invert_=false ;
+			}
+			DrawString(x+c,y+1+row," ",props) ;
 		}
-		bool on=(cellFromBottom<=filled) ;
-		bool vu=((!on)&&(cellFromBottom<=peakFilled)) ;
-		bool tip=((on)&&(cellFromBottom==peakFilled)&&(peakFilled>0)&&(peakFilled<=filled)) ;
-		if (vu||tip) {
-			SetColor(selected?CD_HILITE1:CD_HILITE2) ;
-			props.invert_=true ;
-		} else if (on) {
-			SetColor(selected?CD_HILITE2:CD_NORMAL) ;
-			props.invert_=true ;
-		} else {
-			SetColor(muted?CD_BORDER:CD_HILITE1) ;
-			props.invert_=false ;
-		}
-		DrawString(x,y+1+row,"  ",props) ;
 	}
 
 	SetColor(selected?CD_HILITE2:(muted?CD_BORDER:CD_NORMAL)) ;
@@ -248,11 +246,8 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 void MixerView::drawMasterBar(int x,int y,int height) {
 	Project *project=viewData_->project_ ;
 	int volume=project?project->GetMasterVolume():100 ;
-	int filled=(volume*height+99)/100 ;
 	MixerService *ms=MixerService::GetInstance() ;
 	float peak=ms->GetMasterPeak() ;
-	int peakFilled=int(peak*float(height)) ;
-	if (peakFilled>height) peakFilled=height ;
 	GUITextProperties props ;
 	char buffer[8] ;
 
@@ -260,30 +255,31 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	props.invert_=false ;
 	DrawString(x-1,y,"MST",props) ;
 
-	// TREEFROG_VU_METERS_V2: segmented LED meter, master-wide.
+	// TREEFROG_VU_METERS_V3 (H38.5): dense contiguous LED segments,
+	// master-wide, same style as the record meter (see drawVolumeBar).
+	int totalCells=2*height ;
+	int filledCells=(volume*totalCells+99)/100 ;
+	if (filledCells>totalCells) filledCells=totalCells ;
+	int peakCells=int(peak*float(totalCells)) ;
+	if (peakCells>totalCells) peakCells=totalCells ;
 	for (int row=0;row<height;row++) {
-		int cellFromBottom=height-row ;
-		bool gap=(((cellFromBottom-1)%3)==2) ;
-		if (gap) {
-			SetColor(CD_HILITE1) ;
-			props.invert_=false ;
-			DrawString(x,y+1+row,"  ",props) ;
-			continue ;
+		for (int c=0;c<2;c++) {
+			int cellFromBottom=totalCells-(2*row+c) ;
+			bool on=(cellFromBottom<=filledCells) ;
+			bool vu=((!on)&&(cellFromBottom<=peakCells)) ;
+			bool tip=((on)&&(cellFromBottom==peakCells)&&(peakCells>0)&&(peakCells<=filledCells)) ;
+			if (vu||tip) {
+				SetColor(CD_HILITE2) ;
+				props.invert_=true ;
+			} else if (on) {
+				SetColor(CD_NORMAL) ;
+				props.invert_=true ;
+			} else {
+				SetColor(CD_HILITE1) ;
+				props.invert_=false ;
+			}
+			DrawString(x+c,y+1+row," ",props) ;
 		}
-		bool on=(cellFromBottom<=filled) ;
-		bool vu=((!on)&&(cellFromBottom<=peakFilled)) ;
-		bool tip=((on)&&(cellFromBottom==peakFilled)&&(peakFilled>0)&&(peakFilled<=filled)) ;
-		if (vu||tip) {
-			SetColor(CD_HILITE2) ;
-			props.invert_=true ;
-		} else if (on) {
-			SetColor(CD_NORMAL) ;
-			props.invert_=true ;
-		} else {
-			SetColor(CD_HILITE1) ;
-			props.invert_=false ;
-		}
-		DrawString(x,y+1+row,"  ",props) ;
 	}
 
 	SetColor(CD_NORMAL) ;

@@ -177,15 +177,14 @@ void TablePlayback::ProcessStep(TablePlayerChange &tpc) {
 
 				hopped_[0]=ProcessLocalCommand(0,table_->cmd1_,table_->param1_,tpc) ;
 				hopped_[1]=ProcessLocalCommand(1,table_->cmd2_,table_->param2_,tpc) ;
-				hopped_[2]=ProcessLocalCommand(2,table_->cmd3_,table_->param3_,tpc) ;
+				// TREEFROG_PHRASE_COLUMNS_V1 (H38.5): third table command slot
+				// (cmd3_/param3_) is no longer executed; data is preserved.
 
 				instrument_->ProcessCommand(channel_,table_->cmd1_[position_[0]],table_->param1_[position_[0]]) ;
 				instrument_->ProcessCommand(channel_,table_->cmd2_[position_[1]],table_->param2_[position_[1]]) ;
-				instrument_->ProcessCommand(channel_,table_->cmd3_[position_[2]],table_->param3_[position_[2]]) ;
 
 				previous_[0]=position_[0] ;
 				previous_[1]=position_[1] ;
-				previous_[2]=position_[2] ;
 
 			}
 
@@ -199,13 +198,9 @@ void TablePlayback::ProcessStep(TablePlayerChange &tpc) {
 				if ((table_->cmd2_[position_[1]]!=I_CMD_HOP)||(!hopped_[1])) {
 					position_[1]=(position_[1]+1)%16 ;
 				}
-				if ((table_->cmd3_[position_[2]]!=I_CMD_HOP)||(!hopped_[2])) {
-					position_[2]=(position_[2]+1)%16 ;
-				}
 
 				hopped_[0]=false ;
 				hopped_[1]=false ;
-				hopped_[2]=false ;
 
 				if (automated_) {
 					TableSaveState state ;

@@ -1,4 +1,15 @@
 // TREEFROG_V42_NO_WHITE_BOX_UI
+// TREEFROG_TABLE_COLUMNS_V1 (H38.5): FX3 column removed, 4 columns left
+// (FX1 P1 FX2 P2). Grid centered on the 40-cell screen: row numbers at
+// anchor-1, columns at anchor+2/+7/+12/+17. Block spans cells 9..30 with
+// symmetric margins.
+#define TABLE_GRID_BASE_OFFSET 2
+#define TABLE_COL_PITCH 5
+#define TABLE_COL_COUNT 4
+#define TABLE_HEADER_X1 13
+#define TABLE_HEADER_P1 18
+#define TABLE_HEADER_X2 23
+#define TABLE_HEADER_P2 28
 #include "TableView.h"
 #include "Application/Instruments/CommandList.h"
 #include "Application/Player/TablePlayback.h"
@@ -54,7 +65,7 @@ void TableView::cutPosition() {
     saveRow_ = row_;
     saveCol_ = col_;
 
-    if ((col_ == 0) || (col_ == 2) || (col_ == 4))
+    if ((col_ == 0) || (col_ == 2))
         col_ += 1; // This way, A+B on note cuts
                    // the instruments too and parameters get cut with commands
     cutSelection();
@@ -92,30 +103,24 @@ void TableView::fillClipboardData() {
     uint *dst3 = clipboard_.cmd2_;
     ushort *src4 = table.param2_;
     ushort *dst4 = clipboard_.param2_;
-    uint *src5 = table.cmd3_;
-    uint *dst5 = clipboard_.cmd3_;
-    ushort *src6 = table.param3_;
-    ushort *dst6 = clipboard_.param3_;
 
     for (int i = 0; i < clipboard_.height_; i++) {
         dst1[i] = src1[clipboard_.row_ + i];
         dst2[i] = src2[clipboard_.row_ + i];
         dst3[i] = src3[clipboard_.row_ + i];
         dst4[i] = src4[clipboard_.row_ + i];
-        dst5[i] = src5[clipboard_.row_ + i];
-        dst6[i] = src6[clipboard_.row_ + i];
     };
     updateCursor(0, 0);
 };
 
 void TableView::extendSelection() {
     GUIRect rect = getSelectionRect();
-    if (rect.Left() > 0 || rect.Right() < 6) {
+    if (rect.Left() > 0 || rect.Right() < 3) {
         if (col_ < clipboard_.col_) {
             col_ = 0;
-            clipboard_.col_ = 6;
+            clipboard_.col_ = 3;
         } else {
-            col_ = 6;
+            col_ = 3;
             clipboard_.col_ = 0;
         }
         isDirty_ = true;
@@ -142,9 +147,9 @@ void TableView::interpolateSelection() {
 
     GUIRect rect = getSelectionRect();
     
-    // Only interpolate if we're in param columns (1, 3, 5)
+    // Only interpolate if we're in param columns (1, 3)
     int col = rect.Left();
-    if (col != rect.Right() || (col != 1 && col != 3 && col != 5)) {
+    if (col != rect.Right() || (col != 1 && col != 3)) {
         return;
     }
 
@@ -161,10 +166,8 @@ void TableView::interpolateSelection() {
     ushort *paramData;
     if (col == 1) {
         paramData = table.param1_;
-    } else if (col == 3) {
-        paramData = table.param2_;
     } else {
-        paramData = table.param3_;
+        paramData = table.param2_;
     }
 
     ushort startParam = paramData[startRow];
@@ -212,8 +215,6 @@ void TableView::cutSelection() {
     ushort *dst2 = table.param1_;
     uint *dst3 = table.cmd2_;
     ushort *dst4 = table.param2_;
-    uint *dst5 = table.cmd3_;
-    ushort *dst6 = table.param3_;
 
     for (int i = 0; i < clipboard_.width_; i++) {
         for (int j = 0; j < clipboard_.height_; j++) {
@@ -229,12 +230,6 @@ void TableView::cutSelection() {
                 break;
             case 3:
                 dst4[j + clipboard_.row_] = 0x0000;
-                break;
-            case 4:
-                dst5[j + clipboard_.row_] = I_CMD_NONE;
-                break;
-            case 5:
-                dst6[j + clipboard_.row_] = 0x0000;
                 break;
             }
         }
@@ -275,17 +270,13 @@ void TableView::pasteClipboard() {
     uint *src3 = clipboard_.cmd2_;
     ushort *dst4 = table.param2_;
     ushort *src4 = clipboard_.param2_;
-    uint *dst5 = table.cmd3_;
-    uint *src5 = clipboard_.cmd3_;
-    ushort *dst6 = table.param3_;
-    ushort *src6 = clipboard_.param3_;
 
     uint *noCmd = (uint *)-1;
     ushort *noPrm = (ushort *)-1;
-    uint *srcCmd[5] = {src1, noCmd, src3, noCmd, src5};
-    ushort *srcPrm[6] = {noPrm, src2, noPrm, src4, noPrm, src6};
-    uint *dstCmd[5] = {dst1, noCmd, dst3, noCmd, dst5};
-    ushort *dstPrm[6] = {noPrm, dst2, noPrm, dst4, noPrm, dst6};
+    uint *srcCmd[4] = {src1, noCmd, src3, noCmd};
+    ushort *srcPrm[4] = {noPrm, src2, noPrm, src4};
+    uint *dstCmd[4] = {dst1, noCmd, dst3, noCmd};
+    ushort *dstPrm[4] = {noPrm, dst2, noPrm, dst4};
 
     bool wasUpdated = false;
 
@@ -294,9 +285,7 @@ void TableView::pasteClipboard() {
             switch (i + clipboard_.col_) {
             case 0:
             case 2:
-            case 4:
-                if ((col_ + i) == 0 || (col_ + i) == 2 ||
-                    (col_ + i) == 4) { // Don't allow commands in params, etc
+                if ((col_ + i) == 0 || (col_ + i) == 2) { // Don't allow commands in params, etc
                     dstCmd[col_ + i][(row_ + j) % 16] =
                         srcCmd[clipboard_.col_ + i][j];
                     wasUpdated = true;
@@ -304,8 +293,7 @@ void TableView::pasteClipboard() {
                 break;
             case 1:
             case 3:
-            case 5:
-                if ((col_ + i) == 1 || (col_ + i) == 3 || (col_ + i) == 5) {
+                if ((col_ + i) == 1 || (col_ + i) == 3) {
                     dstPrm[col_ + i][(row_ + j) % 16] =
                         srcPrm[clipboard_.col_ + i][j];
                     wasUpdated = true;
@@ -324,8 +312,8 @@ void TableView::updateCursor(int dx, int dy) {
 
     col_ += dx;
     row_ += dy;
-    if (col_ > 5)
-        col_ = 5;
+    if (col_ > 3)
+        col_ = 3;
     if (col_ < 0)
         col_ = 0;
     if (row_ > 15)
@@ -340,22 +328,16 @@ void TableView::updateCursor(int dx, int dy) {
     GUIPoint p(anchor);
     switch (col_) {
     case 1:
-        p._x += 5;
+        p._x += TABLE_GRID_BASE_OFFSET + TABLE_COL_PITCH;
         p._y += row_;
         cmdEditField_->SetPosition(p);
         cmdEdit_.SetInt(*(table.param1_ + row_));
         break;
     case 3:
-        p._x += 15;
+        p._x += TABLE_GRID_BASE_OFFSET + 3 * TABLE_COL_PITCH;
         p._y += row_;
         cmdEditField_->SetPosition(p);
         cmdEdit_.SetInt(*(table.param2_ + row_));
-        break;
-    case 5:
-        p._x += 25;
-        p._y += row_;
-        cmdEditField_->SetPosition(p);
-        cmdEdit_.SetInt(*(table.param3_ + row_));
         break;
     };
 
@@ -462,42 +444,6 @@ void TableView::updateCursorValue(int offset) {
         *(table.param2_ + row_) = cmdEdit_.GetInt();
         lastParam_ = cmdEdit_.GetInt();
         break;
-    case 4:
-        cc = table.cmd3_ + row_;
-        switch (offset) {
-        case 0x01:
-            *cc = CommandList::GetNext(*cc);
-            break;
-        case 0x10:
-            *cc = CommandList::GetNextAlpha(*cc);
-            break;
-        case -0x01:
-            *cc = CommandList::GetPrev(*cc);
-            break;
-        case -0x10:
-            *cc = CommandList::GetPrevAlpha(*cc);
-            break;
-        }
-        lastCmd_ = *cc;
-        break;
-    case 5:
-        switch (offset) {
-        case 0x01:
-            cmdEditField_->ProcessArrow(EPBM_RIGHT);
-            break;
-        case 0x10:
-            cmdEditField_->ProcessArrow(EPBM_UP);
-            break;
-        case -0x01:
-            cmdEditField_->ProcessArrow(EPBM_LEFT);
-            break;
-        case -0x10:
-            cmdEditField_->ProcessArrow(EPBM_DOWN);
-            break;
-        }
-        *(table.param3_ + row_) = cmdEdit_.GetInt();
-        lastParam_ = cmdEdit_.GetInt();
-        break;
     }
     if (c) {
         updateData(c, offset, limit, wrap);
@@ -517,15 +463,14 @@ void TableView::updateCursorValue(int offset) {
 }
 
 bool TableView::isCommandColumn() const {
-    return CommandSelectorCommon::isCommandColumn(col_, 0, 2, 4);
+    return CommandSelectorCommon::isCommandColumn(col_, 0, 2);
 }
 
 FourCC *TableView::getCurrentCommandPointer() {
     Table &table =
         TableHolder::GetInstance()->GetTable(viewData_->currentTable_);
     return CommandSelectorCommon::getCommandPointerByCol(
-        col_, 0, table.cmd1_ + row_, 2, table.cmd2_ + row_, 4,
-        table.cmd3_ + row_);
+        col_, 0, table.cmd1_ + row_, 2, table.cmd2_ + row_);
 }
 
 void TableView::enterCommandSelector() {
@@ -581,19 +526,6 @@ void TableView::pasteLast() {
         break;
 
     case 3:
-        break;
-
-    case 4:
-        i = table.cmd3_ + row_;
-        if (*i == I_CMD_NONE) {
-            *i = lastCmd_;
-            isDirty_ = true;
-        } else {
-            lastCmd_ = *i;
-        }
-        break;
-
-    case 5:
         break;
     }
 };
@@ -832,11 +764,24 @@ void TableView::DrawView() {
 
     GUIPoint anchor = GetAnchor();
 
+    // Column headers, centered over their columns (TREEFROG_TABLE_COLUMNS_V1)
+
+    static const char *tHeaders[TABLE_COL_COUNT] = {"FX1", "P1", "FX2", "P2"};
+    static const int tHeaderX[TABLE_COL_COUNT] = {TABLE_HEADER_X1,
+                                                  TABLE_HEADER_P1,
+                                                  TABLE_HEADER_X2,
+                                                  TABLE_HEADER_P2};
+    for (int c = 0; c < TABLE_COL_COUNT; c++) {
+        (c == col_) ? SetColor(CD_HILITE2) : SetColor(CD_NORMAL);
+        DrawString(tHeaderX[c], anchor._y - 1, tHeaders[c], props);
+    }
+    SetColor(CD_NORMAL);
+
     // Display row numbers
 
     char buffer[6];
     pos = anchor;
-    pos._x -= 3;
+    pos._x = anchor._x - 1;
     for (int j = 0; j < 16; j++) {
         ((j / altRowNumber_) % 2) ? SetColor(CD_ROW) : SetColor(CD_ROW2);
         hex2char(j, buffer);
@@ -849,6 +794,7 @@ void TableView::DrawView() {
     // Draw command 1
 
     pos = anchor;
+    pos._x += TABLE_GRID_BASE_OFFSET;
 
     FourCC *f = table.cmd1_;
 
@@ -869,7 +815,7 @@ void TableView::DrawView() {
     // Draw commands params 1
 
     pos = anchor;
-    pos._x += 5;
+    pos._x += TABLE_GRID_BASE_OFFSET + TABLE_COL_PITCH;
 
     ushort *param = table.param1_;
     buffer[5] = 0;
@@ -886,7 +832,7 @@ void TableView::DrawView() {
     // Draw commands 2
 
     pos = anchor;
-    pos._x += 10;
+    pos._x += TABLE_GRID_BASE_OFFSET + 2 * TABLE_COL_PITCH;
 
     f = table.cmd2_;
 
@@ -907,7 +853,7 @@ void TableView::DrawView() {
     // Draw commands params
 
     pos = anchor;
-    pos._x += 15;
+    pos._x += TABLE_GRID_BASE_OFFSET + 3 * TABLE_COL_PITCH;
 
     param = table.param2_;
     buffer[5] = 0;
@@ -921,46 +867,8 @@ void TableView::DrawView() {
         pos._y++;
     }
 
-    // Draw command 3
-
-    pos = anchor;
-    pos._x += 20;
-
-    f = table.cmd3_;
-
-    buffer[4] = 0;
-
-    for (int j = 0; j < 16; j++) {
-        FourCC command = *f++;
-        getCommandDisplayName(command, buffer);
-        setTextProps(props, 4, j, false);
-        DrawString(pos._x, pos._y, buffer, props);
-        setTextProps(props, 4, j, true);
-        pos._y++;
-        if (j == row_ && col_ == 5) {
-            printHelpLegend(command, props);
-        }
-    }
-
-    // Draw commands params 3
-
-    pos = anchor;
-    pos._x += 25;
-
-    param = table.param3_;
-    buffer[5] = 0;
-
-    for (int j = 0; j < 16; j++) {
-        ushort p = *param++;
-        setTextProps(props, 5, j, false);
-        hexshort2char(p, buffer);
-        DrawString(pos._x, pos._y, buffer, props);
-        setTextProps(props, 5, j, true);
-        pos._y++;
-    }
-
     if ((viewMode_ != VM_SELECTION) &&
-        ((col_ == 1) || (col_ == 3) || (col_ == 5))) {
+        ((col_ == 1) || (col_ == 3))) {
         cmdEditField_->SetFocus();
         cmdEditField_->Draw(w_);
     };

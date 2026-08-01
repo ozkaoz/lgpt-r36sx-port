@@ -139,6 +139,7 @@ GUIColor AppWindow::muteColor_(0x88, 0x90, 0xB0);
 GUIColor AppWindow::rownumberColor_(0x5A, 0x7D, 0xF0);
 GUIColor AppWindow::rownumber2Color_(0xA8, 0x6B, 0xFF);
 GUIColor AppWindow::majorbeatColor_(0x4A, 0x8C, 0xFF);
+AppWindow *AppWindow::instance_ = 0;
 
 int AppWindow::charWidth_ = 8;
 int AppWindow::charHeight_ = 8;
@@ -567,8 +568,12 @@ AppWindow *AppWindow::Create(GUICreateWindowParams &params) {
     I_GUIWindowImp &imp =
         I_GUIWindowFactory::GetInstance()->CreateWindowImp(params);
     AppWindow *w = new AppWindow(imp);
+    AppWindow::instance_ = w;
     return w;
 };
+
+// TREEFROG_PROJECT_RENAME_V1 (H38.5): singleton accessor.
+AppWindow *AppWindow::GetInstance() { return AppWindow::instance_; };
 
 void AppWindow::SetDirty() { _isDirty = true; };
 
