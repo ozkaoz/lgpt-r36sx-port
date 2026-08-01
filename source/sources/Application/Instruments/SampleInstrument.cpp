@@ -1037,9 +1037,13 @@ void SampleInstrument::SetRowVolume(int channel,unsigned char vol) {
 	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return ;
 	renderParams *rp=renderParams_+channel ;
 	if (!rp->sampleBuffer_) return ;
-	// TREEFROG_PHRASE_VOL_V3: row gain is stored persistently and applied to
-	// every tick (base volume + automation offset), so it is never overwritten.
-	fixed rowGain=i2fp(((int)vol<<8)/0xFE) ;
+	// TREEFROG_PHRASE_VOL_V4_NORMALIZED_Q15:
+	// SetRowVolume receives an integer gain in 0..254. Convert it exactly once
+	// to Q15 0..FP_ONE. The previous i2fp((vol << 8) / 254) converted an
+	// already-scaled ratio as an integer, producing gains up to 256x and hard
+	// clipping every practical value below 100.
+	const unsigned int clamped = (vol > 0xFE) ? 0xFEu : (unsigned int)vol ;
+	fixed rowGain=(fixed)((((long long)clamped*(long long)FP_ONE)+127LL)/254LL) ;
 	rp->rowGain_=rowGain ;
 	rp->volume_=fp_mul(rp->baseVolume_,rowGain) ;
 } ;

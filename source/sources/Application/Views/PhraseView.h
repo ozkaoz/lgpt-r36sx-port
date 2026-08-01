@@ -70,6 +70,7 @@ class PhraseView : public View {
     int getChopSourceInstrumentForCurrentRow();
     int getChopSourceInstrumentForRow(int row);
     int getSavedChopCountForRow(int row, int *sourceInstrument);
+    void ensureDefaultVolumeForRow(int row);
     bool updateChopNoteValueForRow(int row, ViewUpdateDirection direction);
     bool pasteDefaultChopForRow(int row);
     bool adjustPtchParamForRow(int row, int paramCol, ViewUpdateDirection direction);
