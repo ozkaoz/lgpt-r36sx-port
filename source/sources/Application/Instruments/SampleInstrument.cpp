@@ -213,7 +213,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 
 	 int rootNote=(rootNote_->GetInt()-60)+source_->GetRootNote(rp->midiNote_) ;
 
-	 rp->volume_=rp->baseVolume_=i2fp(volume_->GetInt()) ;
+	 rp->volume_=rp->baseVolume_= (fixed)(((long long)volume_->GetInt() * (long long)FP_ONE + 127LL) / 255LL) ;
 	 rp->rowGain_=FP_ONE ;
 	 rp->attenuate_=i2fp(attenuate_->GetInt()) ;	 rp->pan_=rp->basePan_=i2fp(pan_->GetInt()) ;
 
