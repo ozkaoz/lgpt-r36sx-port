@@ -213,7 +213,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 
 	 int rootNote=(rootNote_->GetInt()-60)+source_->GetRootNote(rp->midiNote_) ;
 
-	 rp->volume_=rp->baseVolume_= (fixed)(((long long)volume_->GetInt() * (long long)FP_ONE + 127LL) / 255LL) ;
+	 rp->volume_=rp->baseVolume_=i2fp(volume_->GetInt()) ;
 	 rp->rowGain_=FP_ONE ;
 	 rp->attenuate_=i2fp(attenuate_->GetInt()) ;	 rp->pan_=rp->basePan_=i2fp(pan_->GetInt()) ;
 
@@ -1037,11 +1037,11 @@ void SampleInstrument::SetRowVolume(int channel,unsigned char vol) {
 	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return ;
 	renderParams *rp=renderParams_+channel ;
 	if (!rp->sampleBuffer_) return ;
-	// TREEFROG_PHRASE_VOL_V4_NORMALIZED_Q15:
-	// SetRowVolume receives an integer gain in 0..254. Convert it exactly once
-	// to Q15 0..FP_ONE. The previous i2fp((vol << 8) / 254) converted an
-	// already-scaled ratio as an integer, producing gains up to 256x and hard
-	// clipping every practical value below 100.
+	// TREEFROG_PHRASE_VOL_V7:
+	// SetRowVolume receives an integer gain in 0..254 (mapped from phrase 0..100).
+	// Convert to Q15 0..FP_ONE. baseVolume_ is instrument_vol<<15 (0..255*FP_ONE).
+	// volume_ = baseVolume_ * rowGain_ (fp_mul) => 0..255*FP_ONE.
+	// Render uses volscale=1/255 => final gain 0..1.
 	const unsigned int clamped = (vol > 0xFE) ? 0xFEu : (unsigned int)vol ;
 	fixed rowGain=(fixed)((((long long)clamped*(long long)FP_ONE)+127LL)/254LL) ;
 	rp->rowGain_=rowGain ;
