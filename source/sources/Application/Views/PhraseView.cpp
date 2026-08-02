@@ -291,14 +291,14 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
         if (editCol == 0 && updateChopNoteValueForRow(row_ + yOffset, direction)) {
             lastNote_ = *c;
         } else {
-// TREEFROG_PHRASE_VOL_V3 (H38.6): new note rows get volume 100
-// automatically, and an empty volume cell edited directly starts
-// at 100 (the full-volume level).
-bool noteWasEmpty = (editCol == 0) && (*c == 0xFF);
-if ((editCol == 1) && (*c == 0xFF)) {
-    *c = 0x64;
-    isDirty_ = true;
-}
+            // TREEFROG_PHRASE_VOL_V3 (H38.6): new note rows get volume 100
+            // automatically, and an empty volume cell edited directly starts
+            // at 100 (the full-volume level).
+            bool noteWasEmpty = (editCol == 0) && (*c == 0xFF);
+            if ((editCol == 1) && (*c == 0xFF)) {
+                *c = 0x64;
+                isDirty_ = true;
+            }
             int offset = offsets_[editCol == 2 ? 2 : (editCol == 1 ? 1 : 0)][direction];
             if (editCol == 1 && (direction == VUD_UP || direction == VUD_DOWN)) {
                 int step = bigStep ? 10 : 1;
