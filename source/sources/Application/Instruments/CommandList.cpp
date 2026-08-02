@@ -4,10 +4,11 @@
 static FourCC _all[]= {
 	I_CMD_NONE,
 	// TREEFROG_BEATMAKING_FX_V1:
-	// Phrase command list trimmed to the six beatmaking FX families:
+	// Phrase command list trimmed to the beatmaking FX families:
 	// reverb (FBMX/FBTN), delay (DLAY), filter (FLTR/FCUT/FRES), compression
-	// (CRSH), pitch (PTCH/PFIN). Engine processing is untouched: projects
-	// using other commands still play and are editable from their views.
+	// (CRSH), fine pitch (PFIN). PTCH was removed (H38.7): pitch now lives in
+	// its own phrase column. Engine processing is untouched: projects using
+	// other commands still play and are editable from their views.
 	I_CMD_FBMX,
 	I_CMD_FBTN,
 	I_CMD_DLAY,
@@ -15,7 +16,6 @@ static FourCC _all[]= {
 	I_CMD_FCUT,
 	I_CMD_FRES,
 	I_CMD_CRSH,
-	I_CMD_PTCH,
 	I_CMD_PFIN
 } ;
 

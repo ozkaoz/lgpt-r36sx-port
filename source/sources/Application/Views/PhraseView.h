@@ -57,6 +57,7 @@ class PhraseView : public View {
     int lastNote_;
     int lastVol_;
     int lastInstr_;
+    int lastPitch_;
     int lastCmd_;
     int lastParam_;
     bool commandSelectorModalActive_;
@@ -85,6 +86,7 @@ class PhraseView : public View {
         uchar note_[16];
         uchar instr_[16];
         uchar vol_[16];
+        uchar pitch_[16];
         uint cmd1_[16];
         ushort param1_[16];
         uint cmd2_[16];
@@ -96,8 +98,8 @@ class PhraseView : public View {
     int saveCol_;
     int saveRow_;
 
-    static short offsets_[3][4];
-    static const int kColCount = 7;
+    static short offsets_[4][4];
+    static const int kColCount = 8;
     static const int kColX[kColCount];
     // Header center X per column (headers centered over their column).
     static const int kColHeaderX[kColCount];

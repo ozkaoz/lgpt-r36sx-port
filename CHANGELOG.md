@@ -2,6 +2,8 @@
 
 ## H38.6
 
+- New dedicated Pitch column in the phrase grid (`N V P I FX1 P1 FX2 P2`): each step can be transposed -24..+24 semitones, edited with L/R (+-1) and A+UP/DOWN (+-10). Persisted in the project (new `PITCHES` buffer) and applied per note at playback. Chop rows (S01..S99) are protected so the pitch never selects a different chop.
+- PTCH command removed from the FX command list (old projects with PTCH in FX are ignored on playback; the pitch is now a per-step column).
 - Phrase volume fix: every value 0-100 now maps linearly (100 = full, 1 = ~2%, 0/0xFF = silent), no clipping or distortion at any level; new notes default to volume 100.
 - Mixer VU meters now refresh in real time even while the player is stopped (same frame cadence as the USB-C Record meter).
 - Rename Project moved from the in-project menu (crash when re-entering TreeFrogUI) to the startup menu: R1+A on a selected project.

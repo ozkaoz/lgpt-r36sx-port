@@ -36,6 +36,7 @@ void Song::SaveContent(TiXmlNode *node) {
 	saveHexBuffer(node,"NOTES",phrase_->note_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"INSTRUMENTS",phrase_->instr_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"VOLUME",phrase_->vol_,PHRASE_COUNT*16) ;
+	saveHexBuffer(node,"PITCHES",phrase_->pitch_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"COMMAND1",phrase_->cmd1_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"PARAM1",phrase_->param1_,PHRASE_COUNT*16) ;
 	saveHexBuffer(node,"COMMAND2",phrase_->cmd2_,PHRASE_COUNT*16) ;
@@ -67,6 +68,9 @@ void Song::RestoreContent(TiXmlElement *element) {
 		} ;
 		if (!strcmp("VOLUME",value)) {
 			restoreHexBuffer(current,phrase_->vol_) ;
+		} ;
+		if (!strcmp("PITCHES",value)) {
+			restoreHexBuffer(current,phrase_->pitch_) ;
 		} ;
 		if (!strcmp("COMMAND1",value)) {
 			restoreHexBuffer(current,(uchar *)phrase_->cmd1_) ;

@@ -14,6 +14,9 @@ Phrase::Phrase() {
 	vol_=(unsigned char *)SYS_MALLOC(size) ;
 	memset(vol_,0xFF,size) ;
 
+	pitch_=(unsigned char *)SYS_MALLOC(size) ;
+	memset(pitch_,0x00,size) ;
+
 	cmd1_=(FourCC *)SYS_MALLOC(size*sizeof(FourCC)) ;
 	memset(cmd1_,'-',size*sizeof(FourCC)) ;
 	param1_=(unsigned short *)SYS_MALLOC(size*sizeof(short)) ;
@@ -38,6 +41,7 @@ Phrase::~Phrase() {
 	if (note_) SYS_FREE(note_) ;
 	if (instr_) SYS_FREE(instr_) ;
 	if (vol_) SYS_FREE(vol_) ;
+	if (pitch_) SYS_FREE(pitch_) ;
 	if (cmd1_) SYS_FREE(cmd1_) ;
 	if (param1_) SYS_FREE(param1_) ;
 	if (cmd2_) SYS_FREE(cmd2_) ;

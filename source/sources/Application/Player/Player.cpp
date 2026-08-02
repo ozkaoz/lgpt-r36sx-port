@@ -23,6 +23,7 @@ static void TreeFrogStartTrace(const char *msg) {
 #include "System/Console/n_assert.h"
 #include "Application/Player/TablePlayback.h"
 #include "Application/Model/Groove.h"
+#include "Application/Views/ModalDialogs/SampleChopperModal.h"
 #include <math.h>
 #include <string.h>
 #include "Services/Midi/MidiService.h"
@@ -723,6 +724,11 @@ bool Player::ProcessChannelCommand(int channel,FourCC cmd,ushort param) {
                 timeToLive_[channel]=timeToLive+1 ;
 			}
 			return true ;
+		// TREEFROG_PHRASE_PITCH_COLUMN_V1 (H38.7): PTCH is removed from FX.
+		// Old projects that carry PTCH in cmd1_/cmd2_ do nothing here; pitch
+		// now lives in its own phrase column.
+		case I_CMD_PTCH:
+			return true ;
 		case I_CMD_TMPO:
             if ((param<400)&&(param>40))
             {
@@ -928,6 +934,27 @@ void Player::playCursorPosition(int channel) {
 				unsigned char *trsp=viewData_->song_->chain_->transpose_+(16*chain+chainPos) ;
 				note+=*trsp ;
 				note+=project_->GetTranspose() ;
+				// TREEFROG_PHRASE_PITCH_COLUMN_V1 (H38.7): dedicated pitch column.
+				// The row pitch (signed -24..+24 semitones) is added to the note.
+				// Chop rows use the note column as a chop index (S01..S99), so
+				// the pitch is skipped there to avoid selecting a different chop.
+				{
+					int originalNote=(int)phrase->note_[16*currentPhrase+pos] ;
+					bool isChopRow=false ;
+					if (instr!=0xFF) {
+						int displayChopNumber=0 ;
+						if (LGPTChopperIsChopNoteForInstrument(viewData_,instr,originalNote,&displayChopNumber)) {
+							isChopRow=true ;
+						}
+					}
+					int pitch=(int)((signed char)phrase->pitch_[16*currentPhrase+pos]) ;
+					if (pitch!=0 && !isChopRow) {
+						int n=(int)note+pitch ;
+						if (n<0) n=0 ;
+						if (n>127) n=127 ;
+						note=(unsigned char)n ;
+					}
+				}
 				instrumentOnChannel_[channel][0] = (instr/16)>9?'A'-10+(instr/16):'0'+(instr/16);
 				instrumentOnChannel_[channel][1] = (instr%16)>9?'A'-10+(instr%16):'0'+(instr%16);
 				instrumentOnChannel_[channel][2] = '\0';

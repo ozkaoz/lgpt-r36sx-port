@@ -19,7 +19,6 @@ static inline void getCommandDisplayName(FourCC command, char *out) {
 		case I_CMD_FCUT: strcpy(out, "EQ  "); break;
 		case I_CMD_FRES: strcpy(out, "RES "); break;
 		case I_CMD_CRSH: strcpy(out, "CMP "); break;
-		case I_CMD_PTCH: strcpy(out, "PIT "); break;
 		case I_CMD_PFIN: strcpy(out, "PFI "); break;
 		default: {
 			const char *src = (const char *)&command;
@@ -54,11 +53,6 @@ static inline std::string* getHelpLegend(FourCC command) {
 		case I_CMD_VOLM:
 			result[0].assign("VOLuMe:aabb");
 			result[1].assign("approach volume");
-			break;
-		case I_CMD_PTCH:
-			result[0].assign("PiTCH:aabb");
-			result[1].assign("ramp pitch to aa");
-			result[2].assign("at speed bb");
 			break;
 		case I_CMD_HOP:
 			result[0].assign("HOP:aabb");

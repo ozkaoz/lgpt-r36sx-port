@@ -218,6 +218,7 @@ void Project::Purge() {
     data=song_->phrase_->note_ ;
     data2=song_->phrase_->instr_ ;
     unsigned char *data3=song_->phrase_->vol_ ;
+    unsigned char *data4=song_->phrase_->pitch_ ;
 
 	FourCC *cmd1=song_->phrase_->cmd1_ ;
 	ushort *param1=song_->phrase_->param1_ ;
@@ -232,6 +233,7 @@ void Project::Purge() {
 				*data=0xFF ;
 				*data2=0xFF ;
 				*data3=0xFF ;
+				*data4=0x00 ;
 				*cmd1='----' ;
 				*param1=0 ;
 				*cmd2='----' ;
@@ -242,6 +244,7 @@ void Project::Purge() {
             data++ ;
             data2++ ;
             data3++ ;
+            data4++ ;
 			cmd1++ ;
 			param1++ ;
 			cmd2++ ;

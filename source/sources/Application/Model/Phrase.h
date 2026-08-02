@@ -17,6 +17,7 @@ public:
 	uchar *note_ ;
 	uchar *instr_ ;
 	uchar *vol_ ;
+	uchar *pitch_ ;
 	FourCC *cmd1_ ;
 	ushort *param1_ ;
 	FourCC *cmd2_ ;

@@ -9,6 +9,25 @@ visible) y el **menú de acciones de proyecto** en la pantalla inicial.
 
 ## Correcciones en esta versión
 
+### 0. Nueva columna de Pitch por step (`N V P I FX1 P1 FX2 P2`)
+
+- La rejilla de phrase pasa de `N V I FX1 P1 FX2 P2` a **ocho columnas**:
+  se inserta una columna **P** (pitch) entre Volumen e Instrumento.
+- Cada step guarda un pitch **-24..+24 semitonos** (0 = sin pitch). Se
+  edita igual que el volumen: **L/R** ±1 y **A+UP/DOWN** ±10, con el valor
+  mostrado como `+12`, `-05`, etc.
+- Se aplica por nota al reproducir (se suma a la nota tras transposiciones
+  de chain/proyecto, con clamp 0-127). Persiste en el proyecto mediante un
+  nuevo buffer `PITCHES` (los proyectos viejos cargan con pitch 0).
+- **PTCH desaparece de los FX**: ya no aparece en la lista de comandos ni
+  en el selector. Los proyectos viejos que tengan `PTCH` en FX se ignoran
+  al reproducir (no hacen nada) para no sonar distinto.
+- **Protección de chops**: en filas con chop guardado (notas `S01..S99`)
+  el pitch no se aplica a la nota, para que nunca seleccione un chop
+  distinto al programado.
+- La selección, copiar/pegar, cortar e interpolar soportan la nueva
+  columna de pitch.
+
 ### 1. Volumen de frase corregido (escala lineal, sin distorsión)
 
 - **Causa raíz**: los bloques de Render de `SampleInstrument` sobrescribían
