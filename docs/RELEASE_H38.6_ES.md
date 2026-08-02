@@ -1,8 +1,9 @@
-# LGPT R36SX H38.6 — Volumen lineal, VU en vivo, Rename en el menú de inicio, editor de texto unificado
+# LGPT R36SX H38.6 — Volumen lineal, Mixer con VU en vivo y barra MST, Rename en el menú de inicio, editor de texto unificado
 
 Build H38.6, ABI7, three-mode, frontend-safe. Corrige los tres fallos
 detectados en las pruebas de hardware de H38.5 (volumen de frase,
-VU del Mixer y Rename Project) y unifica la entrada de texto del port.
+VU del Mixer y Rename Project), unifica la entrada de texto del port y
+rehace las barras del Mixer (onda en vivo + máster ajustable + menú FX).
 
 ## Correcciones en esta versión
 
@@ -45,6 +46,35 @@ VU del Mixer y Rename Project) y unifica la entrada de texto del port.
   - `A` = confirmar · `B` = borrar carácter · `R1 + LEFT` = cancelar
 - El teclado QWERTY en pantalla del New Project se retiró en favor de esta
   lógica uniforme.
+
+## 5. Mixer: barras de onda en vivo, barra MST y menú Instrument FX
+
+### Barras de canal dinámicas (forma de onda en tiempo real)
+
+- El relleno de cada barra ahora sigue el **nivel de salida real del canal**
+  (`GetChannelPeak`): volumen bajo = onda pequeña, volumen alto = onda
+  grande.
+- El ajuste de volumen del canal se dibuja como una **marca de color** sobre
+  la barra y como número debajo (ya no es un relleno estático blanco).
+
+### Barra maestra MST (nueva, a la izquierda)
+
+- La barra **MST** (master) se dibuja en vivo **a la izquierda de la primera
+  barra de canal**, en cian para distinguirse de los canales (blanco) y con
+  su propio pico de nivel.
+- Es **seleccionable**: `LEFT` desde el canal 0 entra en MST, `RIGHT` vuelve
+  al canal 0.
+- Con MST seleccionado, `A+UP/DOWN` ajusta el **volumen global** (10 en 10)
+  y `A+LEFT/RIGHT` lo afina (1 en 1). El valor se guarda en el proyecto
+  (igual que "Master" del menú Project) y se aplica al instante.
+
+### Menú Instrument FX (R1+A / R2+A)
+
+- Ya **no se cierra con A** al editar (A sola no hace nada).
+- Se cierra con **B** o con el **mismo combo que lo abre** (R1+A / R2+A).
+- Edición de valores **como en Song**: `A+UP/DOWN` = ±0x10 (grueso),
+  `A+LEFT/RIGHT` = ±1 (fino).
+- **A+B** restaura el valor por defecto de la opción seleccionada.
 
 ## Instalación
 

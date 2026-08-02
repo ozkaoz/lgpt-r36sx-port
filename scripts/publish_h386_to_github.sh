@@ -22,7 +22,7 @@ TMP_ROOT=""
 mkdir -p "$LOG_ROOT" "$BACKUP_ROOT"
 exec > >(tee -a "$LOG") 2>&1
 
-CORE_SHA256="feba1756a1e11c42190b31d88711c2099cf873a9ab42a5ce5588595e4c02d8d1"
+CORE_SHA256="ea6c78047b116a0e8cb650bd26651467d801cfd622d9309190907c8d60fc5265"
 DAEMON_SHA256="53258f2b8b3749c866af248814eb147f0762a1b17cfffb644adb573167b52815"
 APK_SHA256="fd9787727ed683236e12d50c180a9c999db362785bd53758754d8c74e697cd06"
 
@@ -222,7 +222,7 @@ commit_release() {
   git -C "$REPO_ROOT" diff --cached --stat
   [[ -n "$(git -C "$REPO_ROOT" diff --cached --name-only)" ]] || fail "nothing to commit"
 
-  git -C "$REPO_ROOT" commit -m "Release H38.6: linear phrase volume, live mixer VU, startup-menu rename, unified text editor"
+  git -C "$REPO_ROOT" commit -m "Release H38.6: linear phrase volume, live mixer VU with MST bar, FX menu fixes, unified text editor"
   git -C "$REPO_ROOT" tag -a "$TAG" -m "LGPT R36SX H38.6 fixes from hardware feedback"
   echo "RELEASE_COMMIT=$(git -C "$REPO_ROOT" rev-parse HEAD)"
 }

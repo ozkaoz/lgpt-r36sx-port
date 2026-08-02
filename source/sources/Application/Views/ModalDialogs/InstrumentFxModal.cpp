@@ -63,6 +63,69 @@ void InstrumentFxModal::applyRow(int row) {
 void InstrumentFxModal::ProcessButtonMask(unsigned short mask, bool pressed) {
     if (!pressed) return;
 
+    // A modifier:
+    //  R1+A / R2+A  -> close (the same combo that opens the menu)
+    //  A+UP/DOWN    -> value +/- 0x10 (coarse, like Song)
+    //  A+LEFT/RIGHT -> value +/- 1 (fine, like Song)
+    //  A+B          -> reset the selected option to its default
+    //  A alone      -> nothing (must not close anymore)
+    if (mask & EPBM_A) {
+        if (mask & (EPBM_R | EPBM_R2)) {
+            EndModal(1);
+            return;
+        }
+        if (mask & EPBM_UP) {
+            if (row_ < 6) {
+                values_[row_] = (values_[row_] + 0x10) & 0xFF;
+                applyRow(row_);
+                isDirty_ = true;
+            }
+            return;
+        }
+        if (mask & EPBM_DOWN) {
+            if (row_ < 6) {
+                values_[row_] = (values_[row_] - 0x10) & 0xFF;
+                applyRow(row_);
+                isDirty_ = true;
+            }
+            return;
+        }
+        if (mask & EPBM_RIGHT) {
+            if (row_ < 6) {
+                values_[row_] = (values_[row_] + 1) & 0xFF;
+                applyRow(row_);
+                isDirty_ = true;
+            }
+            return;
+        }
+        if (mask & EPBM_LEFT) {
+            if (row_ < 6) {
+                values_[row_] = (values_[row_] - 1) & 0xFF;
+                applyRow(row_);
+                isDirty_ = true;
+            }
+            return;
+        }
+        if (mask & EPBM_B) {
+            if (row_ < 6 && kFxVariables[row_] != FX_NONE && instrument_) {
+                Variable *v = instrument_->FindVariable(kFxVariables[row_]);
+                if (v) {
+                    v->Reset();
+                    values_[row_] = v->GetInt();
+                    applyRow(row_);
+                    isDirty_ = true;
+                }
+            }
+            return;
+        }
+        return;
+    }
+
+    if (mask & EPBM_B) {
+        EndModal(0);
+        return;
+    }
+
     if (mask & EPBM_DOWN) {
         row_ = (row_ + 1) % kRowCount;
         isDirty_ = true;
@@ -71,26 +134,6 @@ void InstrumentFxModal::ProcessButtonMask(unsigned short mask, bool pressed) {
     if (mask & EPBM_UP) {
         row_ = (row_ + kRowCount - 1) % kRowCount;
         isDirty_ = true;
-        return;
-    }
-    if (mask & EPBM_A) {
-        if (mask & EPBM_RIGHT) {
-            if (row_ < 6) {
-                values_[row_] = (values_[row_] + 0x10) & 0xFF;
-                applyRow(row_);
-                isDirty_ = true;
-            }
-            return;
-        }
-        if (mask & EPBM_LEFT) {
-            if (row_ < 6) {
-                values_[row_] = (values_[row_] - 0x10) & 0xFF;
-                applyRow(row_);
-                isDirty_ = true;
-            }
-            return;
-        }
-        EndModal(1);
         return;
     }
     if (mask & EPBM_RIGHT) {
@@ -107,10 +150,6 @@ void InstrumentFxModal::ProcessButtonMask(unsigned short mask, bool pressed) {
             applyRow(row_);
         }
         isDirty_ = true;
-        return;
-    }
-    if (mask & EPBM_B) {
-        EndModal(0);
         return;
     }
     if (mask & (EPBM_X | EPBM_Y)) {
@@ -171,8 +210,8 @@ void InstrumentFxModal::DrawView() {
     props.invert_ = false;
 
     SetColor(CD_NORMAL);
-    DrawString(1, 10, "L/R val  A+L/R x16  X/Y toggle", props);
-    DrawString(1, 11, "A ok  B close", props);
+    DrawString(1, 10, "A+UP/DN x16  A+L/R x1  XY", props);
+    DrawString(1, 11, "A+B dflt  R1+A/B close", props);
 }
 
 void InstrumentFxModal::OnPlayerUpdate(PlayerEventType, unsigned int) {

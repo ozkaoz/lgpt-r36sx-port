@@ -20,6 +20,7 @@ protected:
 	void onStop() ;
 	void updateCursor(int dx,int dy)  ;
 	void updateVolume(int delta) ;
+	void adjustMasterVolume(int delta) ;
 	void toggleMute() ;
 	void switchSoloMode() ;
 	void drawVolumeBar(int channel,int x,int y,int height) ;
@@ -43,6 +44,7 @@ private:
 	int saveOffset_ ;
 	bool invertBatt_ ;
 	bool soloMode_ ;
+	bool masterSelected_ ;
 	int frameRefreshDivider_ ;
 } ;
 #endif

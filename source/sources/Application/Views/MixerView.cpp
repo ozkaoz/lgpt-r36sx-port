@@ -17,6 +17,7 @@ MixerView::MixerView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
 	clipboard_.data_=0 ;
 	invertBatt_=false;
 	soloMode_=false;
+	masterSelected_=false;
 }
 
 MixerView::~MixerView() {
@@ -42,25 +43,57 @@ void MixerView::OnFocus() {
 
 void MixerView::updateCursor(int dx,int dy) {
 	(void)dy ;
-	int x=viewData_->mixerCol_ ;
-	x+=dx ;
-	if (x<0) x=0 ;
-	if (x>7) x=7 ;
-	viewData_->mixerCol_=x ;
+	// TREEFROG_MIXER_MASTER_BAR_V1:
+	// The master bar sits to the LEFT of channel 0. Moving left from channel 0
+	// selects the master; moving right from the master selects channel 0.
+	if (masterSelected_) {
+		if (dx>0) {
+			masterSelected_=false ;
+			viewData_->mixerCol_=0 ;
+		}
+	} else {
+		int x=viewData_->mixerCol_ ;
+		x+=dx ;
+		if (x<0) {
+			x=0 ;
+			masterSelected_=true ;
+		}
+		if (x>7) x=7 ;
+		viewData_->mixerCol_=x ;
+	}
 	isDirty_=true;
 }
 
 void MixerView::updateVolume(int delta) {
+	if (masterSelected_) {
+		adjustMasterVolume(delta) ;
+		return ;
+	}
 	Mixer::GetInstance()->NudgeChannelVolume(viewData_->mixerCol_,delta) ;
 	isDirty_=true ;
 }
 
+void MixerView::adjustMasterVolume(int delta) {
+	Project *project=viewData_->project_ ;
+	if (!project) return ;
+	int v=project->GetMasterVolume() ;
+	v+=delta ;
+	if (v<10) v=10 ;
+	if (v>100) v=100 ;
+	Variable *var=project->FindVariable(VAR_MASTERVOL) ;
+	if (var) var->SetInt(v,false) ;
+	MixerService::GetInstance()->SetMasterVolume(v) ;
+	isDirty_=true ;
+}
+
 void MixerView::toggleMute() {
+	if (masterSelected_) return ;
 	UIController::GetInstance()->ToggleMute(viewData_->mixerCol_,viewData_->mixerCol_) ;
 	isDirty_=true ;
 }
 
 void MixerView::switchSoloMode() {
+	if (masterSelected_) return ;
 	UIController::GetInstance()->SwitchSoloMode(viewData_->mixerCol_,viewData_->mixerCol_,!soloMode_) ;
 	soloMode_=!soloMode_ ;
 	isDirty_=true ;
@@ -181,7 +214,7 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	int volume=mixer->GetChannelVolume(channel) ;
 	MixerService *ms=MixerService::GetInstance() ;
 	float peak=ms->GetChannelPeak(channel) ;
-	bool selected=(channel==viewData_->mixerCol_) ;
+	bool selected=(!masterSelected_ && channel==viewData_->mixerCol_) ;
 	bool muted=player->IsChannelMuted(channel) ;
 	GUITextProperties props ;
 	char buffer[8] ;
@@ -201,31 +234,38 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	DrawString(x,y,hex,props) ;
 	props.invert_=false ;
 
-	// TREEFROG_VU_METERS_V3 (H38.5): dense contiguous LED segments, one per
-	// character cell (2 per row, no gaps), in the style of the USB-C record
-	// meter. The bar reacts in real time to the actual channel output
-	// (MixerService::GetChannelPeak): the tip lights in accent color above
-	// the sustained volume fill.
+	// TREEFROG_MIXER_LIVE_BAR_V4 (H38.7):
+	// The bar fill follows the real-time output level (GetChannelPeak), so a
+	// low volume reads as a small wave and a loud volume as a big one. The
+	// channel volume setting is drawn as an accent marker cell plus the
+	// numeric value below. Selected bars stay purple, muted bars dim.
 	int totalCells=2*height ;
-	int filledCells=(volume*totalCells+99)/100 ;
+	int filledCells=int(peak*float(totalCells)) ;
 	if (filledCells>totalCells) filledCells=totalCells ;
-	int peakCells=int(peak*float(totalCells)) ;
-	if (peakCells>totalCells) peakCells=totalCells ;
+	int volMarker=(volume*totalCells+99)/100 ;
+	if (volMarker>totalCells) volMarker=totalCells ;
 	for (int row=0;row<height;row++) {
 		for (int c=0;c<2;c++) {
 			int cellFromBottom=totalCells-(2*row+c) ;
 			bool on=(cellFromBottom<=filledCells) ;
-			bool vu=((!on)&&(cellFromBottom<=peakCells)) ;
-			bool tip=((on)&&(cellFromBottom==peakCells)&&(peakCells>0)&&(peakCells<=filledCells)) ;
-			if (vu||tip) {
-				SetColor(selected?CD_HILITE1:CD_HILITE2) ;
-				props.invert_=true ;
-			} else if (on) {
-				SetColor(selected?CD_HILITE2:CD_NORMAL) ;
-				props.invert_=true ;
-			} else {
-				SetColor(muted?CD_BORDER:CD_HILITE1) ;
+			bool marker=((!on)&&(cellFromBottom==volMarker)) ;
+			if (selected) {
+				SetColor(on?CD_HILITE2:CD_HILITE1) ;
+				props.invert_=on ;
+			} else if (muted) {
+				SetColor(CD_BORDER) ;
 				props.invert_=false ;
+			} else {
+				if (on) {
+					SetColor(CD_NORMAL) ;
+					props.invert_=true ;
+				} else if (marker) {
+					SetColor(CD_HILITE2) ;
+					props.invert_=true ;
+				} else {
+					SetColor(CD_HILITE1) ;
+					props.invert_=false ;
+				}
 			}
 			DrawString(x+c,y+1+row," ",props) ;
 		}
@@ -251,41 +291,48 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	GUITextProperties props ;
 	char buffer[8] ;
 
-	SetColor(CD_NORMAL) ;
+	// TREEFROG_MIXER_MASTER_BAR_V1 (H38.7):
+	// Master (MST) bar drawn live on the left of the channel bars, in cyan so
+	// it stands out from the white channel fills. When selected it lights
+	// purple like a selected channel.
+	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
 	props.invert_=false ;
 	DrawString(x-1,y,"MST",props) ;
 
-	// TREEFROG_VU_METERS_V3 (H38.5): dense contiguous LED segments,
-	// master-wide, same style as the record meter (see drawVolumeBar).
 	int totalCells=2*height ;
-	int filledCells=(volume*totalCells+99)/100 ;
+	int filledCells=int(peak*float(totalCells)) ;
 	if (filledCells>totalCells) filledCells=totalCells ;
-	int peakCells=int(peak*float(totalCells)) ;
-	if (peakCells>totalCells) peakCells=totalCells ;
+	int volMarker=(volume*totalCells+99)/100 ;
+	if (volMarker>totalCells) volMarker=totalCells ;
 	for (int row=0;row<height;row++) {
 		for (int c=0;c<2;c++) {
 			int cellFromBottom=totalCells-(2*row+c) ;
 			bool on=(cellFromBottom<=filledCells) ;
-			bool vu=((!on)&&(cellFromBottom<=peakCells)) ;
-			bool tip=((on)&&(cellFromBottom==peakCells)&&(peakCells>0)&&(peakCells<=filledCells)) ;
-			if (vu||tip) {
-				SetColor(CD_HILITE2) ;
-				props.invert_=true ;
-			} else if (on) {
-				SetColor(CD_NORMAL) ;
-				props.invert_=true ;
+			bool marker=((!on)&&(cellFromBottom==volMarker)) ;
+			if (masterSelected_) {
+				SetColor(on?CD_HILITE2:CD_HILITE1) ;
+				props.invert_=on ;
 			} else {
-				SetColor(CD_HILITE1) ;
-				props.invert_=false ;
+				if (on) {
+					SetColor(CD_PLAY) ;
+					props.invert_=true ;
+				} else if (marker) {
+					SetColor(CD_HILITE2) ;
+					props.invert_=true ;
+				} else {
+					SetColor(CD_HILITE1) ;
+					props.invert_=false ;
+				}
 			}
 			DrawString(x+c,y+1+row," ",props) ;
 		}
 	}
 
-	SetColor(CD_NORMAL) ;
-	props.invert_=false ;
+	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
+	props.invert_=masterSelected_ ;
 	sprintf(buffer,"%3d",volume) ;
 	DrawString(x-1,y+height+2,buffer,props) ;
+	props.invert_=false ;
 }
 
 void MixerView::DrawView() {
@@ -303,7 +350,7 @@ void MixerView::DrawView() {
 	Player *player=Player::GetInstance() ;
 	DrawString(21,pos._y,(player->GetSequencerMode()==SM_SONG)?"Song":"Live",props) ;
 
-	const int x0=6 ;
+	const int x0=8 ;
 	const int y0=anchor._y+1 ;
 	const int height=11 ;
 	const int dx=4 ;
@@ -312,15 +359,15 @@ void MixerView::DrawView() {
 	DrawString(0,y0,"CH",props) ;
 	DrawString(0,y0+height+2,"VL",props) ;
 
+	drawMasterBar(x0-dx,y0,height) ;
 	for (int i=0;i<8;i++) {
 		drawVolumeBar(i,x0+i*dx,y0,height) ;
 	}
-	drawMasterBar(x0+8*dx,y0,height) ;
 
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
 	DrawString(4,y0+height+4,"A+UP/DN x10  A+L/R x1",props) ;
-	DrawString(4,y0+height+5,"L/R channel  R1+B mute",props) ;
+	DrawString(4,y0+height+5,"L/R ch  L->MST  R1+B mute",props) ;
 	DrawString(4,y0+height+6,"START play  R1+A solo  R2+A FX",props) ;
 
 	drawNotes() ;
