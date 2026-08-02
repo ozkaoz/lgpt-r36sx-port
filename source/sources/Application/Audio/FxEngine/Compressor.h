@@ -55,6 +55,8 @@ public:
     fixed GetMakeupDb() const { return makeupDb_; }
     float GetAttackMs() const { return attackMs_; }
     float GetReleaseMs() const { return releaseMs_; }
+    fixed GetAttackMsFixed() const { return fl2fp(attackMs_); }
+    fixed GetReleaseMsFixed() const { return fl2fp(releaseMs_); }
     bool GetStereoLink() const { return stereoLink_; }
     bool GetBypass() const { return bypass_; }
     bool GetSoftClip() const { return softClip_; }

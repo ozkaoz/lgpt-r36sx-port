@@ -1,4 +1,6 @@
 #include "Mixer.h"
+#include "Application/Audio/FxEngine/FxEngine.h"
+#include <stdio.h>
 
 Mixer::Mixer():Persistent("MIXER")  {
 	Clear() ;
@@ -38,6 +40,7 @@ void Mixer::Clear() {
 		channelDelaySend_[i]=0 ;
 		channelReverbSend_[i]=0 ;
 	}
+	NotifyFxSends() ;
 } ;
 
 int Mixer::GetBus(int i) {
@@ -73,6 +76,7 @@ int Mixer::GetChannelDelaySend(int i) {
 void Mixer::SetChannelDelaySend(int i,int send) {
 	i=clampChannel(i) ;
 	channelDelaySend_[i]=clampSend(send) ;
+	NotifyFxSends() ;
 } ;
 
 void Mixer::NudgeChannelDelaySend(int i,int delta) {
@@ -88,11 +92,26 @@ int Mixer::GetChannelReverbSend(int i) {
 void Mixer::SetChannelReverbSend(int i,int send) {
 	i=clampChannel(i) ;
 	channelReverbSend_[i]=clampSend(send) ;
+	NotifyFxSends() ;
 } ;
 
 void Mixer::NudgeChannelReverbSend(int i,int delta) {
 	i=clampChannel(i) ;
 	SetChannelReverbSend(i,GetChannelReverbSend(i)+delta) ;
+} ;
+
+// Fase 5 auto-engage: any raised channel send must take the FxEngine out of
+// legacy bypass, otherwise the send would be silent.  RefreshLegacy() then
+// re-engages bypass only when every send is back at 0.
+void Mixer::NotifyFxSends() {
+	bool any=false ;
+	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+		if ((channelDelaySend_[i]!=0)||(channelReverbSend_[i]!=0)) {
+			any=true ;
+			break ;
+		}
+	}
+	FxEngine::FxEngine::GetInstance().NotifyChannelSendActive(any) ;
 } ;
 
 void Mixer::SaveContent(TiXmlNode *node) {
@@ -105,6 +124,52 @@ void Mixer::SaveContent(TiXmlNode *node) {
 		channel.SetAttribute("REVERBSEND",GetChannelReverbSend(i)) ;
 		node->InsertEndChild(channel) ;
 	}
+	// Fase 5: persist the FxEngine master parameters (delay/reverb/EQ/comp)
+	// with defaults = legacy.  A project without FXMASTER (old files) restores
+	// to the legacy default state.
+	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
+	TiXmlElement fxMaster("FXMASTER") ;
+	fxMaster.SetAttribute("DLYSEND",(int)fx.GetDelaySend()) ;
+	fxMaster.SetAttribute("DLYRET",(int)fx.GetDelayReturn()) ;
+	fxMaster.SetAttribute("DLYTIME",(int)fx.GetDelayTimeMs()) ;
+	fxMaster.SetAttribute("DLYFB",(int)fx.GetDelayFeedback()) ;
+	fxMaster.SetAttribute("DLYMIX",(int)fx.GetDelayMix()) ;
+	fxMaster.SetAttribute("DLYWID",(int)fx.GetDelayWidth()) ;
+	fxMaster.SetAttribute("DLYPP",fx.GetDelayPingPong()?1:0) ;
+	fxMaster.SetAttribute("DLYSAT",fx.GetDelaySaturation()?1:0) ;
+	fxMaster.SetAttribute("DLYBYP",fx.GetDelayBypass()?1:0) ;
+	fxMaster.SetAttribute("RVBSEND",(int)fx.GetReverbSend()) ;
+	fxMaster.SetAttribute("RVBRET",(int)fx.GetReverbReturn()) ;
+	fxMaster.SetAttribute("RVBPRE",(int)fx.GetReverbPredelayMs()) ;
+	fxMaster.SetAttribute("RVBDEC",(int)fx.GetReverbDecay()) ;
+	fxMaster.SetAttribute("RVBSIZ",(int)fx.GetReverbSize()) ;
+	fxMaster.SetAttribute("RVBDMP",(int)fx.GetReverbDamping()) ;
+	fxMaster.SetAttribute("RVBWID",(int)fx.GetReverbWidth()) ;
+	fxMaster.SetAttribute("RVBMODE",fx.GetReverbMode()) ;
+	fxMaster.SetAttribute("RVBMIX",(int)fx.GetReverbMix()) ;
+	fxMaster.SetAttribute("RVBBYP",fx.GetReverbBypass()?1:0) ;
+	fxMaster.SetAttribute("EQBYP",fx.GetEqBypass()?1:0) ;
+	for (int b=0;b<3;b++) {
+		char attr[16] ;
+		sprintf(attr,"EQ%dFRQ",b) ;
+		fxMaster.SetAttribute(attr,(int)fx.GetEqBandFreq(b)) ;
+		sprintf(attr,"EQ%dGAI",b) ;
+		fxMaster.SetAttribute(attr,(int)fx.GetEqBandGainDb(b)) ;
+		sprintf(attr,"EQ%dQ",b) ;
+		fxMaster.SetAttribute(attr,(int)fx.GetEqBandQ(b)) ;
+		sprintf(attr,"EQ%dEN",b) ;
+		fxMaster.SetAttribute(attr,fx.GetEqBandEnabled(b)?1:0) ;
+	}
+	fxMaster.SetAttribute("CMPTHR",(int)fx.GetCompThresholdDb()) ;
+	fxMaster.SetAttribute("CMPRAT",(int)fx.GetCompRatio()) ;
+	fxMaster.SetAttribute("CMPKNE",(int)fx.GetCompKneeDb()) ;
+	fxMaster.SetAttribute("CMPATK",(int)fx.GetCompAttackMsFixed()) ;
+	fxMaster.SetAttribute("CMPREL",(int)fx.GetCompReleaseMsFixed()) ;
+	fxMaster.SetAttribute("CMPMKU",(int)fx.GetCompMakeupDb()) ;
+	fxMaster.SetAttribute("CMPLNK",fx.GetCompStereoLink()?1:0) ;
+	fxMaster.SetAttribute("CMPSC",fx.GetCompSoftClip()?1:0) ;
+	fxMaster.SetAttribute("CMPBYP",fx.GetCompBypass()?1:0) ;
+	node->InsertEndChild(fxMaster) ;
 } ;
 
 void Mixer::RestoreContent(TiXmlElement *element) {
@@ -134,5 +199,78 @@ void Mixer::RestoreContent(TiXmlElement *element) {
 			}
 		}
 		current=current->NextSiblingElement("CHANNEL") ;
+	}
+	// Fase 5: restore FxEngine master params from FXMASTER.  Old project files
+	// (no FXMASTER) keep the legacy default state: engine bypass, FX off.
+	TiXmlElement *fxMaster=element->FirstChildElement("FXMASTER") ;
+	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
+	if (fxMaster) {
+		int value ;
+		if (fxMaster->Attribute("DLYSEND",&value)) fx.SetDelaySend((fixed)value) ;
+		if (fxMaster->Attribute("DLYRET",&value)) fx.SetDelayReturn((fixed)value) ;
+		if (fxMaster->Attribute("DLYTIME",&value)) fx.SetDelayTimeMs((fixed)value) ;
+		if (fxMaster->Attribute("DLYFB",&value)) fx.SetDelayFeedback((fixed)value) ;
+		if (fxMaster->Attribute("DLYMIX",&value)) fx.SetDelayMix((fixed)value) ;
+		if (fxMaster->Attribute("DLYWID",&value)) fx.SetDelayWidth((fixed)value) ;
+		if (fxMaster->Attribute("DLYPP",&value)) fx.SetDelayPingPong(value!=0) ;
+		if (fxMaster->Attribute("DLYSAT",&value)) fx.SetDelaySaturation(value!=0) ;
+		if (fxMaster->Attribute("DLYBYP",&value)) fx.SetDelayBypass(value!=0) ;
+		if (fxMaster->Attribute("RVBSEND",&value)) fx.SetReverbSend((fixed)value) ;
+		if (fxMaster->Attribute("RVBRET",&value)) fx.SetReverbReturn((fixed)value) ;
+		if (fxMaster->Attribute("RVBPRE",&value)) fx.SetReverbPredelayMs((fixed)value) ;
+		if (fxMaster->Attribute("RVBDEC",&value)) fx.SetReverbDecay((fixed)value) ;
+		if (fxMaster->Attribute("RVBSIZ",&value)) fx.SetReverbSize((fixed)value) ;
+		if (fxMaster->Attribute("RVBDMP",&value)) fx.SetReverbDamping((fixed)value) ;
+		if (fxMaster->Attribute("RVBWID",&value)) fx.SetReverbWidth((fixed)value) ;
+		if (fxMaster->Attribute("RVBMODE",&value)) fx.SetReverbMode(value) ;
+		if (fxMaster->Attribute("RVBMIX",&value)) fx.SetReverbMix((fixed)value) ;
+		if (fxMaster->Attribute("RVBBYP",&value)) fx.SetReverbBypass(value!=0) ;
+		if (fxMaster->Attribute("EQBYP",&value)) fx.SetEqBypass(value!=0) ;
+		for (int b=0;b<3;b++) {
+			char attr[16] ;
+			sprintf(attr,"EQ%dFRQ",b) ;
+			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandFreq(b,(fixed)value) ;
+			sprintf(attr,"EQ%dGAI",b) ;
+			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandGainDb(b,(fixed)value) ;
+			sprintf(attr,"EQ%dQ",b) ;
+			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandQ(b,(fixed)value) ;
+			sprintf(attr,"EQ%dEN",b) ;
+			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandEnabled(b,value!=0) ;
+		}
+		if (fxMaster->Attribute("CMPTHR",&value)) fx.SetCompThresholdDb((fixed)value) ;
+		if (fxMaster->Attribute("CMPRAT",&value)) fx.SetCompRatio((fixed)value) ;
+		if (fxMaster->Attribute("CMPKNE",&value)) fx.SetCompKneeDb((fixed)value) ;
+		if (fxMaster->Attribute("CMPATK",&value)) fx.SetCompAttackMs((fixed)value) ;
+		if (fxMaster->Attribute("CMPREL",&value)) fx.SetCompReleaseMs((fixed)value) ;
+		if (fxMaster->Attribute("CMPMKU",&value)) fx.SetCompMakeupDb((fixed)value) ;
+		if (fxMaster->Attribute("CMPLNK",&value)) fx.SetCompStereoLink(value!=0) ;
+		if (fxMaster->Attribute("CMPSC",&value)) fx.SetCompSoftClip(value!=0) ;
+		if (fxMaster->Attribute("CMPBYP",&value)) fx.SetCompBypass(value!=0) ;
+	} else {
+		// Legacy project: reset the engine to its default (bypass) state so
+		// old songs load with the exact original behaviour.
+		fx.SetLegacyMode(true) ;
+		fx.SetDelayTimeMs(0) ;
+		fx.SetDelayFeedback(0) ;
+		fx.SetDelayPingPong(false) ;
+		fx.SetDelayWidth(i2fp(1)) ;
+		fx.SetDelayMix(i2fp(1)) ;
+		fx.SetDelayBypass(false) ;
+		fx.SetDelaySaturation(false) ;
+		fx.SetReverbPredelayMs(0) ;
+		fx.SetReverbDecay(fl2fp(1.0f)) ;
+		fx.SetReverbSize(i2fp(1)) ;
+		fx.SetReverbDamping(fl2fp(0.5f)) ;
+		fx.SetReverbWidth(i2fp(1)) ;
+		fx.SetReverbMode((int)FxEngine::Reverb::NORMAL) ;
+		fx.SetReverbMix(i2fp(1)) ;
+		fx.SetReverbBypass(false) ;
+		fx.SetEqBypass(true) ;
+		for (int b=0;b<3;b++) {
+			fx.SetEqBandEnabled(b,false) ;
+		}
+		fx.SetCompBypass(true) ;
+		fx.SetCompSoftClip(true) ;
+		fx.SetCompStereoLink(true) ;
 	}
 } ;

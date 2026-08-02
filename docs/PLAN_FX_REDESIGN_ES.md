@@ -367,11 +367,15 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 - Test `tests/test_fx_phase4_ui.py` -> `FX_UI_PHASE43_OK` (readback DSP, roundtrip Q15, consistencia tabla 9/10/22, edición sends, wiring UI, getters).
 - MIPS syntax check: `FXENGINE_FASE43_UI_MIPS_SYNTAX_OK` (5 módulos DSP + MixerView).
 
-### Fase 5 — Compatibilidad y hardening
-- Modo legacy (FxEngine bypass) verificado con golden tests (sin diferencias).
-- Persistencia de nuevos parámetros FX con defaults = legacy.
-- Sanitizers + warnings-as-errors en módulos nuevos.
-- Prueba prolongada R36SX: 10 min, 8 pistas, 0 underruns, presets ECO.
+### Fase 5 — Compatibilidad y hardening (hecho y verificado)
+- **Hallazgo crítico**: `legacyMode_` (default `true`, bypass bit-idéntico al LGPT original) nunca se desactivaba en la app -> los setters de UI/comandos escribían parámetros pero `Process()` seguía en bypass. Decisión: **auto-engage al editar** (tocar cualquier parámetro FX o send desactiva legacy; volver todo a default lo re-marca).
+- **Auto-engage (FxEngine.h/.cpp)**: cada setter público llama `RefreshLegacy()`; nuevos `NotifyChannelSendActive(bool)`, `RefreshLegacy()`, `AllParamsAtLegacyDefault()`, miembro `anyChannelSendActive_`. `AllParamsAtLegacyDefault()` compara todos los defaults legacy (dly time/fb 0, width/mix 1, pp/sat/byp false; reverb predelay 0, decay 1.0, size 1, damping 0.5, width 1, mode NORMAL, mix 1, byp false; sends 0, returns `fl2fp(0.5)`; EQ bypass true + bandas 100/1000/10000 Hz desactivadas; comp bypass true, thr -24, ratio 4, knee 6, atk 15 ms, rel 200 ms, makeup 0, link/softclip true).
+- **Persistencia (Mixer.h/.cpp)**: `NotifyFxSends()` (recorre los 8 canales -> `NotifyChannelSendActive`) invocado desde `SetChannelDelaySend/SetChannelReverbSend/Clear`. `SaveContent` serializa `<FXMASTER>` con 41 atributos (`DLYSEND`..`CMPBYP`); `RestoreContent` lee `FXMASTER` si existe (aplica setters con `(fixed)value`) o resetea FxEngine a defaults legacy si no existe -> los proyectos LGPT clásicos siguen sonando idénticos y se auto-engran al primer edit.
+- **Hardening**: los 4 DSP (`DelayLine`, `Reverb`, `ParametricEQ`, `Compressor`) compilan con `-Wall -Wextra -Werror` (`HARDEN_SYNTAX_WERROR_OK`) y pasan ASan+UBSan con harness estocástico (2000 iteraciones, valores extremos; `rtViolations=0` en los 4, `HARDEN_SANITIZERS_OK`). Corregidos 2 `-Wreorder` (listas de inicialización de `Reverb` y `Compressor`).
+- **MIPS syntax check**: `MIPS_FX_SYNTAX_FASE5_OK` (5 módulos DSP con `mipsel-linux-gnu-g++`, flags buildroot 74kc/dspr2).
+- **Test**: `tests/test_fx_phase5_persistence_legacy.py` -> `FX_PERSISTENCE_LEGACY_PHASE5_OK` (default-is-legacy, edit-master-param-engages, edit-channel-send-engages, return-to-default-reengages, roundtrip FXMASTER 41 params, legacy-project-default, source guards). Suite completa Fases 0-5: 10/10 OK.
+- **Build + instalación**: core `lgpt_r36sx_u2523.so` compilado con toolchain MIPS real -> `BUILD_U2523_OK`; instalado en SD -> `INSTALL_U2523_OK` (backup `LGPT_BEFORE_U2523_20260802_130251`); verificado -> `VERIFY_U2523_OK` (ERRORS=0). Símbolos `RefreshLegacy`, `AllParamsAtLegacyDefault`, `NotifyFxSends`, etiqueta `FXMASTER` presentes en el core de la SD.
+- Prueba prolongada R36SX: 10 min, 8 pistas, 0 underruns, presets ECO. *(queda pendiente en hardware)*
 
 ---
 

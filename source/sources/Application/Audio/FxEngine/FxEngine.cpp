@@ -3,8 +3,8 @@
 namespace FxEngine {
 
 FxEngine::FxEngine()
-    : legacyMode_(true), sendsAccumulated_(false), callCount_(0), frames_(0),
-      maxFrames_(0),
+    : legacyMode_(true), sendsAccumulated_(false), anyChannelSendActive_(false),
+      callCount_(0), frames_(0), maxFrames_(0),
       rtViolations_(0), sampleRate_(44100),
       delaySend_(0), delayReturn_(fl2fp(0.5f)),
       reverbSend_(0), reverbReturn_(fl2fp(0.5f)) {
@@ -45,6 +45,57 @@ void FxEngine::SetSampleRate(int rate) {
     reverb_.SetSampleRate(rate);
     eq_.SetSampleRate(rate);
     comp_.SetSampleRate(rate);
+}
+
+// Fase 5 auto-engage: legacy bypass is only active while every master FX
+// parameter sits at its legacy default AND no per-track send is raised.
+// Any user edit (UI page, FX command or channel send) flips it off so the
+// DSP actually runs; returning everything to default re-engages bypass.
+void FxEngine::RefreshLegacy() {
+    legacyMode_ = AllParamsAtLegacyDefault() && !anyChannelSendActive_;
+}
+
+bool FxEngine::AllParamsAtLegacyDefault() const {
+    if (delaySend_ != 0 || reverbSend_ != 0) return false;
+    if (delayReturn_ != fl2fp(0.5f) || reverbReturn_ != fl2fp(0.5f)) return false;
+    // Delay line: default time 0 ms, no feedback, width 1, mix 1, no flags.
+    if (delay_.GetDelayMsTarget() != 0) return false;
+    if (delay_.GetFeedback() != 0) return false;
+    if (delay_.GetMix() != i2fp(1)) return false;
+    if (delay_.GetWidth() != i2fp(1)) return false;
+    if (delay_.GetPingPong()) return false;
+    if (delay_.GetSaturation()) return false;
+    if (delay_.GetBypass()) return false;
+    // Reverb: default predelay 0, decay 1.0 s, size 1, damping 0.5, width 1.
+    if (reverb_.GetPredelayMs() != 0) return false;
+    if (reverb_.GetDecayTarget() != fl2fp(1.0f)) return false;
+    if (reverb_.GetSize() != i2fp(1)) return false;
+    if (reverb_.GetDamping() != fl2fp(0.5f)) return false;
+    if (reverb_.GetWidth() != i2fp(1)) return false;
+    if (reverb_.GetMode() != Reverb::NORMAL) return false;
+    if (reverb_.GetMix() != i2fp(1)) return false;
+    if (reverb_.GetBypass()) return false;
+    // Master EQ: global bypass on (dry) by default, all bands disabled.
+    if (!eq_.GetBypass()) return false;
+    static const fixed kBandFreqDefault[ParametricEQ::kNumBands] = {
+        fl2fp(100.0f), fl2fp(1000.0f), fl2fp(10000.0f) };
+    for (int b = 0; b < ParametricEQ::kNumBands; b++) {
+        if (eq_.GetBandEnabled((ParametricEQ::Band)b)) return false;
+        if (eq_.GetBandFreq((ParametricEQ::Band)b) != kBandFreqDefault[b]) return false;
+        if (eq_.GetBandGainDb((ParametricEQ::Band)b) != 0) return false;
+        if (eq_.GetBandQ((ParametricEQ::Band)b) != fl2fp(1.0f)) return false;
+    }
+    // Master compressor: bypass on (dry) by default, others at ctor defaults.
+    if (!comp_.GetBypass()) return false;
+    if (comp_.GetThresholdDb() != fl2fp(-24.0f)) return false;
+    if (comp_.GetRatio() != fl2fp(4.0f)) return false;
+    if (comp_.GetKneeDb() != fl2fp(6.0f)) return false;
+    if (comp_.GetMakeupDb() != 0) return false;
+    if (comp_.GetAttackMs() != 15.0f) return false;
+    if (comp_.GetReleaseMs() != 200.0f) return false;
+    if (!comp_.GetStereoLink()) return false;
+    if (!comp_.GetSoftClip()) return false;
+    return true;
 }
 
 void FxEngine::Process(fixed *buffer, int samplecount) {

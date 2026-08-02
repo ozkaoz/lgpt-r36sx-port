@@ -8,10 +8,11 @@ namespace FxEngine {
 #define FX_COMP_GR_SMOOTH  fl2fp(0.005f)
 
 Compressor::Compressor()
-    : rate_(44100), threshDb_(fl2fp(-24.0f)), ratio_(fl2fp(4.0f)),
-      kneeDb_(fl2fp(6.0f)), makeupDb_(0), attK_(fl2fp(0.5f)), relK_(fl2fp(0.1f)),
-      grMeter_(0), attackMs_(15.0f), releaseMs_(200.0f), stereoLink_(true),
-      bypass_(true), softClip_(true), rtViolations_(0) {
+    : attK_(fl2fp(0.5f)), relK_(fl2fp(0.1f)),
+      grMeter_(0), threshDb_(fl2fp(-24.0f)), ratio_(fl2fp(4.0f)),
+      kneeDb_(fl2fp(6.0f)), makeupDb_(0),
+      attackMs_(15.0f), releaseMs_(200.0f), rate_(44100),
+      stereoLink_(true), bypass_(true), softClip_(true), rtViolations_(0) {
     level_[0] = level_[1] = 0;
     recomputeSmoothing();
     recomputeTable();

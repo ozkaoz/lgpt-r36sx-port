@@ -72,35 +72,44 @@ public:
     bool IsLegacyMode() const { return legacyMode_; }
     void SetLegacyMode(bool on) { legacyMode_ = on; }
 
+    // Auto-engage (PLAN_FX_REDESIGN_ES.md, Fase 5): editing any FX master
+    // parameter, or raising any per-track send, disables legacy bypass so the
+    // DSP actually runs.  Returning every parameter to its legacy default
+    // (and clearing all sends) re-engages bypass.  Called at the end of every
+    // public setter and by Mixer whenever a channel send changes.
+    void NotifyChannelSendActive(bool on) { anyChannelSendActive_ = on; RefreshLegacy(); }
+    void RefreshLegacy();
+    bool AllParamsAtLegacyDefault() const;
+
     // Sample rate (used by delay/reverb; control-rate only).
     void SetSampleRate(int rate);
 
     // --- Delay send/return (Fase 2) ---
-    void SetDelaySend(fixed send) { delaySend_ = send; }
-    void SetDelayReturn(fixed ret) { delayReturn_ = ret; }
-    void SetDelayTimeMs(fixed ms) { delay_.SetDelayMs(ms); }
-    void SetDelayFeedback(fixed fb) { delay_.SetFeedback(fb); }
-    void SetDelayPingPong(bool on) { delay_.SetPingPong(on); }
-    void SetDelayWidth(fixed w) { delay_.SetWidth(w); }
-    void SetDelayMix(fixed mix) { delay_.SetMix(mix); }
-    void SetDelayBypass(bool on) { delay_.SetBypass(on); }
-    void SetDelaySaturation(bool on) { delay_.SetSaturation(on); }
-    void SetDelayLoopLPHz(fixed hz) { delay_.SetLoopLPHz(hz); }
-    void SetDelayLoopHPHz(fixed hz) { delay_.SetLoopHPHz(hz); }
+    void SetDelaySend(fixed send) { delaySend_ = send; RefreshLegacy(); }
+    void SetDelayReturn(fixed ret) { delayReturn_ = ret; RefreshLegacy(); }
+    void SetDelayTimeMs(fixed ms) { delay_.SetDelayMs(ms); RefreshLegacy(); }
+    void SetDelayFeedback(fixed fb) { delay_.SetFeedback(fb); RefreshLegacy(); }
+    void SetDelayPingPong(bool on) { delay_.SetPingPong(on); RefreshLegacy(); }
+    void SetDelayWidth(fixed w) { delay_.SetWidth(w); RefreshLegacy(); }
+    void SetDelayMix(fixed mix) { delay_.SetMix(mix); RefreshLegacy(); }
+    void SetDelayBypass(bool on) { delay_.SetBypass(on); RefreshLegacy(); }
+    void SetDelaySaturation(bool on) { delay_.SetSaturation(on); RefreshLegacy(); }
+    void SetDelayLoopLPHz(fixed hz) { delay_.SetLoopLPHz(hz); RefreshLegacy(); }
+    void SetDelayLoopHPHz(fixed hz) { delay_.SetLoopHPHz(hz); RefreshLegacy(); }
 
     // --- Reverb send/return (Fase 2) ---
-    void SetReverbSend(fixed send) { reverbSend_ = send; }
-    void SetReverbReturn(fixed ret) { reverbReturn_ = ret; }
-    void SetReverbPredelayMs(fixed ms) { reverb_.SetPredelayMs(ms); }
-    void SetReverbDecay(fixed rt60) { reverb_.SetDecay(rt60); }
-    void SetReverbSize(fixed size) { reverb_.SetSize(size); }
-    void SetReverbDamping(fixed d) { reverb_.SetDamping(d); }
-    void SetReverbWidth(fixed w) { reverb_.SetWidth(w); }
-    void SetReverbMix(fixed mix) { reverb_.SetMix(mix); }
-    void SetReverbBypass(bool on) { reverb_.SetBypass(on); }
-    void SetReverbInputHPHz(fixed hz) { reverb_.SetInputHP(hz); }
-    void SetReverbInputLPHz(fixed hz) { reverb_.SetInputLP(hz); }
-    void SetReverbMode(int mode) { reverb_.SetMode((Reverb::Mode)mode); }
+    void SetReverbSend(fixed send) { reverbSend_ = send; RefreshLegacy(); }
+    void SetReverbReturn(fixed ret) { reverbReturn_ = ret; RefreshLegacy(); }
+    void SetReverbPredelayMs(fixed ms) { reverb_.SetPredelayMs(ms); RefreshLegacy(); }
+    void SetReverbDecay(fixed rt60) { reverb_.SetDecay(rt60); RefreshLegacy(); }
+    void SetReverbSize(fixed size) { reverb_.SetSize(size); RefreshLegacy(); }
+    void SetReverbDamping(fixed d) { reverb_.SetDamping(d); RefreshLegacy(); }
+    void SetReverbWidth(fixed w) { reverb_.SetWidth(w); RefreshLegacy(); }
+    void SetReverbMix(fixed mix) { reverb_.SetMix(mix); RefreshLegacy(); }
+    void SetReverbBypass(bool on) { reverb_.SetBypass(on); RefreshLegacy(); }
+    void SetReverbInputHPHz(fixed hz) { reverb_.SetInputHP(hz); RefreshLegacy(); }
+    void SetReverbInputLPHz(fixed hz) { reverb_.SetInputLP(hz); RefreshLegacy(); }
+    void SetReverbMode(int mode) { reverb_.SetMode((Reverb::Mode)mode); RefreshLegacy(); }
 
     // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
     fixed GetDelaySend() const { return delaySend_; }
@@ -124,22 +133,22 @@ public:
     bool GetReverbBypass() const { return reverb_.GetBypass(); }
 
     // --- Master EQ 3 bandas (Fase 3) ---
-    void SetEqBypass(bool on) { eq_.SetBypass(on); }
-    void SetEqBandFreq(int band, fixed hz) { eq_.SetBandFreq((ParametricEQ::Band)band, hz); }
-    void SetEqBandGainDb(int band, fixed db) { eq_.SetBandGainDb((ParametricEQ::Band)band, db); }
-    void SetEqBandQ(int band, fixed q) { eq_.SetBandQ((ParametricEQ::Band)band, q); }
-    void SetEqBandEnabled(int band, bool on) { eq_.SetBandEnabled((ParametricEQ::Band)band, on); }
+    void SetEqBypass(bool on) { eq_.SetBypass(on); RefreshLegacy(); }
+    void SetEqBandFreq(int band, fixed hz) { eq_.SetBandFreq((ParametricEQ::Band)band, hz); RefreshLegacy(); }
+    void SetEqBandGainDb(int band, fixed db) { eq_.SetBandGainDb((ParametricEQ::Band)band, db); RefreshLegacy(); }
+    void SetEqBandQ(int band, fixed q) { eq_.SetBandQ((ParametricEQ::Band)band, q); RefreshLegacy(); }
+    void SetEqBandEnabled(int band, bool on) { eq_.SetBandEnabled((ParametricEQ::Band)band, on); RefreshLegacy(); }
 
     // --- Compresor/limitador master (Fase 3) ---
-    void SetCompBypass(bool on) { comp_.SetBypass(on); }
-    void SetCompThresholdDb(fixed db) { comp_.SetThresholdDb(db); }
-    void SetCompRatio(fixed ratio) { comp_.SetRatio(ratio); }
-    void SetCompKneeDb(fixed db) { comp_.SetKneeDb(db); }
-    void SetCompAttackMs(fixed ms) { comp_.SetAttackMs(ms); }
-    void SetCompReleaseMs(fixed ms) { comp_.SetReleaseMs(ms); }
-    void SetCompMakeupDb(fixed db) { comp_.SetMakeupDb(db); }
-    void SetCompStereoLink(bool on) { comp_.SetStereoLink(on); }
-    void SetCompSoftClip(bool on) { comp_.SetSoftClip(on); }
+    void SetCompBypass(bool on) { comp_.SetBypass(on); RefreshLegacy(); }
+    void SetCompThresholdDb(fixed db) { comp_.SetThresholdDb(db); RefreshLegacy(); }
+    void SetCompRatio(fixed ratio) { comp_.SetRatio(ratio); RefreshLegacy(); }
+    void SetCompKneeDb(fixed db) { comp_.SetKneeDb(db); RefreshLegacy(); }
+    void SetCompAttackMs(fixed ms) { comp_.SetAttackMs(ms); RefreshLegacy(); }
+    void SetCompReleaseMs(fixed ms) { comp_.SetReleaseMs(ms); RefreshLegacy(); }
+    void SetCompMakeupDb(fixed db) { comp_.SetMakeupDb(db); RefreshLegacy(); }
+    void SetCompStereoLink(bool on) { comp_.SetStereoLink(on); RefreshLegacy(); }
+    void SetCompSoftClip(bool on) { comp_.SetSoftClip(on); RefreshLegacy(); }
     fixed GetCompGainReductionDb() const { return comp_.GetGainReductionDb(); }
 
     // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
@@ -154,6 +163,8 @@ public:
     fixed GetCompMakeupDb() const { return comp_.GetMakeupDb(); }
     float GetCompAttackMs() const { return comp_.GetAttackMs(); }
     float GetCompReleaseMs() const { return comp_.GetReleaseMs(); }
+    fixed GetCompAttackMsFixed() const { return comp_.GetAttackMsFixed(); }
+    fixed GetCompReleaseMsFixed() const { return comp_.GetReleaseMsFixed(); }
     bool GetCompStereoLink() const { return comp_.GetStereoLink(); }
     bool GetCompSoftClip() const { return comp_.GetSoftClip(); }
     bool GetCompBypass() const { return comp_.GetBypass(); }
@@ -181,6 +192,7 @@ private:
     Buses buses_;
     bool legacyMode_;
     bool sendsAccumulated_;
+    bool anyChannelSendActive_;
     unsigned long callCount_;
     unsigned long frames_;
     unsigned long maxFrames_;

@@ -26,6 +26,7 @@ public:
 	int GetChannelReverbSend(int i) ;
 	void SetChannelReverbSend(int i,int send) ;
 	void NudgeChannelReverbSend(int i,int delta) ;
+	void NotifyFxSends() ;
 
 	virtual void SaveContent(TiXmlNode *node) ;
 	virtual void RestoreContent(TiXmlElement *element);

@@ -16,11 +16,12 @@ static const int kAllpassBase[2] = {556, 441};
 static const int kAllpassBaseR[2] = {561, 445};
 
 Reverb::Reverb()
-    : predelayWrite_(0), predelayLen_(0), mode_(NORMAL),
+    : predelayWrite_(0), predelayLen_(0),
+      inLpCoeff_(0), inHpCoeff_(0), dcCoeff_(fl2fp(0.995f)),
+      rate_(44100), mode_(NORMAL),
       predelayMs_(0), decay_(fl2fp(1.0f)), decayTarget_(fl2fp(1.0f)),
       size_(i2fp(1)), damping_(fl2fp(0.5f)), width_(i2fp(1)),
       bypass_(false), mix_(i2fp(1)), mixCur_(i2fp(1)),
-      inLpCoeff_(0), inHpCoeff_(0), dcCoeff_(fl2fp(0.995f)),
       rtViolations_(0) {
     for (int i = 0; i < 2; i++) {
         inLpState_[i] = inHpState_[i] = dcState_[i] = 0;
