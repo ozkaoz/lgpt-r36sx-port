@@ -101,3 +101,29 @@ visible) y el **menú de acciones de proyecto** en la pantalla inicial.
 - `VERIFY_BUILD_H38_6_ABI7_OK`
 - `VERIFY_SD_H38_6_ABI7_OK`
 - Daemon ABI7 inalterado (golden SHA-256 conservado).
+
+## Actualización H38.6-r2 (feedback de hardware)
+
+### Barras VU calibradas al volumen real (escala dB)
+
+- El relleno de las barras ahora se mapea con una **curva perceptiva (dBFS,
+  rango de 50 dB)** en vez de la escala lineal: `0 dB` = barra llena y el
+  relleno cae conforme baja el volumen real. Antes, cualquier nivel por
+  encima de unos pocos dB quedaba "blanco estático" y los volúmenes bajos
+  también leían alto.
+- El master refleja el nivel audible post-volumen: con volumen maestro bajo
+  (10-17) la barra queda casi vacía (el sonido es casi inaudible) y crece
+  en 30/50/100, en línea con lo que se escucha.
+- El marcador de volumen sigue mostrando el ajuste (número + celda).
+
+### Menú de acciones corregido (abre los diálogos sin liberarlos)
+
+- **Causa raíz**: los diálogos anidados (editor Rename, selector de modo
+  Export, confirmación Delete) se abrían desde el callback de cierre del
+  menú, y el ciclo de vida de los modales los liberaba de inmediato
+  (`SAFE_DELETE` tras el callback), dejando punteros colgando y, al borrar
+  un proyecto, cuelgues al volver a entrar.
+- **Solución**: la acción elegida se difiere y se lanza en el siguiente
+  tick de frame (`OnFrameUpdate`), cuando el menú ya se ha liberado. Ahora
+  Rename / Export / Delete abren sus diálogos correctamente y borrar un
+  proyecto refresca la lista sin crashear.

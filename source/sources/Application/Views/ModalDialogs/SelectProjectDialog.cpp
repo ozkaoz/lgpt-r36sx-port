@@ -101,18 +101,33 @@ static void ProjectExportMenuCallback(View &v, ModalView &dialog) {
 
 // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): R1+A opens a project actions menu.
 // Return 1 = Rename (existing editor), 2 = Export (mode picker), 3 = Delete
-// (confirmation).
+// (confirmation). The nested modals are NOT opened here: View::ProcessButton
+// calls this callback while the finished menu is still installed as the modal
+// and immediately SAFE_DELETEs it afterwards, which would free a modal opened
+// from inside the callback. We defer the action and launch it from the next
+// frame tick (OnFrameUpdate) once the menu has been removed.
 static void ProjectActionsMenuCallback(View &v, ModalView &dialog) {
     int code = dialog.GetReturnCode();
     if (code == 0) return;
     SelectProjectDialog &spd = (SelectProjectDialog &)v;
+    spd.DeferProjectAction(code);
+}
+
+void SelectProjectDialog::DeferProjectAction(int code) {
+    pendingAction_ = code;
+}
+
+// TREEFROG_MIXER_STARTUP_MENU_V2 (H38.7): actually launches the deferred
+// action. Runs from OnFrameUpdate, i.e. after the actions menu modal has been
+// deleted by the base class, so a nested modal opened here survives.
+void SelectProjectDialog::launchProjectAction(int code) {
     switch (code) {
     case 1:
         {
             TreeFrogTextEditor *editor = new TreeFrogTextEditor(
-                spd, "RENAME PROJECT",
-                spd.GetCurrentProjectBaseName().c_str(), 24);
-            spd.DoModal(editor, RenameProjectCallback);
+                *this, "RENAME PROJECT",
+                GetCurrentProjectBaseName().c_str(), 24);
+            DoModal(editor, RenameProjectCallback);
         }
         break;
     case 2:
@@ -120,19 +135,19 @@ static void ProjectActionsMenuCallback(View &v, ModalView &dialog) {
             static const char *exportItems[] = {"Full project (master)",
                                                 "Multitrack"};
             TreeFrogMenuModal *menu =
-                new TreeFrogMenuModal(spd, "EXPORT MODE", exportItems, 2);
-            spd.DoModal(menu, ProjectExportMenuCallback);
+                new TreeFrogMenuModal(*this, "EXPORT MODE", exportItems, 2);
+            DoModal(menu, ProjectExportMenuCallback);
         }
         break;
     case 3:
         {
-            Path projectPath = spd.GetCurrentProjectPath();
+            Path projectPath = GetCurrentProjectPath();
             std::string message =
                 "Delete project '" + projectPath.GetName() + "' ?";
             MessageBox *mb =
-                new MessageBox(spd, message.c_str(), MBBF_YES | MBBF_NO);
-            spd.DoModal(mb, DeleteProjectCallback);
-            spd.DrawView();
+                new MessageBox(*this, message.c_str(), MBBF_YES | MBBF_NO);
+            DoModal(mb, DeleteProjectCallback);
+            DrawView();
         }
         break;
     }
@@ -227,7 +242,7 @@ static bool RecursiveCopyDirectory(const Path &srcPath, Path &dstPath) {
 }
 
 SelectProjectDialog::SelectProjectDialog(View &view)
-    : ModalView(view), content_(true) {}
+    : ModalView(view), content_(true), pendingAction_(0) {}
 
 SelectProjectDialog::~SelectProjectDialog() {
 }
@@ -325,7 +340,15 @@ void SelectProjectDialog::OnPlayerUpdate(PlayerEventType,
 // hosted by the app window. The rename editor is a second-level modal, so
 // forward the retro-frame tick to the nested modal (same pattern as
 // ImportSampleDialog); without this the editor's input FSM never runs.
+// TREEFROG_MIXER_STARTUP_MENU_V2 (H38.7): also launches any deferred project
+// action first, before forwarding the tick, so the nested modal opened here
+// gets its input from the following frames.
 void SelectProjectDialog::OnFrameUpdate(unsigned long frameClock) {
+    if (pendingAction_) {
+        int code = pendingAction_;
+        pendingAction_ = 0;
+        launchProjectAction(code);
+    }
     if (HasModal()) UpdateActiveModalFrame(frameClock);
 }
 

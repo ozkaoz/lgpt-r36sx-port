@@ -29,6 +29,13 @@ public:
     // 2 = stems (multitrack).
     void StartProjectExport(int mode);
 
+    // TREEFROG_MIXER_STARTUP_MENU_V2 (H38.7): the actions menu callback must
+    // not open a nested modal while the finished menu is still being deleted
+    // by View::ProcessButton (SAFE_DELETE would free the new modal). Instead
+    // the callback defers the action here and OnFrameUpdate launches it once
+    // the frame tick runs after the menu has been removed.
+    void DeferProjectAction(int code);
+
     Path GetSelection();
     Path GetCurrentProjectPath();
     std::string GetCurrentProjectBaseName();
@@ -38,10 +45,12 @@ public:
 	void setCurrentFolder(Path &path) ;
 
 private:
+  void launchProjectAction(int code);
   T_SimpleList<Path> content_;
   int topIndex_;
   int currentProject_;
   int selected_;
+  int pendingAction_;
   Path currentPath_;
   Path selection_;
   static Path lastFolder_;
