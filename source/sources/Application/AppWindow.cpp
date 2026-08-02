@@ -577,6 +577,22 @@ AppWindow *AppWindow::GetInstance() { return AppWindow::instance_; };
 
 void AppWindow::SetDirty() { _isDirty = true; };
 
+// TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): writes the same export request the
+// Android host would write, so H35PollExternalExport drives the render once
+// the project has finished loading. mode 1 = mixdown (master), 2 = stems
+// (multitrack); command mapping matches H35 (2=mixdown, 3=stems).
+void AppWindow::RequestExportRender(int mode) {
+#if defined(PLATFORM_TREEFROG)
+    if (mode != 1 && mode != 2) return;
+    static unsigned int s_exportSession = 0;
+    unsigned int session = ++s_exportSession;
+    char line[256];
+    snprintf(line, sizeof(line), "REQUEST command=%u format=1 session=%u\n",
+             (mode == 1) ? 2 : 3, session);
+    h35AtomicText(kH35ExportRequest, line);
+#endif
+}
+
 void AppWindow::SynchronizeInputMask(unsigned short mask) {
     _mask = mask;
     const unsigned short audioCombo =
@@ -868,7 +884,7 @@ void AppWindow::H35PollExternalExport() {
         _viewData->songX_=0; _viewData->songY_=0; _viewData->songOffset_=0;
         player->Start(PM_SONG,false);
         started=h35ExportNowMs(); state=RENDERING;
-        if (_currentView) _currentView->SetNotification(command==2 ? "Rendering mixdown for Android" : "Rendering stems for Android");
+        if (_currentView) _currentView->SetNotification(command==2 ? "Rendering mixdown export..." : "Rendering multitrack export...");
         return;
     }
 
@@ -885,7 +901,7 @@ void AppWindow::H35PollExternalExport() {
             snprintf(body,sizeof(body),"ROOT=%s\nMODE=%s\nFORMAT=WAV\n",
                      _root.GetPath().c_str(),command==2?"MIXDOWN":"STEMS");
             h35AtomicText(ready,body);
-            if (_currentView) _currentView->SetNotification("Android audio export ready");
+            if (_currentView) _currentView->SetNotification(command==2 ? "Mixdown export ready" : "Multitrack export ready");
         } else {
             h35AtomicText(error,"ERROR=RENDER_OUTPUT_MISSING\n");
             if (_currentView) _currentView->SetNotification("Export render failed or song is empty");

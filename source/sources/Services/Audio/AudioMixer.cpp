@@ -137,9 +137,12 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
          if (peak > peakValue_) {
              peakValue_ = peak;
          } else {
-             // TREEFROG_VU_METERS_V2: slower decay so the level stays visible
-             // between audio buffers and the mixer bars read as live meters.
-             peakValue_ *= 0.97f;
+             // TREEFROG_VU_METERS_V3 (H38.7): fast per-buffer decay so the
+             // mixer bars visibly bounce with the music instead of sticking
+             // full white. Render runs once per audio callback (~60/s), so
+             // 0.85 per buffer empties a full bar in well under a second and
+             // still holds between beats for a live-meter feel.
+             peakValue_ *= 0.85f;
          }
      }
 

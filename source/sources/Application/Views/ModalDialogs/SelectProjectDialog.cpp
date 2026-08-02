@@ -3,8 +3,10 @@
 #include "SelectProjectDialog.h"
 #include "NewProjectDialog.h"
 #include "TreeFrogTextEditor.h"
+#include "TreeFrogMenuModal.h"
 #include "System/Console/Trace.h"
 #include "Application/Views/ModalDialogs/MessageBox.h"
+#include "Application/AppWindow.h"
 
 #include <algorithm>
 #include <ctype.h>
@@ -84,6 +86,55 @@ static void RenameProjectCallback(View &v, ModalView &dialog) {
         if (result.Failed()) {
             Trace::Error(result.GetDescription().c_str());
         }
+    }
+}
+
+// TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): second picker that chooses the
+// export flavour once "Export" is selected in the actions menu.
+// Return 1 = full project (master mixdown), 2 = multitrack (stems).
+static void ProjectExportMenuCallback(View &v, ModalView &dialog) {
+    int code = dialog.GetReturnCode();
+    if (code == 0) return;
+    SelectProjectDialog &spd = (SelectProjectDialog &)v;
+    spd.StartProjectExport((code == 1) ? 1 : 2);
+}
+
+// TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): R1+A opens a project actions menu.
+// Return 1 = Rename (existing editor), 2 = Export (mode picker), 3 = Delete
+// (confirmation).
+static void ProjectActionsMenuCallback(View &v, ModalView &dialog) {
+    int code = dialog.GetReturnCode();
+    if (code == 0) return;
+    SelectProjectDialog &spd = (SelectProjectDialog &)v;
+    switch (code) {
+    case 1:
+        {
+            TreeFrogTextEditor *editor = new TreeFrogTextEditor(
+                spd, "RENAME PROJECT",
+                spd.GetCurrentProjectBaseName().c_str(), 24);
+            spd.DoModal(editor, RenameProjectCallback);
+        }
+        break;
+    case 2:
+        {
+            static const char *exportItems[] = {"Full project (master)",
+                                                "Multitrack"};
+            TreeFrogMenuModal *menu =
+                new TreeFrogMenuModal(spd, "EXPORT MODE", exportItems, 2);
+            spd.DoModal(menu, ProjectExportMenuCallback);
+        }
+        break;
+    case 3:
+        {
+            Path projectPath = spd.GetCurrentProjectPath();
+            std::string message =
+                "Delete project '" + projectPath.GetName() + "' ?";
+            MessageBox *mb =
+                new MessageBox(spd, message.c_str(), MBBF_YES | MBBF_NO);
+            spd.DoModal(mb, DeleteProjectCallback);
+            spd.DrawView();
+        }
+        break;
     }
 }
 
@@ -287,15 +338,16 @@ void SelectProjectDialog::OnFocus() {
 void SelectProjectDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
 	if (!pressed) return ;
 
-    // TREEFROG_PROJECT_RENAME_V2 (H38.6): R1+A on the startup menu opens the
-    // rename editor pre-filled with the selected project name. Must be
-    // checked before the plain A branch below (Load/New/Exit).
+    // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): R1+A on the startup menu opens
+    // a project actions menu (Rename / Export / Delete). Must be checked
+    // before the plain A branch below (Load/New/Exit).
     if ((mask & EPBM_R) && (mask & EPBM_A)) {
         if (currentProject_ >= 0 && currentProject_ < content_.Size()) {
-            TreeFrogTextEditor *editor = new TreeFrogTextEditor(
-                *this, "RENAME PROJECT",
-                GetCurrentProjectBaseName().c_str(), 24);
-            DoModal(editor, RenameProjectCallback);
+            static const char *actionItems[] = {"Rename", "Export", "Delete"};
+            TreeFrogMenuModal *menu =
+                new TreeFrogMenuModal(*this, "PROJECT ACTIONS",
+                                      actionItems, 3);
+            DoModal(menu, ProjectActionsMenuCallback);
         }
         return;
     }
@@ -566,6 +618,25 @@ std::string SelectProjectDialog::GetCurrentProjectBaseName() {
     return name;
 }
 
+// TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): starts a render export of the
+// selected project. No project is loaded yet at the startup menu, so we load
+// it through the normal EndModal(1) path (ProjectSelectCallback) and pre-arm
+// the render request. AppWindow::H35PollExternalExport picks the request up
+// once the project is loaded and drives the render state machine to
+// completion (mixdown.wav for master, channelN.wav for multitrack).
+void SelectProjectDialog::StartProjectExport(int mode) {
+    Path projectPath = GetCurrentProjectPath();
+    if (!projectPath.IsDirectory()) {
+        View::SetNotification("No project selected", 0);
+        return;
+    }
+    selection_ = projectPath;
+    lastFolder_ = currentPath_;
+    lastProject_ = currentProject_;
+    AppWindow::GetInstance()->RequestExportRender(mode);
+    EndModal(1);
+}
+
 // TREEFROG_PROJECT_RENAME_V2 (H38.6): renames the selected project
 // directory on disk. The startup menu has no loaded project, so this cannot
 // corrupt a running session the way the old in-project save-as rename did.
@@ -624,4 +695,9 @@ Result SelectProjectDialog::OnRenameProject(const char *newBaseName) {
     }
     isDirty_ = true;
     return Result::NoError;
+}
+
+// TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): build marker verified on install.
+extern "C" const char *TreeFrogH387StartupMenuBuildMarker(void) {
+    return "H38_7_STARTUP_MENU_RENAME_EXPORT_DELETE_MIXER_VU_DYNAMICS";
 }

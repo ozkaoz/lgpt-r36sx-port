@@ -1,9 +1,11 @@
-# LGPT R36SX H38.6 — Volumen lineal, Mixer con VU en vivo y barra MST, Rename en el menú de inicio, editor de texto unificado
+# LGPT R36SX H38.6 — Mixer VU dinámico, menú de inicio Rename/Export/Delete, FX corregido
 
 Build H38.6, ABI7, three-mode, frontend-safe. Corrige los tres fallos
 detectados en las pruebas de hardware de H38.5 (volumen de frase,
 VU del Mixer y Rename Project), unifica la entrada de texto del port y
 rehace las barras del Mixer (onda en vivo + máster ajustable + menú FX).
+Esta revisión añade las **barras VU dinámicas de verdad** (decaimiento
+visible) y el **menú de acciones de proyecto** en la pantalla inicial.
 
 ## Correcciones en esta versión
 
@@ -24,14 +26,23 @@ rehace las barras del Mixer (onda en vivo + máster ajustable + menú FX).
 - Las barras VU del Mixer ahora se actualizan por **cadencia de frame**
   (como el medidor de USB-C Record), independientes del transporte: siguen
   moviéndose con el player parado (decaimiento de picos).
-- Antes solo se redibujaban con el player en marcha.
+- **Nuevo (feedback de hardware)**: el decaimiento del pico por buffer se
+  aceleró (`0.85` por callback de audio), por lo que las barras **bajan
+  visiblemente entre golpes** en vez de quedarse pegadas en blanco completo
+  arriba-abajo. Siguen el nivel real de salida de cada canal y del máster.
+- Al modificar el volumen, este afecta al sonido y **no** mueve la barra
+  (correcto: la barra es el nivel, el número debajo es el volumen).
 
-### 3. Rename Project movido al menú de inicio (R1+A)
+### 3. Menú de acciones de proyecto en la pantalla inicial (R1+A)
 
-- El rename ya no vive en el menú Project (provocaba un crash al salir a
-  TreeFrogUI y reentrar: el nombre no se aplicaba).
-- Ahora: en la pantalla inicial **Load / New / Exit**, con el proyecto
-  seleccionado pulsa **R1 + A** para renombrarlo.
+- En la pantalla inicial **Load / New / Exit**, con un proyecto seleccionado,
+  pulsa **R1 + A** para abrir un menú con **tres opciones**:
+  - **Rename**: renombra el proyecto (el editor de texto unificado).
+  - **Export**: elige **Full project (master)** (mixdown `mixdown.wav`) o
+    **Multitrack** (stems `channel0.wav` … `channel7.wav`). El proyecto se
+    carga y se renderiza automáticamente.
+  - **Delete**: pide confirmación antes de borrar el proyecto.
+- Navega con `UP/DOWN`, confirma con `A`, cancela con `B`.
 - El rename copia el directorio del proyecto en disco (sin proyecto cargado,
   sin riesgo de corrupción) y refresca la lista.
 
@@ -52,8 +63,9 @@ rehace las barras del Mixer (onda en vivo + máster ajustable + menú FX).
 ### Barras de canal dinámicas (forma de onda en tiempo real)
 
 - El relleno de cada barra ahora sigue el **nivel de salida real del canal**
-  (`GetChannelPeak`): volumen bajo = onda pequeña, volumen alto = onda
-  grande.
+  (`GetChannelPeak`) con **decaimiento visible por buffer** (ver punto 2):
+  volumen bajo = onda pequeña, volumen alto = onda grande, y las barras
+  rebotan con la música.
 - El ajuste de volumen del canal se dibuja como una **marca de color** sobre
   la barra y como número debajo (ya no es un relleno estático blanco).
 
@@ -61,7 +73,7 @@ rehace las barras del Mixer (onda en vivo + máster ajustable + menú FX).
 
 - La barra **MST** (master) se dibuja en vivo **a la izquierda de la primera
   barra de canal**, en cian para distinguirse de los canales (blanco) y con
-  su propio pico de nivel.
+  su propio pico de nivel (también dinámico).
 - Es **seleccionable**: `LEFT` desde el canal 0 entra en MST, `RIGHT` vuelve
   al canal 0.
 - Con MST seleccionado, `A+UP/DOWN` ajusta el **volumen global** (10 en 10)
@@ -82,7 +94,7 @@ rehace las barras del Mixer (onda en vivo + máster ajustable + menú FX).
    `cubegm/`, `lgpt/`, `roms/`, `LGPT_OTG_LOGS/`, `ANDROID/`).
 2. Arranca LGPT desde el menú de EmulationStation.
 3. En el menú inicial selecciona el proyecto y pulsa **R1 + A** para
-   probar el rename.
+   probar el menú Rename / Export / Delete.
 
 ## Verificación
 

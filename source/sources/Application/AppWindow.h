@@ -34,6 +34,11 @@ class AppWindow : public GUIWindow, I_Observer, Status {
     void SaveLastProject(const Path &p);
     Path GetLastProjectPath();
     void CloseProject();
+    // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): arms a render export request
+    // for the project that is about to be loaded. mode is 1 = mixdown
+    // (master), 2 = stems (multitrack). The render state machine in
+    // H35PollExternalExport consumes the request once the project is loaded.
+    void RequestExportRender(int mode);
 
     virtual void Clear(bool all = false);
     virtual void ClearRect(GUIRect &rect);
