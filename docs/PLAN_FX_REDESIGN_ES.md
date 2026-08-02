@@ -341,6 +341,25 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 - Comandos: delay send, reverb send, delay feedback, delay time, reverb decay, reverb size, filter cutoff, compressor threshold (en las 2 columnas FX existentes; mapeo monotónico 00-FF documentado, NO convención "1=máximo").
 - UI: sends DLY/RVB por pista, páginas globales delay/reverb/master, GR meter, indicador clipping, unidades ms/Hz/dB/ratio/%, presets ECO.
 
+### Fase 4 - RESULTADO (parcial: sends + comandos; UI pendiente)
+
+**4.1 — Sends DLY/RVB por pista (hecho y verificado)**
+- `Mixer.h/.cpp`: `channelDelaySend_`/`channelReverbSend_` (0..100), getters/setters/nudgers con `clampSend`, atributos XML `DELAYSEND`/`REVERBSEND` en SaveContent/RestoreContent (backwards-compatible: atributos ausentes -> 0).
+- `FxEngine.h/.cpp`: `AccumulateChannelSend(channel, buffer, samplecount, delayGain, reverbGain)` limpia los buses `send_[0]`/`send_[1]` en el primer acumulador del frame (`sendsAccumulated_`) y suma con `fp_mul`; guards RT (`legacyMode_`, frames <= `FX_ENGINE_MAX_FRAMES`, channel < `FX_ENGINE_MAX_CHANNELS`, null buffer, samplecount > 0 -> `rtViolations_++`). `processSendReturns()` consume los buses y hace fallback a los sends globales si nadie acumuló (preserva comportamiento Fases 2/3).
+- `PlayerChannel.cpp`: tras volumen/mute, si el canal es audible y send != 0, `AccumulateChannelSend(index_, ...)` con las ganancias del Mixer.
+- Test `tests/test_fx_phase4_track_sends.py` -> `FX_TRACK_SENDS_PHASE4_OK` (aislamiento por pista, send=100 -> bus=buffer, acumulación estéreo, fallback global, legacy no acumula, guards RT, round-trip persistencia, default legacy 0, guards de fuente).
+
+**4.2 — Comandos FX en columnas FX (hecho y verificado)**
+- `CommandList.h/.cpp`: `I_CMD_DLYS` (`DLYS`), `I_CMD_RVBS` (`RVBS`), `I_CMD_DLYT` (`DLYT`), `I_CMD_DLYF` (`DLYF`), `I_CMD_RVDC` (`RVDC`), `I_CMD_RVSZ` (`RVSZ`), `I_CMD_CMPT` (`CMPT`), añadidos a `_all[]` tras `PFIN`.
+- `HelpLegend.h`: display names `DSN/RSN/DTM/DFB/RDC/RSZ/CTH` y strings de ayuda con rangos.
+- `SampleInstrument::ProcessCommand`: handlers por comando, mapeo monotónico del byte bajo `value&0xFF` (byte alto = speed reservado):
+  - `DLYS`/`RVBS`: send del track 0..100 -> `Mixer::GetInstance()->SetChannelDelaySend/ReverbSend(channel, ...)`.
+  - `DLYT`: 10..2000 ms, `DLYF`: 0..0.98, `RVDC`: 0.2..8.0 s, `RVSZ`: 0.5..1.5, `CMPT`: -60..0 dB -> setters `FxEngine::GetInstance()` (`SetDelayTimeMs`, `SetDelayFeedback`, `SetReverbDecay`, `SetReverbSize`, `SetCompThresholdDb`). Control-rate únicamente, cero asignaciones.
+- Test `tests/test_fx_phase4_commands.py` -> `FX_COMMANDS_PHASE4_OK` (mapeos monotónicos con extremos exactos, byte alto ignorado, FourCC + handlers + HelpLegend en fuente).
+- MIPS syntax check: `FXENGINE_FASE4_CMDS_MIPS_SYNTAX_OK` (Mixer, PlayerChannel, FxEngine, SampleInstrument).
+
+**4.3 — UI (pendiente)**: sends DLY/RVB por pista en MixerView, páginas globales delay/reverb/master, GR meter, indicador clipping.
+
 ### Fase 5 — Compatibilidad y hardening
 - Modo legacy (FxEngine bypass) verificado con golden tests (sin diferencias).
 - Persistencia de nuevos parámetros FX con defaults = legacy.

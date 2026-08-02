@@ -3,6 +3,7 @@
 #include "Application/Player/SyncMaster.h"
 #include "Application/Mixer/MixerService.h"
 #include "Application/Model/Mixer.h"
+#include "Application/Audio/FxEngine/FxEngine.h"
 #include "Application/Utils/fixed.h"
 #include "System/System/System.h"
 #include <math.h>
@@ -45,7 +46,7 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
      bool tableSlice=SyncMaster::GetInstance()->TableSlice() ;
      bool status=instr_->Render(index_,buffer,samplecount,tableSlice) ;
      audible=((status)&&(!muted_)&&(volume_>0)) ;
-     if (audible&&(volume_!=100)) {
+      if (audible&&(volume_!=100)) {
         /* H38.7 OPT_PERF: scale the whole buffer once in fixed point.
          * The old ((long long)x * volume_)/100LL did a 64-bit division
          * per sample (software divdi3 on MIPS32). A precomputed fixed
@@ -58,6 +59,22 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
            current++ ;
         }
      }
+   }
+
+   // TREEFROG_FX_SENDS_V1 (Fase 4):
+   // Accumulate this track's rendered audio into the FxEngine delay/reverb
+   // send buses with the per-track send gains, BEFORE the master mix.  Only
+   // audible (post-volume, non-muted) audio is sent, matching what is heard.
+   // The mixer channels feed the global delay/reverb returns which are summed
+   // back into the master in FxEngine::processSendReturns().
+   if (audible) {
+       Mixer *mixer=Mixer::GetInstance() ;
+       fixed dg=fl2fp((float)mixer->GetChannelDelaySend(index_)/100.0f) ;
+       fixed rg=fl2fp((float)mixer->GetChannelReverbSend(index_)/100.0f) ;
+       if (dg!=0 || rg!=0) {
+           FxEngine::FxEngine::GetInstance().AccumulateChannelSend(
+               index_,buffer,samplecount,dg,rg) ;
+       }
    }
    lastPeakClock_ = System::GetInstance()->GetClock() ;
    // TREEFROG_MIXER_PER_CHANNEL_VU_V2 (H38.7):

@@ -58,6 +58,17 @@ public:
     // so the output is bit-for-bit identical to the original path.
     void Process(fixed *buffer, int samplecount);
 
+    // --- Per-track sends (Fase 4) ---
+    // Each PlayerChannel accumulates its own rendered audio into the delay and
+    // reverb send buses with the track's send gains (read from the Mixer
+    // model), BEFORE the master mix.  Process() then uses the accumulated
+    // buses.  When no channel accumulates (e.g. bench calls Process() directly
+    // on a single mixed buffer), Process() falls back to the global
+    // delaySend_/reverbSend_ sends so the Fase 2/3 behaviour is preserved.
+    void AccumulateChannelSend(int channel, const fixed *buffer,
+                               int samplecount, fixed delayGain,
+                               fixed reverbGain);
+
     bool IsLegacyMode() const { return legacyMode_; }
     void SetLegacyMode(bool on) { legacyMode_ = on; }
 
@@ -131,6 +142,7 @@ private:
 
     Buses buses_;
     bool legacyMode_;
+    bool sendsAccumulated_;
     unsigned long callCount_;
     unsigned long frames_;
     unsigned long maxFrames_;

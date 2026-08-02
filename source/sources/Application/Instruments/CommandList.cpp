@@ -17,7 +17,18 @@ static FourCC _all[]= {
 	I_CMD_FCUT,
 	I_CMD_FRES,
 	I_CMD_CRSH,
-	I_CMD_PFIN
+	I_CMD_PFIN,
+	// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4):
+	// Master-bus FX automation, monotonic 00-FF on the low param byte:
+	// DLYS/RVBS set the track sends, DLYT/DLYF the master delay,
+	// RVDC/RVSZ the master reverb, CMPT the master compressor threshold.
+	I_CMD_DLYS,
+	I_CMD_RVBS,
+	I_CMD_DLYT,
+	I_CMD_DLYF,
+	I_CMD_RVDC,
+	I_CMD_RVSZ,
+	I_CMD_CMPT
 } ;
 
 int CommandList::GetCount() { return sizeof(_all) / sizeof(FourCC); }

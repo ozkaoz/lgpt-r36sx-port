@@ -20,6 +20,14 @@ static inline void getCommandDisplayName(FourCC command, char *out) {
 		case I_CMD_FRES: strcpy(out, "RES "); break;
 		case I_CMD_CRSH: strcpy(out, "BTS "); break;
 		case I_CMD_PFIN: strcpy(out, "PFI "); break;
+		// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4)
+		case I_CMD_DLYS: strcpy(out, "DSN "); break;
+		case I_CMD_RVBS: strcpy(out, "RSN "); break;
+		case I_CMD_DLYT: strcpy(out, "DTM "); break;
+		case I_CMD_DLYF: strcpy(out, "DFB "); break;
+		case I_CMD_RVDC: strcpy(out, "RDC "); break;
+		case I_CMD_RVSZ: strcpy(out, "RSZ "); break;
+		case I_CMD_CMPT: strcpy(out, "CTH "); break;
 		default: {
 			const char *src = (const char *)&command;
 			out[0] = src[0];
@@ -155,6 +163,43 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[0].assign("STOP playing song");
 			result[1].assign("immediately");
 			result[2].assign("");
+			break;
+		// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4):
+		// Master-bus FX, monotonic 00-FF on the low byte (0=min, FF=max).
+		case I_CMD_DLYS:
+			result[0].assign("Delay Send:--bb");
+			result[1].assign("track delay send bb");
+			result[2].assign("00-FF -> 0-100%");
+			break;
+		case I_CMD_RVBS:
+			result[0].assign("ReveRb Send:--bb");
+			result[1].assign("track reverb send bb");
+			result[2].assign("00-FF -> 0-100%");
+			break;
+		case I_CMD_DLYT:
+			result[0].assign("Delay TiMe:--bb");
+			result[1].assign("master delay time");
+			result[2].assign("00-FF -> 10-2000 ms");
+			break;
+		case I_CMD_DLYF:
+			result[0].assign("Delay FeedBack:--bb");
+			result[1].assign("master delay feedback");
+			result[2].assign("00-FF -> 0-98%");
+			break;
+		case I_CMD_RVDC:
+			result[0].assign("ReveRb DeCay:--bb");
+			result[1].assign("master reverb RT60");
+			result[2].assign("00-FF -> 0.2-8 s");
+			break;
+		case I_CMD_RVSZ:
+			result[0].assign("ReveRb Size:--bb");
+			result[1].assign("master reverb size");
+			result[2].assign("00-FF -> 0.5-1.5");
+			break;
+		case I_CMD_CMPT:
+			result[0].assign("CoMP threshold:--bb");
+			result[1].assign("master comp threshold");
+			result[2].assign("00-FF -> -60-0 dB");
 			break;
 		default:
 

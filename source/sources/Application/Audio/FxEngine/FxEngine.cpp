@@ -3,7 +3,8 @@
 namespace FxEngine {
 
 FxEngine::FxEngine()
-    : legacyMode_(true), callCount_(0), frames_(0), maxFrames_(0),
+    : legacyMode_(true), sendsAccumulated_(false), callCount_(0), frames_(0),
+      maxFrames_(0),
       rtViolations_(0), sampleRate_(44100),
       delaySend_(0), delayReturn_(fl2fp(0.5f)),
       reverbSend_(0), reverbReturn_(fl2fp(0.5f)) {
@@ -27,6 +28,7 @@ void FxEngine::Reset() {
     frames_ = 0;
     maxFrames_ = 0;
     rtViolations_ = 0;
+    sendsAccumulated_ = false;
     delay_.Reset();
     reverb_.Reset();
     eq_.Reset();
@@ -80,11 +82,18 @@ void FxEngine::processSendReturns(fixed *buffer, int samplecount) {
     // Snapshot dry master.
     for (int i = 0; i < n; i++) buses_.master_[i] = buffer[i];
 
-    // Build send buses (channel 0 = delay, channel 1 = reverb).
-    for (int i = 0; i < n; i++) {
-        buses_.send_[0][i] = fp_mul(buffer[i], delaySend_);
-        buses_.send_[1][i] = fp_mul(buffer[i], reverbSend_);
+    // Build send buses.  Fase 4: per-track sends were accumulated into
+    // send_[0]/send_[1] by AccumulateChannelSend() during channel rendering.
+    // If no channel accumulated (direct Process() on a mixed buffer), fall
+    // back to the global delaySend_/reverbSend_ gains so the Fase 2/3 send
+    // model is preserved.
+    if (!sendsAccumulated_) {
+        for (int i = 0; i < n; i++) {
+            buses_.send_[0][i] = fp_mul(buffer[i], delaySend_);
+            buses_.send_[1][i] = fp_mul(buffer[i], reverbSend_);
+        }
     }
+    sendsAccumulated_ = false;
 
     // Process returns (wet).
     delay_.Process(buses_.send_[0], buses_.returnDelay_, samplecount);
@@ -100,6 +109,51 @@ void FxEngine::processSendReturns(fixed *buffer, int samplecount) {
     // Master chain (Fase 3): EQ then compressor/limiter, in place.
     eq_.Process(buffer, buffer, samplecount);
     comp_.Process(buffer, buffer, samplecount);
+}
+
+// Called by each PlayerChannel after it renders its own instrument buffer and
+// before the master mix.  RT-safe: pure fixed-point accumulation into the
+// static send buses, no allocation/syscalls.
+void FxEngine::AccumulateChannelSend(int channel, const fixed *buffer,
+                                     int samplecount, fixed delayGain,
+                                     fixed reverbGain) {
+    if (legacyMode_) {
+        return;
+    }
+    if (samplecount <= 0 || !buffer) {
+        ++rtViolations_;
+        return;
+    }
+    if (channel < 0 || channel >= FX_ENGINE_MAX_CHANNELS) {
+        ++rtViolations_;
+        return;
+    }
+    if ((unsigned long)samplecount > FX_ENGINE_MAX_FRAMES) {
+        ++rtViolations_;
+        return;
+    }
+    int n = samplecount * 2;
+    // First accumulator of this frame: the send buses still hold the previous
+    // frame's data (static buffers), so zero the part this frame will use.
+    if (!sendsAccumulated_) {
+        for (int i = 0; i < n; i++) {
+            buses_.send_[0][i] = 0;
+            buses_.send_[1][i] = 0;
+        }
+        sendsAccumulated_ = true;
+    }
+    if (delayGain != 0) {
+        fixed *dst = buses_.send_[0];
+        for (int i = 0; i < n; i++) {
+            dst[i] += fp_mul(buffer[i], delayGain);
+        }
+    }
+    if (reverbGain != 0) {
+        fixed *dst = buses_.send_[1];
+        for (int i = 0; i < n; i++) {
+            dst[i] += fp_mul(buffer[i], reverbGain);
+        }
+    }
 }
 
 } // namespace FxEngine

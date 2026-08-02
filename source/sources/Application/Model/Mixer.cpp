@@ -25,10 +25,18 @@ int Mixer::clampBus(int bus) const {
 	return bus ;
 } ;
 
+int Mixer::clampSend(int send) const {
+	if (send<0) return 0 ;
+	if (send>100) return 100 ;
+	return send ;
+} ;
+
 void Mixer::Clear() {
 	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 		channelBus_[i]=i ;
 		channelVolume_[i]=100 ;
+		channelDelaySend_[i]=0 ;
+		channelReverbSend_[i]=0 ;
 	}
 } ;
 
@@ -57,12 +65,44 @@ void Mixer::NudgeChannelVolume(int i,int delta) {
 	SetChannelVolume(i,GetChannelVolume(i)+delta) ;
 } ;
 
+int Mixer::GetChannelDelaySend(int i) {
+	i=clampChannel(i) ;
+	return clampSend(channelDelaySend_[i]) ;
+} ;
+
+void Mixer::SetChannelDelaySend(int i,int send) {
+	i=clampChannel(i) ;
+	channelDelaySend_[i]=clampSend(send) ;
+} ;
+
+void Mixer::NudgeChannelDelaySend(int i,int delta) {
+	i=clampChannel(i) ;
+	SetChannelDelaySend(i,GetChannelDelaySend(i)+delta) ;
+} ;
+
+int Mixer::GetChannelReverbSend(int i) {
+	i=clampChannel(i) ;
+	return clampSend(channelReverbSend_[i]) ;
+} ;
+
+void Mixer::SetChannelReverbSend(int i,int send) {
+	i=clampChannel(i) ;
+	channelReverbSend_[i]=clampSend(send) ;
+} ;
+
+void Mixer::NudgeChannelReverbSend(int i,int delta) {
+	i=clampChannel(i) ;
+	SetChannelReverbSend(i,GetChannelReverbSend(i)+delta) ;
+} ;
+
 void Mixer::SaveContent(TiXmlNode *node) {
 	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 		TiXmlElement channel("CHANNEL") ;
 		channel.SetAttribute("INDEX",i) ;
 		channel.SetAttribute("BUS",GetBus(i)) ;
 		channel.SetAttribute("VOLUME",GetChannelVolume(i)) ;
+		channel.SetAttribute("DELAYSEND",GetChannelDelaySend(i)) ;
+		channel.SetAttribute("REVERBSEND",GetChannelReverbSend(i)) ;
 		node->InsertEndChild(channel) ;
 	}
 } ;
@@ -75,6 +115,8 @@ void Mixer::RestoreContent(TiXmlElement *element) {
 		int index=-1 ;
 		int bus=0 ;
 		int volume=100 ;
+		int delaySend=0 ;
+		int reverbSend=0 ;
 		if (current->Attribute("INDEX",&index)) {
 			if (index>=0 && index<SONG_CHANNEL_COUNT) {
 				if (current->Attribute("BUS",&bus)) {
@@ -82,6 +124,12 @@ void Mixer::RestoreContent(TiXmlElement *element) {
 				}
 				if (current->Attribute("VOLUME",&volume)) {
 					SetChannelVolume(index,volume) ;
+				}
+				if (current->Attribute("DELAYSEND",&delaySend)) {
+					SetChannelDelaySend(index,delaySend) ;
+				}
+				if (current->Attribute("REVERBSEND",&reverbSend)) {
+					SetChannelReverbSend(index,reverbSend) ;
 				}
 			}
 		}

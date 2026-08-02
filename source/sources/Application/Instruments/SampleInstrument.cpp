@@ -18,6 +18,8 @@ extern bool LGPTChopperGetChopRangeForSampleIndex(int sampleIndex, int chopIndex
 
 #include "SampleInstrumentDatas.h"
 #include "Application/Player/SyncMaster.h"
+#include "Application/Model/Mixer.h"
+#include "Application/Audio/FxEngine/FxEngine.h"
 
 fixed SampleInstrument::feedback_[SONG_CHANNEL_COUNT][FB_BUFFER_LENGTH*2] ;
 
@@ -1524,6 +1526,67 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 					rp->crush_=crush ;
 				}
 			}
+			break ;
+
+		// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4):
+		// Master-bus FX automation.  All use a monotonic 00-FF mapping of the
+		// low param byte (value&0xFF): 0x00 = minimum, 0xFF = maximum.  The
+		// high byte (speed) is reserved and ignored.  Sends are per-track
+		// (Mixer model); time/feedback/decay/size/threshold are master-bus
+		// (FxEngine).  All writes happen at control rate (audio callback), are
+		// pure fixed-point assignments, and never allocate.
+		case I_CMD_DLYS:
+			{
+				int send=(int)((long)(value&0xFF)*100)/255 ;
+				Mixer::GetInstance()->SetChannelDelaySend(channel,send) ;
+			}
+			break ;
+		case I_CMD_RVBS:
+			{
+				int send=(int)((long)(value&0xFF)*100)/255 ;
+				Mixer::GetInstance()->SetChannelReverbSend(channel,send) ;
+			}
+			break ;
+		case I_CMD_DLYT:
+			{
+				// 00-FF -> 10..2000 ms (monotonic).
+				float v=(float)(value&0xFF)/255.0f ;
+				FxEngine::FxEngine::GetInstance().SetDelayTimeMs(
+				    fl2fp(10.0f+(2000.0f-10.0f)*v)) ;
+			}
+			break ;
+		case I_CMD_DLYF:
+			{
+				// 00-FF -> 0..0.98 feedback (monotonic).
+				float v=(float)(value&0xFF)/255.0f ;
+				FxEngine::FxEngine::GetInstance().SetDelayFeedback(
+				    fl2fp(0.98f*v)) ;
+			}
+			break ;
+		case I_CMD_RVDC:
+			{
+				// 00-FF -> 0.2..8.0 s RT60 (monotonic).
+				float v=(float)(value&0xFF)/255.0f ;
+				FxEngine::FxEngine::GetInstance().SetReverbDecay(
+				    fl2fp(0.2f+(8.0f-0.2f)*v)) ;
+			}
+			break ;
+		case I_CMD_RVSZ:
+			{
+				// 00-FF -> 0.5..1.5 size (monotonic).
+				float v=(float)(value&0xFF)/255.0f ;
+				FxEngine::FxEngine::GetInstance().SetReverbSize(
+				    fl2fp(0.5f+(1.5f-0.5f)*v)) ;
+			}
+			break ;
+		case I_CMD_CMPT:
+			{
+				// 00-FF -> -60..0 dB threshold (monotonic).
+				float v=(float)(value&0xFF)/255.0f ;
+				FxEngine::FxEngine::GetInstance().SetCompThresholdDb(
+				    fl2fp(-60.0f+60.0f*v)) ;
+			}
+			break ;
 		default:
 			break;
 	} ;
