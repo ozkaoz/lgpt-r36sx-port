@@ -52,6 +52,12 @@ public:
 
 	  virtual void SetRowVolume(int channel,unsigned char vol) { (void)channel; (void)vol; } ;
 
+	  // TREEFROG_PHRASE_PITCH_COLUMN_V2 (H38.7): row pitch override in semitones.
+	  // Used by SampleInstrument to transpose a chop row's playback while keeping
+	  // the same chop index. Non-sample instruments ignore it.
+
+	  virtual void SetRowPitch(int channel,int pitch) { (void)channel; (void)pitch; } ;
+
 	  virtual int GetTable()=0 ;
 	  virtual bool GetTableAutomation()=0 ;
 

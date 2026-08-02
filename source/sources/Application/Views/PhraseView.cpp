@@ -300,11 +300,12 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
         if (editCol == 0 && updateChopNoteValueForRow(row_ + yOffset, direction)) {
             lastNote_ = *c;
         } else {
-            // TREEFROG_PHRASE_PITCH_COLUMN_V1 (H38.7): the pitch column stores
-            // a signed value -24..+24 (0xFF = none). Steps by 1 per direction,
-            // A+UP/DOWN steps by 10, same scheme as the volume column.
+            // TREEFROG_PHRASE_PITCH_COLUMN_V2 (H38.7): the pitch column stores
+            // -24..+24 semitones with an offset so that -1 (0xFF) does not
+            // collide with the "no pitch" marker. 0x00 = none, values 0x28..0x58
+            // map to -24..+24. Steps by 1 per direction, A+UP/DOWN by 10.
             if (editCol == 2) {
-                int p = (*c == 0xFF) ? 0 : (int)(signed char)*c;
+                int p = phrasePitchStoredToInt(*c);
                 int step = (direction == VUD_UP || direction == VUD_DOWN) && bigStep
                                ? 10
                                : 1;
@@ -326,7 +327,7 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
                 p += offset;
                 if (p < -24) p = -24;
                 if (p > 24) p = 24;
-                *c = (unsigned char)(signed char)p;
+                *c = phrasePitchIntToStored(p);
                 lastPitch_ = p;
             } else {
                 bool noteWasEmpty = (editCol == 0) && (*c == 0xFF);
@@ -351,6 +352,11 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
                     uchar *vc = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
                     if (*vc == 0xFF) {
                         *vc = 0x64;
+                        isDirty_ = true;
+                    }
+                    uchar *pc = phrase_->pitch_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
+                    if (*pc == PITCH_STORED_NONE) {
+                        *pc = PITCH_STORED_ZERO;
                         isDirty_ = true;
                     }
                 }
@@ -411,6 +417,11 @@ void PhraseView::pasteLast() {
             if (*c == 0xFF) {
                 *c = 0x64;
             }
+            // Auto-set pitch to 00 when placing a note in empty row
+            c = phrase_->pitch_ + (16 * viewData_->currentPhrase_ + row_);
+            if (*c == PITCH_STORED_NONE) {
+                *c = PITCH_STORED_ZERO;
+            }
             isDirty_ = true;
         } else {
             lastNote_ = *c;
@@ -429,11 +440,11 @@ void PhraseView::pasteLast() {
         break;
     case 2:
         c = phrase_->pitch_ + (16 * viewData_->currentPhrase_ + row_);
-        if (*c == 0xFF) {
-            *c = (unsigned char)(signed char)lastPitch_;
+        if (*c == PITCH_STORED_NONE) {
+            *c = phrasePitchIntToStored(lastPitch_);
             isDirty_ = true;
         } else {
-            lastPitch_ = (int)(signed char)*c;
+            lastPitch_ = phrasePitchStoredToInt(*c);
         }
         break;
     case 3:
@@ -737,12 +748,8 @@ void PhraseView::interpolateSelection() {
         // Pitch column
         uchar *pitchData = phrase_->pitch_ + (16 * viewData_->currentPhrase_);
 
-        int startPitch = (pitchData[startRow] == 0xFF)
-                             ? 0
-                             : (int)(signed char)pitchData[startRow];
-        int endPitch = (pitchData[endRow] == 0xFF)
-                           ? 0
-                           : (int)(signed char)pitchData[endRow];
+        int startPitch = phrasePitchStoredToInt(pitchData[startRow]);
+        int endPitch = phrasePitchStoredToInt(pitchData[endRow]);
 
         int numSteps = endRow - startRow;
         int pitchDiff = endPitch - startPitch;
@@ -752,7 +759,7 @@ void PhraseView::interpolateSelection() {
             int value = startPitch + (pitchDiff * step) / (numSteps);
             if (value < -24) value = -24;
             if (value > 24) value = 24;
-            pitchData[row] = (uchar)(signed char)value;
+            pitchData[row] = phrasePitchIntToStored(value);
         }
     } else {
         // Parameter columns (5 or 7)
@@ -838,7 +845,7 @@ void PhraseView::cutSelection() {
                 dst2[j + clipboard_.row_] = 0xFF;
                 break;
             case 2:
-                dst3[j + clipboard_.row_] = 0xFF;
+                dst3[j + clipboard_.row_] = PITCH_STORED_NONE;
                 break;
             case 3:
                 dst4[j + clipboard_.row_] = 0xFF;
@@ -1689,10 +1696,11 @@ void PhraseView::DrawView() {
         (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
                                                 : SetColor(CD_NORMAL);
         setTextProps(props, 2, j, false);
-        if (d == 0xFF || d == 0x00) {
-            DrawString(pos._x, pos._y, "  .", props);
+        if (d == PITCH_STORED_NONE) {
+            DrawString(pos._x, pos._y, " --", props);
         } else {
-            snprintf(buffer, sizeof(buffer), "%+03d", (int)(signed char)d);
+            snprintf(buffer, sizeof(buffer), "%+03d",
+                     phrasePitchStoredToInt(d));
             DrawString(pos._x, pos._y, buffer, props);
         }
         setTextProps(props, 2, j, true);

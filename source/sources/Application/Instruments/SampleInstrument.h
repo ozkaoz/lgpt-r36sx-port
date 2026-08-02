@@ -87,6 +87,9 @@ public:
 	   int GetVolume() ;
 	   void SetVolume(int) ;
 	   void SetRowVolume(int channel,unsigned char vol) ;
+	   // TREEFROG_PHRASE_PITCH_COLUMN_V2 (H38.7): transposes the running voice
+	   // by `pitch` semitones without touching the note/chop index.
+	   void SetRowPitch(int channel,int pitch) ;
 	   int GetSampleSize(int channel=-1) ;
        int GetLoopEnd();
        virtual const char *GetName();

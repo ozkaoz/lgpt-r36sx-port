@@ -934,22 +934,23 @@ void Player::playCursorPosition(int channel) {
 				unsigned char *trsp=viewData_->song_->chain_->transpose_+(16*chain+chainPos) ;
 				note+=*trsp ;
 				note+=project_->GetTranspose() ;
-				// TREEFROG_PHRASE_PITCH_COLUMN_V1 (H38.7): dedicated pitch column.
-				// The row pitch (signed -24..+24 semitones) is added to the note.
-				// Chop rows use the note column as a chop index (S01..S99), so
-				// the pitch is skipped there to avoid selecting a different chop.
+				// TREEFROG_PHRASE_PITCH_COLUMN_V2 (H38.7): dedicated pitch column.
+				// The row pitch (signed -24..+24 semitones) is added to the note
+				// for regular rows. Chop rows use the note column as a chop index
+				// (S01..S99), so the pitch is applied as a playback transposition
+				// on the SAME chop via SetRowPitch instead of changing the note.
+				int rowPitch=phrasePitchStoredToInt(phrase->pitch_[16*currentPhrase+pos]) ;
+				bool isChopRow=false ;
 				{
 					int originalNote=(int)phrase->note_[16*currentPhrase+pos] ;
-					bool isChopRow=false ;
 					if (instr!=0xFF) {
 						int displayChopNumber=0 ;
 						if (LGPTChopperIsChopNoteForInstrument(viewData_,instr,originalNote,&displayChopNumber)) {
 							isChopRow=true ;
 						}
 					}
-					int pitch=(int)((signed char)phrase->pitch_[16*currentPhrase+pos]) ;
-					if (pitch!=0 && !isChopRow) {
-						int n=(int)note+pitch ;
+					if (rowPitch!=0 && !isChopRow) {
+						int n=(int)note+rowPitch ;
 						if (n<0) n=0 ;
 						if (n>127) n=127 ;
 						note=(unsigned char)n ;
@@ -963,6 +964,9 @@ void Player::playCursorPosition(int channel) {
 
 				if (note<128) {
 					mixer_->StartInstrument(channel,instrument,note,newInstrument) ;
+					if (isChopRow && rowPitch!=0) {
+						instrument->SetRowPitch(channel,rowPitch) ;
+					}
 
 // TREEFROG_PHRASE_VOL_V6 (H38.6 fix):
 // -- (0xFF) and 00 are silent. Values 01..100 (0x64) are a linear

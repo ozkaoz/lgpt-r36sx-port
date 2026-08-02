@@ -1048,6 +1048,20 @@ void SampleInstrument::SetRowVolume(int channel,unsigned char vol) {
 	rp->volume_=fp_mul(rp->baseVolume_,rowGain) ;
 } ;
 
+// TREEFROG_PHRASE_PITCH_COLUMN_V2 (H38.7): transposes the running voice by
+// `pitch` semitones. For chop rows the note/chop index stays untouched, so we
+// only scale the playback speed of the current voice by 2^(pitch/12).
+
+void SampleInstrument::SetRowPitch(int channel,int pitch) {
+	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return ;
+	if (pitch==0) return ;
+	renderParams *rp=renderParams_+channel ;
+	if (!rp->sampleBuffer_) return ;
+	fixed factor=fl2fp(float(pow(2.0,(double)pitch/12.0))) ;
+	rp->baseSpeed_=fp_mul(rp->baseSpeed_,factor) ;
+	rp->speed_=fp_mul(rp->speed_,factor) ;
+} ;
+
 int SampleInstrument::GetSampleSize(int channel) {
 	if (source_) {
 		 renderParams *rp=renderParams_+channel ;
