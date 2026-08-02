@@ -84,6 +84,7 @@ public:
     void SetDelayWidth(fixed w) { delay_.SetWidth(w); }
     void SetDelayMix(fixed mix) { delay_.SetMix(mix); }
     void SetDelayBypass(bool on) { delay_.SetBypass(on); }
+    void SetDelaySaturation(bool on) { delay_.SetSaturation(on); }
     void SetDelayLoopLPHz(fixed hz) { delay_.SetLoopLPHz(hz); }
     void SetDelayLoopHPHz(fixed hz) { delay_.SetLoopHPHz(hz); }
 
@@ -100,6 +101,27 @@ public:
     void SetReverbInputHPHz(fixed hz) { reverb_.SetInputHP(hz); }
     void SetReverbInputLPHz(fixed hz) { reverb_.SetInputLP(hz); }
     void SetReverbMode(int mode) { reverb_.SetMode((Reverb::Mode)mode); }
+
+    // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
+    fixed GetDelaySend() const { return delaySend_; }
+    fixed GetDelayReturn() const { return delayReturn_; }
+    fixed GetDelayTimeMs() const { return delay_.GetDelayMsTarget(); }
+    fixed GetDelayFeedback() const { return delay_.GetFeedback(); }
+    fixed GetDelayMix() const { return delay_.GetMix(); }
+    fixed GetDelayWidth() const { return delay_.GetWidth(); }
+    bool GetDelayPingPong() const { return delay_.GetPingPong(); }
+    bool GetDelayBypass() const { return delay_.GetBypass(); }
+    bool GetDelaySaturation() const { return delay_.GetSaturation(); }
+    fixed GetReverbSend() const { return reverbSend_; }
+    fixed GetReverbReturn() const { return reverbReturn_; }
+    fixed GetReverbPredelayMs() const { return reverb_.GetPredelayMs(); }
+    fixed GetReverbDecay() const { return reverb_.GetDecayTarget(); }
+    fixed GetReverbSize() const { return reverb_.GetSize(); }
+    fixed GetReverbDamping() const { return reverb_.GetDamping(); }
+    fixed GetReverbWidth() const { return reverb_.GetWidth(); }
+    fixed GetReverbMix() const { return reverb_.GetMix(); }
+    int GetReverbMode() const { return reverb_.GetMode(); }
+    bool GetReverbBypass() const { return reverb_.GetBypass(); }
 
     // --- Master EQ 3 bandas (Fase 3) ---
     void SetEqBypass(bool on) { eq_.SetBypass(on); }
@@ -119,6 +141,22 @@ public:
     void SetCompStereoLink(bool on) { comp_.SetStereoLink(on); }
     void SetCompSoftClip(bool on) { comp_.SetSoftClip(on); }
     fixed GetCompGainReductionDb() const { return comp_.GetGainReductionDb(); }
+
+    // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
+    fixed GetEqBandFreq(int band) const { return eq_.GetBandFreq((ParametricEQ::Band)band); }
+    fixed GetEqBandGainDb(int band) const { return eq_.GetBandGainDb((ParametricEQ::Band)band); }
+    fixed GetEqBandQ(int band) const { return eq_.GetBandQ((ParametricEQ::Band)band); }
+    bool GetEqBandEnabled(int band) const { return eq_.GetBandEnabled((ParametricEQ::Band)band); }
+    bool GetEqBypass() const { return eq_.GetBypass(); }
+    fixed GetCompThresholdDb() const { return comp_.GetThresholdDb(); }
+    fixed GetCompRatio() const { return comp_.GetRatio(); }
+    fixed GetCompKneeDb() const { return comp_.GetKneeDb(); }
+    fixed GetCompMakeupDb() const { return comp_.GetMakeupDb(); }
+    float GetCompAttackMs() const { return comp_.GetAttackMs(); }
+    float GetCompReleaseMs() const { return comp_.GetReleaseMs(); }
+    bool GetCompStereoLink() const { return comp_.GetStereoLink(); }
+    bool GetCompSoftClip() const { return comp_.GetSoftClip(); }
+    bool GetCompBypass() const { return comp_.GetBypass(); }
 
     // RT telemetry.  rtViolations_ must stay 0; it is incremented only if
     // Process() would have needed a dynamic allocation or a syscall.

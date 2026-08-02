@@ -53,6 +53,17 @@ public:
     unsigned long GetRtViolations() const { return rtViolations_; }
     static unsigned long StaticMemoryBytes();
 
+    // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
+    fixed GetPredelayMs() const { return predelayMs_; }
+    fixed GetDecayTarget() const { return decayTarget_; }
+    fixed GetDecay() const { return decay_; }
+    fixed GetSize() const { return size_; }
+    fixed GetDamping() const { return damping_; }
+    fixed GetWidth() const { return width_; }
+    int GetMode() const { return mode_; }
+    bool GetBypass() const { return bypass_; }
+    fixed GetMix() const { return mix_; }
+
 private:
     static fixed saturate(fixed x);
     void recomputeCombs();

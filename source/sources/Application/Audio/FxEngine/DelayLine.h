@@ -48,6 +48,16 @@ public:
     // bpm -> delay time in ms.  Controller (Fase 4) calls SetDelayMs with it.
     static fixed SyncDivisionToMs(int division, int bpm);
 
+    // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
+    fixed GetDelayMsTarget() const { return delayTarget_; }
+    fixed GetDelayMs() const { return delaySamples_; }
+    fixed GetFeedback() const { return fb_; }
+    fixed GetMix() const { return mix_; }
+    fixed GetWidth() const { return width_; }
+    bool GetPingPong() const { return pingPong_; }
+    bool GetSaturation() const { return sat_; }
+    bool GetBypass() const { return bypass_; }
+
     unsigned long GetRtViolations() const { return rtViolations_; }
     static unsigned long StaticMemoryBytes() {
         return (unsigned long)kBufferSize * sizeof(fixed);

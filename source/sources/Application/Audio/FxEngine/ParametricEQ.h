@@ -38,6 +38,13 @@ public:
     unsigned long GetRtViolations() const { return rtViolations_; }
     static unsigned long StaticMemoryBytes() { return 0; }
 
+    // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
+    fixed GetBandFreq(Band band) const { return bands_[band].hz; }
+    fixed GetBandGainDb(Band band) const { return bands_[band].db; }
+    fixed GetBandQ(Band band) const { return bands_[band].q; }
+    bool GetBandEnabled(Band band) const { return bands_[band].enabled; }
+    bool GetBypass() const { return bypass_; }
+
 private:
     static fixed saturate(fixed x);
     void recompute(Band band);

@@ -48,6 +48,17 @@ public:
         return (unsigned long)kTableSize * sizeof(fixed) * 2; // gain + gr tables
     }
 
+    // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
+    fixed GetThresholdDb() const { return threshDb_; }
+    fixed GetRatio() const { return ratio_; }
+    fixed GetKneeDb() const { return kneeDb_; }
+    fixed GetMakeupDb() const { return makeupDb_; }
+    float GetAttackMs() const { return attackMs_; }
+    float GetReleaseMs() const { return releaseMs_; }
+    bool GetStereoLink() const { return stereoLink_; }
+    bool GetBypass() const { return bypass_; }
+    bool GetSoftClip() const { return softClip_; }
+
 private:
     static fixed saturate(fixed x);
     static fixed cubicClip(fixed x);

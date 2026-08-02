@@ -341,7 +341,7 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 - Comandos: delay send, reverb send, delay feedback, delay time, reverb decay, reverb size, filter cutoff, compressor threshold (en las 2 columnas FX existentes; mapeo monotónico 00-FF documentado, NO convención "1=máximo").
 - UI: sends DLY/RVB por pista, páginas globales delay/reverb/master, GR meter, indicador clipping, unidades ms/Hz/dB/ratio/%, presets ECO.
 
-### Fase 4 - RESULTADO (parcial: sends + comandos; UI pendiente)
+### Fase 4 - RESULTADO (completo: sends + comandos + UI)
 
 **4.1 — Sends DLY/RVB por pista (hecho y verificado)**
 - `Mixer.h/.cpp`: `channelDelaySend_`/`channelReverbSend_` (0..100), getters/setters/nudgers con `clampSend`, atributos XML `DELAYSEND`/`REVERBSEND` en SaveContent/RestoreContent (backwards-compatible: atributos ausentes -> 0).
@@ -358,7 +358,14 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 - Test `tests/test_fx_phase4_commands.py` -> `FX_COMMANDS_PHASE4_OK` (mapeos monotónicos con extremos exactos, byte alto ignorado, FourCC + handlers + HelpLegend en fuente).
 - MIPS syntax check: `FXENGINE_FASE4_CMDS_MIPS_SYNTAX_OK` (Mixer, PlayerChannel, FxEngine, SampleInstrument).
 
-**4.3 — UI (pendiente)**: sends DLY/RVB por pista en MixerView, páginas globales delay/reverb/master, GR meter, indicador clipping.
+**4.3 — UI (hecho y verificado)**
+- `MixerView` gana un sistema de páginas FX (TREEFROG_FX_PAGES_V1): SELECT cicla MIX -> DELAY -> REVERB -> MASTER -> MIX.
+- Página MIX: barras clásicas + readouts de send DLY/RVB por pista bajo cada barra (filas 16/17). R2 solo cicla el target de edición VOL/DLY/RVB del canal hovereado; UP/DOWN y A+UP/DOWN editan según el target (`Mixer::NudgeChannelDelaySend/ReverbSend`).
+- Páginas DELAY/REVERB/MASTER: tabla `kFxParams_` (41 parámetros) — filas con etiqueta + valor en unidades naturales (ms, %, s, dB, Hz, ratio). UP/DOWN mueve la fila, LEFT/RIGHT edita, A+LEFT/RIGHT/A+UP/DOWN edición gruesa.
+- Página MASTER: EQ 3 bandas completo (freq/gain/Q/enable por banda + bypass) y compresor completo (threshold, ratio, knee, attack, release, makeup, stereo link, soft clip, bypass) + GR meter en vivo.
+- Getters de control-rate añadidos a `DelayLine`/`Reverb`/`ParametricEQ`/`Compressor` y readbacks en `FxEngine` (`GetDelayTimeMs`, `GetReverbDecay`, `GetEqBandFreq`, `GetCompThresholdDb`, ...) — la UI solo escribe en control-rate.
+- Test `tests/test_fx_phase4_ui.py` -> `FX_UI_PHASE43_OK` (readback DSP, roundtrip Q15, consistencia tabla 9/10/22, edición sends, wiring UI, getters).
+- MIPS syntax check: `FXENGINE_FASE43_UI_MIPS_SYNTAX_OK` (5 módulos DSP + MixerView).
 
 ### Fase 5 — Compatibilidad y hardening
 - Modo legacy (FxEngine bypass) verificado con golden tests (sin diferencias).
