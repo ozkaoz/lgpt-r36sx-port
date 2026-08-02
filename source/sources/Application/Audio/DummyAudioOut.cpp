@@ -2,6 +2,7 @@
 #include "Application/Player/SyncMaster.h" // Should be installable
 #include "Services/Time/TimeService.h"
 #include "Services/Audio/AudioDriver.h"
+#include "Application/Audio/FxEngine/FxEngine.h"
 
 static bool threadon=false ;
 
@@ -31,6 +32,9 @@ DummyAudioOut::~DummyAudioOut() {
 void DummyAudioOut::Trigger() {
 	int sampleCount=getPlaySampleCount() ;  
     AudioMixer::Render(primarySoundBuffer_,sampleCount) ;
+    // FxEngine (Fase 1): post-mix master stage.  Pure bypass by default
+    // (legacyMode_ == true, gain 1.0) so file renders stay unchanged.
+    FxEngine::FxEngine::GetInstance().Process(primarySoundBuffer_,sampleCount) ;
 } ;
 
 bool DummyAudioOut::Init() {

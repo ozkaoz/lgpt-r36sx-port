@@ -550,10 +550,18 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 	  // Get additional parameters from variables
 
 
-		 // Crush 
+		 // Crush (bit depth). rp->crush_ is the number of retained bits:
+		 // 16 = full resolution (bypass), lower values quantize harder.
+		 // All arithmetic is unsigned; crush_ is clamped to [0,16] so the
+		 // shift count can never be negative or exceed the integer width
+		 // (previously `mask<<=FIXED_SHIFT+shift` with a signed mask and a
+		 // possibly negative shift was undefined behaviour).
 
-		 int shift=16-rp->crush_;
-	     fixed mask=0xFFFFFFFF ;
+		 int crushBits=rp->crush_ ;
+		 if (crushBits>16) crushBits=16 ;
+		 if (crushBits<0) crushBits=0 ;
+		 int shift=16-crushBits ;
+		 unsigned int mask=0xFFFFFFFFu ;
 		 if (shift !=0) {
 			 mask<<=FIXED_SHIFT+shift  ;
 		 }
@@ -566,7 +574,9 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 		 // downsample
 
 		 int downsmpl=rp->downsample_ ;
-		 unsigned int dsMask=0xFFFFFFFF<<downsmpl ;
+		 if (downsmpl>31) downsmpl=31 ;
+		 if (downsmpl<0) downsmpl=0 ;
+		 unsigned int dsMask=0xFFFFFFFFu<<downsmpl ;
 
 		 // Loop mode
 
@@ -918,7 +928,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 
 				// store result, applying crush
 
-					s2=(s2&mask);
+					s2=(fixed)((unsigned int)s2 & mask);
 
 				// apply volume
 

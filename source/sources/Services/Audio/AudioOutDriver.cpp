@@ -6,6 +6,7 @@
 #include "Services/Time/TimeService.h"
 #include "System/Console/Trace.h"
 #include "System/System/System.h"
+#include "Application/Audio/FxEngine/FxEngine.h"
 #include <math.h>
 
 AudioOutDriver::AudioOutDriver(AudioDriver &driver) {
@@ -48,6 +49,9 @@ void AudioOutDriver::Trigger() {
 
     prepareMixBuffers();
     hasSound_=AudioMixer::Render(primarySoundBuffer_,sampleCount_) ;
+    // FxEngine (Fase 1): post-mix master stage.  Pure bypass by default
+    // (legacyMode_ == true, gain 1.0) so the master path is unchanged.
+    FxEngine::FxEngine::GetInstance().Process(primarySoundBuffer_,sampleCount_) ;
     clipToMix();
     driver_->AddBuffer(mixBuffer_,sampleCount_) ;
 }

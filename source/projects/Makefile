@@ -38,6 +38,7 @@ COMMONDIRS := \
 	../sources/Application/Controllers \
 	../sources/Application/Commands \
 	../sources/Application/Audio \
+	../sources/Application/Audio/FxEngine \
 	../sources/Application/FX \
 	../sources/Application/Views \
 	../sources/Application/Views/ModalDialogs \
@@ -265,7 +266,7 @@ COMMONFILES := \
 	Observable.o SingletonRegistry.o \
 	Audio.o AudioMixer.o AudioOutDriver.o AudioDriver.o \
 	AudioOut.o \
-	DummyAudioOut.o PlayerChannel.o AudioFileStreamer.o \
+	DummyAudioOut.o PlayerChannel.o AudioFileStreamer.o FxEngine.o DelayLine.o Reverb.o ParametricEQ.o Compressor.o \
 	MixBus.o \
 	MixerService.o PlayerMixer.o \
 	Service.o ServiceRegistry.o SubService.o \

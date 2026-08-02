@@ -9,16 +9,16 @@
 // Display names for the phrase commands, shown in the phrase grid, the table
 // editor and the command selector. The stored FourCC is never changed, so
 // projects stay compatible; only the on-screen name follows the expected
-// beatmaking labels (RVB/DLY/FLT/EQ/CMP/PIT).
+// beatmaking labels (FBM/FBT/DLY/FLT/EQ/BTS/PFI).
 static inline void getCommandDisplayName(FourCC command, char *out) {
 	switch (command) {
-		case I_CMD_FBMX: strcpy(out, "RVB "); break;
-		case I_CMD_FBTN: strcpy(out, "RVT "); break;
+		case I_CMD_FBMX: strcpy(out, "FBM "); break;
+		case I_CMD_FBTN: strcpy(out, "FBT "); break;
 		case I_CMD_DLAY: strcpy(out, "DLY "); break;
 		case I_CMD_FLTR: strcpy(out, "FLT "); break;
 		case I_CMD_FCUT: strcpy(out, "EQ  "); break;
 		case I_CMD_FRES: strcpy(out, "RES "); break;
-		case I_CMD_CRSH: strcpy(out, "CMP "); break;
+		case I_CMD_CRSH: strcpy(out, "BTS "); break;
 		case I_CMD_PFIN: strcpy(out, "PFI "); break;
 		default: {
 			const char *src = (const char *)&command;
@@ -104,9 +104,9 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[2].assign("");
 			break;
 		case I_CMD_CRSH:
-			result[0].assign("ComPress:aa-b");
-			result[1].assign("drive aa (max 80)");
-			result[2].assign("crush -b (max 8)");
+			result[0].assign("bit CrusH:aa-b");
+			result[1].assign("drive aa (max 128)");
+			result[2].assign("bit depth -b (max 8)");
 			break;
 		case I_CMD_FCUT:
 			result[0].assign("EQ CUToff:aa bb");
@@ -137,18 +137,18 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[2].assign("at speed bb");
 			break;
 		case I_CMD_DLAY:
-			result[0].assign("DeLAY:--bb");
-			result[1].assign("delay note bb tics");
+			result[0].assign("DeLAY note:--bb");
+			result[1].assign("delay note trigger bb tics");
 			result[2].assign("");
 			break;
 		case I_CMD_FBMX:
-			result[0].assign("REVerB mix:aa bb");
-			result[1].assign("feedback wetness aa");
+			result[0].assign("legacy FBack mix:aa bb");
+			result[1].assign("comb feedback wetness aa");
 			result[2].assign("max 50% (no buzz)");
 			break;
 		case I_CMD_FBTN:
-			result[0].assign("REVerB tune:aa bb");
-			result[1].assign("feedback pitch aa");
+			result[0].assign("legacy FBack tune:aa bb");
+			result[1].assign("comb feedback pitch aa");
 			result[2].assign("max 50% (no buzz)");
 			break;
 		case I_CMD_STOP:
