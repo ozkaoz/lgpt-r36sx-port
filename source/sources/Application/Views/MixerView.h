@@ -3,6 +3,7 @@
 
 #include "BaseClasses/View.h"
 #include "ViewData.h"
+#include "Application/Model/Song.h"
 
 class MixerView: public View {
 public:
@@ -46,5 +47,10 @@ private:
 	bool soloMode_ ;
 	bool masterSelected_ ;
 	int frameRefreshDivider_ ;
+	// TREEFROG_MIXER_VU_SMOOTH_V1 (H38.7):
+	// Per-channel display level that attacks instantly on a note and falls
+	// with a smooth per-frame exponential release, so the bars never jump
+	// from full to empty in a single frame (which looked like screen flicker).
+	float vuDisplay_[SONG_CHANNEL_COUNT] ;
 } ;
 #endif

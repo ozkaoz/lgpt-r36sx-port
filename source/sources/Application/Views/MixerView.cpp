@@ -34,6 +34,9 @@ MixerView::MixerView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
 	invertBatt_=false;
 	soloMode_=false;
 	masterSelected_=false;
+	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+		vuDisplay_[i]=0.0f ;
+	}
 }
 
 MixerView::~MixerView() {
@@ -232,7 +235,10 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// Read the channel's own produced-audio level (instrument buffer activity)
 	// instead of the saturated mixed bus level, so the bar bounces with the
 	// instrument in real time and falls quickly on mute/stop.
-	float peak=player->GetChannelPeak(channel) ;
+	// TREEFROG_MIXER_VU_SMOOTH_V1 (H38.7): the drawn level is the per-frame
+	// smoothed display value (instant attack, smooth release), never the raw
+	// audio peak, so the bar cannot jump full->empty in one frame.
+	float peak=vuDisplay_[channel] ;
 	bool selected=(!masterSelected_ && channel==viewData_->mixerCol_) ;
 	bool muted=player->IsChannelMuted(channel) ;
 	GUITextProperties props ;
@@ -306,21 +312,21 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	Project *project=viewData_->project_ ;
 	int volume=project?project->GetMasterVolume():100 ;
 	Mixer *mixer=Mixer::GetInstance() ;
-	Player *player=Player::GetInstance() ;
 	GUITextProperties props ;
 	char buffer[8] ;
 
-	// TREEFROG_MIXER_MASTER_SUM_V2 (H38.7):
-	// The master bar is the DYNAMIC SUM of the channel activity levels
-	// (each channel's produced-audio level scaled by its volume setting),
-	// clamped to full scale. A single quiet element reads near-empty instead
-	// of saturating the meter, and the bar tracks the real combined flow of
-	// all tracks in real time.
+	// TREEFROG_MIXER_MASTER_SUM_V3 (H38.7):
+	// The master bar is the DYNAMIC SUM of the per-channel DISPLAY levels,
+	// i.e. exactly the same dB-scaled level each channel bar shows
+	// (mixVULevel(display) * volume/100). This keeps the master consistent
+	// with the channel bars and adds headroom so a single quiet element reads
+	// near-empty instead of pinning the meter to 100% (half the sum scale is
+	// reserved, so two full-loudness channels reach full scale).
 	float sum=0.0f ;
 	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
-		sum += player->GetChannelPeak(i) * (float)mixer->GetChannelVolume(i) * 0.01f ;
+		sum += mixVULevel(vuDisplay_[i]) * (float)mixer->GetChannelVolume(i) * 0.01f ;
 	}
-	float masterLevel=sum ;
+	float masterLevel=sum*0.5f ;
 	if (masterLevel>1.0f) masterLevel=1.0f ;
 
 	// TREEFROG_MIXER_MASTER_BAR_V1 (H38.7):
@@ -468,6 +474,26 @@ void MixerView::OnPlayerUpdate(PlayerEventType ,unsigned int tick) {
 
 void MixerView::OnFrameUpdate(unsigned long frameClock) {
 	(void)frameClock ;
+
+	// TREEFROG_MIXER_VU_SMOOTH_V1 (H38.7):
+	// Once per frame, blend the raw audio peak into the display levels used
+	// by the bars. Attack is instant (a note pops straight up), release is a
+	// smooth per-frame exponential fall (~0.6^12 empties a full bar in about
+	// 12 frames) so the bars never jump full->empty in one frame. This runs
+	// every frame regardless of transport, so the fall is also smooth when
+	// the player is stopped.
+	{
+		Player *player=Player::GetInstance() ;
+		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+			float measured=player->GetChannelPeak(i) ;
+			if (measured>vuDisplay_[i]) {
+				vuDisplay_[i]=measured ;
+			} else {
+				vuDisplay_[i]*=0.6f ;
+				if (vuDisplay_[i]<0.001f) vuDisplay_[i]=0.0f ;
+			}
+		}
+	}
 
 	// TREEFROG_MIXER_LIVE_VU_V2 (H38.7):
 	// Frame updates are independent of Player transport (same as the USB-C
