@@ -722,5 +722,5 @@ Result SelectProjectDialog::OnRenameProject(const char *newBaseName) {
 
 // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): build marker verified on install.
 extern "C" const char *TreeFrogH387StartupMenuBuildMarker(void) {
-    return "H38_7_STARTUP_MENU_RENAME_EXPORT_DELETE_MIXER_VU_DYNAMICS";
+    return "H38_7_STARTUP_MENU_RENAME_EXPORT_DELETE_MIXER_VU_DYNAMICS_PHRASE_AUTOVOL_OPT_PERF";
 }

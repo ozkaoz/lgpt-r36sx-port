@@ -22,7 +22,7 @@ TMP_ROOT=""
 mkdir -p "$LOG_ROOT" "$BACKUP_ROOT"
 exec > >(tee -a "$LOG") 2>&1
 
-CORE_SHA256="5188322fad34d0c045ec3ddca605bd67df5133f09101cdcfd0d267cd28ea1731"
+CORE_SHA256="06ae7a356a037c88ec7b8bf25a15f4bc1dc9d806aaa01428cc044581aa9c9b2f"
 DAEMON_SHA256="53258f2b8b3749c866af248814eb147f0762a1b17cfffb644adb573167b52815"
 APK_SHA256="fd9787727ed683236e12d50c180a9c999db362785bd53758754d8c74e697cd06"
 
@@ -222,8 +222,8 @@ commit_release() {
   git -C "$REPO_ROOT" diff --cached --stat
   [[ -n "$(git -C "$REPO_ROOT" diff --cached --name-only)" ]] || fail "nothing to commit"
 
-  git -C "$REPO_ROOT" commit -m "Release H38.6: dynamic mixer VU bars, startup menu Rename/Export/Delete, FX menu fixes"
-  git -C "$REPO_ROOT" tag -a "$TAG" -m "LGPT R36SX H38.6 fixes from hardware feedback"
+  git -C "$REPO_ROOT" commit -m "Release H38.6: dynamic mixer VU bars, startup menu Rename/Export/Delete, phrase auto-volume, audio/GUI perf optimizations"
+  git -C "$REPO_ROOT" tag -a "$TAG" -m "LGPT R36SX H38.6 fixes from hardware feedback + perf optimizations"
   echo "RELEASE_COMMIT=$(git -C "$REPO_ROOT" rev-parse HEAD)"
 }
 
@@ -258,7 +258,7 @@ publish() {
     "$asset#Copy-to-SD-root full ZIP (includes Android APK)" \
     "$asset.sha256#SHA-256 checksum" \
     --repo "$GITHUB_REPO" \
-    --title "LGPT R36SX H38.6 — Mixer VU dinamico, menu de inicio Rename/Export/Delete, FX corregido" \
+    --title "LGPT R36SX H38.6 — Mixer VU dinamico, menu de inicio Rename/Export/Delete, auto-volumen de phrase y optimizaciones de rendimiento" \
     --notes-file "$REPO_ROOT/docs/RELEASE_H38.6_ES.md" \
     --verify-tag \
     --latest

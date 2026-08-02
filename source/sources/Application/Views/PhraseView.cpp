@@ -1270,6 +1270,9 @@ bool PhraseView::updateChopNoteValueForRow(int row, ViewUpdateDirection directio
 
     *note = (unsigned char)current;
     *instr = (unsigned char)sourceInstrument;
+    if (phrase_->vol_[offset] == 0xFF) {
+        phrase_->vol_[offset] = 0x64;
+    }
     lastNote_ = *note;
     lastInstr_ = *instr;
     char status[48];
@@ -1290,6 +1293,9 @@ bool PhraseView::pasteDefaultChopForRow(int row) {
     int chop = (lastNote_ >= 0 && lastNote_ < count) ? lastNote_ : 0;
     *note = (unsigned char)chop;
     *instr = (unsigned char)sourceInstrument;
+    if (phrase_->vol_[offset] == 0xFF) {
+        phrase_->vol_[offset] = 0x64;
+    }
     lastNote_ = *note;
     lastInstr_ = *instr;
     char status[48];

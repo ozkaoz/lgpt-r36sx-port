@@ -112,6 +112,9 @@ void TreeFrogGUIWindowImp::DrawCharInternal(const char c, GUIPoint &pos, GUIText
      * Pixel address = y * (128 * 8) + character * 8 + x.
      */
     const size_t FONT_SCANLINE_WIDTH = 128 * 8;
+    const size_t glyphBase = (size_t)ch * 8;
+    const size_t fontSize = sizeof(treefrog_font);
+    const bool spaceChar = ((unsigned char)c == (unsigned char)' ');
 
     uint16_t fg = currentColor_;
     uint16_t bg = backgroundColor_;
@@ -132,23 +135,34 @@ void TreeFrogGUIWindowImp::DrawCharInternal(const char c, GUIPoint &pos, GUIText
         int yy = y0 + y;
         if (yy < 0 || yy >= TREEFROG_LGPT_HEIGHT) continue;
 
-        for (int x = 0; x < 8; ++x) {
-            int xx = x0 + x;
-            if (xx < 0 || xx >= TREEFROG_LGPT_WIDTH) continue;
+        /* H38.7 OPT_PERF: hoist the glyph row pointer and the column
+         * clipping out of the inner loop. The bounds guard is preserved
+         * (same result as the per-pixel index check). */
+        const unsigned char *row =
+            ((size_t)y * FONT_SCANLINE_WIDTH + glyphBase + 8 <= fontSize)
+                ? treefrog_font + (size_t)y * FONT_SCANLINE_WIDTH + glyphBase
+                : 0;
+        uint16_t *dst = framebuffer_ + (size_t)yy * TREEFROG_LGPT_WIDTH;
 
-            size_t idx = (size_t)y * FONT_SCANLINE_WIDTH + (size_t)ch * 8 + (size_t)x;
-            bool rawOn = (idx < sizeof(treefrog_font)) && treefrog_font[idx] != 0;
+        int xStart = (x0 < 0) ? (-x0) : 0;
+        int xEnd = (x0 + 8) > TREEFROG_LGPT_WIDTH ? (TREEFROG_LGPT_WIDTH - x0) : 8;
+        if (xEnd < xStart) xEnd = xStart;
+
+        for (int x = xStart; x < xEnd; ++x) {
+            int xx = x0 + x;
+
+            bool rawOn = row && row[x] != 0;
 #if TREEFROG_FONT_ZERO_IS_INK
-            bool on = (idx < sizeof(treefrog_font)) && !rawOn;
-            if ((unsigned char)c == (unsigned char)' ') on = false;
+            bool on = (row != 0) && !rawOn;
+            if (spaceChar) on = false;
 #else
             bool on = rawOn;
 #endif
 
             if (on) {
-                framebuffer_[yy * TREEFROG_LGPT_WIDTH + xx] = fg;
+                dst[xx] = fg;
             } else if (!overlay || props.invert_) {
-                framebuffer_[yy * TREEFROG_LGPT_WIDTH + xx] = bg;
+                dst[xx] = bg;
             }
         }
     }

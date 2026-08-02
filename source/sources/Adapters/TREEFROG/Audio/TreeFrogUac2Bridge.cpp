@@ -190,6 +190,39 @@ static int exists_file(const char *p) {
     return p && stat(p, &st) == 0;
 }
 
+static long long monotonic_milliseconds(void);
+
+/* H38.7 OPT_PERF: the USB bridge enable/mute switches live on the SD card.
+ * Every audio callback (60/s) used to stat() them from the realtime thread,
+ * adding ~180 SD-card syscalls per second and jitter under heavy write load.
+ * Cache the result for 100 ms (same period as refresh_usb_state) so the hot
+ * path touches the SD at most ~10 times per second instead. */
+static long long g_enable_cache_ms = -1000000;
+static int g_enable_cache_value = 0;
+
+static int enable_file_present(void) {
+    const long long now_ms = monotonic_milliseconds();
+    if (now_ms > 0 && (now_ms - g_enable_cache_ms) < 100) {
+        return g_enable_cache_value;
+    }
+    g_enable_cache_ms = now_ms;
+    g_enable_cache_value = exists_file(kEnable);
+    return g_enable_cache_value;
+}
+
+static long long g_nomute_cache_ms = -1000000;
+static int g_nomute_cache_value = 0;
+
+static int nomute_file_present(void) {
+    const long long now_ms = monotonic_milliseconds();
+    if (now_ms > 0 && (now_ms - g_nomute_cache_ms) < 100) {
+        return g_nomute_cache_value;
+    }
+    g_nomute_cache_ms = now_ms;
+    g_nomute_cache_value = exists_file(kNoMute);
+    return g_nomute_cache_value;
+}
+
 static long long monotonic_milliseconds(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
@@ -803,7 +836,7 @@ static int should_mute_now(void) {
      * disable_mute_local is retained only as an explicit diagnostic override.
      */
     return (g_driver_mode == U241_USB_DUPLEX) &&
-           !exists_file(kNoMute) &&
+           !nomute_file_present() &&
            g_usb_raw;
 }
 
@@ -849,8 +882,14 @@ static void reap_setup_child_nonblocking(void) {
     }
 }
 
+static long long g_last_mode_refresh_ms = -1000000;
+
 static void ensure_setup_started(void) {
-    if (!exists_file(kEnable)) return;
+    if (!enable_file_present()) return;
+
+    const long long now_ms = monotonic_milliseconds();
+    if (now_ms > 0 && (now_ms - g_last_mode_refresh_ms) < 100) return;
+    g_last_mode_refresh_ms = now_ms;
 
     refresh_mode_from_file(1);
     reap_setup_child_nonblocking();
@@ -886,13 +925,13 @@ static void ensure_setup_started(void) {
     if (g_setup_child_pid > 0) return;
     if (exists_file(kSetupLock)) return;
 
-    const long long now_ms = monotonic_milliseconds();
-    if (now_ms > 0 &&
-        (now_ms - g_last_setup_attempt_ms) < 10000)
+    const long long now_ms2 = monotonic_milliseconds();
+    if (now_ms2 > 0 &&
+        (now_ms2 - g_last_setup_attempt_ms) < 10000)
         return;
 
     g_setup_started = 1;
-    g_last_setup_attempt_ms = now_ms;
+    g_last_setup_attempt_ms = now_ms2;
     ++g_setup_attempts;
 
     char message[160];
@@ -949,7 +988,7 @@ static void close_fifo_if_open(const char *why) {
 
 static void ensure_fifo_open_nonblocking(void) {
     if (g_fifo_fd >= 0) return;
-    if (!exists_file(kEnable)) return;
+    if (!enable_file_present()) return;
     ensure_setup_started();
     g_fifo_fd = open(kFifo, O_WRONLY | O_NONBLOCK);
     if (g_fifo_fd < 0) {
@@ -1275,7 +1314,7 @@ static void basename_only(const char *path, char *dst, int len) {
 
 void TreeFrogUac2Bridge_Prime(void) {
 #if TREEFROG_UAC2_BRIDGE
-    if (!exists_file(kEnable)) return;
+    if (!enable_file_present()) return;
     refresh_mode_from_file(1);
     ensure_setup_started();
     refresh_usb_state();
@@ -1346,7 +1385,7 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
         log_msg("R36SX U2.51.4 CLEAN CLOCKED USB AUDIO INPUT RESPONSIVENESS");
     }
     if (!stereo || frames <= 0) return;
-    if (!exists_file(kEnable)) return;
+    if (!enable_file_present()) return;
     if ((g_submit_count % 30) == 0) refresh_mode_from_file(0);
     ensure_setup_started();
     refresh_usb_state();
@@ -1574,7 +1613,7 @@ void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo44100(
 
 int TreeFrogUac2Bridge_ShouldMuteLocal(void) {
 #if TREEFROG_UAC2_BRIDGE
-    if (!exists_file(kEnable)) return 0;
+    if (!enable_file_present()) return 0;
     if ((g_submit_count % 30) == 0) refresh_mode_from_file(0);
     refresh_usb_state();
     if ((g_submit_count % 30) == 0) refresh_passive_physical_volume_file();

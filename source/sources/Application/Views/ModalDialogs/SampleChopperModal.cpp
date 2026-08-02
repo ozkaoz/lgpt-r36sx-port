@@ -677,6 +677,9 @@ bool LGPTChopperAssignSavedChopToPhraseRow(ViewData *viewData,
        - Existing command columns are not cleared, so PTCH/ARPG/VOLM/FCUT/etc remain available. */
     phrase->note_[offset] = (unsigned char)chopIndex;
     phrase->instr_[offset] = (unsigned char)sourceInstrumentIndex;
+    if (phrase->vol_[offset] == 0xFF) {
+        phrase->vol_[offset] = 0x64;
+    }
 
     saved.selectedChop = chopIndex;
     viewData->currentInstrument_ = sourceInstrumentIndex;
@@ -2856,6 +2859,7 @@ void SampleChopperModal::exportChopsToPhrase() {
         int offset = 16 * phraseIndex + row;
         phrase->note_[offset] = 60;
         phrase->instr_[offset] = (unsigned char)nextInstr;
+        phrase->vol_[offset] = 0x64;
         phrase->cmd1_[offset] = I_CMD_NONE;
         phrase->param1_[offset] = 0;
         phrase->cmd2_[offset] = I_CMD_NONE;

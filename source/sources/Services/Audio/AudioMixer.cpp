@@ -15,6 +15,8 @@ AudioMixer::AudioMixer(const char *name):
     softclip_ = -1;
     softclipGain_ = 0 ;
 	masterVolume_ = 100 ;
+	masterVolumeCached_ = -1 ;
+	dampCached_ = 1.0f ;
 	clipped_ = false ;
     peakValue_ = 0.0f ;
 	lastPeakClock_ = 0 ;
@@ -97,7 +99,13 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
 
      if (gotData) {
          fixed *c = buffer;
-         float damp = pow((float)masterVolume_ / 100, 4.0f);
+         // H38.7 OPT_PERF: pow() was recomputed on every buffer. Cache it and
+         // only recompute when the master volume actually changes.
+         if (masterVolume_ != masterVolumeCached_) {
+             dampCached_ = pow((float)masterVolume_ / 100, 4.0f);
+             masterVolumeCached_ = masterVolume_;
+         }
+         float damp = dampCached_;
 
          if (volume_ != i2fp(1)) {
              for (int i = 0; i < samplecount * 2; i++) {
@@ -106,12 +114,23 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
              }
          }
 
-         // Apply soft/hard clipping before recording
+         // Apply soft/hard clipping before recording.
+         // H38.7 OPT_PERF: when the softclipper is bypassed and the volume is
+         // 100 (damp == 1.0) the per-sample path was a no-op that still round
+         // tripped every sample through float. Skip the float conversion and
+         // keep only the cheap fixed-point hard clip.
          c = buffer;
-         for (int i = 0; i < samplecount * 2; i++) {
-             fixed sample = *c;
-             sample = fl2fp(damp * fp2fl(hardClip(softClip(sample))));
-             *c++ = sample;
+         if (softclip_ == -1 && damp == 1.0f) {
+             for (int i = 0; i < samplecount * 2; i++) {
+                 fixed sample = *c;
+                 *c++ = hardClip(sample);
+             }
+         } else {
+             for (int i = 0; i < samplecount * 2; i++) {
+                 fixed sample = *c;
+                 sample = fl2fp(damp * fp2fl(hardClip(softClip(sample))));
+                 *c++ = sample;
+             }
          }
      }
     if (enableRendering_&&writer_) {
@@ -135,12 +154,14 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
              if (n > block) n = block ;
              float peak = 0.0f ;
              if (gotData) {
+                 // H38.7 OPT_PERF: sample every 4th sample for the peak (see
+                 // PlayerChannel::Render for rationale).
                  fixed *c = buffer + off ;
-                 for (int i = 0; i < n; i++) {
+                 for (int i = 0; i < n; i += 4) {
                      float v = fp2fl(*c) ;
                      if (v < 0.0f) v = -v ;
                      if (v > peak) peak = v ;
-                     c++ ;
+                     c += 4 ;
                  }
              }
              if (peak > peakValue_) {

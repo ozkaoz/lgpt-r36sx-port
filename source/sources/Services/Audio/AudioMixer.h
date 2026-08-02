@@ -43,6 +43,8 @@ private:
   int softclip_;
   int softclipGain_;
   int masterVolume_;
+  int masterVolumeCached_;
+  float dampCached_;
   bool clipped_;
   float peakValue_;
   unsigned long lastPeakClock_ ;
