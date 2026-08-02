@@ -19,13 +19,14 @@
 // volume and instrument. PTCH is removed from FX; pitch lives in its own
 // column. X positions in character cells (each cell = 8px). The 40-cell
 // screen is centered: row# at cells 6-7, play cursor at cell 5, data columns
-// start at cell 9.
-const int PhraseView::kColX[kColCount] = {9, 12, 15, 18, 21, 25, 29, 33};
+// start at cell 9. The FX block (cols 4-7) is separated from the N-V-P-I
+// block by a 2-cell gap (I ends at 20, FX1 starts at 23).
+const int PhraseView::kColX[kColCount] = {9, 12, 15, 18, 23, 27, 31, 35};
 
 // Header center positions over each data column:
-// N(9-11)->10, V(12-14)->13, P(15-17)->16, I(18-20)->19, FX1(21-24)->22,
-// P1(25-28)->26, FX2(29-32)->30, P2(33-36)->34. Parameter columns are blank.
-const int PhraseView::kColHeaderX[kColCount] = {10, 13, 16, 19, 22, 26, 30, 34};
+// N(9-11)->10, V(12-14)->13, P(15-17)->16, I(18-20)->19, FX1(23-25)->24,
+// P1(27-30)->28, FX2(31-33)->32, P2(35-38)->36. Parameter columns are blank.
+const int PhraseView::kColHeaderX[kColCount] = {10, 13, 16, 19, 24, 28, 32, 36};
 
 // Offsets for note(0), volume(1), pitch(2) and instrument(3) value stepping:
 // L, R, U, D. TREEFROG_PHRASE_VOL_EDIT_V1: volume steps by 1 in every

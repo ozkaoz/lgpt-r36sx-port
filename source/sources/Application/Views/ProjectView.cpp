@@ -320,8 +320,7 @@ void ProjectView::DrawView() {
 // Draw title
 
 	char projectString[80] ;
-    sprintf(projectString, "Project (Build %s.%s.%s)", PROJECT_NUMBER,
-            PROJECT_RELEASE, BUILD_COUNT);
+    sprintf(projectString, "LGPT R36SX - Bacon 1.0");
 
     SetColor(CD_NORMAL);
     DrawString(pos._x,pos._y,projectString,props) ;

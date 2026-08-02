@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Publish LGPT R36SX H38.7 (phrase pitch column V2: "--" empty, -24..+24,
-# auto-pitch 00 on insert, real chop transposition via SetRowPitch) to
+# Publish LGPT R36SX Bacon 1.0 (phrase pitch column V2, N-V-P-I / FX block
+# separation, "LGPT R36SX - Bacon 1.0" project menu branding) to
 # ozkaoz/lgpt-r36sx-port.
 # The release ZIP is copy-to-SD-root (cubegm/, lgpt/, roms/, LGPT_OTG_LOGS/, ANDROID/)
 # and contains the Android APK plus the full repository source snapshot.
 
 PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
 REPO_ROOT="${REPO_ROOT:-$PROJECT_ROOT/GITHUB/lgpt-r36sx-port}"
-VERSION="H38.7"
-TAG="H38.7"
+VERSION="Bacon-1.0"
+TAG="Bacon-1.0"
 GITHUB_REPO="ozkaoz/lgpt-r36sx-port"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PAYLOAD="$SCRIPT_DIR/payload"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_ROOT="$PROJECT_ROOT/LOGS"
 BACKUP_ROOT="$PROJECT_ROOT/BACKUPS"
-LOG="$LOG_ROOT/PUBLISH_H387_${TIMESTAMP}.log"
+LOG="$LOG_ROOT/PUBLISH_BACON1_${TIMESTAMP}.log"
 TMP_ROOT=""
 
 mkdir -p "$LOG_ROOT" "$BACKUP_ROOT"
@@ -72,7 +72,7 @@ path_is_expected_release_change() {
     ANDROID/*|\
     deployment/*|\
     device/*|\
-    docs/RELEASE_H38.7_ES.md|\
+    docs/RELEASE_BACON_1.0_ES.md|\
     scripts/*|\
     source/*|\
     sd_root/*|\
@@ -117,7 +117,7 @@ verify_resume_worktree() {
   done <<<"$porcelain"
 
   (( unexpected == 0 )) ||
-    fail "repository contains changes unrelated to H38.7; they were not modified"
+    fail "repository contains changes unrelated to Bacon 1.0; they were not modified"
 
   git -C "$REPO_ROOT" diff --cached --quiet ||
     fail "staged changes exist; unstage them before resuming"
@@ -223,15 +223,15 @@ commit_release() {
   git -C "$REPO_ROOT" diff --cached --stat
   [[ -n "$(git -C "$REPO_ROOT" diff --cached --name-only)" ]] || fail "nothing to commit"
 
-  git -C "$REPO_ROOT" commit -m "Release H38.7: phrase pitch column V2 (-- empty, -24..+24, auto 00 on insert), real chop transposition via SetRowPitch"
-  git -C "$REPO_ROOT" tag -a "$TAG" -m "LGPT R36SX H38.7: pitch column fixes from hardware feedback + chop transpose"
+  git -C "$REPO_ROOT" commit -m "Release Bacon 1.0: phrase pitch column V2, N-V-P-I / FX block separation, LGPT R36SX - Bacon 1.0 branding"
+  git -C "$REPO_ROOT" tag -a "$TAG" -m "LGPT R36SX Bacon 1.0 release"
   echo "RELEASE_COMMIT=$(git -C "$REPO_ROOT" rev-parse HEAD)"
 }
 
 build_asset() {
   local asset sha_file
   echo "=== BUILD COPY-TO-SD-ROOT ASSET ==="
-  asset="$REPO_ROOT/dist/LGPT_R36SX_H387_COPYROOT_3AUDIO_FULL_SOURCE.zip"
+  asset="$REPO_ROOT/dist/LGPT_R36SX_BACON1_COPYROOT_3AUDIO_FULL_SOURCE.zip"
   rm -f "$asset" "$asset.sha256"
   bash "$REPO_ROOT/scripts/build_from_full_clone.sh" "$asset"
   sha256sum "$asset" > "$asset.sha256"
@@ -259,8 +259,8 @@ publish() {
     "$asset#Copy-to-SD-root full ZIP (includes Android APK)" \
     "$asset.sha256#SHA-256 checksum" \
     --repo "$GITHUB_REPO" \
-    --title "LGPT R36SX H38.7 — Columna de Pitch V2: vacio --, -24..+24, auto 00 al insertar nota, transposicion real de chops" \
-    --notes-file "$REPO_ROOT/docs/RELEASE_H38.7_ES.md" \
+    --title "LGPT R36SX - Bacon 1.0" \
+    --notes-file "$REPO_ROOT/docs/RELEASE_BACON_1.0_ES.md" \
     --verify-tag \
     --latest
 
@@ -288,7 +288,7 @@ main() {
   [[ -s "$asset" ]] || fail "release asset was not generated"
   publish "$asset"
 
-  echo "PUBLISH_RESULT=GITHUB_RELEASE_CREATED_H387"
+  echo "PUBLISH_RESULT=GITHUB_RELEASE_CREATED_BACON1"
 }
 
 main "$@"
