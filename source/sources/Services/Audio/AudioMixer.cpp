@@ -125,25 +125,32 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
      // Track the smoothed peak of the post-volume output (audible level).
      // Fast attack, slow decay, so the mixer bars bounce with the music.
      {
-         float peak = 0.0f;
-         if (gotData) {
-             fixed *c = buffer;
-             for (int i = 0; i < samplecount * 2; i++) {
-                 float v = fp2fl(*c);
-                 if (v < 0.0f) v = -v;
-                 if (v > peak) peak = v;
-                 c++;
+         // TREEFROG_VU_METERS_V6 (H38.7): scan the mixed buffer in short
+         // sub-blocks and decay between them, so the master meter dips between
+         // closely-spaced notes (hi-hats) instead of staying pinned at the
+         // held peak of the whole buffer.
+         const int block = 128 ; // stereo samples
+         for (int off = 0; off < samplecount * 2; off += block) {
+             int n = samplecount * 2 - off ;
+             if (n > block) n = block ;
+             float peak = 0.0f ;
+             if (gotData) {
+                 fixed *c = buffer + off ;
+                 for (int i = 0; i < n; i++) {
+                     float v = fp2fl(*c) ;
+                     if (v < 0.0f) v = -v ;
+                     if (v > peak) peak = v ;
+                     c++ ;
+                 }
              }
-         }
-         if (peak > peakValue_) {
-             peakValue_ = peak;
-         } else {
-             // TREEFROG_VU_METERS_V5 (H38.7): fast per-buffer decay so the
-             // mixer bars empty quickly when the audio goes quiet. Render runs
-             // once per audio callback (~60/s), so 0.6 per buffer empties a
-             // full bar in ~10 buffers (~170ms) for a live-meter feel.
-             peakValue_ *= 0.6f;
-             if (peakValue_ < 0.002f) peakValue_ = 0.0f;
+             if (peak > peakValue_) {
+                 peakValue_ = peak;
+             } else {
+                 // Fast release so the master bar empties in a few ms of
+                 // quiet, giving a live-meter feel even for dense patterns.
+                 peakValue_ *= 0.5f;
+                 if (peakValue_ < 0.002f) peakValue_ = 0.0f;
+             }
          }
          lastPeakClock_ = System::GetInstance()->GetClock() ;
      }
@@ -167,9 +174,9 @@ float AudioMixer::GetPeakValue() {
     unsigned long elapsed = (lastPeakClock_ == 0) ? 0 : (now - lastPeakClock_) ;
     if (elapsed > 100) {
         // Render() has been idle for >100ms: player is stopped. Apply the
-        // same 0.6-per-buffer rate (per 16.6ms) so the fall matches the live
-        // fall. 0.6^N empties a full bar in ~10 buffers (~170ms).
-        peakValue_ *= powf(0.6f, (float)elapsed / 16.6f) ;
+        // same 0.5-per-block rate (per 16.6ms) so the fall matches the live
+        // fall. 0.5^N empties a full bar in ~10 blocks (~170ms).
+        peakValue_ *= powf(0.5f, (float)elapsed / 16.6f) ;
         if (peakValue_ < 0.002f) peakValue_ = 0.0f ;
         lastPeakClock_ = now ;
     }

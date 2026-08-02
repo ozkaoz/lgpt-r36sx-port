@@ -40,25 +40,11 @@ void PlayerChannel::StopInstrument() {
 } ;
 
 bool PlayerChannel::Render(fixed *buffer,int samplecount) {
-   float peak = 0.0f ;
    bool audible = false ;
    if (instr_) {
      bool tableSlice=SyncMaster::GetInstance()->TableSlice() ;
      bool status=instr_->Render(index_,buffer,samplecount,tableSlice) ;
      audible=((status)&&(!muted_)&&(volume_>0)) ;
-     // TREEFROG_MIXER_PER_CHANNEL_VU_V1 (H38.7):
-     // Measure the RAW instrument buffer level (pre-volume) so the Mixer view
-     // can combine it with the channel volume setting: activity * volume.
-     // This reflects the real flow of the instrument (notes on/off, decay)
-     // instead of the saturated mixed bus level.
-     fixed *c=buffer ;
-     for (int i=0;i<samplecount*2;i++) {
-        float v=fp2fl(*c) ;
-        if (v<0.0f) v=-v ;
-        if (v>peak) peak=v ;
-        c++ ;
-     }
-     if (!audible) peak = 0.0f ;
      if (audible&&(volume_!=100)) {
         fixed *current=buffer ;
         int count=samplecount*2 ;
@@ -70,26 +56,46 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
      }
    }
    lastPeakClock_ = System::GetInstance()->GetClock() ;
-   if (peak > peakValue_) {
-       peakValue_ = peak ;
-   } else {
-       // Decay while the player runs so quiet buffers empty the bar quickly.
-       peakValue_ *= 0.6f ;
-       if (peakValue_ < 0.002f) peakValue_ = 0.0f ;
+   // TREEFROG_MIXER_PER_CHANNEL_VU_V2 (H38.7):
+   // Scan the rendered buffer in short sub-blocks and apply fast decay
+   // between them. Even when notes are very close (hi-hats) the meter dips
+   // between hits instead of staying pinned at the held peak, because the
+   // attack/release runs at sub-buffer resolution (~2-3ms) instead of once
+   // per whole audio buffer.
+   const int block = 128 ; // stereo samples
+   for (int off=0; off<samplecount*2; off+=block) {
+       int n=samplecount*2-off ;
+       if (n>block) n=block ;
+       float blockPeak=0.0f ;
+       if (audible) {
+          fixed *c=buffer+off ;
+          for (int i=0;i<n;i++) {
+             float v=fp2fl(*c) ;
+             if (v<0.0f) v=-v ;
+             if (v>blockPeak) blockPeak=v ;
+             c++ ;
+          }
+       }
+       if (blockPeak > peakValue_) {
+           peakValue_ = blockPeak ;
+       } else {
+           peakValue_ *= 0.5f ;
+           if (peakValue_ < 0.002f) peakValue_ = 0.0f ;
+       }
    }
    return audible ;
 } ;
 
 float PlayerChannel::GetPeakValue() {
-    // TREEFROG_MIXER_PER_CHANNEL_VU_V1 (H38.7):
+    // TREEFROG_MIXER_PER_CHANNEL_VU_V2 (H38.7):
     // When the player is stopped Render() stops being called, so decay by
-    // wall-clock time here (fast, ~10 frames to empty). While the player runs
+    // wall-clock time here (fast, ~10 blocks to empty). While the player runs
     // Render() owns the decay and the getter stays a pure read (elapsed below
     // the idle threshold) to avoid double-decaying the bars.
     unsigned long now = System::GetInstance()->GetClock() ;
     unsigned long elapsed = (lastPeakClock_ == 0) ? 0 : (now - lastPeakClock_) ;
     if (elapsed > 100) {
-        peakValue_ *= powf(0.6f, (float)elapsed / 16.6f) ;
+        peakValue_ *= powf(0.5f, (float)elapsed / 16.6f) ;
         if (peakValue_ < 0.002f) peakValue_ = 0.0f ;
         lastPeakClock_ = now ;
     }

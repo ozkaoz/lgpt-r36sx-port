@@ -305,10 +305,23 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 void MixerView::drawMasterBar(int x,int y,int height) {
 	Project *project=viewData_->project_ ;
 	int volume=project?project->GetMasterVolume():100 ;
-	MixerService *ms=MixerService::GetInstance() ;
-	float peak=ms->GetMasterPeak() ;
+	Mixer *mixer=Mixer::GetInstance() ;
+	Player *player=Player::GetInstance() ;
 	GUITextProperties props ;
 	char buffer[8] ;
+
+	// TREEFROG_MIXER_MASTER_SUM_V2 (H38.7):
+	// The master bar is the DYNAMIC SUM of the channel activity levels
+	// (each channel's produced-audio level scaled by its volume setting),
+	// clamped to full scale. A single quiet element reads near-empty instead
+	// of saturating the meter, and the bar tracks the real combined flow of
+	// all tracks in real time.
+	float sum=0.0f ;
+	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+		sum += player->GetChannelPeak(i) * (float)mixer->GetChannelVolume(i) * 0.01f ;
+	}
+	float masterLevel=sum ;
+	if (masterLevel>1.0f) masterLevel=1.0f ;
 
 	// TREEFROG_MIXER_MASTER_BAR_V1 (H38.7):
 	// Master (MST) bar drawn live on the left of the channel bars, in cyan so
@@ -319,7 +332,7 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	DrawString(x-1,y,"MST",props) ;
 
 	int totalCells=2*height ;
-	int filledCells=int(mixVULevel(peak)*float(volume)*0.01f*float(totalCells)) ;
+	int filledCells=int(masterLevel*float(volume)*0.01f*float(totalCells)) ;
 	if (filledCells>totalCells) filledCells=totalCells ;
 	int volMarker=(volume*totalCells+99)/100 ;
 	if (volMarker>totalCells) volMarker=totalCells ;
