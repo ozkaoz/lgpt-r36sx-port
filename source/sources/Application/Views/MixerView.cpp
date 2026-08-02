@@ -228,8 +228,11 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	Mixer *mixer=Mixer::GetInstance() ;
 	Player *player=Player::GetInstance() ;
 	int volume=mixer->GetChannelVolume(channel) ;
-	MixerService *ms=MixerService::GetInstance() ;
-	float peak=ms->GetChannelPeak(channel) ;
+	// TREEFROG_MIXER_PER_CHANNEL_VU_V1 (H38.7):
+	// Read the channel's own produced-audio level (instrument buffer activity)
+	// instead of the saturated mixed bus level, so the bar bounces with the
+	// instrument in real time and falls quickly on mute/stop.
+	float peak=player->GetChannelPeak(channel) ;
 	bool selected=(!masterSelected_ && channel==viewData_->mixerCol_) ;
 	bool muted=player->IsChannelMuted(channel) ;
 	GUITextProperties props ;
@@ -453,12 +456,12 @@ void MixerView::OnPlayerUpdate(PlayerEventType ,unsigned int tick) {
 void MixerView::OnFrameUpdate(unsigned long frameClock) {
 	(void)frameClock ;
 
-	// TREEFROG_MIXER_LIVE_VU_V2 (H38.6):
+	// TREEFROG_MIXER_LIVE_VU_V2 (H38.7):
 	// Frame updates are independent of Player transport (same as the USB-C
-	// record meter): request a redraw every few frames so the VU bars keep
-	// moving even while the player is stopped (recent buffer levels decay).
+	// record meter): request a redraw every frame so the VU bars track the
+	// channel activity in real time, including quick mute/stop decay.
 	++frameRefreshDivider_ ;
-	if (frameRefreshDivider_ >= 3) {
+	if (frameRefreshDivider_ >= 1) {
 		frameRefreshDivider_ = 0 ;
 		isDirty_ = true ;
 		((AppWindow &)w_).SetDirty() ;

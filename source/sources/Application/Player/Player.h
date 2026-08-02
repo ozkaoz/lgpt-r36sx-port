@@ -88,6 +88,9 @@ public:
 	void SetChannelMute(int channel,bool mute) ;
 	bool IsChannelMuted(int channel) ;
 	I_Instrument *GetChannelInstrument(int channel) { return mixer_->GetInstrument(channel) ; }
+	// TREEFROG_MIXER_PER_CHANNEL_VU_V1 (H38.7):
+	// Live per-channel level (0..1) of the audio the channel is producing now.
+	float GetChannelPeak(int channel) { return mixer_->GetChannelPeak(channel) ; }
 	
 	// Live queuing
 

@@ -57,6 +57,10 @@ public:
 	void SetChannelMute(int channel,bool mute) ;
 	bool IsChannelMuted(int channel) ;
 
+    // TREEFROG_MIXER_PER_CHANNEL_VU_V1 (H38.7):
+    // Live per-channel level (0..1) read from the channel's own rendered audio.
+    float GetChannelPeak(int channel) { return channel_[channel]->GetPeakValue() ; }
+
 	char *GetPlayedNote(int channel) ;
 	char *GetPlayedOctive(int channel) ;
 	

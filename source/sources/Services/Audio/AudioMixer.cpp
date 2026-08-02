@@ -138,12 +138,12 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
          if (peak > peakValue_) {
              peakValue_ = peak;
          } else {
-             // TREEFROG_VU_METERS_V3 (H38.7): fast per-buffer decay so the
-             // mixer bars visibly bounce with the music instead of sticking
-             // full white. Render runs once per audio callback (~60/s), so
-             // 0.85 per buffer empties a full bar in well under a second and
-             // still holds between beats for a live-meter feel.
-             peakValue_ *= 0.85f;
+             // TREEFROG_VU_METERS_V5 (H38.7): fast per-buffer decay so the
+             // mixer bars empty quickly when the audio goes quiet. Render runs
+             // once per audio callback (~60/s), so 0.6 per buffer empties a
+             // full bar in ~10 buffers (~170ms) for a live-meter feel.
+             peakValue_ *= 0.6f;
+             if (peakValue_ < 0.002f) peakValue_ = 0.0f;
          }
          lastPeakClock_ = System::GetInstance()->GetClock() ;
      }
@@ -167,10 +167,10 @@ float AudioMixer::GetPeakValue() {
     unsigned long elapsed = (lastPeakClock_ == 0) ? 0 : (now - lastPeakClock_) ;
     if (elapsed > 100) {
         // Render() has been idle for >100ms: player is stopped. Apply the
-        // same 0.85-per-buffer rate (per 16.6ms) so the fall matches the
-        // live fall. 0.85^N reaches 0 after ~30 buffers (~0.5s).
-        peakValue_ *= powf(0.85f, (float)elapsed / 16.6f) ;
-        if (peakValue_ < 0.001f) peakValue_ = 0.0f ;
+        // same 0.6-per-buffer rate (per 16.6ms) so the fall matches the live
+        // fall. 0.6^N empties a full bar in ~10 buffers (~170ms).
+        peakValue_ *= powf(0.6f, (float)elapsed / 16.6f) ;
+        if (peakValue_ < 0.002f) peakValue_ = 0.0f ;
         lastPeakClock_ = now ;
     }
     return peakValue_ ;

@@ -19,6 +19,12 @@ public:
 	void SetMixBus(int i) ;
 	void SetVolume(int volume) ;
 	void Reset() ;
+    // TREEFROG_MIXER_PER_CHANNEL_VU_V1 (H38.7):
+    // Live 0..1 level of the audio this channel is actually producing right
+    // now (instrument buffer, post volume/mute), so the Mixer view can draw
+    // real-time per-channel bars that follow the instrument's activity.
+    float GetPeakValue() ;
+    void ResetPeak() { peakValue_ = 0.0f; lastPeakClock_ = 0; }
 private:
 	int index_ ;
 	I_Instrument *instr_ ;
@@ -26,6 +32,8 @@ private:
 	int busIndex_ ;
 	int volume_ ;
 	MixBus *mixBus_ ;
+    float peakValue_ ;
+    unsigned long lastPeakClock_ ;
 } ;
 
 #endif
