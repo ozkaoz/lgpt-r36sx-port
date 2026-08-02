@@ -128,6 +128,19 @@ visible) y el **menú de acciones de proyecto** en la pantalla inicial.
   - Master: `10` ≈ bajo, `20` ≈ media, `30/50/100` creciendo y con rebote.
 - El decaimiento (`0.85` por callback) se mantiene; solo cambió el mapeo.
 
+### H38.6-r4 (tercer feedback de hardware): las barras vuelven a fluir
+
+- Tras la r3 las barras reflejaban el volumen (bien), pero quedaban
+  **estáticas**: al detener la reproducción el pico se congelaba en el último
+  valor porque `AudioMixer::Render` deja de ejecutarse cuando el driver deja
+  de pedir buffers, y el decaimiento vivía dentro de ese render.
+- **Solución**: el decaimiento ahora también se aplica por **tiempo de reloj**
+  en `AudioMixer::GetPeakValue()`. Con el player parado (>100 ms sin render)
+  el nivel cae al mismo ritmo (0.85 por ~16.6 ms) hasta 0; al volver a
+  reproducir salta al nivel real y rebota con la música.
+- Resultado esperado: reproduciendo ~80 → al parar cae a 0 → al reanudar
+  vuelve a ~80, y las barras (canal y master) se mueven con el flujo real.
+
 ### Menú de acciones corregido (abre los diálogos sin liberarlos)
 
 - **Causa raíz**: los diálogos anidados (editor Rename, selector de modo

@@ -17,6 +17,7 @@ AudioMixer::AudioMixer(const char *name):
 	masterVolume_ = 100 ;
 	clipped_ = false ;
     peakValue_ = 0.0f ;
+	lastPeakClock_ = 0 ;
 	
 	// Precalculate constant values for softclipping algorithm
 	softClipData_[0].alpha = 1.45f; // -1.5db (approx.)
@@ -144,11 +145,36 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
              // still holds between beats for a live-meter feel.
              peakValue_ *= 0.85f;
          }
+         lastPeakClock_ = System::GetInstance()->GetClock() ;
      }
 
      SAFE_FREE(mixBuffer) ;
      return gotData ;
 } ;
+
+float AudioMixer::GetPeakValue() {
+    // TREEFROG_VU_METERS_V4 (H38.7-r3): when the player is stopped the audio
+    // driver stops pulling buffers, so Render() (and its per-buffer decay)
+    // never runs again and peakValue_ would freeze at its last value. Decay
+    // the level here based on wall-clock time instead, so the bars still fall
+    // to 0 shortly after the music stops and bounce again on the next start.
+    //
+    // While the player is running, Render() refreshes peakValue_ every audio
+    // buffer (~16.6 ms) and owns the decay; the getter must stay a pure read
+    // then (elapsed < idle threshold), otherwise it would double-decay the
+    // bars and they would never reach full.
+    unsigned long now = System::GetInstance()->GetClock() ;
+    unsigned long elapsed = (lastPeakClock_ == 0) ? 0 : (now - lastPeakClock_) ;
+    if (elapsed > 100) {
+        // Render() has been idle for >100ms: player is stopped. Apply the
+        // same 0.85-per-buffer rate (per 16.6ms) so the fall matches the
+        // live fall. 0.85^N reaches 0 after ~30 buffers (~0.5s).
+        peakValue_ *= powf(0.85f, (float)elapsed / 16.6f) ;
+        if (peakValue_ < 0.001f) peakValue_ = 0.0f ;
+        lastPeakClock_ = now ;
+    }
+    return peakValue_ ;
+}
 
 void AudioMixer::SetVolume(fixed volume) { volume_ = volume; }
 

@@ -28,7 +28,7 @@ public:
     // Smoothed peak of the last rendered buffers, 0..1. Each MixBus instance
     // reports its own channel level; the AudioOut instance reports the master
     // level, so the Mixer and Record views can draw live VU bars.
-    float GetPeakValue() const { return peakValue_; }
+    float GetPeakValue() ;
     void ResetPeak() { peakValue_ = 0.0f; }
 	
 private:
@@ -45,5 +45,6 @@ private:
   int masterVolume_;
   bool clipped_;
   float peakValue_;
+  unsigned long lastPeakClock_ ;
 } ;
 #endif
