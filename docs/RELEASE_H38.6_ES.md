@@ -116,6 +116,18 @@ visible) y el **menú de acciones de proyecto** en la pantalla inicial.
   en 30/50/100, en línea con lo que se escucha.
 - El marcador de volumen sigue mostrando el ajuste (número + celda).
 
+### H38.6-r3 (segundo feedback de hardware): barras escaladas por volumen
+
+- En hardware el pico medido **no sigue el volumen** del canal: un canal a
+  volumen 1 leía "lleno" y el master a 20 ya llenaba la barra. La curva dB
+  sola no bastaba.
+- **Solución**: el relleno ahora se escala por **ambos** factores:
+  `relleno = (volumen/100) * nivel_dB_del_pico`. Resultado esperado:
+  - Canal: volumen `0` = vacío, `1` = casi vacío, `50` = mitad,
+    `100` = lleno (rebotando con la música).
+  - Master: `10` ≈ bajo, `20` ≈ media, `30/50/100` creciendo y con rebote.
+- El decaimiento (`0.85` por callback) se mantiene; solo cambió el mapeo.
+
 ### Menú de acciones corregido (abre los diálogos sin liberarlos)
 
 - **Causa raíz**: los diálogos anidados (editor Rename, selector de modo

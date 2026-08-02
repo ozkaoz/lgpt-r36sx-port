@@ -13,11 +13,12 @@
 #include <sstream>
 #include <math.h>
 
-// TREEFROG_MIXER_VU_DB_SCALE_V1 (H38.7):
-// Map a linear output level (0..1) to a perceptual (dBFS) bar fill so the
-// bars track the real audible volume: 0dB=full, and the fill drops as the
-// volume falls (50dB display range). A linear map makes anything above a few
-// dB stay "full white", which is what made the bars look static before.
+// TREEFROG_MIXER_VU_DB_SCALE_V2 (H38.6):
+// The bar fill is scaled by BOTH the volume setting and the live output
+// level: fill = (volume/100) * dB-scaled(peak). This keeps the bars honest
+// on hardware where the measured peak itself does not follow the volume:
+// volume 0 -> empty, volume 1 -> near empty, 50 -> half, 100 -> full, while
+// the dB-scaled peak still makes the bar bounce with the music.
 static float mixVULevel(float peak) {
 	if (peak <= 0.0f) return 0.0f ;
 	float db = 20.0f * log10f(peak) ;
@@ -255,7 +256,7 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// channel volume setting is drawn as an accent marker cell plus the
 	// numeric value below. Selected bars stay purple, muted bars dim.
 	int totalCells=2*height ;
-	int filledCells=int(mixVULevel(peak)*float(totalCells)) ;
+	int filledCells=int(mixVULevel(peak)*float(volume)*0.01f*float(totalCells)) ;
 	if (filledCells>totalCells) filledCells=totalCells ;
 	int volMarker=(volume*totalCells+99)/100 ;
 	if (volMarker>totalCells) volMarker=totalCells ;
@@ -315,7 +316,7 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	DrawString(x-1,y,"MST",props) ;
 
 	int totalCells=2*height ;
-	int filledCells=int(mixVULevel(peak)*float(totalCells)) ;
+	int filledCells=int(mixVULevel(peak)*float(volume)*0.01f*float(totalCells)) ;
 	if (filledCells>totalCells) filledCells=totalCells ;
 	int volMarker=(volume*totalCells+99)/100 ;
 	if (volMarker>totalCells) volMarker=totalCells ;
