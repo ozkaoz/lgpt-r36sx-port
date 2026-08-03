@@ -539,6 +539,48 @@ Nuevo test `tests/test_fx_phase17_acceptance.py` -> `FX_ACCEPTANCE_PHASE17_OK`, 
 - **Nomenclatura**: "reverb" no ligado a SIP_FBMIX, "compressor" no ligado a SIP_CRUSH, "EQ" vive en la tabla central (FCUT="EQ "), los nombres de la rejilla se copian de `CommandList::GetDisplayName`.
 - **Persistencia**: round-trip de sends por instrumento (PARAMs insertados), capa per-track `DELAYSEND`/`REVERBSEND` (Fase 7), modo compat (fallback Mixer en PlayerChannel) y bloque `FXMASTER` (DLYRET/RVBRET/...).
 
+### Fase 18 — Criterios finales de aceptación y entregables (hecho y verificado)
+
+**Auditoría final de los 15 comandos asignables (tabla canónica).**
+El editor de la columna de comandos usa precisión por comando (`CommandSpec.paramFormat`): HEX8 = 2 dígitos `%2.2X` rango `00..FF` (el byte alto queda en cero al editar por clamp), HEX16 = 4 dígitos `%4.4X` rango `0000..FFFF` (sin pérdida). Phrase y Table comparten los mismos helpers. `_specs[]` = 16 entradas (índice 0 = NONE) -> **15 asignables**:
+
+| ID (FourCC) | Código | Nombre | Formato / rango | Ámbito |
+|-------------|--------|--------|-----------------|--------|
+| `DLYS` | `DSN` | delay send (instrumento, live) | HEX8 00..FF | por canal, live (Fase 15) |
+| `RVBS` | `RSN` | reverb send (instrumento, live) | HEX8 00..FF | por canal, live (Fase 15) |
+| `DLYT` | `DTM` | delay time maestro | HEX8 00..FF | master |
+| `DLYF` | `DFB` | delay feedback maestro | HEX8 00..FF | master |
+| `RVDC` | `RDC` | reverb decay maestro | HEX8 00..FF | master |
+| `RVSZ` | `RSZ` | reverb size maestro | HEX8 00..FF | master |
+| `CMPT` | `CTH` | comp threshold maestro | HEX8 00..FF | master |
+| `FBMX` | `FBM` | comb feedback mix (legacy) | HEX16 | instrumento |
+| `FBTN` | `FBT` | comb feedback tune (legacy) | HEX16 | instrumento |
+| `DLAY` | `NDL` | Note Delay (NO audio delay) | HEX16 | nota |
+| `FLTR` | `FLT` | filter (legacy) | HEX16 | instrumento |
+| `FCUT` | `EQ` | filter cutoff (legacy) | HEX16 | instrumento |
+| `FRES` | `RES` | filter resonance (legacy) | HEX16 | instrumento |
+| `CRSH` | `BTS` | bit crusher (legacy) | HEX16 | instrumento |
+| `PFIN` | `PFI` | fine pitch (legacy) | HEX16 | instrumento |
+
+**Comandos heredados ocultados / conservados / retirados de edición.**
+- Ocultados del popup (no en `_specs[]`) pero SEGUEN reproduciéndose: `KILL`, `LPOF`, `ARPG`, `VOLM`, `HOP`, `LEGA`, `RTRG`, `TMPO`, `MDCC`, `MDPG`, `MVEL`, `PLOF`, `TABL`, `PAN_`, `GROV`, `FBTU`, `FBAM`, `IRTG`, `SLCE`, `STOP`. Verificados: PTCH/RTRG/LEGA en `SampleInstrument::ProcessCommand`; TABL/STOP/KILL/HOP/TMPO en `Player`.
+- Retirado de edición: `PTCH` (H38.7: el pitch vive en su propia columna; el comando sigue procesándose para compatibilidad de proyectos).
+- `DLAY` se muestra como `NDL` "Note DeLay" en rejilla y ayuda (nunca como delay de audio).
+
+**Estrategia de compatibilidad de sends por pista.**
+Los sends per-track (`Mixer::SetChannelDelaySend/ReverbSend`, atributos `DELAYSEND`/`REVERBSEND`) se conservan persistidos como capa de herencia. Un instrumento con base `-1` (solo proyectos de builds anteriores) hereda el send per-track; un instrumento con base 0..100 usa la suya. Desde Fase 15 la automatización `DLYS/RVBS` es live por canal y jamás escribe ni la base persistida ni el send per-track. `FXMASTER` sigue restaurando sus 41 parámetros (Fase 5).
+
+**Estado de los criterios finales (Fase 18).**
+Todos verificados por la suite automatizada (Fase 0-17) y los guards de fuente: 7 comandos HEX8 de 2 dígitos; heredados 16 bits sin pérdida; 15 comandos asignables documentados; DLAY como Note Delay; InstrumentFxModal eliminado (Fase 6.3) y sustituido por controles en InstrumentView; InstrumentView con DRY/DELAY/REVERB; envíos base por instrumento; Phrase/Table automatizan sin modificar valores persistidos; Mixer muestra retornos (no envíos duplicados); páginas independientes Delay/Reverb/EQ/Comp; CMP BYP visible y editable; EQ centrada; ningún parámetro sobre las filas de ayuda; booleanos ON/OFF; unidades y rangos coherentes; proyectos clásicos bit-idénticos (golden); proyectos exploratory conservan efectos; sin allocs ni bloqueos en el callback (envíos live = asignaciones de int).
+
+**Entregables.**
+- Auditoría de 15 comandos y tabla canónica: esta sección.
+- Implementación sends por instrumento: Fases 6/15. Layout InstrumentView: Fase 8. Layout Mixer: Fase 9. Páginas Delay/Reverb/EQ/Comp: Fases 6.2/12/13. Editor hexadecimal por comando: Fase 6 (`CommandSpec`). Eliminación InstrumentFxModal: Fase 6.3.
+- Pruebas automatizadas: `tests/test_fx_phase*.py` (21/21 en verde).
+- Resultado de pruebas existentes: audit completo 27/27 grupos OK; único fallo = `test_u2520_transactional_record_source.py` (espera la ruta `/mnt/sdcard/lgpt/tmp/record`, ausente en el fuente actual; preexistente, ajeno a este rediseño).
+- Capturas de cada página en resolución real R36SX: **pendiente de hardware** (no disponible en esta máquina; se entregarán al flashear).
+- Resumen de archivos modificados y cambios de formato de proyecto: ver commits Fase 0-18; los únicos campos nuevos de proyecto son los PARAMs de instrumento `DRY`/`DLY send`/`RVB send` (defaults `100/0/0`, `-1` solo en proyectos antiguos) y el `FXMASTER` (41 atributos) — ambos con fallback a legacy.
+
 ---
 
 ## G. Diseño de clases / APIs (FxEngine)
