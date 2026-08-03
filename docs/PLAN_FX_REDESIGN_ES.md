@@ -577,7 +577,7 @@ Todos verificados por la suite automatizada (Fase 0-17) y los guards de fuente: 
 - Auditoría de 15 comandos y tabla canónica: esta sección.
 - Implementación sends por instrumento: Fases 6/15. Layout InstrumentView: Fase 8. Layout Mixer: Fase 9. Páginas Delay/Reverb/EQ/Comp: Fases 6.2/12/13. Editor hexadecimal por comando: Fase 6 (`CommandSpec`). Eliminación InstrumentFxModal: Fase 6.3.
 - Pruebas automatizadas: `tests/test_fx_phase*.py` (21/21 en verde).
-- Resultado de pruebas existentes: audit completo 27/27 grupos OK; único fallo = `test_u2520_transactional_record_source.py` (espera la ruta `/mnt/sdcard/lgpt/tmp/record`, ausente en el fuente actual; preexistente, ajeno a este rediseño).
+- Resultado de pruebas existentes: audit completo 27/27 grupos OK; `test_u2520_transactional_record_source.py` corregido (marcador de ruta temp actualizado a `/tmp/r36sx_lgpt_record`, el directorio tmpfs real usado por `UsbRecordModal` e `ImportSampleDialog`; preexistente y ajeno a este rediseño, resuelto como parte del release Bacon 1.1).
 - Capturas de cada página en resolución real R36SX: **pendiente de hardware** (no disponible en esta máquina; se entregarán al flashear).
 - Resumen de archivos modificados y cambios de formato de proyecto: ver commits Fase 0-18; los únicos campos nuevos de proyecto son los PARAMs de instrumento `DRY`/`DLY send`/`RVB send` (defaults `100/0/0`, `-1` solo en proyectos antiguos) y el `FXMASTER` (41 atributos) — ambos con fallback a legacy.
 

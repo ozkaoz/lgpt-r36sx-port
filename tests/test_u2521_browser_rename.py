@@ -7,14 +7,15 @@ pool=(root/'source/sources/Application/Instruments/SamplePool.cpp').read_text()
 poolh=(root/'source/sources/Application/Instruments/SamplePool.h').read_text()
 required=[
  'U2521_BROWSER_RENAME_DEFERRED_DELETE_CRASH_SAFE',
- 'class ImportBrowserRenameModal',
+ 'ImportBrowserRenameCallback',
  'L1+X rename   L1+Y delete',
  'const bool renameChord',
  'requestBrowserRename',
  'ConfirmPendingBrowserRename',
  'BrowserRenamePathCaseSafe',
- 'X+UP/DOWN +/-5',
- 'R1+LEFT cancel',
+ 'Rename requires a .wav name',
+ 'requestBrowserDelete',
+ 'Exact duplicate name blocked',
  'CD_HILITE2',
 ]
 for marker in required: assert marker in cpp or marker in h, marker

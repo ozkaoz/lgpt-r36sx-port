@@ -1,5 +1,22 @@
 # Changelog
 
+## Release candidate: Bacon 1.1 - FX Dev (RC1)
+
+- **Estado**: release candidate (no estable) sobre la línea Bacon. Integra el
+  rediseño FX completo (Fases 0-18 de `docs/PLAN_FX_REDESIGN_ES.md`):
+  sends por instrumento DRY/DLY/RVB (live por canal, defaults `100/0/0`),
+  automatización live `DLYS`/`RVBS`, retornos globales `DLYRET`/`RVBRET`,
+  páginas dedicadas Delay/Reverb/EQ/Comp y branding `LGPT R36SX - Bacon 1.1`.
+- **Pruebas**: suite completa en verde (`AUDIT_CLEAN_MAIN_U2523_OK`, 176
+  checks OK, 27/27 grupos de audit). Tests preexistentes corregidos:
+  `test_u2520_transactional_record_source` (ruta temp `/tmp/r36sx_lgpt_record`),
+  `test_u2521_browser_rename`, `test_u2522_nested_rename_frame_forwarding` y
+  `test_u2523_rename_caret_alignment` (verifican la implementación actual con
+  `TreeFrogTextEditor`; el modal `ImportBrowserRenameModal` fue eliminado en H38.x).
+- **Binario**: `BUILD/U2523/lgpt_r36sx_u2523.so`
+  (SHA-256 `fddc4b042742da0745edf4f24edeee66543e67b900ecb03b87196bc41f8764ec`),
+  daemon ABI7 golden inalterado. Detalles en `docs/RELEASE_BACON_1.1_FX_DEV_ES.md`.
+
 ## FX redesign Fase 14 (general fine/coarse curve editing)
 
 - The Fase 12 musical curve edit is generalized: `fxUsesCurve()` + `fxEditCurve()` apply semitone fine (L/R) / octave coarse (A+UP/DOWN) proportional steps to every wide-range time/ratio param — EQ frequencies plus `DLY TIM`, `RVB PRE`, `RVB DEC`, `CMP ATK`, `CMP REL`, `CMP RAT`. Relative error is constant, so the full range is reachable in a bounded number of presses (e.g. CMP REL 1..2000 ms in ~132 fine / ~11 coarse).

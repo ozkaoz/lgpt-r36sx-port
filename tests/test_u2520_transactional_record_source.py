@@ -5,7 +5,7 @@ cpp=(root/'source/sources/Application/Views/ModalDialogs/UsbRecordModal.cpp').re
 h=(root/'source/sources/Application/Views/ModalDialogs/UsbRecordModal.h').read_text()
 required=[
  'U2520_PENDING_TAKE_RECORD_EDITOR_PHYSICAL_EDGE_READY',
- '"/mnt/sdcard/lgpt/tmp/record"',
+ '"/tmp/r36sx_lgpt_record"',
  'makeTemporaryCapturePath();',
  'promoteCaptureToFinalPath(',
  'O_WRONLY | O_CREAT | O_EXCL',

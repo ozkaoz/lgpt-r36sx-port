@@ -320,7 +320,7 @@ void ProjectView::DrawView() {
 // Draw title
 
 	char projectString[80] ;
-    sprintf(projectString, "LGPT R36SX - Bacon 1.0");
+    sprintf(projectString, "LGPT R36SX - Bacon 1.1");
 
     SetColor(CD_NORMAL);
     DrawString(pos._x,pos._y,projectString,props) ;
