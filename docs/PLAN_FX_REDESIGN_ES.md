@@ -528,6 +528,17 @@ Auditoría de los archivos del listado de la spec (no se asumió que todos neces
 - `Audio/FxEngine.{h,cpp}`: DSP no se modifica (evitar cambios innecesarios en módulos DSP).
 - Verificación: suite FX (Fase 4/6/8/15) en verde; `g++ -fpermissive -fsyntax-only` de `CommandList.cpp`, `InstrumentView.cpp`, `HelpLegend.h` OK.
 
+### Fase 17 — Pruebas nuevas de aceptación (hecho y verificado)
+
+Nuevo test `tests/test_fx_phase17_acceptance.py` -> `FX_ACCEPTANCE_PHASE17_OK`, que modela el checklist de "pruebas nuevas requeridas" contra el fuente:
+
+- **Representación**: los 7 comandos nuevos usan editor HEX8 de 2 dígitos (`%2.2X`, min 0, max 0xFF); los 8 heredados conservan HEX16 (`%4.4X`, max 0xFFFF). El clamp de edición (`UIBigHexVarField::ProcessArrow`) deja el byte alto en cero y el byte bajo conserva 00..FF. PhraseView y TableView usan los mismos helpers `CommandList::GetParam*` y dibujan el byte bajo (`p & 0xFF`) para HEX8.
+- **Inventario**: tabla canónica parseada de `_specs[]` = 7 nuevos + 8 heredados + NONE = 15 comandos asignables; los ocultos (PTCH/RTRG/LEGA en SampleInstrument; TABL/STOP/KILL/HOP/TMPO en Player) siguen procesándose; DLAY se presenta como `NDL` "Note DeLay" (nunca audio delay).
+- **Sends de instrumento**: modelo Fase 6/15 re-verificado (envíos propios por instrumento, dos instrumentos en la misma pista distintos, cambio de instrumento restaura base, DLYS/RVBS live-only, trigger restaura, escala DRY, defaults = sonido dry legacy).
+- **Interfaz**: ninguna página dibuja parámetros sobre las filas de ayuda (InstrumentView bajo y=27, Mixer páginas FX en y<22), CMP BYP y CMP SCL visibles, EQ/COMP independientes, ON/OFF y unidades (Hz/dB).
+- **Nomenclatura**: "reverb" no ligado a SIP_FBMIX, "compressor" no ligado a SIP_CRUSH, "EQ" vive en la tabla central (FCUT="EQ "), los nombres de la rejilla se copian de `CommandList::GetDisplayName`.
+- **Persistencia**: round-trip de sends por instrumento (PARAMs insertados), capa per-track `DELAYSEND`/`REVERBSEND` (Fase 7), modo compat (fallback Mixer en PlayerChannel) y bloque `FXMASTER` (DLYRET/RVBRET/...).
+
 ---
 
 ## G. Diseño de clases / APIs (FxEngine)
