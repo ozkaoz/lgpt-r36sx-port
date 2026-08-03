@@ -58,6 +58,8 @@ if [[ "$HOST_MODULES" -eq 1 ]]; then
   install -m 0644 "$HOST_USBMIDI_MODULE" "$ACTIVE_HOST_USBMIDI_MODULE"
 fi
 printf 'MONO_48K\n' > "$SD/lgpt/otg/audio_usb_profile"
+: > "$SD/lgpt/otg/enable_lgpt_uac2_bridge"
+printf 'LOCAL_CONSOLE\n' > "$SD/lgpt/otg/audio_driver_mode"
 rm -f "$SD/lgpt/otg/lowlat_240" "$SD/lgpt/otg/disable_mute_local" "$SD/lgpt/otg/mute_local_during_otg"
 cat > "$SD/LGPT_OTG_LOGS/INSTALL_STATE_U2523.txt" <<EOF
 Installed: $(date -Is)

@@ -23,6 +23,67 @@ normalize_mode() {
 }
 NORM="$(normalize_mode "$MODE")"
 
+HOST_MODBASE=$BASE/modules/4.4.186-release/host_usb_audio
+HOST_MODULES="snd-usbmidi-lib.ko snd-usb-audio.ko"
+
+u2414_loaded() {
+    grep -q "^$1 " /proc/modules 2>/dev/null
+}
+
+load_host_usb_module() {
+    filename="$1"
+    module="$(echo "${filename%.ko}" | tr '-' '_')"
+    if u2414_loaded "$module"; then
+        echo "HOST_LOAD_${filename}_ALREADY=YES"
+        return 0
+    fi
+    if command -v modprobe >/dev/null 2>&1; then
+        modprobe "$module" 2>/dev/null && {
+            echo "HOST_LOAD_${filename}_MODPROBE=YES"
+            return 0
+        }
+    fi
+    for p in \
+      /lib/modules/4.4.186-release/kernel/sound/usb/"$filename" \
+      /lib32/modules/4.4.186-release/kernel/sound/usb/"$filename" \
+      $(find "$HOST_MODBASE" -type f -name "$filename" 2>/dev/null); do
+        [ -f "$p" ] || continue
+        insmod "$p" 2>/dev/null && {
+            echo "HOST_LOAD_${filename}_INSMOD=YES FROM=$p"
+            return 0
+        }
+    done
+    echo "HOST_LOAD_${filename}_FAILED=YES"
+    return 1
+}
+
+load_host_usb_modules() {
+    for m in $HOST_MODULES; do
+        load_host_usb_module "$m" || true
+    done
+}
+
+H35_ROLE_PATH="/sys/devices/platform/soc/18844000.usb/musb-hdrc.0.auto/mode"
+switch_host_role() {
+    for g in /sys/kernel/config/usb_gadget/r36sx_lgpt_* \
+             /sys/kernel/config/usb_gadget/r36sx_uac2_*; do
+        [ -d "$g" ] || continue
+        echo "" > "$g/UDC" 2>/dev/null || true
+    done
+    [ -e "$H35_ROLE_PATH" ] || H35_ROLE_PATH="$(find /sys/devices -path '*musb-hdrc.0.auto/mode' -print -quit 2>/dev/null)"
+    [ -n "$H35_ROLE_PATH" ] && [ -e "$H35_ROLE_PATH" ] || {
+        echo "ERROR_HOST_ROLE_PATH_MISSING=YES"
+        return 2
+    }
+    echo "ROLE_BEFORE $H35_ROLE_PATH=$(cat "$H35_ROLE_PATH" 2>/dev/null)"
+    echo host > "$H35_ROLE_PATH" 2>/dev/null || echo b_host > "$H35_ROLE_PATH" 2>/dev/null || {
+        echo "ERROR_HOST_ROLE_WRITE_FAILED=YES"
+        return 3
+    }
+    echo "ROLE_AFTER $H35_ROLE_PATH=$(cat "$H35_ROLE_PATH" 2>/dev/null)"
+    return 0
+}
+
 case "$NORM" in
     ANDROID) POLICY=USB_IN_OTG ;;
     WINDOWS) POLICY=USB_DUPLEX_OTG ;;
@@ -57,6 +118,8 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
                      r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
                 pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
             done
+            load_host_usb_modules
+            switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
             if [ -x "$BIN/otg_h37_host_runtime_supervisor.sh" ]; then
                 LGPT_H38_POLICY=USB_OUT_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh"
             else
@@ -69,6 +132,8 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
                      r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
                 pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
             done
+            load_host_usb_modules
+            switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
             if [ -x "$BIN/otg_h37_host_runtime_supervisor.sh" ]; then
                 LGPT_H38_POLICY=MIDI_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh"
             else
