@@ -9,6 +9,7 @@
 #include "Application/Views/ModalDialogs/MessageBox.h"
 #include "Application/Views/ModalDialogs/SelectProjectDialog.h"
 #include "Application/Views/ModalDialogs/AudioDriverModal.h"
+#include "Application/Views/BaseClasses/HelpOverlay.h"
 #include "Foundation/Variables/WatchedVariable.h"
 #include "Player/Player.h"
 #include "Services/Midi/MidiService.h"
@@ -199,6 +200,7 @@ AppWindow::AppWindow(I_GUIWindowImp &imp) : GUIWindow(imp) {
     _lastB = 0;
     _mask = 0;
     _audioShortcutLatched = false;
+    _helpShortcutLatched = false;
     colorIndex_ = CD_NORMAL;
 
     EventDispatcher *ed = EventDispatcher::GetInstance();
@@ -601,6 +603,14 @@ void AppWindow::SynchronizeInputMask(unsigned short mask) {
         (_mask & audioCombo) != audioCombo) {
         _audioShortcutLatched = false;
     }
+    // TREEFROG_HELP_OVERLAY_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, point 13):
+    // the help latch clears once SELECT+R1 (R1 = EPBM_R) is released.
+    const unsigned short helpCombo =
+        EPBM_SELECT | EPBM_R;
+    if (_helpShortcutLatched &&
+        (_mask & helpCombo) != helpCombo) {
+        _helpShortcutLatched = false;
+    }
 }
 
 extern "C" void TreeFrogAppWindow_SynchronizeInputMask(
@@ -659,6 +669,24 @@ bool AppWindow::onEvent(GUIEvent &event) {
 
         const unsigned short audioCombo =
             EPBM_SELECT | EPBM_R2;
+        const unsigned short helpCombo =
+            EPBM_SELECT | EPBM_R;
+
+        // TREEFROG_HELP_OVERLAY_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md):
+        // SELECT+R1 opens the context help overlay (latched, non-modal
+        // state change); SELECT+R2 keeps the Audio Driver dialog.
+        if ((_mask & helpCombo) == helpCombo &&
+            _currentView &&
+            !_currentView->HasModal()) {
+            if (!_helpShortcutLatched) {
+                _helpShortcutLatched = true;
+                _currentView->ReplaceModal(
+                    new HelpOverlay(*_currentView),
+                    HelpOverlayApplyCallback);
+                _isDirty = true;
+            }
+            break;
+        }
 
         if ((_mask & audioCombo) == audioCombo &&
             _currentView &&
@@ -673,7 +701,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
             break;
         }
 
-        if (_audioShortcutLatched) break;
+        if (_helpShortcutLatched || _audioShortcutLatched) break;
 
         if (_currentView)
             _currentView->ProcessButton(
@@ -686,6 +714,18 @@ bool AppWindow::onEvent(GUIEvent &event) {
     case ET_PADMASKUP: {
         SynchronizeInputMask(
             (unsigned short)(event.GetValue() & 0xffffL));
+
+        if (_helpShortcutLatched) {
+            if (_currentView)
+                _currentView->ProcessButton(
+                    _mask,
+                    false,
+                    event.When());
+            if ((_mask & (EPBM_SELECT | EPBM_R)) == 0) {
+                _helpShortcutLatched = false;
+            }
+            break;
+        }
 
         if (_audioShortcutLatched) {
             if (_currentView)
@@ -713,11 +753,25 @@ bool AppWindow::onEvent(GUIEvent &event) {
         _mask |= v;
 
         const unsigned short audioCombo = EPBM_SELECT | EPBM_R2;
+        const unsigned short helpCombo = EPBM_SELECT | EPBM_R;
         /*
          * U2.42.0 DO_NOT_REPLACE_ACTIVE_MODAL:
          * keep the original global controls and Song combinations untouched.
          * The audio shortcut cannot replace a modal that is already open.
+         * SELECT+R1 opens the help overlay with the same latch discipline.
          */
+        if ((_mask & helpCombo) == helpCombo &&
+            _currentView && !_currentView->HasModal()) {
+            if (!_helpShortcutLatched) {
+                _helpShortcutLatched = true;
+                _currentView->ReplaceModal(
+                    new HelpOverlay(*_currentView),
+                    HelpOverlayApplyCallback);
+                _isDirty = true;
+            }
+            break;
+        }
+
         if ((_mask & audioCombo) == audioCombo &&
             _currentView && !_currentView->HasModal()) {
             if (!_audioShortcutLatched) {
@@ -730,7 +784,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
             break;
         }
 
-        if (_audioShortcutLatched) break;
+        if (_helpShortcutLatched || _audioShortcutLatched) break;
 
         if (_currentView)
             _currentView->ProcessButton(_mask, true, event.When());
@@ -739,6 +793,15 @@ bool AppWindow::onEvent(GUIEvent &event) {
 
     case ET_PADBUTTONUP: {
         _mask &= (0xFFFF - v);
+
+        if (_helpShortcutLatched) {
+            if (_currentView)
+                _currentView->ProcessButton(_mask, false, event.When());
+            if ((_mask & (EPBM_SELECT | EPBM_R)) == 0) {
+                _helpShortcutLatched = false;
+            }
+            break;
+        }
 
         if (_audioShortcutLatched) {
             /*

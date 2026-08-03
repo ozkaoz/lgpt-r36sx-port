@@ -1,5 +1,31 @@
 # Changelog
 
+## Release candidate: Bacon 1.1 - FX Dev (RC3 base)
+
+- **Estado**: fase base de la modernización visual integral
+  (`docs/PLAN_RC3_MODERNIZACION_VISUAL_ES.md`). No toca el motor FX.
+- **Bypass unificado**: en las páginas master DELAY/REVERB/EQ/COMP el
+  `BYPASS` es ahora la primera fila visual y lógica (semántica
+  `ON = efecto desactivado`). Helpers de fila ordenada (`fxBypassId`,
+  `fxIdForRow`, `fxCountOnPage`) compartidos por navegación y dibujo; la
+  tabla `kFxParams_` y el enum quedan byte-idénticos (persistencia
+  bit-idéntica).
+- **Librería UiDraw**: primitivas compartidas `DrawCenteredTitle`
+  (título centrado `x=(40-len)/2`), `DrawSectionHeader`, `DrawValueRow`,
+  `DrawToggle` (`[ ON ]`/`[ OFF ]`), `DrawSolidBar`, `DrawBipolarBar`,
+  `DrawProgressBar`, `DrawTabs`, `DrawModalFrame`, `DrawScrollIndicator`
+  y `DrawSeparator`. Todo dibujo se clampa a 40x30.
+- **Colores semánticos** (`UiColors.h`): roles `UI_COLOR_*` mapeados a los
+  `CD_*` existentes; sin RGB directo por vista.
+- **Help centralizado**: `HelpRegistry` (sección por vista) + `HelpOverlay`
+  (latch, no propaga input). `SELECT+R1` abre la ayuda contextual desde
+  cualquier pantalla; `SELECT+R2` conserva el diálogo de Audio Driver.
+- **Auditorías**: `UI_CONTROL_AUDIT.md`, `OBSOLETE_FEATURE_AUDIT.md`,
+  `UI_VISUAL_AUDIT.md` y la guía `UI_STYLE_GUIDE.md`.
+- **Pruebas**: nuevo `test_rc3_base_unified_bypass_uidraw_help.py`; suite
+  completa en verde (`AUDIT_CLEAN_MAIN_U2523_OK`). Core instalado y
+  verificado en SD (`VERIFY_U2523_OK`, `ERRORS=0`).
+
 ## Release candidate: Bacon 1.1 - FX Dev (RC2)
 
 - **Estado**: release candidate sobre RC1. Añade la **normalización de

@@ -147,6 +147,11 @@ protected:
 	float fxGet(int id) const ;
 	void fxSet(int id,float v) ;
 	int fxRowForId(int id) const ;
+	// TREEFROG_MASTER_BYPASS_FIRST_V1 (PLAN_RC3... point 7): ordered row
+	// helpers keep BYPASS as the first row on the four master pages.
+	int fxBypassId(FxPage page) const ;
+	int fxCountOnPage(FxPage page) const ;
+	int fxIdForRow(int row) const ;
 	bool fxIdOnPage(int id,FxPage page) const ;
 private:
 	const char *song_ ;

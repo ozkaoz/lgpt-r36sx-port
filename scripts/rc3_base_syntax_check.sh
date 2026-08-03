@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SOURCE="$ROOT/source/sources"
+BASE=(
+  -std=gnu++03 -DPLATFORM_TREEFROG -DTREEFROG_UAC2_BRIDGE=1
+  -DTREEFROG_INPUT_PROFILE=0 -DTREEFROG_INPUT_DEBUG=0
+  -DTREEFROG_AUDIO_MODE=0 -DTREEFROG_TIMER_MODE=1
+  -DTREEFROG_FACE_TAP_MODE=0 -DTREEFROG_MODIFIER_RETRIGGER=0
+  -DTREEFROG_EVENT_DEBUG_ALL=1 -DTREEFROG_DISABLE_PHRASE_AUDITION=0
+  -DTREEFROG_HIGH_CONTRAST_SELECTION=1 -DTREEFROG_PURPLE_FOCUS_SELECTION=1
+  -DTREEFROG_PURPLE_FOCUS_RGB565=0xd99b -DTREEFROG_VIDEO_MODE=0
+  -DTREEFROG_VIDEO_PROBE=0 -DTREEFROG_PORT_VERSION_BADGE=0
+  -DTREEFROG_AUDIO_DEBUG=0 -DTREEFROG_RETRO_LIFECYCLE_DEBUG=0
+  -DCPP_MEMORY -DHAVE_STDINT_H -D_NDEBUG -D_NO_JACK_ -DDUMMYMIDI
+  -D_LGPT_NO_SCREEN_CACHE_ -include stdint.h
+  -include "$SOURCE/Adapters/TREEFROG/Compat/SDL_types_force.h"
+  -I"$SOURCE/Adapters/TREEFROG/Compat" -I"$SOURCE"
+)
+FILES=(
+  "$SOURCE/Application/Views/BaseClasses/UiDraw.cpp"
+  "$SOURCE/Application/Views/BaseClasses/HelpRegistry.cpp"
+  "$SOURCE/Application/Views/BaseClasses/HelpOverlay.cpp"
+  "$SOURCE/Application/AppWindow.cpp"
+  "$SOURCE/Application/Views/MixerView.cpp"
+)
+for f in "${FILES[@]}"; do
+  echo "== $f =="
+  g++ "${BASE[@]}" -DTREEFROG_ENABLE_START=1 -DTREEFROG_ENABLE_SELECT=1 -fsyntax-only "$f" || exit 1
+done
+echo RC3_BASE_SYNTAX_OK

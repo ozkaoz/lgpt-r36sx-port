@@ -93,6 +93,7 @@ class AppWindow : public GUIWindow, I_Observer, Status {
     bool _shouldQuit;
     unsigned short _mask;
     bool _audioShortcutLatched;
+    bool _helpShortcutLatched;
     unsigned long _lastA;
     unsigned long _lastB;
     char _statusLine[80];

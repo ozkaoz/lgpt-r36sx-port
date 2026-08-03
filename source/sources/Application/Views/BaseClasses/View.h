@@ -82,6 +82,7 @@ enum ViewUpdateDirection { VUD_LEFT = 0, VUD_RIGHT, VUD_UP, VUD_DOWN };
 
 class View;
 class ModalView;
+class UiDraw;
 
 typedef void (*ModalViewCallback)(View &v, ModalView &d);
 
@@ -169,6 +170,8 @@ class View : public Observable {
 
     void drawMap();
     void drawNotes();
+
+    friend class UiDraw;
 
   public: // temp hack for modl windo constructors
     GUIWindow &w_;

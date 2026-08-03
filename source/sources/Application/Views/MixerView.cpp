@@ -550,19 +550,57 @@ bool MixerView::fxIdOnPage(int id,FxPage page) const {
 	return kFxParams_[id].page==page ;
 }
 
+// TREEFROG_MASTER_BYPASS_FIRST_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, point 7):
+// On DELAY/REVERB/EQ/COMP the BYPASS parameter is the FIRST visual and logical
+// row.  These helpers put the page Bypass at row 0 for navigation and drawing.
+// The underlying kFxParams_ table and FxParam enum stay byte-identical
+// (bit-identical persistence); only the row order changes.
+int MixerView::fxBypassId(FxPage page) const {
+	switch (page) {
+	case FX_PAGE_DELAY:  return FX_P_DLY_BYP ;
+	case FX_PAGE_REVERB: return FX_P_RVB_BYP ;
+	case FX_PAGE_EQ:     return FX_P_EQ_BYP ;
+	case FX_PAGE_COMP:   return FX_P_CMP_BYP ;
+	default:             return -1 ;
+	}
+}
+
+int MixerView::fxCountOnPage(FxPage page) const {
+	int count=0 ;
+	for (int i=0;i<FX_PARAM_COUNT;i++) {
+		if (kFxParams_[i].page==page) count++ ;
+	}
+	return count ;
+}
+
+// Ordered row position of a param on its page, with the page Bypass first.
 int MixerView::fxRowForId(int id) const {
-	int row=0 ;
+	FxPage page=kFxParams_[id].page ;
+	int byp=fxBypassId(page) ;
+	if (id==byp) return 0 ;
+	int row=1 ;
 	for (int i=0;i<id;i++) {
-		if (kFxParams_[i].page==kFxParams_[id].page) row++ ;
+		if (kFxParams_[i].page==page && i!=byp) row++ ;
 	}
 	return row ;
 }
 
-void MixerView::fxMoveRow(int delta) {
-	int count=0 ;
+// Inverse of fxRowForId: given a logical row (0 = bypass), return the param id.
+int MixerView::fxIdForRow(int row) const {
+	FxPage page=(FxPage)fxPage_ ;
+	int byp=fxBypassId(page) ;
+	if (byp>=0 && row==0) return byp ;
+	int seen=1 ;
 	for (int i=0;i<FX_PARAM_COUNT;i++) {
-		if (fxIdOnPage(i,(FxPage)fxPage_)) count++ ;
+		if (kFxParams_[i].page!=page || i==byp) continue ;
+		if (seen==row) return i ;
+		seen++ ;
 	}
+	return -1 ;
+}
+
+void MixerView::fxMoveRow(int delta) {
+	int count=fxCountOnPage((FxPage)fxPage_) ;
 	if (count<=0) return ;
 	fxRow_+=delta ;
 	if (fxRow_<0) fxRow_=count-1 ;
@@ -618,14 +656,7 @@ void MixerView::fxEditCurve(int id,int delta,bool coarse) {
 }
 
 void MixerView::fxEditRow(int delta,bool coarse) {
-	int count=0 ;
-	int targetId=-1 ;
-	for (int i=0;i<FX_PARAM_COUNT;i++) {
-		if (fxIdOnPage(i,(FxPage)fxPage_)) {
-			if (count==fxRow_) targetId=i ;
-			count++ ;
-		}
-	}
+	int targetId=fxIdForRow(fxRow_) ;
 	if (targetId<0) return ;
 	const FxParamSpec &spec=kFxParams_[targetId] ;
 	if (fxUsesCurve(targetId)) {
@@ -649,14 +680,7 @@ void MixerView::fxEditRow(int delta,bool coarse) {
 // A+B restores the hovered parameter to its legacy default so the whole page
 // can be brought back to the Fase 5 "all defaults" state without hunting.
 void MixerView::fxResetRow() {
-	int count=0 ;
-	int targetId=-1 ;
-	for (int i=0;i<FX_PARAM_COUNT;i++) {
-		if (fxIdOnPage(i,(FxPage)fxPage_)) {
-			if (count==fxRow_) targetId=i ;
-			count++ ;
-		}
-	}
+	int targetId=fxIdForRow(fxRow_) ;
 	if (targetId<0) return ;
 	fxSet(targetId,kFxParams_[targetId].vdef) ;
 	isDirty_=true ;
@@ -860,11 +884,11 @@ void MixerView::drawDelayPage() {
 	char buffer[16] ;
 	const int x=2 ;
 	const int valueX=x+12 ;
-	static const char *labels[7]={"TIME","FEEDBACK","MIX","WIDTH",
-	                              "PING/PONG","SATURATE","BYPASS"} ;
-	static const int ids[7]={FX_P_DLY_TIME,FX_P_DLY_FBK,FX_P_DLY_MIX,
-	                         FX_P_DLY_WID,FX_P_DLY_PP,FX_P_DLY_SAT,
-	                         FX_P_DLY_BYP} ;
+	static const char *labels[7]={"BYPASS","TIME","FEEDBACK","MIX",
+	                              "WIDTH","PING/PONG","SATURATE"} ;
+	static const int ids[7]={FX_P_DLY_BYP,FX_P_DLY_TIME,FX_P_DLY_FBK,
+	                         FX_P_DLY_MIX,FX_P_DLY_WID,FX_P_DLY_PP,
+	                         FX_P_DLY_SAT} ;
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
@@ -883,11 +907,11 @@ void MixerView::drawReverbPage() {
 	char buffer[16] ;
 	const int x=2 ;
 	const int valueX=x+12 ;
-	static const char *labels[7]={"PREDELAY","DECAY","SIZE","DAMPING",
-	                              "WIDTH","MODE","BYPASS"} ;
-	static const int ids[7]={FX_P_RVB_PRE,FX_P_RVB_DEC,FX_P_RVB_SIZ,
-	                         FX_P_RVB_DMP,FX_P_RVB_WID,FX_P_RVB_MODE,
-	                         FX_P_RVB_BYP} ;
+	static const char *labels[7]={"BYPASS","PREDELAY","DECAY","SIZE",
+	                              "DAMPING","WIDTH","MODE"} ;
+	static const int ids[7]={FX_P_RVB_BYP,FX_P_RVB_PRE,FX_P_RVB_DEC,
+	                         FX_P_RVB_SIZ,FX_P_RVB_DMP,FX_P_RVB_WID,
+	                         FX_P_RVB_MODE} ;
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
