@@ -130,18 +130,22 @@ void FxEngine::Process(fixed *buffer, int samplecount) {
 void FxEngine::processSendReturns(fixed *buffer, int samplecount) {
     int n = samplecount * 2;
 
-    // Snapshot dry master.
-    for (int i = 0; i < n; i++) buses_.master_[i] = buffer[i];
+    // The master bus runs at int16<<15 scale (AudioMixer), but the DSP
+    // kernels (delay/reverb/EQ/compressor) are Q15 (range ±1.0 = ±i2fp(1)).
+    // Normalize the snapshot into Q15 first, otherwise every master sample
+    // (~5e8) collapses into the DSP saturate() clamps and the output is
+    // destroyed.  The >>FIXED_SHIFT / <<FIXED_SHIFT round trip is exact.
+    for (int i = 0; i < n; i++) buses_.master_[i] = buffer[i] >> FIXED_SHIFT;
 
     // Build send buses.  Fase 4: per-track sends were accumulated into
-    // send_[0]/send_[1] by AccumulateChannelSend() during channel rendering.
-    // If no channel accumulated (direct Process() on a mixed buffer), fall
-    // back to the global delaySend_/reverbSend_ gains so the Fase 2/3 send
-    // model is preserved.
+    // send_[0]/send_[1] by AccumulateChannelSend() during channel rendering
+    // (already normalized to Q15).  If no channel accumulated (direct
+    // Process() on a mixed buffer), fall back to the global delaySend_/
+    // reverbSend_ gains so the Fase 2/3 send model is preserved.
     if (!sendsAccumulated_) {
         for (int i = 0; i < n; i++) {
-            buses_.send_[0][i] = fp_mul(buffer[i], delaySend_);
-            buses_.send_[1][i] = fp_mul(buffer[i], reverbSend_);
+            buses_.send_[0][i] = fp_mul(buses_.master_[i], delaySend_);
+            buses_.send_[1][i] = fp_mul(buses_.master_[i], reverbSend_);
         }
     }
     sendsAccumulated_ = false;
@@ -150,16 +154,28 @@ void FxEngine::processSendReturns(fixed *buffer, int samplecount) {
     delay_.Process(buses_.send_[0], buses_.returnDelay_, samplecount);
     reverb_.Process(buses_.send_[1], buses_.returnReverb_, samplecount);
 
-    // Sum returns back into the master output.
+    // Sum returns back into the master output (Q15).
     for (int i = 0; i < n; i++) {
-        buffer[i] = buses_.master_[i]
-                    + fp_mul(buses_.returnDelay_[i], delayReturn_)
-                    + fp_mul(buses_.returnReverb_[i], reverbReturn_);
+        buses_.master_[i] = buses_.master_[i]
+                            + fp_mul(buses_.returnDelay_[i], delayReturn_)
+                            + fp_mul(buses_.returnReverb_[i], reverbReturn_);
     }
 
     // Master chain (Fase 3): EQ then compressor/limiter, in place.
-    eq_.Process(buffer, buffer, samplecount);
-    comp_.Process(buffer, buffer, samplecount);
+    eq_.Process(buses_.master_, buses_.master_, samplecount);
+    comp_.Process(buses_.master_, buses_.master_, samplecount);
+
+    // Expand back to the int16<<15 scale that AudioMixer / clipToMix expect,
+    // with the same hard clip the mixer uses so full-scale DSP output (Q15
+    // ±1.0) maps exactly onto a full-scale 16-bit sample.
+    const fixed maxPos = i2fp(32767);
+    const fixed maxNeg = i2fp(-32768);
+    for (int i = 0; i < n; i++) {
+        fixed s = buses_.master_[i] << FIXED_SHIFT;
+        if (s > maxPos) s = maxPos;
+        else if (s < maxNeg) s = maxNeg;
+        buffer[i] = s;
+    }
 }
 
 // Called by each PlayerChannel after it renders its own instrument buffer and
@@ -196,13 +212,15 @@ void FxEngine::AccumulateChannelSend(int channel, const fixed *buffer,
     if (delayGain != 0) {
         fixed *dst = buses_.send_[0];
         for (int i = 0; i < n; i++) {
-            dst[i] += fp_mul(buffer[i], delayGain);
+            // Channel buffer is int16<<15 scale; normalize to Q15 so the send
+            // buses match the delay/reverb DSP range.
+            dst[i] += fp_mul(buffer[i] >> FIXED_SHIFT, delayGain);
         }
     }
     if (reverbGain != 0) {
         fixed *dst = buses_.send_[1];
         for (int i = 0; i < n; i++) {
-            dst[i] += fp_mul(buffer[i], reverbGain);
+            dst[i] += fp_mul(buffer[i] >> FIXED_SHIFT, reverbGain);
         }
     }
 }

@@ -161,6 +161,15 @@ void Compressor::Process(const fixed *in, fixed *out, int frames) {
         return;
     }
 
+    // True passthrough when bypassed: never apply cubicClip/saturate to the
+    // audio (that would clamp the whole bus and destroy playback).  Only keep
+    // the GR meter gliding back to 0 for the UI.
+    if (bypass_) {
+        for (int i = 0; i < frames * 2; i++) out[i] = in[i];
+        grMeter_ = grMeter_ + fp_mul(FX_COMP_GR_SMOOTH, 0 - grMeter_);
+        return;
+    }
+
     int idx = 0;
     for (int i = 0; i < frames; i++) {
         fixed xL = in[idx];
@@ -213,9 +222,6 @@ void Compressor::Process(const fixed *in, fixed *out, int frames) {
             }
         }
 
-        // Bypass crossfade toward unity gain (smoothed per sample).
-        fixed unity = i2fp(1);
-        if (bypass_) { gainL = unity; gainR = unity; }
         fixed outL = fp_mul(xL, gainL);
         fixed outR = fp_mul(xR, gainR);
         if (softClip_) { outL = cubicClip(outL); outR = cubicClip(outR); }
@@ -229,7 +235,7 @@ void Compressor::Process(const fixed *in, fixed *out, int frames) {
     int g = (int)(level_[0] >> (15 - kTableBits));
     if (g < 0) g = 0;
     if (g >= kTableSize) g = kTableSize - 1;
-    fixed targetGr = bypass_ ? 0 : grTable_[g];
+    fixed targetGr = grTable_[g];
     grMeter_ = grMeter_ + fp_mul(FX_COMP_GR_SMOOTH, targetGr - grMeter_);
 }
 

@@ -17,6 +17,11 @@ using namespace FxEngine;
 // 4) player channel accumulates its audio into the send bus
 // 5) FxEngine::Process runs on the mixed master
 // Checks output RMS stays comparable to input (no total silence).
+//
+// Buffers are generated at the REAL master scale (int16 << 15, as AudioMixer
+// produces) so this reproduces the scale-mismatch bug that destroyed the
+// audio: the DSP must normalize >>FIXED_SHIFT to Q15, process, then expand
+// <<FIXED_SHIFT back with a hard clip.  A Q15-only harness would miss it.
 
 static float rms(const fixed *b, int n) {
     double acc = 0;
@@ -35,8 +40,9 @@ int main() {
 
     static fixed in[FRAMES * 2], master[FRAMES * 2];
 
-    // Baseline: legacy bypass.
-    for (int i = 0; i < FRAMES * 2; i++) in[i] = fl2fp(0.5f * sinf(i * 0.01f));
+    // Baseline: legacy bypass (int16<<15 scale, 0.5 amplitude).
+    for (int i = 0; i < FRAMES * 2; i++)
+        in[i] = i2fp((int)(0.5f * 32767.0f * sinf(i * 0.01f)));
     float inRms = rms(in, FRAMES * 2);
 
     fx.Process(in, FRAMES);
@@ -54,7 +60,7 @@ int main() {
     // then Process the master.
     for (int it = 0; it < ITER; it++) {
         for (int i = 0; i < FRAMES * 2; i++)
-            master[i] = fl2fp(0.5f * sinf((i + it * FRAMES) * 0.01f));
+            master[i] = i2fp((int)(0.5f * 32767.0f * sinf((i + it * FRAMES) * 0.01f)));
         // PlayerChannel: delayGain = 40/100
         fx.AccumulateChannelSend(0, master, FRAMES, fl2fp(0.4f), fl2fp(0.0f));
         fx.Process(master, FRAMES);

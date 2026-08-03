@@ -240,6 +240,16 @@ class CompressorModel:
         return 1.0 - math.exp(-1000.0 / (ms * self.rate))
 
     def process(self, frames, x_l=0, x_r=0):
+        # True passthrough when bypassed: never touch the audio (mirrors
+        # Compressor::Process early-return).  GR meter still glides to 0.
+        if self.bypass:
+            self.grMeter += fp_mul(fl2fp(0.005), 0 - self.grMeter)
+            out = []
+            for _ in range(frames):
+                out.append(x_l)
+                out.append(x_r)
+            return out
+
         attK = fl2fp(self._env_coeff(self.attack))
         relK = fl2fp(self._env_coeff(self.release))
         out = []
@@ -269,8 +279,6 @@ class CompressorModel:
                 idxR = max(0, min(idxR, kTableSize - 1))
                 gainR = self.gainTable[idxR]
 
-            if self.bypass:
-                gainL = gainR = i2fp(1)
             yL = fp_mul(x_l, gainL)
             yR = fp_mul(x_r, gainR)
             if self.soft_clip:
@@ -280,7 +288,7 @@ class CompressorModel:
             out.append(sat(yR))
         g = self.level[0] >> (15 - 12)
         g = max(0, min(g, kTableSize - 1))
-        targetGr = 0 if self.bypass else self.grTable[g]
+        targetGr = self.grTable[g]
         self.grMeter += fp_mul(fl2fp(0.005), targetGr - self.grMeter)
         return out
 
@@ -486,7 +494,7 @@ def check_comp_stereo_link():
 
 def check_comp_softclip_limits():
     rate = 44100
-    m = CompressorModel(rate, bypass=True, soft_clip=True)
+    m = CompressorModel(rate, bypass=False, soft_clip=True)
     out = []
     for s in sine(rate, 1000, 4000, 2.0):  # 2.0 -> clipping
         out += m.process(1, x_l=s, x_r=s)
@@ -498,6 +506,25 @@ def check_comp_softclip_limits():
     assert peak_out <= 1.0 and peak_out < 2.0
     print(f"  soft clip peak = {peak_out:.3f} (input 2.0) OK")
     print("comp soft clip OK")
+
+
+def check_comp_bypass_identity():
+    # Bypass must be a TRUE passthrough: even a 2.0 (over-full-scale) signal
+    # must come out bit-for-bit untouched.  This is the regression for the
+    # "FX destroys the audio" bug: the old code applied cubicClip/saturate
+    # even when bypassed, collapsing every sample to +/-1.
+    rate = 44100
+    m = CompressorModel(rate, bypass=True, soft_clip=True)
+    x = sine(rate, 1000, 4000, 2.0)
+    out = []
+    for s in x:
+        out += m.process(1, x_l=s, x_r=s)
+    for i in range(0, len(out), 2):
+        assert out[i] == x[i // 2], (i, out[i], x[i // 2])
+        assert out[i + 1] == x[i // 2], (i + 1, out[i + 1], x[i // 2])
+    # GR meter must stay ~0 in bypass.
+    assert abs(fp2fl(m.grMeter)) < 0.5, fp2fl(m.grMeter)
+    print("comp bypass identity OK")
 
 
 def check_comp_gr_meter():
@@ -523,7 +550,7 @@ def check_source_guards():
         assert token in src, token
     csrc = (ROOT / "source/sources/Application/Audio/FxEngine/Compressor.cpp").read_text()
     for token in ("recomputeTable", "cubicClip", "stereoLink_", "attK_",
-                  "relK_", "grTable_"):
+                  "relK_", "grTable_", "out[i] = in[i]"):
         assert token in csrc, token
     chdr = (ROOT / "source/sources/Application/Audio/FxEngine/Compressor.h").read_text()
     for token in ("GetGainReductionDb", "SetSoftClip", "kTableSize"):
@@ -542,6 +569,7 @@ check_comp_curve()
 check_comp_attack_release()
 check_comp_stereo_link()
 check_comp_softclip_limits()
+check_comp_bypass_identity()
 check_comp_gr_meter()
 check_source_guards()
 print("EQ_COMP_PHASE3_OK")

@@ -150,24 +150,28 @@ class FxEngineSendModel:
             self.sendsAccumulated = True
         if delay_gain != 0:
             for i in range(n):
-                self.send0[i] += fp_mul(buf[i], delay_gain)
+                # Channel buffers are int16<<15 scale; normalize to Q15 before
+                # the multiply so the send buses match the delay/reverb DSP
+                # range (mirrors FxEngine.cpp).
+                self.send0[i] += fp_mul(buf[i] >> SHIFT, delay_gain)
         if reverb_gain != 0:
             for i in range(n):
-                self.send1[i] += fp_mul(buf[i], reverb_gain)
+                self.send1[i] += fp_mul(buf[i] >> SHIFT, reverb_gain)
 
     def process_send_returns(self, buf, samplecount):
         n = samplecount * 2
         if not self.sendsAccumulated:
             for i in range(n):
-                self.send0[i] = fp_mul(buf[i], self.delaySend)
-                self.send1[i] = fp_mul(buf[i], self.reverbSend)
+                self.send0[i] = fp_mul(buf[i] >> SHIFT, self.delaySend)
+                self.send1[i] = fp_mul(buf[i] >> SHIFT, self.reverbSend)
         self.sendsAccumulated = False
         return self.send0[:n], self.send1[:n]
 
 
 def sine(rate, freq, frames, amp=1.0):
+    """int16<<15 scale (as the channel/master buffers really are)."""
     for i in range(frames):
-        yield fl2fp(amp * math.sin(2.0 * math.pi * freq * i / rate))
+        yield i2fp(int(amp * 32767 * math.sin(2.0 * math.pi * freq * i / rate)))
 
 
 def stereo_buf(rate, freq, samplecount, amp=1.0):
@@ -197,7 +201,8 @@ def check_per_track_isolation():
 
 
 def check_send_level_mapping():
-    # Gain 1.0 (send=100) -> send bus equals the track buffer exactly.
+    # Gain 1.0 (send=100) -> send bus equals the track buffer normalized to
+    # Q15 (the DSP scale), exactly as FxEngine now does.
     m = MixerModel()
     m.set_delay_send(2, 100)
     fx = FxEngineSendModel(legacy_mode=False)
@@ -207,7 +212,7 @@ def check_send_level_mapping():
                                fl2fp(m.get_reverb_send(2) / 100.0))
     send0, _ = fx.process_send_returns([0] * (128 * 2), 128)
     for a, b in zip(send0, buf):
-        assert a == b, (a, b)
+        assert a == (b >> SHIFT), (a, b)
     print("send level mapping OK")
 
 
@@ -221,19 +226,19 @@ def check_stereo_accumulation():
     fx.accumulate_channel_send(1, bufR, 64, fl2fp(1.0), 0)
     send0, _ = fx.process_send_returns([0] * (64 * 2), 64)
     for i in range(64 * 2):
-        assert send0[i] == bufL[i] + bufR[i], (i, send0[i])
+        assert send0[i] == (bufL[i] >> SHIFT) + (bufR[i] >> SHIFT), (i, send0[i])
     print("stereo accumulation OK")
 
 
 def check_fallback_global_sends():
     # No channel accumulated this frame: Process() uses the global sends,
-    # preserving the Fase 2/3 single-buffer behaviour.
+    # preserving the Fase 2/3 single-buffer behaviour (input normalized to Q15).
     fx = FxEngineSendModel(legacy_mode=False)
     fx.delaySend = fl2fp(0.25)
     buf = stereo_buf(44100, 440, 128, 0.5)
     send0, send1 = fx.process_send_returns(buf, 128)
     for i in range(128 * 2):
-        assert send0[i] == fp_mul(buf[i], fx.delaySend), i
+        assert send0[i] == fp_mul(buf[i] >> SHIFT, fx.delaySend), i
         assert send1[i] == 0, i
     print("global send fallback OK")
 
@@ -290,7 +295,8 @@ def check_source_guards():
     fsrc = (ROOT / "source/sources/Application/Audio/FxEngine/FxEngine.cpp").read_text()
     for token in ("AccumulateChannelSend", "sendsAccumulated_",
                   "FX_ENGINE_MAX_CHANNELS", "processSendReturns",
-                  "FX_ENGINE_MAX_FRAMES"):
+                  "FX_ENGINE_MAX_FRAMES", "FIXED_SHIFT",
+                  "buffer[i] >> FIXED_SHIFT"):
         assert token in fsrc, token
     pcsrc = (ROOT / "source/sources/Application/Player/PlayerChannel.cpp").read_text()
     for token in ("AccumulateChannelSend", "GetChannelDelaySend",
