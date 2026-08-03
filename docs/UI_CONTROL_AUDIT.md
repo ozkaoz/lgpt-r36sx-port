@@ -23,16 +23,20 @@ HelpRegistry (punto 26 del plan).
 
 | file:line | Texto | Clasificación |
 |---|---|---|
-| MixerView.cpp drawFxParamPage | `UP/DN row  L/R edit  A coarse` | MOVE_TO_HELP |
-| MixerView.cpp drawFxParamPage | `SELECT page  START play` | MOVE_TO_HELP |
-| MixerView.cpp drawFxPages (MIX) | `A+UP/DN x10  A+L/R x1` | MOVE_TO_HELP |
-| MixerView.cpp drawFxPages (MIX) | `L/R ch  L->MST  R1+B mute` | MOVE_TO_HELP |
-| MixerView.cpp drawFxPages (MIX) | `START play  R1+A solo  R2+A instr` | MOVE_TO_HELP |
-| MixerView.cpp drawFxPages (MIX) | `R2 edit VOL/RET  SELECT [1/5]` | KEEP_STATUS |
+| MixerView.cpp drawFxParamPage | `UP/DN row  L/R edit  A coarse` | MOVE_TO_HELP — migrado (fase completa) |
+| MixerView.cpp drawFxParamPage | `SELECT page  START play` | MOVE_TO_HELP (migrado, fase completa) |
+| MixerView.cpp drawFxPages (MIX) | `A+UP/DN x10  A+L/R x1` | MOVE_TO_HELP (migrado, fase completa) |
+| MixerView.cpp drawFxPages (MIX) | `L/R ch  L->MST  R1+B mute` | MOVE_TO_HELP (migrado, fase completa) |
+| MixerView.cpp drawFxPages (MIX) | `START play  R1+A solo  R2+A instr` | MOVE_TO_HELP (migrado, fase completa) |
+| MixerView.cpp drawFxPages (MIX) | `R2 edit VOL/RET  SELECT [1/5]` | KEEP_STATUS (retirado, no era navegación) |
+| InstrumentView.cpp DrawView | `R1+RIGHT USB REC` | MOVE_TO_HELP (migrado, fase completa) |
+| TableView/PhraseView printHelpLegend | descripción del comando bajo cursor | KEEP (contenido contextual legítimo) |
 
-Nota: la migración completa de estas leyendas a la ayuda se hará en la fase
-completa del plan (punto 26); en la fase base quedan in situ a la espera de la
-retirada coordinada con HelpRegistry.
+Estado de la migración: todas las filas `MOVE_TO_HELP` del Mixer e Instrument
+ya migraron en la fase completa a `HelpRegistry` y se muestran vía HelpOverlay
+(`SELECT+R1`). Las leyendas de la página MIX que eran meros estados
+(`R2 edit VOL/RET`) se retiraron por no ser indicaciones de navegación
+(commit `978d8a9`).
 
 ## Overlay de ayuda (RC3)
 

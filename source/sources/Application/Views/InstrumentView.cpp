@@ -17,6 +17,7 @@ extern "C" void TreeFrogInputTrace_LogView(
 #include "BaseClasses/UIBigHexVarField.h"
 #include "BaseClasses/UIIntVarOffField.h"
 #include "BaseClasses/UINoteVarField.h"
+#include "BaseClasses/UiDraw.h"
 #include "BaseClasses/UIStaticField.h"
 #include "Foundation/Variables/Variable.h"
 #include "ModalDialogs/ImportSampleDialog.h"
@@ -669,26 +670,22 @@ void InstrumentView::DrawView() {
     // TREEFROG_FX_BLOCKS_V1 (PLAN_FX_REDESIGN_ES.md, Fase 8): block
     // headers for fillSampleParameters().  Drawn here (not as fields) so
     // the field list's first/last stay sample/table for L2+A cut/clear.
+    // RC3 (point 19): rendered through UiDraw::DrawSectionHeader.
     if (getInstrumentType()==IT_SAMPLE) {
         GUIPoint hp = GetAnchor();
-        SetColor(CD_HILITE1);
         props.invert_ = false;
-        DrawString(hp._x, hp._y,     "INSTRUMENT", props);
-        DrawString(hp._x, hp._y + 4, "FILTER", props);
-        DrawString(hp._x, hp._y + 8, "BITCRUSHER", props);
-        DrawString(hp._x, hp._y + 11, "PLAYBACK", props);
-        DrawString(hp._x, hp._y + 17, "EFFECT SENDS", props);
-        DrawString(hp._x, hp._y + 21, "AUTOMATION", props);
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y, "INSTRUMENT");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 4, "FILTER");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 8, "BITCRUSHER");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 11, "PLAYBACK");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 17, "EFFECT SENDS");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 21, "AUTOMATION");
     }
 
     // Draw fields
 
     FieldView::Redraw();
     drawMap();
-
-    SetColor(CD_HILITE1);
-    props.invert_ = false;
-    DrawString(19, 0, "R1+RIGHT USB REC", props);
 } ;
 
 void InstrumentView::OnFocus() { onInstrumentChange(); }

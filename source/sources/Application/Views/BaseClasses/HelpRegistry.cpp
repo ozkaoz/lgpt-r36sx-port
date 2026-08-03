@@ -54,6 +54,7 @@ static const HelpLine kInstrumentLines_[] = {
     {"L/R", "edit value"},
     {"A+UP/DN", "coarse"},
     {"R2+A", "fx menu"},
+    {"R1+RIGHT", "USB record"},
     {"START", "play/stop"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
