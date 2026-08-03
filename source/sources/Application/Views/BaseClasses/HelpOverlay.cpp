@@ -1,7 +1,9 @@
 #include "HelpOverlay.h"
 #include "HelpRegistry.h"
+#include "UiDraw.h"
 
 #include <stdio.h>
+#include <string.h>
 
 /*
  * TREEFROG_HELP_OVERLAY_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, point 13)
@@ -89,10 +91,15 @@ void HelpOverlay::DrawView() {
         char line[40];
         for (int i = 0; i < n && i < kMaxWindowLines_; i++) {
             const HelpSection *s = HelpRegistry::GetSectionAt(i);
-            props.invert_ = (i == sectionIndex_);
-            snprintf(line, sizeof(line), "%s",
-                     s ? s->title : "?");
-            DrawString(0, 2 + i, line, props);
+            if (i == sectionIndex_) {
+                snprintf(line, sizeof(line), "%s", s ? s->title : "?");
+                UiDraw::DrawSelectionRegion(*this, 0, 2 + i, (int)strlen(line), 1);
+                DrawString(0, 2 + i, line, props);
+            } else {
+                props.invert_ = false;
+                snprintf(line, sizeof(line), "%s", s ? s->title : "?");
+                DrawString(0, 2 + i, line, props);
+            }
         }
         props.invert_ = false;
     } else if (section) {
@@ -111,6 +118,23 @@ void HelpOverlay::DrawView() {
     }
     SetColor(CD_NORMAL);
     DrawString(0, 10, "B close  UP/DN  L/R next", props);
+    // RC4 P6 (PLAN_RC4 11.7): proportional scroll indicator (right edge)
+    // when the section overflows, and centered tabs for the section
+    // navigation (prev / current / next), reusing the shared primitives.
+    if (section && section->lineCount > kMaxWindowLines_) {
+        UiDraw::DrawScrollIndicator(*this, lineScroll_ > 0,
+                                    (lineScroll_ + kMaxWindowLines_) <
+                                        section->lineCount);
+    }
+    if (HelpRegistry::GetSectionCount() > 1 && !showIndex_) {
+        const HelpSection *prevSec =
+            HelpRegistry::GetSectionAt((sectionIndex_ + HelpRegistry::GetSectionCount() - 1) % HelpRegistry::GetSectionCount());
+        const HelpSection *nextSec =
+            HelpRegistry::GetSectionAt((sectionIndex_ + 1) % HelpRegistry::GetSectionCount());
+        UiDraw::DrawTabs(*this, 1, prevSec ? prevSec->title : "?",
+                         section ? section->title : "?",
+                         nextSec ? nextSec->title : "?");
+    }
 }
 
 void HelpOverlay::ProcessButtonMask(unsigned short mask, bool pressed) {

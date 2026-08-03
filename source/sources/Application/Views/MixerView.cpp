@@ -1105,8 +1105,9 @@ void MixerView::DrawView() {
 	GUIPoint anchor=GetAnchor() ;
 
 	SetColor(CD_NORMAL) ;
+	// RC4 P3: "R+UP Song" navigation hint retired from the title row;
+	// documented in HelpRegistry (MIXER section, SELECT+R1).
 	DrawString(pos._x,pos._y,"Mixer",props) ;
-	DrawString(7,pos._y,"R+UP Song",props) ;
 
 	Player *player=Player::GetInstance() ;
 	DrawString(21,pos._y,(player->GetSequencerMode()==SM_SONG)?"Song":"Live",props) ;

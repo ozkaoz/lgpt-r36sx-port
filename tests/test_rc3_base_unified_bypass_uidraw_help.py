@@ -158,7 +158,44 @@ def check_uicolors():
 def check_layout_model():
     # UiDraw clamps so no primitive can draw out of bounds.
     assert "kScreenWidth" in UIDRAW_CPP and "kScreenHeight" in UIDRAW_CPP
-    print("layout bounds (0<=x<40, 0<=y<30) model OK")
+    # RC4 P4: centered menu helpers exist and are used.
+    assert "int UiDraw::CenterTextX" in UIDRAW_CPP
+    assert "MakeCenteredMenuLayout" in UIDRAW_H and "MakeCenteredMenuLayout" in UIDRAW_CPP
+    assert "struct MenuLayout" in UIDRAW_H
+    project = (ROOT / "source/sources/Application/Views/ProjectView.cpp").read_text()
+    assert "UiDraw::CenterTextX" in project
+    assert "UiDraw::MakeCenteredMenuLayout" in project
+    print("layout bounds + centered menu helpers OK")
+
+
+def check_p5_global_uidraw():
+    # RC4 P5 (PLAN_RC4 section 12): the three global primitives exist.
+    for token in ("DrawSelectionRegion", "DrawStatusMessage",
+                  "DrawErrorMessage"):
+        assert token in UIDRAW_H, token
+        assert token in UIDRAW_CPP, token
+    # Each has a real consumer in the char-screen views.
+    helpovl = (ROOT / "source/sources/Application/Views/BaseClasses/HelpOverlay.cpp").read_text()
+    assert "UiDraw::DrawSelectionRegion" in helpovl
+    sm = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleManagerDialog.cpp").read_text()
+    smh = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleManagerDialog.h").read_text()
+    assert "UiDraw::DrawStatusMessage" in sm
+    assert "UiDraw::DrawErrorMessage" in sm
+    assert "setStatusError" in smh and "setStatusError" in sm
+    assert "statusIsError_" in smh
+    print("RC4 P5 global primitives + real consumers OK")
+
+
+def check_p5_warning_error_colors():
+    # RC4 P5: CD_WARNING/CD_ERROR exist and map to real GUI colors.
+    view_h = (ROOT / "source/sources/Application/Views/BaseClasses/View.h").read_text()
+    assert "CD_WARNING" in view_h and "CD_ERROR" in view_h
+    assert "CD_WARNING" in APPW_CPP and "CD_ERROR" in APPW_CPP
+    assert "warningColor_" in APPW_H and "errorColor_" in APPW_H
+    assert "case CD_WARNING" in APPW_CPP and "case CD_ERROR" in APPW_CPP
+    # Semantic roles wire the new colors into UiColors.
+    assert "UI_COLOR_WARNING" in UICOL_H and "UI_COLOR_ERROR" in UICOL_H
+    print("CD_WARNING/CD_ERROR + semantic roles OK")
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +211,19 @@ def check_help_registry():
     assert "\"MIXER\"" in sec
     assert "GetSectionCount" in HELPREG_CPP
     assert "GetSectionAt" in HELPREG_CPP
+    # RC4 P3: the Mixer navigation hint "R+UP Song" moved to Help.
+    assert "R+UP" in HELPREG_CPP
+    assert "back to Song" in HELPREG_CPP
     print("HelpRegistry context sections + index OK")
+
+
+def check_perm_hints_retired():
+    # RC4 P3 (PLAN_RC4 11.6): permanent help texts are gone from the main
+    # views; the navigation actions they advertised now live in Help.
+    for src, name in ((MIX_CPP, "MixerView"),):
+        # The retired draw call (not the comment documenting the move).
+        assert 'DrawString(7,pos._y,"R+UP Song"' not in src, name
+    print("Permanent hint rows retired from main views OK")
 
 
 def check_help_overlay():
@@ -238,15 +287,43 @@ def check_makefile_registration():
     print("Makefile registration OK")
 
 
+def check_p6_chopper_modernization():
+    # RC4 P6 (PLAN_RC4 section 11.7): the Graphical Chopper draws its frame
+    # with solid cells, never ASCII box-drawing chars.
+    chopper = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
+    frameStart = chopper.index("void SampleChopperModal::drawFrame")
+    frameEnd = chopper.index("void SampleChopperModal::drawSampleInfo")
+    frame = chopper[frameStart:frameEnd]
+    assert '"+-' not in frame
+    assert '"|"' not in frame
+    assert "CD_BORDER" in frame
+    print("RC4 P6 chopper solid frame (no ASCII) OK")
+
+
+def check_p6_tabs_scroll_consumers():
+    # RC4 P6: DrawTabs and DrawScrollIndicator have real consumers.
+    helpovl = (ROOT / "source/sources/Application/Views/BaseClasses/HelpOverlay.cpp").read_text()
+    assert "UiDraw::DrawTabs" in helpovl
+    assert "UiDraw::DrawScrollIndicator" in helpovl
+    assert "prevSec" in helpovl and "nextSec" in helpovl
+    assert "lineScroll_" in helpovl
+    print("RC4 P6 DrawTabs + DrawScrollIndicator consumers OK")
+
+
 check_bypass_first()
 check_bypass_uidraw()
 check_bypass_row_model()
 check_uidraw_primitives()
 check_uicolors()
 check_layout_model()
+check_p5_global_uidraw()
+check_p5_warning_error_colors()
 check_help_registry()
+check_perm_hints_retired()
 check_help_overlay()
 check_view_push_modal()
 check_appwindow_shortcut()
 check_makefile_registration()
+check_p6_chopper_modernization()
+check_p6_tabs_scroll_consumers()
 print("RC3_BASE_UNIFIED_BYPASS_UIDRAW_HELP_OK")

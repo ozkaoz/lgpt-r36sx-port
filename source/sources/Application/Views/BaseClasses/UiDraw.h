@@ -4,7 +4,8 @@
 #include "View.h"
 
 /*
- * TREEFROG_UI_DRAW_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, point 19).
+ * TREEFROG_UI_DRAW_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, point 19)
+ * + RC4 P4 (PLAN_RC4 section 8).
  *
  * Shared rendering primitives for the LGPT R36SX UI.  Every view draws
  * through these helpers (or the semantic colors in UiColors.h) so the
@@ -14,8 +15,36 @@
  * Screen geometry is fixed at 40x30 characters (AppWindow flush loop).
  * All helpers clamp their output into [0,40)x[0,30).
  */
+
+// Layout of a vertically stacked value menu: a centered block with a left
+// label column and a fixed value column.  Used by MakeCenteredMenuLayout.
+struct MenuLayout {
+    int screenWidth;
+    int screenHeight;
+    int contentTop;
+    int contentBottom;
+    int blockWidth;
+    int blockHeight;
+    int startX;
+    int startY;
+    int labelX;
+    int valueX;
+};
+
 class UiDraw {
   public:
+    // RC4 P4 (PLAN_RC4 section 8): x that centers `text` on the 40-cell
+    // screen: (40 - len) / 2.
+    static int CenterTextX(const char *text);
+
+    // RC4 P4: computes a centered block layout for a vertical menu of
+    // `rowCount` rows whose label column is labelWidth cells and value
+    // column valueWidth cells, with preferredSpacing between them.  The
+    // block spans rows contentTop..contentBottom and is centered on the
+    // 40x30 screen.
+    static MenuLayout MakeCenteredMenuLayout(int rowCount, int labelWidth,
+                                             int valueWidth,
+                                             int preferredSpacing);
     // Centered title at row 0 using CD_HILITE1.  x is computed as
     // (screenWidth - textWidth)/2 per the RC3 plan.
     static void DrawCenteredTitle(View &view, const char *title);
@@ -72,6 +101,22 @@ class UiDraw {
 
     // Horizontal separator of solid cells across the given column span.
     static void DrawSeparator(View &view, int y, int x, int width);
+
+    // RC4 P5 (PLAN_RC4 section 12): fills a rectangular selection region
+    // (x..x+w-1, y..y+h-1) with inverted CD_HILITE2 cells.  The region is
+    // clamped to the 40x30 screen.  Used for chopper selection windows and
+    // keyboard-focus highlights.
+    static void DrawSelectionRegion(View &view, int x, int y, int w, int h);
+
+    // RC4 P5: one-line status message at (x,y) using the WARNING semantic
+    // color (CD_WARNING).  Drawn with the shared props, no invert.
+    static void DrawStatusMessage(View &view, int x, int y,
+                                  const char *message);
+
+    // RC4 P5: one-line error message at (x,y) using the ERROR semantic
+    // color (CD_ERROR).  Drawn with the shared props, no invert.
+    static void DrawErrorMessage(View &view, int x, int y,
+                                 const char *message);
 };
 
 #endif  // _UI_DRAW_H_

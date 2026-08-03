@@ -2884,10 +2884,23 @@ void SampleChopperModal::clearTextScreen() { View::ClearRect(0, 0, SCREEN_W, SCR
 void SampleChopperModal::drawTopBar(GUITextProperties &props) { props.invert_ = true; SetColor(CD_HILITE1); drawStringAbs(0, 0, " P G  SCPI  M TT       CHOPPER       ", props); props.invert_ = false; }
 
 void SampleChopperModal::drawFrame(GUITextProperties &props) {
+    /* RC4 P6 (PLAN_RC4 11.7): solid-border frame, no ASCII box-drawing.
+       Same 40-cell geometry (rows 1..22, columns 0/39) so the waveform
+       overlay and the char-screen text stay aligned. */
     SetColor(CD_BORDER);
-    drawStringAbs(0, 1,  "+--------------------------------------+", props);
-    for (int y = 2; y < 22; y++) { drawStringAbs(0, y, "|", props); drawStringAbs(39, y, "|", props); }
-    drawStringAbs(0, 22, "+--------------------------------------+", props);
+    for (int x = 0; x < 40; x++) {
+        char cell[2] = {' ', 0};
+        props.invert_ = true;
+        drawStringAbs(x, 1, cell, props);
+        drawStringAbs(x, 22, cell, props);
+    }
+    for (int y = 2; y < 22; y++) {
+        char cell[2] = {' ', 0};
+        props.invert_ = true;
+        drawStringAbs(0, y, cell, props);
+        drawStringAbs(39, y, cell, props);
+    }
+    props.invert_ = false;
     SetColor(CD_HILITE2);
     drawStringAbs(2, 2, "Graphical Chopper U2.36", props);
 }

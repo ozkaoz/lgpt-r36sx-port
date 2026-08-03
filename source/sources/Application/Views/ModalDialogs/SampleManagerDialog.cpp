@@ -1,4 +1,5 @@
 #include "SampleManagerDialog.h"
+#include "Application/Views/BaseClasses/UiDraw.h"
 // TREEFROG_U2_34_SAMPLE_MANAGER_PURGE
 // TREEFROG_U2_35_SAMPLE_MANAGER_IMPORT_FORCE_DELETE
 // TREEFROG_U2_36_IMPORT_DEDUP_LISTEN_LAYOUT_USAGE
@@ -20,7 +21,8 @@ extern void LGPTChopperOnSamplePoolDelete(int deletedIndex);
 #define SAMPLE_MANAGER_WIDTH 36
 
 SampleManagerDialog::SampleManagerDialog(View &view)
-    : ModalView(view), selected_(0), topIndex_(0), forceConfirmIndex_(-1) {
+    : ModalView(view), selected_(0), topIndex_(0), forceConfirmIndex_(-1),
+      statusIsError_(false) {
     status_[0] = 0;
 }
 
@@ -29,6 +31,21 @@ SampleManagerDialog::~SampleManagerDialog() {
 }
 
 void SampleManagerDialog::setStatus(const char *fmt, ...) {
+    statusIsError_ = false;
+    if (!fmt) {
+        status_[0] = 0;
+    } else {
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(status_, sizeof(status_), fmt, args);
+        va_end(args);
+        status_[sizeof(status_) - 1] = 0;
+    }
+    isDirty_ = true;
+}
+
+void SampleManagerDialog::setStatusError(const char *fmt, ...) {
+    statusIsError_ = true;
     if (!fmt) {
         status_[0] = 0;
     } else {
@@ -163,7 +180,7 @@ void SampleManagerDialog::deleteSelectedSample() {
 
     char reason[32];
     if (!canDeleteSample(selected_, reason, sizeof(reason))) {
-        setStatus("Blocked: %s", reason);
+        setStatusError("Blocked: %s", reason);
         forceConfirmIndex_ = -1;
         return;
     }
@@ -291,8 +308,13 @@ void SampleManagerDialog::DrawView() {
     DrawString(1, SAMPLE_MANAGER_LIST_SIZE + 2, "A del free  X force  Y purge", props);
     DrawString(1, SAMPLE_MANAGER_LIST_SIZE + 3, "CH/Cn protected by purge  B exit", props);
     if (status_[0]) {
-        SetColor(CD_HILITE1);
-        DrawString(1, SAMPLE_MANAGER_LIST_SIZE + 4, status_, props);
+        if (statusIsError_) {
+            UiDraw::DrawErrorMessage(*this, 1, SAMPLE_MANAGER_LIST_SIZE + 4,
+                                     status_);
+        } else {
+            UiDraw::DrawStatusMessage(*this, 1, SAMPLE_MANAGER_LIST_SIZE + 4,
+                                      status_);
+        }
     }
 }
 

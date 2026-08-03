@@ -119,6 +119,8 @@ class AppWindow : public GUIWindow, I_Observer, Status {
     static GUIColor rownumberColor_;
     static GUIColor rownumber2Color_;
     static GUIColor majorbeatColor_;
+    static GUIColor warningColor_;
+    static GUIColor errorColor_;
 #define LAST_PROJECT_NAME "bin:last_project"
 
     ColorDefinition colorIndex_;

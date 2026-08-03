@@ -16,6 +16,7 @@ public:
 protected:
     void clampSelection();
     void setStatus(const char *fmt, ...);
+    void setStatusError(const char *fmt, ...);
     int getUseCount(int sampleIndex);
     bool hasChops(int sampleIndex);
     bool canDeleteSample(int sampleIndex, char *reason, int reasonLen);
@@ -31,6 +32,7 @@ private:
     int topIndex_;
     int forceConfirmIndex_;
     char status_[64];
+    bool statusIsError_;
 };
 
 #endif

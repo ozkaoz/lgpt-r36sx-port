@@ -26,7 +26,58 @@ int clampY(int y) {
     if (y >= kScreenHeight) return kScreenHeight - 1;
     return y;
 }
+
+// RC4 P4 (PLAN_RC4 section 8): the left margin of a horizontally centered
+// text.  Odd-width text shifts the half cell to the right, matching the
+// title centering rule (tolerance of one cell on odd widths).
+int centerX(int len) { return (kScreenWidth - len) / 2; }
 }  // namespace
+
+// RC4 P4 (PLAN_RC4 section 8): centers `text` on the 40-cell screen.
+int UiDraw::CenterTextX(const char *text) {
+    if (!text) return 0;
+    int len = (int)strlen(text);
+    return centerX(len);
+}
+
+// RC4 P4: computes a centered block layout for a vertical value menu.
+// The block is (labelWidth + spacing + valueWidth) cells wide and
+// rowCount + 2 rows tall (title + rows + bottom pad), vertically centered
+// in contentTop..contentBottom (defaulting to the 1..29 band).
+MenuLayout UiDraw::MakeCenteredMenuLayout(int rowCount, int labelWidth,
+                                          int valueWidth,
+                                          int preferredSpacing) {
+    MenuLayout ml;
+    ml.screenWidth = kScreenWidth;
+    ml.screenHeight = kScreenHeight;
+    ml.contentTop = 1;
+    ml.contentBottom = kScreenHeight - 1;
+    if (preferredSpacing < 0) preferredSpacing = 0;
+
+    // Block width = label + spacing + value.  The value column is optional
+    // (valueWidth <= 0 means a single column menu).
+    int valueSpan = (valueWidth > 0) ? (preferredSpacing + valueWidth) : 0;
+    ml.blockWidth = labelWidth + valueSpan;
+    if (ml.blockWidth > kScreenWidth) {
+        ml.blockWidth = kScreenWidth;
+    }
+    ml.startX = centerX(ml.blockWidth);
+
+    // The block spans the rows it occupies; its height is the visible row
+    // count, and the block is centered vertically in the content band.
+    ml.blockHeight = rowCount;
+    int band = ml.contentBottom - ml.contentTop + 1;
+    if (ml.blockHeight > band) ml.blockHeight = band;
+    ml.startY = ml.contentTop + (band - ml.blockHeight) / 2;
+
+    ml.labelX = ml.startX;
+    if (valueWidth > 0) {
+        ml.valueX = ml.startX + labelWidth + preferredSpacing;
+    } else {
+        ml.valueX = ml.startX;
+    }
+    return ml;
+}
 
 void UiDraw::DrawCenteredTitle(View &view, const char *title) {
     int len = (int)strlen(title);
@@ -228,5 +279,43 @@ void UiDraw::DrawBypassRow(View &view, int x, int y, bool on, bool selected) {
     props.invert_ = selected;
     view.DrawString(clampX(x + 8), clampY(y), toggle, props);
     props.invert_ = false;
+    view.SetColor(CD_NORMAL);
+}
+
+void UiDraw::DrawSelectionRegion(View &view, int x, int y, int w, int h) {
+    GUITextProperties props;
+    props.invert_ = true;
+    view.SetColor(CD_HILITE2);
+    int x0 = clampX(x);
+    int y0 = clampY(y);
+    int wmax = kScreenWidth - x0;
+    int hmax = kScreenHeight - y0;
+    if (w > wmax) w = wmax;
+    if (h > hmax) h = hmax;
+    for (int ry = 0; ry < h; ry++) {
+        int cy = y0 + ry;
+        for (int cx = 0; cx < w; cx++) {
+            view.DrawString(x0 + cx, cy, " ", props);
+        }
+    }
+    props.invert_ = false;
+    view.SetColor(CD_NORMAL);
+}
+
+void UiDraw::DrawStatusMessage(View &view, int x, int y, const char *message) {
+    if (!message) return;
+    GUITextProperties props;
+    props.invert_ = false;
+    view.SetColor(CD_WARNING);
+    view.DrawString(clampX(x), clampY(y), message, props);
+    view.SetColor(CD_NORMAL);
+}
+
+void UiDraw::DrawErrorMessage(View &view, int x, int y, const char *message) {
+    if (!message) return;
+    GUITextProperties props;
+    props.invert_ = false;
+    view.SetColor(CD_ERROR);
+    view.DrawString(clampX(x), clampY(y), message, props);
     view.SetColor(CD_NORMAL);
 }

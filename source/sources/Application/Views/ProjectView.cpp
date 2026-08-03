@@ -5,6 +5,7 @@
 #include "Application/Persistency/PersistencyService.h"
 #include "Application/Views/ModalDialogs/MessageBox.h"
 #include "Application/Views/BaseClasses/UiColors.h"
+#include "Application/Views/BaseClasses/UiDraw.h"
 #include "Application/Views/ModalDialogs/NewProjectDialog.h"
 #include "Application/Views/ModalDialogs/SelectProjectDialog.h"
 #include "Application/Views/ModalDialogs/AudioDriverModal.h"
@@ -129,18 +130,25 @@ public:
     virtual void DrawView() {
         SetWindow(28,6);
         GUITextProperties props;
+        // RC4 P4: centered title and menu block (PLAN_RC4 section 8).
+        SetColor(UiColors::Resolve(UI_COLOR_TITLE));
+        props.invert_ = false;
+        DrawString(UiDraw::CenterTextX("Project Exit"), 0, "Project Exit",
+                   props);
         SetColor(CD_NORMAL);
-        DrawString(1,0,"Project Exit",props);
 
         static const char *items[3] = {
             "Exit to Main Menu",
             "Exit to TreeFrogUI",
             "Cancel"
         };
+        MenuLayout ml = UiDraw::MakeCenteredMenuLayout(3, 20, 0, 0);
+        (void)ml;
         for (int i=0;i<3;i++) {
             props.invert_ = (i==selected_);
             SetColor((i==selected_)?CD_HILITE2:CD_NORMAL);
-            DrawString(2,2+i,items[i],props);
+            int x = UiDraw::CenterTextX(items[i]);
+            DrawString(x, 2+i, items[i], props);
         }
         props.invert_ = false;
     }
