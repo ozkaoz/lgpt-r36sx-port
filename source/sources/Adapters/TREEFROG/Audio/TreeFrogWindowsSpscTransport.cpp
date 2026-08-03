@@ -236,8 +236,7 @@ static void monitor_stage_append_worker(const int16_t *mono, unsigned frames) {
 }
 
 static void monitor_render_worker() {
-    const unsigned long long step =
-        ((unsigned long long)48000U << 32) / 44100U;
+    const unsigned long long step = 1ULL << 32;
     const unsigned long long one_q32 = 1ULL << 32;
     int16_t out[kMonitorOutputChunkFrames * 2];
     unsigned produced = 0U;
@@ -340,7 +339,7 @@ static void publish_metrics(int fifo_fd, unsigned pending_bytes) {
     const unsigned fill = ring_fill_frames();
     snprintf(text, sizeof(text),
         "version=H38.1R1_WINDOWS_SPSC_AUDIO_ONLY_SAFE_FRONTEND\n"
-        "protocol=RAW_44100_STEREO\n"
+        "protocol=RAW_48000_STEREO\n"
         "callback_contract=BOUNDED_COPY_ONLY\n"
         "callback_timing=NOT_MEASURED_IN_CALLBACK\n"
         "worker_running=%u\n"
@@ -401,7 +400,7 @@ static void *worker_main(void *) {
     int monitor_fd = -1;
     unsigned long long last_mute_refresh_ms = 0ULL;
 
-    (void)write_text_atomic(kProtocol, "RAW_44100_STEREO\n");
+    (void)write_text_atomic(kProtocol, "RAW_48000_STEREO\n");
     publish_gain_if_changed(&last_mixer, &last_master);
 
     while (load_acquire(&g_running)) {

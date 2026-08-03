@@ -28,5 +28,9 @@ MANIFEST_PACKAGE_CONTENTS.txt
 SOURCE_FILE_MANIFEST.json
 SHA256SUMS.txt
 
+# Host harness build artifacts (WSL builds to /tmp; stray Windows binaries)
+tests/*.exe
+tests/*.out
+
 # Windows Visual Studio build artifacts inside the synced source tree
 source/build/

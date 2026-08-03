@@ -1,6 +1,7 @@
 #include "TreeFrogAudio.h"
 #include "TreeFrogAudioDriver.h"
 #include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
+#include "Application/Audio/FxEngine/FxEngine.h"
 
 #include "Foundation/I_Iterator.h"
 #include "Services/Audio/AudioOut.h"
@@ -24,6 +25,12 @@ void TreeFrogAudio::Init() {
     TreeFrogAudioDriver *drv = new TreeFrogAudioDriver(settings);
     AudioOut *out = new AudioOutDriver(*drv);
     Insert(out);
+
+    FxEngine::FxEngine::GetInstance().SetSampleRate(GetSampleRate());
+}
+
+int TreeFrogAudio::GetSampleRate() {
+    return 48000;
 }
 
 void TreeFrogAudio::Close() {

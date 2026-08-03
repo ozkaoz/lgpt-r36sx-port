@@ -53,7 +53,7 @@ rm -f "$RUNTIME/aoa_host_configured" "$RUNTIME/aoa_bulk_accessory_present" \
       "$RUNTIME/aoa_bulk_stream_ready" "$RUNTIME/aoa_state" "$RUNTIME/aoa_result" \
       "$RUNTIME/daemon_version" "$RUNTIME/capture_abi" "$RUNTIME/export_request" "$RUNTIME/export_state" "$RUNTIME/export_transport" "$RUNTIME"/export_ready.* "$RUNTIME"/export_error.* 2>/dev/null || true
 [ -p "$PROJECT_FIFO" ] || { rm -f "$PROJECT_FIFO" 2>/dev/null || true; mkfifo "$PROJECT_FIFO" 2>/dev/null || true; }
-"$DAEMON" "$PROJECT_FIFO" - "$PCM_FIFO" 2 44100 >>"$LOGROOT/H35_AOA_BULK_AUDIO_DAEMON.log" 2>&1 &
+"$DAEMON" "$PROJECT_FIFO" - "$PCM_FIFO" 2 48000 >>"$LOGROOT/H35_AOA_BULK_AUDIO_DAEMON.log" 2>&1 &
 dp=$!
 atomic_write "$DAEMON_PID" "$dp" || true
 sleep 0.15

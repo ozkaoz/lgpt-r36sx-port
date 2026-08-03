@@ -23,7 +23,7 @@ extern "C" const char *TreeFrogU241OtgBuildMarker(void) {
 }
 
 extern "C" const char *TreeFrogH25DualRateRuntimeMarker(void) {
-    return "H25_RUNTIME_ACCEPTS_44100_AND_48000";
+    return "H36_SINGLE_RATE_48K";
 }
 
 extern "C" const char *TreeFrogH26ThreeDriverMarker(void) {
@@ -102,6 +102,7 @@ static int16_t g_resample_input[U2514_RESAMPLE_INPUT_CAPACITY_FRAMES * 2];
 static unsigned g_resample_input_fill_frames = 0;
 static int g_usb_channels = 1;
 static int g_usb_rate = 48000;
+static int g_engine_rate = 48000;
 static int g_mixer_volume_percent = 100;
 static int g_project_master_volume_percent = 100;
 static char g_last_capture_name[96] = "";
@@ -611,7 +612,7 @@ static int android_runtime_contract_code(void) {
     if (!file_contains(kCaptureAbi, "R36SX_CAPTURE_ABI=4"))
         return 24;
     if (!file_contains(kAudioChannels, "2")) return 25;
-    if (!file_contains(kAudioRate, "44100")) return 26;
+    if (!file_contains(kAudioRate, "48000")) return 26;
     if (!exists_file(kAoaState) && !exists_file(kAoaResult)) return 27;
     return 0;
 }
@@ -1334,6 +1335,21 @@ void TreeFrogUac2Bridge_ResetTransport(void) {
 #endif
 }
 
+void TreeFrogUac2Bridge_SetEngineSampleRate(int rate) {
+#if TREEFROG_UAC2_BRIDGE
+    if (rate <= 0) return;
+    if (g_engine_rate != rate) {
+        g_engine_rate = rate;
+        g_resample_phase_160 = 0;
+        g_resample_input_fill_frames = 0;
+        g_monitor_phase = 0.0;
+        log_msg("engine sample rate set");
+    }
+#else
+    (void)rate;
+#endif
+}
+
 void TreeFrogUac2Bridge_SetMixerVolumePercent(int volume) {
 #if TREEFROG_UAC2_BRIDGE
     if (volume < 0) volume = 0;
@@ -1402,8 +1418,7 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
 
     enum {
         MAX_OUT_FRAMES = 4096,
-        RESAMPLE_DENOMINATOR = 160,
-        RESAMPLE_INCREMENT = 147
+        RESAMPLE_DENOMINATOR = 160
     };
     int16_t out[MAX_OUT_FRAMES * 2];
     int out_frames = 0;
@@ -1421,7 +1436,20 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
      * callback, repeating the final sample about 60 times per second. This
      * streaming buffer produces only when a real next source frame exists,
      * so interpolation remains continuous across callback boundaries.
+     *
+     * H36_SINGLE_RATE_48K: the engine now renders at 48000 Hz end-to-end.
+     * When the USB profile is also 48000 the increment equals the denominator
+     * and the resampler degenerates to a sample-exact copy (identity).
      */
+    const int resample_increment =
+        (g_usb_rate <= 0 || g_engine_rate <= 0)
+            ? RESAMPLE_DENOMINATOR
+            : (int)((long long)g_engine_rate * RESAMPLE_DENOMINATOR /
+                    g_usb_rate);
+    if (resample_increment <= 0) {
+        close_fifo_if_open("fifo closed invalid resample increment");
+        return;
+    }
     if ((unsigned)frames >= U2514_RESAMPLE_INPUT_CAPACITY_FRAMES) {
         const int keep_frames = U2514_RESAMPLE_INPUT_CAPACITY_FRAMES - 1;
         stereo += (frames - keep_frames) * 2;
@@ -1430,7 +1458,7 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
         g_resample_phase_160 = 0;
     } else if (g_resample_input_fill_frames + (unsigned)frames >
                U2514_RESAMPLE_INPUT_CAPACITY_FRAMES) {
-        /* This should not occur at the normal 735-frame callback cadence.
+        /* This should not occur at the normal 800-frame callback cadence.
          * Reset rather than accumulate stale audio or block the audio thread. */
         g_resample_input_fill_frames = 0;
         g_resample_phase_160 = 0;
@@ -1478,7 +1506,7 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
         }
 
         ++out_frames;
-        g_resample_phase_160 += RESAMPLE_INCREMENT;
+        g_resample_phase_160 += (unsigned)resample_increment;
     }
 
     {
@@ -1551,7 +1579,9 @@ void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo44100(
     }
 
     const double step =
-        (double)g_usb_rate / 44100.0;
+        (g_engine_rate > 0)
+            ? (double)g_usb_rate / (double)g_engine_rate
+            : 1.0;
 
     for (int i = 0; i < frames; ++i) {
         const unsigned frame_index =

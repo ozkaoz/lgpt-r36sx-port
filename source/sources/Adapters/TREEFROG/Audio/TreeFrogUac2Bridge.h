@@ -7,6 +7,7 @@ extern "C" {
 void TreeFrogUac2Bridge_Prime(void);
 void TreeFrogUac2Bridge_ResetTransport(void);
 void TreeFrogUac2Bridge_Close(void);
+void TreeFrogUac2Bridge_SetEngineSampleRate(int rate);
 void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames);
 void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo44100(int16_t *stereo, int frames);
 int  TreeFrogUac2Bridge_ShouldMuteLocal(void);

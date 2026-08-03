@@ -9,6 +9,7 @@ public:
     virtual ~TreeFrogAudio();
     virtual void Init();
     virtual void Close();
+    virtual int GetSampleRate();
     virtual int GetMixerVolume();
     virtual void SetMixerVolume(int volume);
 };

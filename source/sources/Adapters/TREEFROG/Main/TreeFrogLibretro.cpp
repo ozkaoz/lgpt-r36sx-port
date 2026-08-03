@@ -1053,7 +1053,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info) {
     info->geometry.aspect_ratio = 4.0f / 3.0f;
 #endif
     info->timing.fps = 60.0;
-    info->timing.sample_rate = 44100.0;
+    info->timing.sample_rate = 48000.0;
 }
 
 
@@ -1191,8 +1191,8 @@ void retro_run(void) {
     ++g_treefrog_v40_run_count;
 
     if (!app_ready) {
-        memset(audio_buffer, 0, 735 * 2 * sizeof(int16_t));
-        if (audio_batch_cb) audio_batch_cb(audio_buffer, 735);
+        memset(audio_buffer, 0, 800 * 2 * sizeof(int16_t));
+        if (audio_batch_cb) audio_batch_cb(audio_buffer, 800);
         if (video_cb) {
             unsigned vw, vh; size_t vp;
             uint16_t *vf = make_video_output(framebuffer, &vw, &vh, &vp);
@@ -1211,7 +1211,7 @@ void retro_run(void) {
     GUIWindow *w = Application::GetInstance()->GetWindow();
     if (w) w->Update();
 
-    audio_accum += 44100.0 / 60.0;
+    audio_accum += 48000.0 / 60.0;
     int frames = (int)audio_accum;
     audio_accum -= frames;
     if (frames < 0) frames = 0;
