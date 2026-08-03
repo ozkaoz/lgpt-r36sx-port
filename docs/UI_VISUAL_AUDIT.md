@@ -1,7 +1,8 @@
 # UI_VISUAL_AUDIT — Auditoría visual de la UI LGPT R36SX
 
-Versión: RC5 (bloques tipo menú y modales centrados de verdad: MIX/DELAY/
-REVERB/EQ/COMP, Project Exit).
+Versión: RC6 (centrado real de cuadrículas Phrase/Table/Instrument, barras
+VU de MIX compactadas, títulos MASTER pegados a su menú; sobre el RC5 de
+bloques tipo menú y modales centrados).
 Marco normativo: UI_STYLE_GUIDE.md. Checklist por punto del plan.
 
 Estado: auditoría en curso en la fase completa; las capturas ASCII de
@@ -19,7 +20,9 @@ estado de cada vista se rastrea en el checklist por vista.
   (...[, viewportWidth, contentTop, contentBottom])` con margen máximo de 1
   celda (2 para separadores impares).
 - Las páginas MASTER del Mixer y el modal de salida se dibujan con estos
-  helpers; las barras VU de la página MIX son de 1 celda.
+  helpers; las barras VU de la página MIX son de 1 celda con pitch 3 (RC6).
+- Las cuadrículas Phrase/Table/Instrument se centran con desplazamientos
+  locales por vista; `View::GetAnchor()` NO se modifica globalmente (RC6).
 
 ## Checklist RC3/RC4/RC5 (estado fase completa)
 
@@ -104,7 +107,7 @@ las cuadrículas del tracker.
 
 | Bloque | Antes (RC4) | Después (RC5) | Banda |
 |---|---|---|---|
-| MIX (9 barras) | x0=8..35 (barras de 2 celdas), y 2..16 | barras en x=3,7,...,35 (1 celda, pitch 4); labelY 6, barras 7..18, num 20, mute 21, RET 22 | 3..25 |
+| MIX (9 barras) | x0=8..35 (barras de 2 celdas), y 2..16 | barras en x=7,10,...,31 (1 celda, pitch 3; bankWidth 25); labelY 6, barras 7..18, num 20, mute 21, RET 22 | 3..25 |
 | DELAY (7 filas) | x=2..22, filas 2..8 | bloque x=10..28, filas 11..17 | 3..25 |
 | REVERB (7 filas) | x=2..22, filas 2..8 | bloque x=11..28, filas 11..17 | 3..25 |
 | EQ (16 filas) | x=13..26, y 2..18 | bloque x=11..27, filas 6..21 | 3..25 |
@@ -123,12 +126,12 @@ Margen del cuerpo de cada página respecto a la banda 3..25:
 ```
 MIX (fila 0: "Mixer" x=17; fila 1: "MIX" x=21 pre-existente)
 row 6 : CH   MST  00   01   02   03   04   05   06   07
-rows 7-18: barras verticales de 1 celda en x=3,7,11,15,19,23,27,31,35
+rows 7-18: barras verticales de 1 celda en x=7,10,13,16,19,22,25,28,31
 row 20: VL   120  100  100  100  100  100  100  100  100
 row 21:       M    M    M    M    M    M    M    M    M
 row 22: RET  D:200  R:100  FX RETURNS   (D/R resaltados por separado)
 
-DELAY (fila 1: "DELAY"; bloque filas 11..17)
+DELAY (fila 10: "DELAY MASTER [1/5]" sobre el bloque; bloque filas 11..17)
        labelX=10              valueX=20
 row 11: BYPASS                 [ ON ]
 row 12: Time                  200 ms
@@ -138,7 +141,7 @@ row 15: LFO Amount               0 %
 row 16: Stereo                  ON
 row 17: Echo                    OFF
 
-REVERB (fila 1: "REVERB"; bloque filas 11..17, labelX=11)
+REVERB (fila 10: título sobre el bloque; bloque filas 11..17, labelX=11)
 row 11: BYPASS                 [ ON ]
 row 12: Pre-delay               0 ms
 row 13: Decay                  1.20 s
@@ -147,7 +150,7 @@ row 15: Input Filter            OFF
 row 16: Mode                    ECO
 row 17: Stereo                  ON
 
-EQ (fila 1: "EQ"; bloque filas 6..21, labelX=11)
+EQ (fila 5: "MASTER EQ [4/5]" sobre el bloque; bloque filas 6..21, labelX=11)
 row 6 : BYPASS                 [ ON ]
 row 7 :        EN   FRQ    GAIN    Q
 row 8 : LOW    ON  100 Hz  +0.0 dB 1.0
@@ -155,7 +158,8 @@ row 9 : MID    ON 1000 Hz  +0.0 dB 1.0
 row 10: HIGH   ON 10000 Hz +0.0 dB 1.0
 row 11:       ---- band separators ----
 
-COMP (fila 1: "COMP"; bloque filas 10..18, GR fila 19, labelX=9)
+COMP (fila 9: "MASTER COMP [5/5]" sobre el bloque; bloque filas 10..18,
+       GR fila 19, labelX=9)
 row 10: BYPASS                 [ OFF ]
 row 11: Threshold             -24.0 dB
 row 12: Ratio                   4.0:1
@@ -181,6 +185,56 @@ row 17:  ====borde inferior====
 La validación visual definitiva con pantalla real R36SX queda pendiente de
 hardware.)
 
+## RC6 — Centrado de cuadrículas Phrase/Table/Instrument y MIX compactado
+
+Iteración exclusiva de layout sobre RC5. **No toca** motor FX/DSP, FxEngine,
+ranges/defaults/enums, navegación, persistencia, colores, footer, Chopper,
+las cuadrículas Song/Chain ni `View::GetAnchor()`.
+
+### Barras VU de la página MIX (compactadas)
+- `meterPitch` pasa de 4 a 3: `bankWidth=(9-1)*3+1=25`, `firstMeterX=7`
+  (márgenes 7/8). Ejes en x=7,10,13,16,19,22,25,28,31.
+- Los textos `MST`, `00..07` y `%3d` se dibujan en `x-1` para asentar su
+  columna derecha sobre el eje de 1 celda (la barra sigue en `x`).
+- Filas sin cambios: labelY 6, barras 7..18, num 20, mute 21, RET 22.
+
+### Títulos de subpágina MASTER (DELAY/REVERB/EQ/COMP)
+- Cada página dedicada dibuja ahora su título con
+  `DrawCenteredTitleAt(*this, ml.startY-1, title)`: el título queda sobre la
+  fila superior de su bloque centrado (título+menú = una unidad centrada),
+  en lugar de la fila 1 flotante del RC5. `drawFxParamPage` calcula el título
+  y lo pasa por parámetro a `drawDelayPage/drawReverbPage/drawEqPage/
+  drawCompPage`; el fallback genérico conserva la fila 1.
+- Filas de título resultantes (sin colisiones con la banda 3..25 ni el
+  header de fila 0): DELAY/REVERB 10, EQ 5, COMP 9.
+
+### Phrase (centrado horizontal y vertical)
+- `kColX` = {5,8,11,14,19,23,27,31} y `kColHeaderX` = {6,9,12,15,20,24,28,32}:
+  el contenido pasa de 9..39 a 5..35 (centro 20, márgenes 5/5). Números de
+  fila en x=2 y cursor de play en x=1 (antes 6/5).
+- Desplazamiento vertical `anchor._y += 3` en los tres puntos `GetAnchor()`
+  de la vista (DrawView, UpdateCursor/ProcessButtonMask, OnPlayerUpdate):
+  cuadrícula 7..22, cabeceras fila 6.
+
+### Table (centrado vertical; horizontal ya centrado)
+- El contenido ya estaba centrado en horizontal (filas 9..30, centro 19.5),
+  por lo que solo se aplica `anchor._y += 3` en sus tres puntos `GetAnchor()`
+  (DrawView, updateCursor, OnPlayerUpdate): cuadrícula 7..22, coherente con
+  Phrase.
+
+### Instrument (centrado horizontal; vertical ya centrado)
+- El bloque de campos (filas 4..26, centro 15) ya estaba centrado en
+  vertical. Las dos columnas de campos (etiquetas en x=10 y x+16=26,
+  contenido hasta ~37) se desplazan `position._x -= 4` (x=6 / x+16=22) en
+  `fillSampleParameters()` y `fillMidiParameters()`, y `hp._x -= 4` en las
+  cabeceras de bloque de `DrawView()`.
+
+### Verificación
+- `tests/test_ui_centered_layout.py` -> `UI_CENTERED_LAYOUT_OK` (13 checks:
+  comprobación 8 con pitch 3 / firstMeterX 7 / textos en x-1; comprobación 10
+  con títulos sobre el bloque; comprobación 13 nueva para Phrase/Table/
+  Instrument y la no-modificación de `View::GetAnchor()`).
+
 ## Capturas de referencia (estado anterior / RC2)
 
 Se documentarán aquí en la fase completa las capturas ASCII antes/después por
@@ -202,13 +256,16 @@ intencional).
 
 ## Checklist por vista
 
-- [x] Mixer MASTER: título centrado (DrawCenteredTitleAt), toggles de bypass,
-      leyendas a Help (P3).
-- [x] Instrument: cabeceras de sección vía UiDraw, hint USB a Help.
+- [x] Mixer MASTER: título centrado sobre su bloque (RC6), toggles de bypass,
+      leyendas a Help (P3), barras MIX pitch 3 (RC6).
+- [x] Instrument: cabeceras de sección vía UiDraw, hint USB a Help, columnas
+      centradas en x=6/x+16 (RC6).
 - [x] Song: título con rol semántico (UI_COLOR_TITLE), filas con jerarquía.
 - [x] Chain: título con rol semántico, cursor coherente.
-- [x] Phrase: título con rol semántico, notas con CD_NORMAL/HILITE.
-- [x] Table: título con rol semántico, comandos con barras/valores sólidos.
+- [x] Phrase: título con rol semántico, notas con CD_NORMAL/HILITE, cuadrícula
+      centrada 5..35 / filas 7..22 (RC6).
+- [x] Table: título con rol semántico, comandos con barras/valores sólidos,
+      cuadrícula centrada en filas 7..22 (RC6).
 - [x] Chopper: frame sólido sin ASCII (P6), overlay de onda preservado.
 - [x] SampleManager: estado con roles de severidad (P5).
 - [x] ProjectExit: título e items centrados (P4).

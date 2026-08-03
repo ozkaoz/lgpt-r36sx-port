@@ -347,7 +347,9 @@ void TableView::updateCursor(int dx, int dy) {
     Table &table =
         TableHolder::GetInstance()->GetTable(viewData_->currentTable_);
 
+    // RC6: the grid is centered vertically on 30 rows (anchor +3).
     GUIPoint anchor = GetAnchor();
+    anchor._y += 3 ;
     GUIPoint p(anchor);
     switch (col_) {
     case 1:
@@ -790,7 +792,9 @@ void TableView::DrawView() {
 
     // Compute song grid location
 
+    // RC6: the grid is centered vertically on 30 rows (anchor +3).
     GUIPoint anchor = GetAnchor();
+    anchor._y += 3 ;
 
     // Column headers, centered over their columns (TREEFROG_TABLE_COLUMNS_V1)
 
@@ -928,7 +932,9 @@ void TableView::DrawView() {
 void TableView::OnPlayerUpdate(PlayerEventType eventType, unsigned int tick) {
 
     GUITextProperties props;
+    // RC6: the grid is centered vertically on 30 rows (anchor +3).
     GUIPoint anchor = GetAnchor();
+    anchor._y += 3 ;
     GUIPoint pos;
 
     pos._x = anchor._x - 1;

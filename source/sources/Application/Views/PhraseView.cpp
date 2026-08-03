@@ -19,15 +19,16 @@
 // TREEFROG_PHRASE_PITCH_COLUMN_V1 (H38.7): dedicated pitch column (P) between
 // volume and instrument. PTCH is removed from FX; pitch lives in its own
 // column. X positions in character cells (each cell = 8px). The 40-cell
-// screen is centered: row# at cells 6-7, play cursor at cell 5, data columns
-// start at cell 9. The FX block (cols 4-7) is separated from the N-V-P-I
-// block by a 2-cell gap (I ends at 20, FX1 starts at 23).
-const int PhraseView::kColX[kColCount] = {9, 12, 15, 18, 23, 27, 31, 35};
+// screen is centered: row# at cells 2-3, play cursor at cell 1, data columns
+// start at cell 5 (RC6: content spans 5..35, exactly centered with 5/5
+// margins). The FX block (cols 4-7) is separated from the N-V-P-I block by a
+// 2-cell gap (I ends at 18, FX1 starts at 19).
+const int PhraseView::kColX[kColCount] = {5, 8, 11, 14, 19, 23, 27, 31};
 
 // Header center positions over each data column:
-// N(9-11)->10, V(12-14)->13, P(15-17)->16, I(18-20)->19, FX1(23-25)->24,
-// P1(27-30)->28, FX2(31-33)->32, P2(35-38)->36. Parameter columns are blank.
-const int PhraseView::kColHeaderX[kColCount] = {10, 13, 16, 19, 24, 28, 32, 36};
+// N(5-8)->6, V(8-11)->9, P(11-14)->12, I(14-19)->15, FX1(19-23)->20,
+// P1(23-27)->24, FX2(27-31)->28, P2(31-35)->32. Parameter columns are blank.
+const int PhraseView::kColHeaderX[kColCount] = {6, 9, 12, 15, 20, 24, 28, 32};
 
 // Offsets for note(0), volume(1), pitch(2) and instrument(3) value stepping:
 // L, R, U, D. TREEFROG_PHRASE_VOL_EDIT_V1: volume steps by 1 in every
@@ -143,7 +144,9 @@ void PhraseView::updateCursor(int dx, int dy) {
             row_ = 0;
         }
     }
+    // RC6: the grid is centered vertically on 30 rows (anchor +3).
     GUIPoint anchor = GetAnchor();
+    anchor._y += 3 ;
     GUIPoint p(anchor);
     switch (col_) {
     case 5:
@@ -1629,7 +1632,9 @@ void PhraseView::DrawView() {
 
     // Compute song grid location
 
+    // RC6: the grid is centered vertically on 30 rows (anchor +3).
     GUIPoint anchor = GetAnchor();
+    anchor._y += 3 ;
 
     // Column headers, centered over their columns (TREEFROG_PHRASE_COLUMNS_V1)
     static const char *headers[kColCount] = {"N", "V", "P", "I", "FX1",
@@ -1639,10 +1644,10 @@ void PhraseView::DrawView() {
         DrawString(kColHeaderX[c], anchor._y - 1, headers[c], props);
     }
 
-    // Display row numbers (cells 6-7, grid centered with 6-cell margins)
+    // Display row numbers (cells 2-3, grid centered with 5-cell margins)
 
     char buffer[6];
-    pos._x = 6;
+    pos._x = 2;
     pos._y = anchor._y;
     for (int j = 0; j < 16; j++) {
         ((j / altRowNumber_) % 2) ? SetColor(CD_ROW) : SetColor(CD_ROW2);
@@ -1892,9 +1897,11 @@ void PhraseView::OnPlayerUpdate(PlayerEventType eventType, unsigned int tick) {
     GUITextProperties props;
     drawNotes();
 
+    // RC6: the grid is centered vertically on 30 rows (anchor +3).
     GUIPoint anchor = GetAnchor();
+    anchor._y += 3 ;
     GUIPoint pos = anchor;
-    pos._x = 5;
+    pos._x = 1;
 
     SetColor(CD_NORMAL);
 

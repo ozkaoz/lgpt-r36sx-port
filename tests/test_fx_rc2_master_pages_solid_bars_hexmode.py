@@ -43,12 +43,12 @@ BIGHEX_CPP = (ROOT / "source/sources/Application/Views/BaseClasses/UIBigHexVarFi
 # ---------------------------------------------------------------------------
 def check_master_pages_dispatched():
     # drawFxParamPage dispatches DELAY/REVERB to the dedicated page renderers.
-    assert "drawDelayPage()" in MV_CPP and "drawReverbPage()" in MV_CPP
-    assert "drawDelayPage()" in MV_H and "drawReverbPage()" in MV_H
+    assert "drawDelayPage(pageTitle)" in MV_CPP and "drawReverbPage(pageTitle)" in MV_CPP
+    assert "drawDelayPage(const char *title)" in MV_H and "drawReverbPage(const char *title)" in MV_H
     assert "drawMasterFxRow" in MV_H
     idx = MV_CPP.index("void MixerView::drawFxParamPage")
-    assert "drawDelayPage()" in MV_CPP[idx:idx + 1200]
-    assert "drawReverbPage()" in MV_CPP[idx:idx + 1600]
+    assert "drawDelayPage(pageTitle)" in MV_CPP[idx:idx + 1200]
+    assert "drawReverbPage(pageTitle)" in MV_CPP[idx:idx + 1600]
     # Titles carry the SELECT page position [n/5].
     assert '"DELAY MASTER [%d/5]"' in MV_CPP
     assert '"REVERB MASTER [%d/5]"' in MV_CPP

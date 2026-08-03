@@ -15,9 +15,13 @@ views compute:
   viewportWidth, contentTop, contentBottom) centers a vertical menu block.
 - ModalView::SetWindow centers on the full 30 rows and keeps both borders
   inside rows 0..29.
-- The MIX page lays out 9 single-cell meters (MST + 8 channels) every 4
-  columns across a 33-cell centered bank; DELAY/REVERB/EQ/COMP master pages
-  use centered MenuLayout blocks inside the safe band.
+- The MIX page lays out 9 single-cell meters (MST + 8 channels) every 3
+  columns across a 25-cell centered bank; DELAY/REVERB/EQ/COMP master pages
+  use centered MenuLayout blocks inside the safe band, and each page draws
+  its title at the top of its centered block.
+- Phrase/Table/Instrument grids are centered on 40x30 (Phrase grid shifted
+  left 4 and all three grids shifted for vertical centering) without changing
+  View::GetAnchor().
 - The refactor must not touch DSP ranges, defaults or the FxParamId enum.
 
 Acceptance: all layout helpers produce in-band, centered geometry; nothing
@@ -35,6 +39,9 @@ MODAL_H = (VIEWS / "BaseClasses/ModalView.h").read_text()
 PROJECT_CPP = (VIEWS / "ProjectView.cpp").read_text()
 MIX_CPP = (VIEWS / "MixerView.cpp").read_text()
 MIX_H = (VIEWS / "MixerView.h").read_text()
+PHRASE_CPP = (VIEWS / "PhraseView.cpp").read_text()
+TABLE_CPP = (VIEWS / "TableView.cpp").read_text()
+INSTRUMENT_CPP = (VIEWS / "InstrumentView.cpp").read_text()
 
 # ---------------------------------------------------------------------------
 # Mirror of the C++ layout helpers (UiDraw.cpp, RC5).
@@ -220,16 +227,16 @@ def check_mixer_meters():
                    MIX_CPP.index("drawNotes()")]
     assert "SONG_CHANNEL_COUNT+1" in draw          # 9 meters
     assert "meterWidth=1" in draw
-    assert "meterPitch=4" in draw
-    assert "(meterCount-1)*meterPitch+meterWidth" in draw   # bankWidth 33
+    assert "meterPitch=3" in draw
+    assert "(meterCount-1)*meterPitch+meterWidth" in draw   # bankWidth 25
     assert "firstMeterX" in draw
-    # Uniform positions: firstMeterX=3, pitch 4 -> all within 0..39.
-    first = 3
-    positions = [first + i * 4 for i in range(9)]
-    assert positions == [3, 7, 11, 15, 19, 23, 27, 31, 35]
+    # Uniform positions: firstMeterX=7, pitch 3 -> all within 0..39.
+    first = 7
+    positions = [first + i * 3 for i in range(9)]
+    assert positions == [7, 10, 13, 16, 19, 22, 25, 28, 31]
     assert all(0 <= p <= 39 for p in positions)
     assert len(set(positions)) == 9
-    assert all(positions[i + 1] - positions[i] == 4 for i in range(8))
+    assert all(positions[i + 1] - positions[i] == 3 for i in range(8))
     # Bars are drawn one cell per row (single column).
     bar = MIX_CPP[MIX_CPP.index("void MixerView::drawVolumeBar"):
                   MIX_CPP.index("void MixerView::drawMasterBar")]
@@ -239,6 +246,11 @@ def check_mixer_meters():
         assert "totalCells=height" in seg
         assert "2*height" not in seg
         assert "DrawString(x,y+1+row" in seg
+    # Channel labels and volume numbers are drawn at x-1 (centered over the
+    # 1-cell meter axis); the master "MST" label keeps its x-1 rule too.
+    assert "DrawString(x-1,y,hex,props)" in bar
+    assert "DrawString(x-1,y+height+2" in bar
+    assert "DrawString(x-1,y,\"MST\",props)" in mbar
     print("8. 9 single-cell meters uniformly spaced in 0..39 OK")
 
 
@@ -294,9 +306,17 @@ def check_bypass_columns():
     for seg in (dl, rv, eq, cm):
         assert "UiDraw::DrawBypassRow(*this,ml.labelX,ml.valueX" in seg or \
                "UiDraw::DrawBypassRow(*this,labelX,valueX" in seg
-    # The title stays centered on row 1 above every block.
-    assert "UiDraw::DrawCenteredTitleAt(*this,1,pageTitle)" in MIX_CPP
-    print("10. bypass rows use centered label/value columns; title row 1 OK")
+    # RC6: each dedicated page draws its title at the top of its centered
+    # block (ml.startY-1); drawFxParamPage passes the page title through.
+    eqpage = MIX_CPP[MIX_CPP.index("void MixerView::drawEqPage"):
+                     MIX_CPP.index("void MixerView::drawCompPage")]
+    for page_seg in (dl, rv, eqpage, cm):
+        assert "UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title)" in page_seg
+    assert "drawDelayPage(pageTitle)" in MIX_CPP
+    assert "drawReverbPage(pageTitle)" in MIX_CPP
+    assert "drawEqPage(pageTitle)" in MIX_CPP
+    assert "drawCompPage(pageTitle)" in MIX_CPP
+    print("10. bypass rows use centered label/value columns; title above block OK")
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +374,37 @@ def check_footer_band():
     print("12. menu blocks never reach the footer band 27..29 OK")
 
 
+# ---------------------------------------------------------------------------
+# 13. Phrase/Table/Instrument centered without touching View::GetAnchor()
+# ---------------------------------------------------------------------------
+def check_grid_views_centered():
+    # Phrase grid is horizontally centered: kColX content spans 5..35 on the
+    # 40-cell screen (center 20), row numbers at x=2, play cursor at x=1.
+    assert "{5, 8, 11, 14, 19, 23, 27, 31}" in PHRASE_CPP
+    assert "{6, 9, 12, 15, 20, 24, 28, 32}" in PHRASE_CPP
+    assert "pos._x = 2;" in PHRASE_CPP
+    assert "pos._x = 1;" in PHRASE_CPP
+    # Both grids shift down 3 rows so rows 7..22 center on the 30-row screen
+    # (three GetAnchor sites each: DrawView / UpdateCursor / OnPlayerUpdate).
+    assert PHRASE_CPP.count("anchor._y += 3 ;") == 3
+    assert TABLE_CPP.count("anchor._y += 3 ;") == 3
+    # Table content is already horizontally centered (9..30); only the
+    # vertical shift applies, so the row-number column stays anchor-derived.
+    assert "pos._x = anchor._x - 1;" in TABLE_CPP
+    # Instrument form columns shift left 4 (labels x=6, second column x+16)
+    # in both fillers and in the block headers of DrawView.
+    assert INSTRUMENT_CPP.count("position._x -= 4 ;") == 2
+    assert INSTRUMENT_CPP.count("hp._x -= 4 ;") == 1
+    # View::GetAnchor() itself is untouched by this iteration (the per-view
+    # offsets live in Phrase/Table/Instrument, never in View.cpp).
+    v = (VIEWS / "BaseClasses/View.cpp").read_text()
+    assert "View::GetAnchor()" in v
+    assert "(height-View::songRowCount_)/2" in v
+    assert "anchor._y += 3" not in v
+    assert "position._x -= 4" not in v
+    print("13. Phrase/Table/Instrument centered; GetAnchor() untouched OK")
+
+
 check_constants()
 check_center_text_x()
 check_layout_parity()
@@ -366,4 +417,5 @@ check_mixer_block_bounds()
 check_bypass_columns()
 check_dsp_table_unchanged()
 check_footer_band()
+check_grid_views_centered()
 print("UI_CENTERED_LAYOUT_OK")

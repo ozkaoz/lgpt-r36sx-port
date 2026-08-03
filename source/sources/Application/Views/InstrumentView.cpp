@@ -104,7 +104,10 @@ void InstrumentView::fillSampleParameters() {
 	InstrumentBank *bank=viewData_->project_->GetInstrumentBank() ;
 	I_Instrument *instr=bank->GetInstrument(i) ;
 	SampleInstrument *instrument=(SampleInstrument *)instr  ;
+	// RC6: the two-column form (labels at x=6, x+16=22) is centered on the
+	// 40-cell screen; GetAnchor()._x would leave it ~3-4 cells right.
 	GUIPoint position=GetAnchor() ;
+	position._x -= 4 ;
 
 	// TREEFROG_FX_BLOCKS_V1 (PLAN_FX_REDESIGN_ES.md, Fase 8):
 	// Reorganized as vertical blocks.  Row numbers below are screen rows
@@ -328,7 +331,9 @@ void InstrumentView::fillMidiParameters() {
 	InstrumentBank *bank=viewData_->project_->GetInstrumentBank() ;
 	I_Instrument *instr=bank->GetInstrument(i) ;
 	MidiInstrument *instrument=(MidiInstrument *)instr  ;
+	// RC6: the form column is centered on the 40-cell screen (x=6).
 	GUIPoint position=GetAnchor() ;
+	position._x -= 4 ;
 
 	Variable *v=instrument->FindVariable(MIP_CHANNEL) ;
 	UIIntVarField* f1=new UIIntVarField(position,*v,"channel: %2.2d",0,0x0F,1,0x04,1) ;
@@ -672,7 +677,9 @@ void InstrumentView::DrawView() {
     // the field list's first/last stay sample/table for L2+A cut/clear.
     // RC3 (point 19): rendered through UiDraw::DrawSectionHeader.
     if (getInstrumentType()==IT_SAMPLE) {
+        // RC6: block headers align with the centered field columns (x=6).
         GUIPoint hp = GetAnchor();
+        hp._x -= 4 ;
         props.invert_ = false;
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y, "INSTRUMENT");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 4, "FILTER");

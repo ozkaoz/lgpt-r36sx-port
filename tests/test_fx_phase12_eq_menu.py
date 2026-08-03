@@ -136,12 +136,12 @@ def check_range_reachable_and_clamped():
 
 def check_source_guards():
     # Dedicated menu: EQ page dispatches to drawEqPage inside drawFxParamPage.
-    assert "drawEqPage()" in MIX
+    assert "drawEqPage(pageTitle)" in MIX
     assert "drawFxParamPage" in MIX
     idx = MIX.index("void MixerView::drawFxParamPage")
     # Window allows for the RC2 DELAY/REVERB dedicated-page dispatches that
     # now precede the EQ dispatch inside drawFxParamPage.
-    assert "drawEqPage()" in MIX[idx:idx + 2400]
+    assert "drawEqPage(pageTitle)" in MIX[idx:idx + 2400]
     # Row renderer + musical frequency editing helpers.
     assert "void MixerView::drawEqRow" in MIX
     assert "void MixerView::drawEqPage" in MIX
@@ -155,7 +155,7 @@ def check_source_guards():
     assert '"LOW"' in MIX and '"MID"' in MIX and '"HIGH"' in MIX
     # Header declares the EQ menu methods (RC5: drawEqRow takes the centered
     # label/value columns).
-    assert "drawEqPage()" in MIX_H and "drawEqRow(int id,int labelX,int valueX,int y)" in MIX_H
+    assert "drawEqPage(const char *title)" in MIX_H and "drawEqRow(int id,int labelX,int valueX,int y)" in MIX_H
     # Enum is EN-first per band (order marker comment in the header).
     assert "FX_P_EQ_LOW_EN" in MIX_H and "FX_P_EQ_LOW_FRQ" in MIX_H
     l = MIX_H.index("FX_P_EQ_LOW_EN")

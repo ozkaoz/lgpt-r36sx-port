@@ -128,18 +128,18 @@ protected:
 	// one two-column row; drawDelayPage/drawReverbPage lay the pages out.
 	void drawMasterFxRow(const char *label,const char *value,bool selected,
 	                     int x,int y,int valueX) ;
-	void drawDelayPage() ;
-	void drawReverbPage() ;
+	void drawDelayPage(const char *title) ;
+	void drawReverbPage(const char *title) ;
 	// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12): dedicated EQ
 	// menu (exclusive page) with banded LOW/MID/HIGH layout, ON/OFF, Hz and
 	// signed-dB values.  drawEqRow draws one row; drawEqPage is dispatched by
 	// drawFxParamPage.
-	void drawEqPage() ;
+	void drawEqPage(const char *title) ;
 	void drawEqRow(int id,int labelX,int valueX,int y) ;
 	// TREEFROG_COMP_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 13): dedicated COMP
 	// menu (exclusive page) with BYP first, centered labeled rows with units,
 	// ratio as x:1, booleans as ON/OFF, and the GR meter always visible below.
-	void drawCompPage() ;
+	void drawCompPage(const char *title) ;
 	// TREEFROG_FX_PAGES_V3 (Fase 9): master FX returns on the MIX page.
 	void nudgeDelayReturn(int delta) ;
 	void nudgeReverbReturn(int delta) ;

@@ -421,7 +421,9 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 		SetColor(CD_NORMAL) ;
 		props.invert_=false ;
 	}
-	DrawString(x,y,hex,props) ;
+	// RC6: the 2-cell channel label is drawn at x-1 so its right cell sits
+	// on the 1-cell meter axis (same rule as MST/%3d).
+	DrawString(x-1,y,hex,props) ;
 	props.invert_=false ;
 
 	// TREEFROG_MIXER_LIVE_BAR_V4 (H38.7) + RC5:
@@ -817,32 +819,31 @@ void MixerView::drawFxParamPage(FxPage page) {
 	case FX_PAGE_EQ:     sprintf(pageTitle,"MASTER EQ [%d/5]",pageNum) ; break ;
 	default:             sprintf(pageTitle,"MASTER COMP [%d/5]",pageNum) ; break ;
 	}
-	UiDraw::DrawCenteredTitleAt(*this,1,pageTitle) ;
-	// TREEFROG_FX_MASTER_PAGES_RC2 (PLAN_FX_REDESIGN_ES.md, RC2 point 4): the
-	// DELAY and REVERB pages are dedicated two-column menus (label / value)
-	// with a clear hierarchy instead of the generic parameter list.
+	// RC6: each dedicated page draws its own title at the top of its centered
+	// block (ml.startY-1) so the title and its menu form one centered unit.
 	if (page==FX_PAGE_DELAY) {
-		drawDelayPage() ;
+		drawDelayPage(pageTitle) ;
 		return ;
 	}
 	if (page==FX_PAGE_REVERB) {
-		drawReverbPage() ;
+		drawReverbPage(pageTitle) ;
 		return ;
 	}
 	// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12): the EQ page is a
 	// dedicated exclusive menu with a banded LOW/MID/HIGH layout (EN/FRQ/GAI/Q
 	// per band), so it does not use the generic parameter list.
 	if (page==FX_PAGE_EQ) {
-		drawEqPage() ;
+		drawEqPage(pageTitle) ;
 		return ;
 	}
 	// TREEFROG_COMP_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 13): the COMP page
 	// is a dedicated exclusive menu (BYP first, centered labeled rows, GR
 	// meter always visible) instead of the generic parameter list.
 	if (page==FX_PAGE_COMP) {
-		drawCompPage() ;
+		drawCompPage(pageTitle) ;
 		return ;
 	}
+	UiDraw::DrawCenteredTitleAt(*this,1,pageTitle) ;
 	for (int i=0;i<FX_PARAM_COUNT;i++) {
 		if (fxIdOnPage(i,page)) {
 			drawFxParamRow(i,1,y,0) ;
@@ -868,7 +869,7 @@ void MixerView::drawMasterFxRow(const char *label,const char *value,
 	SetColor(CD_NORMAL) ;
 }
 
-void MixerView::drawDelayPage() {
+void MixerView::drawDelayPage(const char *title) {
 	char buffer[16] ;
 	static const char *labels[7]={"BYPASS","TIME","FEEDBACK","MIX",
 	                              "WIDTH","PING/PONG","SATURATE"} ;
@@ -878,6 +879,8 @@ void MixerView::drawDelayPage() {
 	// RC5: the whole 7-row block is centered in the safe menu band 3..25
 	// (label column 9 = "PING/PONG", value column 8, two-cell spacing).
 	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,9,8,2) ;
+	// RC6: the page title sits on the row just above the centered block.
+	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
@@ -897,7 +900,7 @@ void MixerView::drawDelayPage() {
 	}
 }
 
-void MixerView::drawReverbPage() {
+void MixerView::drawReverbPage(const char *title) {
 	char buffer[16] ;
 	static const char *labels[7]={"BYPASS","PREDELAY","DECAY","SIZE",
 	                              "DAMPING","WIDTH","MODE"} ;
@@ -907,6 +910,8 @@ void MixerView::drawReverbPage() {
 	// RC5: centered 7-row block in the safe menu band 3..25 (label column
 	// 8 = "PREDELAY", value column 8, two-cell spacing).
 	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,8,8,2) ;
+	// RC6: the page title sits on the row just above the centered block.
+	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
@@ -974,13 +979,15 @@ void MixerView::drawEqRow(int id,int labelX,int valueX,int y) {
 	SetColor(CD_NORMAL) ;
 }
 
-void MixerView::drawEqPage() {
-	// Title (row 1) is drawn by drawFxParamPage(); hints moved to the
-	// HelpOverlay (SELECT+R1).  Rows: bypass first, then each band is a
-	// header line followed by EN/FRQ/GAIN/Q.  RC5 centers the whole 16-row
-	// block in the safe menu band 3..25 (label column 6, value column 9,
-	// two-cell spacing) so the full EQ stays on screen and balanced.
+void MixerView::drawEqPage(const char *title) {
+	// Title is drawn here, at the top of the centered block (row 5 for the
+	// 16-row EQ block); hints moved to the HelpOverlay (SELECT+R1).  Rows:
+	// bypass first, then each band is a header line followed by EN/FRQ/GAIN/Q.
+	// RC5 centers the whole 16-row block in the safe menu band 3..25 (label
+	// column 6, value column 9, two-cell spacing) so the full EQ stays on
+	// screen and balanced.
 	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(16,6,9,2) ;
+	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
 	GUITextProperties props ;
 	drawEqRow(FX_P_EQ_BYP,ml.labelX,ml.valueX,ml.startY) ;
 	const int bandBase[3]={FX_P_EQ_LOW_EN,FX_P_EQ_MID_EN,FX_P_EQ_HI_EN} ;
@@ -1002,12 +1009,13 @@ void MixerView::drawEqPage() {
 // GR meter (a readout, not a selectable row) stays visible below the
 // parameters.  No clipping indicator: the engine exposes no reliable real
 // audio clip reading (GetRtViolations is buffer RT telemetry, must stay 0).
-void MixerView::drawCompPage() {
+void MixerView::drawCompPage(const char *title) {
 	// RC5: the whole 9-row block is centered in the safe menu band 3..25
 	// (label column 11 = "Stereo Link", value column 8, three-cell spacing so
 	// the 14-cell "Gain Reduction" line below fits beside its value); the GR
 	// meter stays visible one row below the last parameter.
 	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(9,11,8,3) ;
+	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
 	GUITextProperties props ;
 	char buffer[20] ;
 	const char *labels[9]={"Bypass","Threshold","Ratio","Knee",
@@ -1088,16 +1096,16 @@ void MixerView::drawFxPages() {
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
 	if (fxPage_==FX_PAGE_MIX) {
-		// RC5 (centered single-cell meters): the MIX page lays out 9 meters
-		// (MST + 8 channels) of one cell each, uniformly spaced every 4
+		// RC6 (compact single-cell meters): the MIX page lays out 9 meters
+		// (MST + 8 channels) of one cell each, uniformly spaced every 3
 		// columns across the full 40-cell width.  The bank is exactly
-		// bankWidth=(9-1)*4+1=33 cells, so firstMeterX=(40-33)/2=3 leaves a
-		// 3-cell left and a 4-cell right margin (one-cell tolerance).  The
+		// bankWidth=(9-1)*3+1=25 cells, so firstMeterX=(40-25)/2=7 leaves a
+		// 7-cell left and an 8-cell right margin (odd-bank tolerance).  The
 		// whole block (labels, bars, volume numbers, mute markers and the
 		// FX RETURNS line) is centered vertically in the safe band 3..25.
 		const int meterCount=SONG_CHANNEL_COUNT+1 ;
 		const int meterWidth=1 ;
-		const int meterPitch=4 ;
+		const int meterPitch=3 ;
 		const int bankWidth=(meterCount-1)*meterPitch+meterWidth ;
 		const int firstMeterX=(UiDraw::kScreenWidth-bankWidth)/2 ;
 		const int labelY=6 ;

@@ -71,11 +71,11 @@ def check_comp_order_and_defaults():
 def check_source_guards():
     # Dedicated menu: COMP page dispatches to drawCompPage.
     assert "void MixerView::drawCompPage" in MIX
-    assert "drawCompPage()" in MIX_H
+    assert "drawCompPage(const char *title)" in MIX_H
     idx = MIX.index("void MixerView::drawFxParamPage")
     # Window allows for the RC2 DELAY/REVERB dedicated-page dispatches that
     # now precede the COMP dispatch inside drawFxParamPage.
-    assert "drawCompPage()" in MIX[idx:idx + 2400]
+    assert "drawCompPage(pageTitle)" in MIX[idx:idx + 2400]
     # BYP is the first COMP table row (never off-screen).
     byp = MIX.index("{ \"CMP BYP\"")
     thr = MIX.index("{ \"CMP THR\"")
