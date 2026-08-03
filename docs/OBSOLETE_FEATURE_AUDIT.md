@@ -17,6 +17,11 @@ sends heredados) se conservan aunque no se muestren en la UI.
 | `drawMasterFxRow` | MixerView.cpp | KEEP (nuevo) | Filas DELAY/REVERB MASTER |
 | `RVB MIX` persistido | FxEngine/Persistencia | KEEP_HIDDEN | Lectura/escritura inerte por compatibilidad (RC2) |
 | `FBMX`/`FBTN` (FourCC legacy) | CommandList | KEEP_HIDDEN | Se cargan proyectos antiguos (muestran CFM/CFT) |
+| Marco ASCII `+----+` del Chopper | SampleChopperModal.cpp drawFrame | KEEP | Borde estructural que delimita la banda gráfica del overlay framebuffer (punto 18); coincidente con la geometría 320×240, excepción documentada del punto 17 |
+| Overlay de progreso del Chopper | SampleChopperModal.cpp drawOperationOverlay | KEEP | Marco invertido que bloquea visualmente la onda durante el procesamiento; no usa DrawModalFrame a propósito (punto 24) |
+| Panel Pitch/Env del Chopper | SampleChopperModal.cpp drawPitchScreen | KEEP | Panel invertido que reemplaza la banda de onda en pitch mode; bloqueo visual intencional sobre el framebuffer (punto 24/17) |
+| Hint del TextEditor | TreeFrogTextEditor.cpp:99 | KEEP | Ayuda interna de la ventana de edición de texto (modal no soporta HelpOverlay: requiere `!HasModal`) |
+| Hint del UsbRecordModal | UsbRecordModal.cpp:1440 | KEEP | Ayuda interna del modal USB record (mismo motivo) |
 
 ## Pendientes (fase completa)
 

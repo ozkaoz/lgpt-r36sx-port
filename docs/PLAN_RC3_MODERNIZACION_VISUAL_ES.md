@@ -212,6 +212,34 @@ sin efectos nuevos, sin tocar FxEngine/DSP callback en esta iteración.
 7. Auditorías finales + tests por vista + revalidación.
 8. Publicar RC3 completo.
 
+### Estado fase completa (completado, RC3 full)
+- **MixerView MASTER** (`978d8a9`): título de página centrado con
+  `UiDraw::DrawCenteredTitleAt` (fila 1), bypass de DELAY/REVERB con
+  `UiDraw::DrawToggle`, leyendas de filas 22/23 y de la página MIX retiradas
+  y migradas a `HelpRegistry` (sección MIXER).
+- **InstrumentView** (`22efd34`): cabeceras de bloque vía
+  `UiDraw::DrawSectionHeader`; hint `R1+RIGHT USB REC` migrado a Help
+  (sección INSTRUMENT).
+- **SongView/Chain/Phrase/Table/Groove**: revisadas; ya usan `UiColors` y el
+  header de app estándar; grids de 16 pasos fijos (sin scroll real, no
+  requieren `DrawScrollIndicator`); la leyenda del comando bajo el cursor
+  (Phrase/Table) es contenido contextual legítimo (KEEP).
+- **Graphical Chopper** (punto 18): ya gráfico vía overlay framebuffer
+  (forma de onda real, región seleccionada, marcadores de corte, eje y
+  cursor). Marcos ASCII restantes (frame principal, overlay de operación,
+  panel Pitch/Env) documentados como excepciones en
+  `OBSOLETE_FEATURE_AUDIT` / `UI_VISUAL_AUDIT`.
+- **Widgets ASCII/leyendas** (puntos 17/26): sin widgets ASCII no
+  documentados; `--`/`----` son placeholders de valor; hint de modales de
+  texto/USB son ayuda interna (modal no soporta HelpOverlay).
+- **Tests** (punto 30-32): `test_rc3_full_views_modernization.py` nuevo
+  (Mixer título/toggles/leyendas, Instrument secciones, HelpRegistry,
+  allowlist ASCII); revalidación completa `AUDIT_CLEAN_MAIN_U2523_OK`.
+- **Build/install/verify SD**: `BUILD_U2523_OK`, `INSTALL_U2523_OK`,
+  `VERIFY_U2523_OK`/`ERRORS=0`.
+- Commits fase completa: `978d8a9`, `22efd34`, y el commit de release con
+  auditorías y test nuevo.
+
 ---
 
 ## D. Criterios de aceptación

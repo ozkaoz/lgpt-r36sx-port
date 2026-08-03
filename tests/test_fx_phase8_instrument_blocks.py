@@ -93,16 +93,18 @@ def check_layout_rows():
 
 def check_headers_in_drawview():
     for label, row in HEADERS:
-        # DrawView draws them at hp._y + offset; anchor y == ANCHOR_Y.
+        # RC3 (fase completa): DrawView draws them with UiDraw section
+        # headers at hp._y + offset; anchor y == ANCHOR_Y.
         offset = row - ANCHOR_Y
-        assert '"%s", props' % label in IV_CPP, label
+        assert 'DrawSectionHeader(*this, hp._x' in IV_CPP, label
+        assert '"%s"' % label in IV_CPP, label
         if offset > 0:
             assert 'hp._y + %d' % offset in IV_CPP, (label, offset)
     # block headers are NOT inserted as UIStaticField fields
     for sf in IV_CPP.split("new UIStaticField(")[1:]:
         for label, _ in HEADERS:
             assert ('"%s"' % label) not in sf.split(")")[0], label
-    print("block headers drawn in DrawView (not as fields) OK")
+    print("block headers drawn in DrawView via UiDraw section headers (not as fields) OK")
 
 
 def check_first_last_fields():

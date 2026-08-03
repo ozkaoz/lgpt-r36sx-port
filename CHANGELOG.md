@@ -1,5 +1,30 @@
 # Changelog
 
+## Release candidate: Bacon 1.1 - FX Dev (RC3 full)
+
+- **Estado**: fase completa de la modernización visual integral
+  (`docs/PLAN_RC3_MODERNIZACION_VISUAL_ES.md`, sección C). No toca el motor
+  FX/DSP/persistencia (compatibilidad bit-idéntica intacta).
+- **MixerView MASTER**: título de página centrado con
+  `UiDraw::DrawCenteredTitleAt` (fila 1), bypass de DELAY/REVERB con
+  `UiDraw::DrawToggle`; las leyendas permanentes de las filas 22/23 y de la
+  página MIX se retiraron de la pantalla y migraron a la ayuda contextual
+  (`HelpRegistry`, sección MIXER, abierta con SELECT+R1).
+- **InstrumentView**: cabeceras de bloque (INSTRUMENT/FILTER/BITCRUSHER/
+  PLAYBACK/EFFECT SENDS/AUTOMATION) renderizadas con
+  `UiDraw::DrawSectionHeader`; el hint `R1+RIGHT USB REC` migró a Help.
+- **Graphical Chopper** (punto 18): confirmado gráfico vía overlay
+  framebuffer (forma de onda real, región seleccionada, marcadores de
+  corte, eje y cursor). Los tres marcos ASCII restantes (frame, overlay de
+  progreso, panel Pitch/Env) quedan documentados como excepciones en
+  `OBSOLETE_FEATURE_AUDIT`/`UI_VISUAL_AUDIT`.
+- **Widgets ASCII** (punto 17): sin widgets ASCII no documentados en la
+  capa de vistas; `--`/`----` son placeholders de valor legítimos.
+- **Pruebas**: nuevo `test_rc3_full_views_modernization.py`; auditoría
+  completa en verde (`AUDIT_CLEAN_MAIN_U2523_OK`); core reconstruido,
+  instalado y verificado en SD (`BUILD_U2523_OK`, `INSTALL_U2523_OK`,
+  `VERIFY_U2523_OK`, `ERRORS=0`).
+
 ## Release candidate: Bacon 1.1 - FX Dev (RC3 base)
 
 - **Estado**: fase base de la modernización visual integral

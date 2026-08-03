@@ -249,9 +249,13 @@ def check_instrument_sends():
 # 4. Interface
 # ---------------------------------------------------------------------------
 def check_ui_bounds():
-    # help rows at y=22/23 in the MIX/param pages; no param page draws there
-    assert 'DrawString(1,22,"UP/DN row' in MIX
-    assert 'DrawString(1,23,"SELECT page' in MIX
+    # RC3 (fase completa): the help rows at y=22/23 of the MASTER pages were
+    # migrated to HelpRegistry (HelpOverlay, SELECT+R1); they must no longer
+    # be drawn in the MIX/param pages.  The centered page title replaces the
+    # old (1,1) DrawString.
+    assert 'DrawString(1,22,"UP/DN row' not in MIX
+    assert 'DrawString(1,23,"SELECT page' not in MIX
+    assert "UiDraw::DrawCenteredTitleAt(*this,1,pageTitle)" in MIX
     # InstrumentView fields stay above the map band (y=27)
     assert "drawMap" in IV
     # CMP BYP (first) and CMP SCL (soft clip) are visible rows
@@ -260,7 +264,7 @@ def check_ui_bounds():
     # EQ and COMP are separate pages
     assert "FxPage" in (APP / "Views/MixerView.h").read_text()
     assert "EQ" in MIX and "COMP" in MIX
-    print("UI: no page over help rows, CMP BYP/SCL visible, EQ/COMP separate OK")
+    print("UI: no page over help rows, centered title, CMP BYP/SCL visible, EQ/COMP separate OK")
 
 
 def check_ui_onoff_units():

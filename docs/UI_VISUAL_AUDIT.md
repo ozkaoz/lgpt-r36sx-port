@@ -23,7 +23,7 @@ estado de cada vista se rastrea en el checklist por vista.
 | 20 | Colores semánticos | UiColors.h |
 | 24 | Modales unificados | Pendiente fase completa |
 | 30-32 | Tests (colores/toggles/barras/layout) | RC2 + RC3 suite PASS |
-| 18 | Graphical Chopper modernizado | Pendiente fase completa |
+| 18 | Graphical Chopper modernizado | Implementado (overlay framebuffer) |
 
 ## Avances fase completa
 
@@ -49,6 +49,20 @@ estado de cada vista se rastrea en el checklist por vista.
 
 Se documentarán aquí en la fase completa las capturas ASCII antes/después por
 vista (Song, Chain, Phrase, Table, Groove, Instrument, Mixer).
+
+### Graphical Chopper (punto 18)
+Ya modernizado: la forma de onda real se renderiza por framebuffer overlay
+(`tf_vline`/`tf_rect` en `PLATFORM_TREEFROG`) con amplitud por columna,
+región seleccionada (banda + raíles finos), marcadores de corte, eje central
+y cursor. El borde ASCII `+----+` de la capa de texto es el marco estructural
+de la banda (KEEP, ver OBSOLETE_FEATURE_AUDIT).
+
+El overlay de progreso de operación (`drawOperationOverlay`) y el panel
+Pitch/Env (`drawPitchScreen`) usan marcos invertidos propios que
+sobrescriben visualmente la banda durante el procesamiento/edición; se
+conservan como excepción documentada del punto 24/17 (no son
+`DrawModalFrame` porque el bloqueo sólido sobre la forma de onda es
+intencional).
 
 ## Checklist por vista
 
