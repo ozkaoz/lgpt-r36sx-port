@@ -130,9 +130,13 @@ def check_no_nan_inf():
 
 def check_fixed_44k_documented():
     root = Path(__file__).resolve().parents[1]
-    src = (root / "source/sources/Application/Instruments/Filters.cpp").read_text()
+    # UTF-8 explicit: the docs/tests use accented Spanish and the Windows
+    # default codec (cp1252/charmap) cannot decode them (preexisting failure
+    # fixed in RC2: UnicodeDecodeError on Windows, silent on WSL).
+    src = (root / "source/sources/Application/Instruments/Filters.cpp").read_text(
+        encoding="utf-8")
     assert "22050" in src
-    plan = (root / "docs/PLAN_FX_REDESIGN_ES.md").read_text()
+    plan = (root / "docs/PLAN_FX_REDESIGN_ES.md").read_text(encoding="utf-8")
     assert "44.1kHz" in plan and "22050" in plan
 
 
