@@ -184,14 +184,33 @@ sin efectos nuevos, sin tocar FxEngine/DSP callback en esta iteración.
 5. **Auditorías** (puntos 14, 27, 28, 29): crear los cuatro documentos.
 6. **Tests** (puntos 30-32): suite nueva + revalidación completa.
 
+### Estado fase base (completado, RC3 base)
+- `UiColors.h` con roles `UI_COLOR_*` mapeados a `CD_*` (punto 20).
+- `UiDraw.h/.cpp` con todas las primitivas (punto 19), clamp 40x30.
+- `HelpRegistry` + `HelpOverlay`, `SELECT+R1` con latch, `SELECT+R2`
+  conserva Audio Driver (puntos 10-13).
+- Bypass como primera fila en DELAY/REVERB/EQ/COMP (punto 7), con helpers
+  `fxBypassId`/`fxIdForRow`/`fxCountOnPage`; tabla y enum byte-idénticos.
+- Auditorías: `UI_CONTROL_AUDIT`, `OBSOLETE_FEATURE_AUDIT`,
+  `UI_VISUAL_AUDIT`, `UI_STYLE_GUIDE`.
+- Tests: `test_rc3_base_unified_bypass_uidraw_help.py`;
+  build/install/verify SD OK.
+
+### Commit base RC3 (fase base)
+`84b9821`.
+
 ## C. Fase completa (siguientes entregas)
 
-- Modernización de todas las vistas (Song, Chain, Phrase, Table, Groove,
-  modales, listas) con los componentes UiDraw.
-- Graphical Chopper (punto 18).
-- Eliminación de widgets ASCII restantes (punto 17) y retirada de leyendas
-  permanentes movidas a Help.
-- Indicadores de scroll y tabs en todas las vistas con subpáginas.
+1. Modernizar MixerView (MASTER pages con `UiDraw`, título centrado, toggles
+   y barras vía UiColors/UiDraw) y retirar leyendas a Help.
+2. Modernizar InstrumentView (tabs, barras sólidas de envíos, jerarquía).
+3. Modernizar SongView (título centrado, jerarquía, hints mínimos).
+4. Modernizar Chain/Phrase/Table/Groove (título centrado, cursor coherente,
+   scroll indicadores).
+5. Graphical Chopper (punto 18).
+6. Retirar widgets ASCII restantes (punto 17) y leyendas -> Help (punto 26).
+7. Auditorías finales + tests por vista + revalidación.
+8. Publicar RC3 completo.
 
 ---
 
