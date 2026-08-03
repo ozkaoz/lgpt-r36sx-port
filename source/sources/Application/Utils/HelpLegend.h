@@ -5,38 +5,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "Application/Instruments/CommandList.h"
+
 // TREEFROG_BEATMAKING_FX_V1:
 // Display names for the phrase commands, shown in the phrase grid, the table
 // editor and the command selector. The stored FourCC is never changed, so
 // projects stay compatible; only the on-screen name follows the expected
-// beatmaking labels (FBM/FBT/DLY/FLT/EQ/BTS/PFI).
+// beatmaking labels (FBM/FBT/NDL/FLT/EQ/BTS/PFI).
+// TREEFROG_COMMAND_SPECS_V1 (Fase 6): the names (and the per-command hex
+// editor format) now live in CommandList::_specs_; this function just copies
+// the central label so the grid, the table and the selector never drift.
 static inline void getCommandDisplayName(FourCC command, char *out) {
-	switch (command) {
-		case I_CMD_FBMX: strcpy(out, "FBM "); break;
-		case I_CMD_FBTN: strcpy(out, "FBT "); break;
-		case I_CMD_DLAY: strcpy(out, "DLY "); break;
-		case I_CMD_FLTR: strcpy(out, "FLT "); break;
-		case I_CMD_FCUT: strcpy(out, "EQ  "); break;
-		case I_CMD_FRES: strcpy(out, "RES "); break;
-		case I_CMD_CRSH: strcpy(out, "BTS "); break;
-		case I_CMD_PFIN: strcpy(out, "PFI "); break;
-		// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4)
-		case I_CMD_DLYS: strcpy(out, "DSN "); break;
-		case I_CMD_RVBS: strcpy(out, "RSN "); break;
-		case I_CMD_DLYT: strcpy(out, "DTM "); break;
-		case I_CMD_DLYF: strcpy(out, "DFB "); break;
-		case I_CMD_RVDC: strcpy(out, "RDC "); break;
-		case I_CMD_RVSZ: strcpy(out, "RSZ "); break;
-		case I_CMD_CMPT: strcpy(out, "CTH "); break;
-		default: {
-			const char *src = (const char *)&command;
-			out[0] = src[0];
-			out[1] = src[1];
-			out[2] = src[2];
-			out[3] = src[3];
-			break;
-		}
-	}
+	strcpy(out, CommandList::GetDisplayName(command)) ;
+	out[4] = 0 ;
 }
 
 static inline std::string* getHelpLegend(FourCC command) {
@@ -145,7 +126,7 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[2].assign("at speed bb");
 			break;
 		case I_CMD_DLAY:
-			result[0].assign("DeLAY note:--bb");
+			result[0].assign("Note DeLay:--bb");
 			result[1].assign("delay note trigger bb tics");
 			result[2].assign("");
 			break;

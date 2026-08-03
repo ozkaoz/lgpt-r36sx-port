@@ -49,6 +49,25 @@
 #define I_CMD_RVSZ MAKE_FOURCC('R','V','S','Z')  // reverb size (master)
 #define I_CMD_CMPT MAKE_FOURCC('C','M','P','T')  // comp threshold (master)
 
+// TREEFROG_COMMAND_SPECS_V1 (Fase 6):
+// Central definition of every command's on-screen identity and parameter
+// editor format.  The FourCC stored in .lsdsx projects never changes
+// (compatibility); only the display name and the hex editor precision are
+// driven from here.  Legacy commands keep the 4-digit 16-bit hex editor; the
+// Fase 4 FX-engine commands use a 2-digit 8-bit hex editor because they only
+// read the low param byte (value & 0xFF).
+enum CommandParamFormat {
+    CMD_PARAM_FORMAT_HEX16 = 0, // 4 hex digits, 0x0000..0xFFFF (legacy)
+    CMD_PARAM_FORMAT_HEX8,      // 2 hex digits, 0x00..0xFF (Fase 4 FX cmds)
+    CMD_PARAM_FORMAT_COUNT
+};
+
+struct CommandSpec {
+    FourCC command ;
+    const char *displayName ;   // short grid label, 4 chars incl. trailing space
+    CommandParamFormat paramFormat ;
+};
+
 class CommandList {
 public:
 	static FourCC GetNext(FourCC current) ;
@@ -62,6 +81,16 @@ public:
 	static FourCC GetLast() ;
 	static bool IsFirst(FourCC current) ;
 	static bool IsLast(FourCC current) ;
+
+	// TREEFROG_COMMAND_SPECS_V1 (Fase 6)
+	static const CommandSpec *GetSpec(FourCC command) ;
+	static const char *GetDisplayName(FourCC command) ;
+	static CommandParamFormat GetParamFormat(FourCC command) ;
+	static int GetParamPrecision(FourCC command) ;
+	static const char *GetParamFormatString(FourCC command) ;
+	static int GetParamMin(FourCC command) ;
+	static int GetParamMax(FourCC command) ;
+	static bool GetParamWrap(FourCC command) ;
 };
 #endif
 

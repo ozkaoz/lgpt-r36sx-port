@@ -77,6 +77,28 @@ PhraseView::PhraseView(GUIWindow &w, ViewData *viewData)
 
 PhraseView::~PhraseView() { delete cmdEditField_; };
 
+// TREEFROG_COMMAND_SPECS_V1 (Fase 6): the shared param hex editor adapts its
+// digit count to the command in the cell's cmd column (HEX4 for legacy
+// commands, HEX8 for the Fase 4 FX-engine commands).  The stored param value
+// is a ushort; only the low byte is meaningful for HEX8 commands.
+void PhraseView::applyCmdEditModeForCommand(FourCC command) {
+	cmdEditField_->SetHexMode(CommandList::GetParamPrecision(command),
+	                         CommandList::GetParamFormatString(command),
+	                         CommandList::GetParamMin(command),
+	                         CommandList::GetParamMax(command),
+	                         CommandList::GetParamWrap(command)) ;
+}
+
+void PhraseView::applyCmdEditMode(int paramCol) {
+	FourCC *cmd = 0 ;
+	if (paramCol == 5) {
+		cmd = phrase_->cmd1_ + (16 * viewData_->currentPhrase_ + row_) ;
+	} else if (paramCol == 7) {
+		cmd = phrase_->cmd2_ + (16 * viewData_->currentPhrase_ + row_) ;
+	}
+	if (cmd) applyCmdEditModeForCommand(*cmd) ;
+}
+
 void PhraseView::updateCursor(int dx, int dy) {
 
     col_ += dx;
@@ -127,6 +149,7 @@ void PhraseView::updateCursor(int dx, int dy) {
         p._x = kColX[5];
         p._y += row_;
         cmdEditField_->SetPosition(p);
+        applyCmdEditMode(5);
         cmdEdit_.SetInt(
             *(phrase_->param1_ + (16 * viewData_->currentPhrase_ + row_)));
         break;
@@ -134,6 +157,7 @@ void PhraseView::updateCursor(int dx, int dy) {
         p._x = kColX[7];
         p._y += row_;
         cmdEditField_->SetPosition(p);
+        applyCmdEditMode(7);
         cmdEdit_.SetInt(
             *(phrase_->param2_ + (16 * viewData_->currentPhrase_ + row_)));
         break;
@@ -240,6 +264,7 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
         lastCmd_ = *cc;
         break;
     case 5:
+        applyCmdEditMode(5);
         switch (direction) {
         case VUD_RIGHT:
             cmdEditField_->ProcessArrow(EPBM_RIGHT);
@@ -277,6 +302,7 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
         lastCmd_ = *cc;
         break;
     case 7:
+        applyCmdEditMode(7);
         switch (direction) {
         case VUD_RIGHT:
             cmdEditField_->ProcessArrow(EPBM_RIGHT);
@@ -1774,14 +1800,22 @@ void PhraseView::DrawView() {
     pos._y = anchor._y;
 
     ushort *param = phrase_->param1_ + (16 * viewData_->currentPhrase_);
+    FourCC *cf = phrase_->cmd1_ + (16 * viewData_->currentPhrase_);
     buffer[5] = 0;
 
     for (int j = 0; j < 16; j++) {
         ushort p = *param++;
+        FourCC cmd = *cf++;
         (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
                                                  : SetColor(CD_NORMAL);
         setTextProps(props, 5, j, false);
-        hexshort2char(p, buffer);
+        // TREEFROG_COMMAND_SPECS_V1 (Fase 6): Fase 4 FX commands only use the
+        // low byte, so their grid cell shows 2 hex digits (HEX8) instead of 4.
+        if (CommandList::GetParamFormat(cmd) == CMD_PARAM_FORMAT_HEX8) {
+            hex2char((unsigned char)(p & 0xFF), buffer);
+        } else {
+            hexshort2char(p, buffer);
+        }
         DrawString(pos._x, pos._y, buffer, props);
         setTextProps(props, 5, j, true);
         pos._y++;
@@ -1816,14 +1850,21 @@ void PhraseView::DrawView() {
     pos._y = anchor._y;
 
     param = phrase_->param2_ + (16 * viewData_->currentPhrase_);
+    cf = phrase_->cmd2_ + (16 * viewData_->currentPhrase_);
     buffer[5] = 0;
 
     for (int j = 0; j < 16; j++) {
         ushort p = *param++;
+        FourCC cmd = *cf++;
         (0 == j || 4 == j || 8 == j || 12 == j) ? SetColor(CD_MAJORBEAT)
                                                  : SetColor(CD_NORMAL);
         setTextProps(props, 7, j, false);
-        hexshort2char(p, buffer);
+        // TREEFROG_COMMAND_SPECS_V1 (Fase 6): HEX8 for Fase 4 FX commands.
+        if (CommandList::GetParamFormat(cmd) == CMD_PARAM_FORMAT_HEX8) {
+            hex2char((unsigned char)(p & 0xFF), buffer);
+        } else {
+            hexshort2char(p, buffer);
+        }
         DrawString(pos._x, pos._y, buffer, props);
         setTextProps(props, 7, j, true);
         pos._y++;

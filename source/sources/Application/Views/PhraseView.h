@@ -67,6 +67,10 @@ class PhraseView : public View {
     UIBigHexVarField *cmdEditField_;
     void printHelpLegend(FourCC command, GUITextProperties props);
     void enterCommandSelector();
+    // TREEFROG_COMMAND_SPECS_V1 (Fase 6): configures the shared hex editor
+    // (precision/range) from the command stored in the cell's cmd column.
+    void applyCmdEditMode(int paramCol);
+    void applyCmdEditModeForCommand(FourCC command);
     int findClosestInstrumentFor(int);
     int getChopSourceInstrumentForCurrentRow();
     int getChopSourceInstrumentForRow(int row);

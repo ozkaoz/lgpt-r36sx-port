@@ -64,5 +64,16 @@ public:
 	  virtual void GetTableState(TableSaveState &state)=0 ;	 
 	  virtual void SetTableState(TableSaveState &state)=0 ;	 
 
+	  // TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6):
+	  // Per-instrument FX sends.  Overrides return 0xFF ("unset") by default so
+	  // the legacy per-track Mixer sends keep working unchanged; SampleInstrument
+	  // overrides them with real 0..100 values once the user drives DLYS/RVBS.
+	  // GetFxDry() is a 0..100 send gain (100 = full).  PlayerChannel combines
+	  // these with the per-track Mixer sends at render time.
+
+	  virtual int GetFxDelaySendOverride() { return 0xFF; }
+	  virtual int GetFxReverbSendOverride() { return 0xFF; }
+	  virtual int GetFxDry() { return 100; }
+
 };
 #endif

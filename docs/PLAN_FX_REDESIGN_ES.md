@@ -377,6 +377,32 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 - **Build + instalación**: core `lgpt_r36sx_u2523.so` compilado con toolchain MIPS real -> `BUILD_U2523_OK`; instalado en SD -> `INSTALL_U2523_OK` (backup `LGPT_BEFORE_U2523_20260802_130251`); verificado -> `VERIFY_U2523_OK` (ERRORS=0). Símbolos `RefreshLegacy`, `AllParamsAtLegacyDefault`, `NotifyFxSends`, etiqueta `FXMASTER` presentes en el core de la SD.
 - Prueba prolongada R36SX: 10 min, 8 pistas, 0 underruns, presets ECO. *(queda pendiente en hardware)*
 
+### Fase 6 — Sends por instrumento, rediseño de UI y navegación A+B=default (hecho y verificado)
+
+**6.1 — Sends FX por instrumento (hecho y verificado)**
+- `I_Instrument.h`: virtuals no-virt-pure `GetFxDelaySendOverride()`/`GetFxReverbSendOverride()` (default `0xFF` = "hereda el send per-track del Mixer") y `GetFxDry()` (default 100). `MidiInstrument` queda intacto.
+- `SampleInstrument`: variables persistidas `DRY` (`SIP_DRY`, 0..100, default 100), `DLY send` (`SIP_DLY_SEND`, 0..100, default -1 = inherit) y `RVB send` (`SIP_RVB_SEND`, idem). Se serializan como PARAMs ordinarios.
+- `PlayerChannel::Render`: `gain = (send% * DRY%) / 10000.0f` con `fl2fp`; el override del instrumento gana; si no hay override se hereda el send per-track del Mixer. `DRY=100` es bit-idéntico a Fase 4/5.
+- Handlers `I_CMD_DLYS`/`I_CMD_RVBS`: escriben el override del instrumento Y el send per-track del `Mixer` (UI legacy + persistencia consistentes).
+- Test `tests/test_fx_phase6_instrument_sends.py` -> `FX_INSTRUMENT_SENDS_PHASE6_OK` (default hereda track, DRY=100 == Fase 4, DRY escala lineal, override gana, DLYS/RVBS tocan Mixer, guards de fuente).
+
+**6.2 — Rediseño MixerView: 5 páginas (hecho y verificado)**
+- `MixerView.h`: enum `FxPage` = MIX, DELAY, REVERB, EQ, COMP (`FX_PAGE_COUNT=5`). SELECT cicla MIX -> DELAY -> REVERB -> EQ -> COMP.
+- `kFxParams_` = 37 parámetros (delay 7, reverb 8, EQ 13, comp 9); eliminadas las filas globales `DLY SND/DLY RET/RVB SND/RVB RET` (los sends pasan a ser per-pista/per-instrumento y los returns quedan fijos en `fl2fp(0.5)`).
+- Títulos por página: `DELAY MASTER`, `REVERB MASTER`, `MASTER EQ`, `MASTER COMP` (GR meter en COMP).
+- Test `tests/test_fx_phase4_ui.py` actualizado -> `FX_UI_PHASE43_OK` (5 páginas / 37 params).
+
+**6.3 — InstrumentFxModal eliminado (hecho y verificado)**
+- Borrados `InstrumentFxModal.{h,cpp}`; el Makefile no lo compila.
+- R2+A en el Mixer ya no abre un modal: salta a `VT_INSTRUMENT` con `viewData_->currentInstrument_=mixerCol_`. Hint en la página MIX: `R2+A instr`.
+
+**6.4 — InstrumentView: campos de send + navegación A+B=default (hecho y verificado)**
+- Bloque `fx sends: dry:%3d dly:%3d rvb:%3d` insertado tras `SIP_PAN` (`UIStaticField* sendLabel`).
+- `A+B` resetea el campo enfocado a su default (`Variable::Reset()`), incluyendo los campos editables del InstrumentView.
+- En las páginas FX de `MixerView`, `A+B` restaura la fila hovereada a su default legacy (`fxResetRow()` + columna `vdef` en `kFxParams_`, alineada con `AllParamsAtLegacyDefault` de Fase 5) — permite devolver toda la página al estado "all defaults" sin buscar a mano.
+- **Conflicto resuelto**: como `A+B` y `B+A` comparten el mismo bitmask, la acción legacy "B+A cortar instrumento / limpiar tabla" se mueve a `L2+A`.
+- Test `tests/test_fx_phase6_nav_ab_default.py` -> `FX_NAV_AB_DEFAULT_PHASE6_OK` (37 params / 5 páginas, defaults == `AllParamsAtLegacyDefault`, reset idempotente, guards de fuente).
+
 ---
 
 ## G. Diseño de clases / APIs (FxEngine)

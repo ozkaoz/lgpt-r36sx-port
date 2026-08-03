@@ -11,6 +11,20 @@ UIBigHexVarField::UIBigHexVarField(GUIPoint &position,Variable &v,int precision,
 	wrap_=wrap ;
 } ; 
 
+// TREEFROG_COMMAND_SPECS_V1 (Fase 6): re-target precision/range/format in
+// place (used when the edited cell's command switches between the 4-digit
+// legacy format and the 2-digit Fase 4 FX format).  position_ is reset to the
+// least significant digit so the nibble cursor stays coherent after the
+// switch.
+void UIBigHexVarField::SetHexMode(int precision,const char *format,int min,int max,bool wrap) {
+	precision_=(precision>0)?(unsigned int)(precision-1):0 ;
+	format_=format ;
+	min_=min ;
+	max_=max ;
+	wrap_=wrap ;
+	position_=0 ;
+} ; 
+
 void UIBigHexVarField::Draw(GUIWindow &w,int offset) {
 
 	GUITextProperties props ;

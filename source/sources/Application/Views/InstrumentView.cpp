@@ -136,10 +136,34 @@ void InstrumentView::fillSampleParameters() {
 	f1=new UIIntVarField(position,*v,"volume: %d [%2.2X]",0,255,1,10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
-    position._y+=1 ;
+	position._y+=1 ;
 	v=instrument->FindVariable(SIP_PAN) ;
 	f1=new UIIntVarField(position,*v,"pan: %2.2X",0,0xFE,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
+
+	// TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6): per-instrument FX sends.
+	// DRY (0..100, default 100) scales the effective delay/reverb sends;
+	// DLY/RVB send (0..100, default -1 = inherit the per-track Mixer send).
+	// These are read at render time by PlayerChannel.
+	position._y+=1 ;
+	UIStaticField *sendLabel=new UIStaticField(position,"fx sends: ") ;
+	T_SimpleList<UIField>::Insert(sendLabel) ;
+	position._x+=10 ;
+	v=instrument->FindVariable(SIP_DRY) ;
+	f1=new UIIntVarField(position,*v,"dry:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	position._x-=10 ;
+	position._y+=1 ;
+	position._x+=10 ;
+	v=instrument->FindVariable(SIP_DLY_SEND) ;
+	f1=new UIIntVarField(position,*v,"dly:%3d",-1,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	position._x+=6 ;
+	v=instrument->FindVariable(SIP_RVB_SEND) ;
+	f1=new UIIntVarField(position,*v,"rvb:%3d",-1,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	position._x-=16 ;
+
 
 	position._y+=1 ;
 	v=instrument->FindVariable(SIP_ROOTNOTE) ;
@@ -323,6 +347,24 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
 
 	isDirty_=false ;
 
+	// TREEFROG_FX_NAV_A_B_DEFAULT_V1 (PLAN_FX_REDESIGN_ES.md, Fase 6):
+	// A+B resets the focused field's variable to its default.  Because A+B and
+	// B+A share the same bitmask, the old "B+A cut instrument" action moved to
+	// L2+A (see below).
+	if ((mask & (EPBM_A | EPBM_B)) == (EPBM_A | EPBM_B) &&
+	    !(mask & (EPBM_LEFT | EPBM_RIGHT | EPBM_UP | EPBM_DOWN |
+	              EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2 |
+	              EPBM_X | EPBM_Y | EPBM_SELECT | EPBM_START))) {
+		UIField *rawFocus=GetFocus() ;
+		if (rawFocus && !rawFocus->IsStatic()) {
+			UIIntVarField *field=(UIIntVarField *)rawFocus ;
+			Variable &v=field->GetVariable() ;
+			v.Reset() ;
+			isDirty_=true ;
+		}
+		return ;
+	}
+
     // U2.52.0: L1+Y deletion is intentionally not handled in Instrument.
     // Use the Import/Listen/Manage/Exit browser so the selected WAV path is
     // explicit and deletion can be confirmed before project and SD cleanup.
@@ -359,6 +401,32 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
     if (stopPreview && getInstrumentType() == IT_SAMPLE) {
         Player::GetInstance()->StopStreaming();
         isDirty_ = true;
+        return;
+    }
+
+    // TREEFROG_FX_NAV_A_B_DEFAULT_V1: cut instrument / clear table moved from
+    // B+A to L2+A (A+B is now "reset field to default").
+    bool cutInstrument = (mask & EPBM_L2) && (mask & EPBM_A) &&
+        !(mask & (EPBM_LEFT | EPBM_RIGHT | EPBM_UP | EPBM_DOWN |
+                  EPBM_B | EPBM_X | EPBM_Y | EPBM_L | EPBM_R |
+                  EPBM_R2 | EPBM_SELECT | EPBM_START));
+    if (cutInstrument) {
+        if (getInstrumentType() == IT_SAMPLE &&
+            GetFocus() == T_SimpleList<UIField>::GetFirst()) {
+            int i = viewData_->currentInstrument_;
+            InstrumentBank *bank = viewData_->project_->GetInstrumentBank();
+            I_Instrument *instr = bank->GetInstrument(i);
+            instr->Purge();
+            isDirty_ = true;
+        }
+        if (GetFocus() == T_SimpleList<UIField>::GetLast()) {
+            int i = viewData_->currentInstrument_;
+            InstrumentBank *bank = viewData_->project_->GetInstrumentBank();
+            I_Instrument *instr = bank->GetInstrument(i);
+            Variable *v = instr->FindVariable(SIP_TABLE);
+            v->SetInt(-1);
+            isDirty_ = true;
+        }
         return;
     }
 
@@ -442,29 +510,6 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
 		if (mask&EPBM_RIGHT) warpToNext(+1);
 		if (mask&EPBM_DOWN) warpToNext(-16) ;
 		if (mask&EPBM_UP) warpToNext(+16);
-		if (mask&EPBM_A) { // Allow cut instrument
-		   if (getInstrumentType()==IT_SAMPLE) {
-                if (GetFocus()==T_SimpleList<UIField>::GetFirst()) {
-	               int i=viewData_->currentInstrument_ ;
-	               InstrumentBank *bank=viewData_->project_->GetInstrumentBank() ;
-	               I_Instrument *instr=bank->GetInstrument(i) ;
-					instr->Purge() ;
-//                   Variable *v=instr->FindVariable(SIP_SAMPLE) ;
-//                   v->SetInt(-1) ;
-                   isDirty_=true ;
-                }
-           }
-
-		   // Check if on table
-		   if (GetFocus()==T_SimpleList<UIField>::GetLast()) {
-	            int i=viewData_->currentInstrument_ ;
-	            InstrumentBank *bank=viewData_->project_->GetInstrumentBank() ;
-	            I_Instrument *instr=bank->GetInstrument(i) ;
-                Variable *v=instr->FindVariable(SIP_TABLE) ;
-                v->SetInt(-1) ;
-                isDirty_=true ;
-		   } ;
-        }
         if (mask&EPBM_L) {
             viewMode_=VM_CLONE ;
         } ;

@@ -49,6 +49,13 @@ enum SampleInstrumentLoopMode {
 #define SIP_PRINTFX MAKE_FOURCC('P', 'R', 'F', 'X')
 #define SIP_IR_PAD MAKE_FOURCC('I', 'R', 'P', 'D')
 #define SIP_IR_WET MAKE_FOURCC('I', 'R', 'W', 'T')
+// TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6): per-instrument FX sends.
+// DRY (0..100, default 100) scales the effective sends; DLY/RVB sends are
+// 0..100 overrides (default -1 = inherit the per-track Mixer send).  All are
+// persisted automatically as instrument PARAMs (InstrumentBank iterator).
+#define SIP_DRY MAKE_FOURCC('D', 'R', 'Y', '_')
+#define SIP_DLY_SEND MAKE_FOURCC('D', 'S', 'N', 'D')
+#define SIP_RVB_SEND MAKE_FOURCC('R', 'S', 'N', 'D')
 
 #define FB_BUFFER_LENGTH 3500 // (in samples)
 
@@ -72,6 +79,12 @@ public:
 	   virtual bool GetTableAutomation();
 	   virtual void GetTableState(TableSaveState &state) ;	 
 	   virtual void SetTableState(TableSaveState &state) ;	 
+
+	   // TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6): per-instrument FX sends.
+	   // Returns the override if set (>=0) or 0xFF ("inherit Mixer") otherwise.
+	   virtual int GetFxDelaySendOverride() ;
+	   virtual int GetFxReverbSendOverride() ;
+	   virtual int GetFxDry() ;
 
 	   bool IsMulti() ;
 
@@ -139,6 +152,9 @@ private:
        Variable *printFx_;
        Variable *irPad_;
        Variable *irWet_;
+       Variable *dry_;
+       Variable *dlySend_;
+       Variable *rvbSend_;
 
        static bool useDirtyDownsampling_;
        char *fxPresets[4];

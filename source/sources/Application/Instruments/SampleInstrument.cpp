@@ -130,6 +130,17 @@ SampleInstrument::SampleInstrument() {
      irWet_ = new Variable("effect amount", SIP_IR_WET, 45);
      Insert(irWet_);
 
+     // TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6): per-instrument FX sends.
+     // DRY (0..100, default 100) scales the effective sends.  DLY/RVB sends
+     // are 0..100 overrides; -1 means "inherit the per-track Mixer send".
+     // They are persisted automatically as instrument PARAMs.
+     dry_ = new Variable("dry", SIP_DRY, 100, 100);
+     Insert(dry_);
+     dlySend_ = new Variable("dly send", SIP_DLY_SEND, -1, 100);
+     Insert(dlySend_);
+     rvbSend_ = new Variable("rvb send", SIP_RVB_SEND, -1, 100);
+     Insert(rvbSend_);
+
      // Initalize instrument's voices update list
 
      for (int i = 0; i < SONG_CHANNEL_COUNT; i++) {
@@ -1045,6 +1056,27 @@ int SampleInstrument::GetVolume() {
 	return v->GetInt() ;
 } ;
 
+// TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6): per-instrument FX sends.
+// Overrides return the instrument value when set (>=0), else 0xFF ("inherit
+// the per-track Mixer send").  GetFxDry() returns the DRY send scale 0..100.
+// These are read at render time by PlayerChannel, which combines them with
+// the per-track Mixer sends.
+
+int SampleInstrument::GetFxDelaySendOverride() {
+	int v=dlySend_->GetInt() ;
+	return (v<0)?0xFF:v ;
+} ;
+
+int SampleInstrument::GetFxReverbSendOverride() {
+	int v=rvbSend_->GetInt() ;
+	return (v<0)?0xFF:v ;
+} ;
+
+int SampleInstrument::GetFxDry() {
+	int v=dry_->GetInt() ;
+	return (v<0)?0:v ;
+} ;
+
 void SampleInstrument::SetRowVolume(int channel,unsigned char vol) {
 	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return ;
 	renderParams *rp=renderParams_+channel ;
@@ -1537,13 +1569,20 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 		// pure fixed-point assignments, and never allocate.
 		case I_CMD_DLYS:
 			{
+				// TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6): DLYS drives both the
+				// per-track Mixer send (legacy UI / persistence) and this
+				// instrument's override.  PlayerChannel prefers the instrument
+				// override at render time; instruments without an override
+				// keep inheriting the per-track Mixer send (compat).
 				int send=(int)((long)(value&0xFF)*100)/255 ;
+				dlySend_->SetInt(send) ;
 				Mixer::GetInstance()->SetChannelDelaySend(channel,send) ;
 			}
 			break ;
 		case I_CMD_RVBS:
 			{
 				int send=(int)((long)(value&0xFF)*100)/255 ;
+				rvbSend_->SetInt(send) ;
 				Mixer::GetInstance()->SetChannelReverbSend(channel,send) ;
 			}
 			break ;

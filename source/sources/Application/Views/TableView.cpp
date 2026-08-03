@@ -50,6 +50,28 @@ TableView::TableView(GUIWindow &w, ViewData *viewData)
 
 TableView::~TableView() {}
 
+// TREEFROG_COMMAND_SPECS_V1 (Fase 6): adapt the shared hex editor to the
+// command in the cell's cmd column (HEX4 legacy / HEX8 Fase 4 FX).
+void TableView::applyCmdEditModeForCommand(FourCC command) {
+	cmdEditField_->SetHexMode(CommandList::GetParamPrecision(command),
+	                         CommandList::GetParamFormatString(command),
+	                         CommandList::GetParamMin(command),
+	                         CommandList::GetParamMax(command),
+	                         CommandList::GetParamWrap(command)) ;
+}
+
+void TableView::applyCmdEditMode(int paramCol) {
+	Table &table =
+	    TableHolder::GetInstance()->GetTable(viewData_->currentTable_) ;
+	FourCC *cmd = 0 ;
+	if (paramCol == 1) {
+		cmd = table.cmd1_ + row_ ;
+	} else if (paramCol == 3) {
+		cmd = table.cmd2_ + row_ ;
+	}
+	if (cmd) applyCmdEditModeForCommand(*cmd) ;
+}
+
 void TableView::OnFocus() {
     clipboard_.active_ = false;
     viewMode_ = VM_NORMAL;
@@ -331,12 +353,14 @@ void TableView::updateCursor(int dx, int dy) {
         p._x += TABLE_GRID_BASE_OFFSET + TABLE_COL_PITCH;
         p._y += row_;
         cmdEditField_->SetPosition(p);
+        applyCmdEditMode(1);
         cmdEdit_.SetInt(*(table.param1_ + row_));
         break;
     case 3:
         p._x += TABLE_GRID_BASE_OFFSET + 3 * TABLE_COL_PITCH;
         p._y += row_;
         cmdEditField_->SetPosition(p);
+        applyCmdEditMode(3);
         cmdEdit_.SetInt(*(table.param2_ + row_));
         break;
     };
@@ -390,6 +414,7 @@ void TableView::updateCursorValue(int offset) {
         break;
 
     case 1:
+        applyCmdEditMode(1);
         switch (offset) {
         case 0x01:
             cmdEditField_->ProcessArrow(EPBM_RIGHT);
@@ -427,6 +452,7 @@ void TableView::updateCursorValue(int offset) {
         lastCmd_ = *cc;
         break;
     case 3:
+        applyCmdEditMode(3);
         switch (offset) {
         case 0x01:
             cmdEditField_->ProcessArrow(EPBM_RIGHT);
@@ -818,12 +844,19 @@ void TableView::DrawView() {
     pos._x += TABLE_GRID_BASE_OFFSET + TABLE_COL_PITCH;
 
     ushort *param = table.param1_;
+    FourCC *cf = table.cmd1_;
     buffer[5] = 0;
 
     for (int j = 0; j < 16; j++) {
         ushort p = *param++;
+        FourCC cmd = *cf++;
         setTextProps(props, 1, j, false);
-        hexshort2char(p, buffer);
+        // TREEFROG_COMMAND_SPECS_V1 (Fase 6): HEX8 for Fase 4 FX commands.
+        if (CommandList::GetParamFormat(cmd) == CMD_PARAM_FORMAT_HEX8) {
+            hex2char((unsigned char)(p & 0xFF), buffer);
+        } else {
+            hexshort2char(p, buffer);
+        }
         DrawString(pos._x, pos._y, buffer, props);
         setTextProps(props, 1, j, true);
         pos._y++;
@@ -856,12 +889,19 @@ void TableView::DrawView() {
     pos._x += TABLE_GRID_BASE_OFFSET + 3 * TABLE_COL_PITCH;
 
     param = table.param2_;
+    cf = table.cmd2_;
     buffer[5] = 0;
 
     for (int j = 0; j < 16; j++) {
         ushort p = *param++;
+        FourCC cmd = *cf++;
         setTextProps(props, 3, j, false);
-        hexshort2char(p, buffer);
+        // TREEFROG_COMMAND_SPECS_V1 (Fase 6): HEX8 for Fase 4 FX commands.
+        if (CommandList::GetParamFormat(cmd) == CMD_PARAM_FORMAT_HEX8) {
+            hex2char((unsigned char)(p & 0xFF), buffer);
+        } else {
+            hexshort2char(p, buffer);
+        }
         DrawString(pos._x, pos._y, buffer, props);
         setTextProps(props, 3, j, true);
         pos._y++;

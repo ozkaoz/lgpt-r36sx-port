@@ -1,8 +1,18 @@
 
 #include "CommandList.h"
+#include <string.h>
 
-static FourCC _all[]= {
-	I_CMD_NONE,
+// TREEFROG_COMMAND_SPECS_V1 (Fase 6):
+// Single source of truth for the phrase command list.  The first entry is the
+// empty command (I_CMD_NONE, index 0) which the UI skips; navigation helpers
+// below operate on this table so the popup grid and the hex editor stay in
+// sync.  Display names follow the beatmaking labels (FBM/FBT/NDL/FLT/EQ/RES/
+// BTS/PFI) and the Fase 4 FX-engine codes (DSN/RSN/DTM/DFB/RDC/RSZ/CTH).
+// The stored FourCC is never changed (project compatibility); the parameter
+// editor format is per-command (HEX16 for legacy, HEX8 for Fase 4 FX).
+static const CommandSpec _specs[] = {
+	// command,                       displayName,       paramFormat
+	{ I_CMD_NONE,                     "----",            CMD_PARAM_FORMAT_HEX16 },
 	// TREEFROG_BEATMAKING_FX_V1:
 	// Phrase command list trimmed to the beatmaking FX families:
 	// legacy comb feedback (FBMX/FBTN), note delay (DLAY),
@@ -10,28 +20,31 @@ static FourCC _all[]= {
 	// PTCH was removed (H38.7): pitch now lives in its own phrase column.
 	// Engine processing is untouched: projects using other commands still
 	// play and are editable from their views.
-	I_CMD_FBMX,
-	I_CMD_FBTN,
-	I_CMD_DLAY,
-	I_CMD_FLTR,
-	I_CMD_FCUT,
-	I_CMD_FRES,
-	I_CMD_CRSH,
-	I_CMD_PFIN,
+	{ I_CMD_FBMX,                     "FBM ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_FBTN,                     "FBT ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_DLAY,                     "NDL ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_FLTR,                     "FLT ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_FCUT,                     "EQ  ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_FRES,                     "RES ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_CRSH,                     "BTS ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_PFIN,                     "PFI ",            CMD_PARAM_FORMAT_HEX16 },
 	// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4):
 	// Master-bus FX automation, monotonic 00-FF on the low param byte:
 	// DLYS/RVBS set the track sends, DLYT/DLYF the master delay,
 	// RVDC/RVSZ the master reverb, CMPT the master compressor threshold.
-	I_CMD_DLYS,
-	I_CMD_RVBS,
-	I_CMD_DLYT,
-	I_CMD_DLYF,
-	I_CMD_RVDC,
-	I_CMD_RVSZ,
-	I_CMD_CMPT
+	// These commands only read (value & 0xFF), so the editor is 2-digit HEX8.
+	{ I_CMD_DLYS,                     "DSN ",            CMD_PARAM_FORMAT_HEX8 },
+	{ I_CMD_RVBS,                     "RSN ",            CMD_PARAM_FORMAT_HEX8 },
+	{ I_CMD_DLYT,                     "DTM ",            CMD_PARAM_FORMAT_HEX8 },
+	{ I_CMD_DLYF,                     "DFB ",            CMD_PARAM_FORMAT_HEX8 },
+	{ I_CMD_RVDC,                     "RDC ",            CMD_PARAM_FORMAT_HEX8 },
+	{ I_CMD_RVSZ,                     "RSZ ",            CMD_PARAM_FORMAT_HEX8 },
+	{ I_CMD_CMPT,                     "CTH ",            CMD_PARAM_FORMAT_HEX8 },
 } ;
 
-int CommandList::GetCount() { return sizeof(_all) / sizeof(FourCC); }
+static const int _count = sizeof(_specs) / sizeof(CommandSpec) ;
+
+int CommandList::GetCount() { return _count; }
 
 FourCC CommandList::GetAt(int index) {
 	int count = GetCount() ;
@@ -42,12 +55,12 @@ FourCC CommandList::GetAt(int index) {
 		index += count;
 	}
 	index %= count;
-	return _all[index] ;
+	return _specs[index].command ;
 }
 
 int CommandList::IndexOf(FourCC current) {
 	for (int i=0;i<GetCount();i++) {
-		if (_all[i] == current) {
+		if (_specs[i].command == current) {
 			return i;
 		}
 	}
@@ -55,44 +68,44 @@ int CommandList::IndexOf(FourCC current) {
 }
 
 FourCC CommandList::GetNext(FourCC current) {
-	for (uint i=0;i<sizeof(_all)/sizeof(FourCC)-1;i++) {
-		if (_all[i]==current) {
-			return _all[i+1] ;
+	for (uint i=0;i<_count-1;i++) {
+		if (_specs[i].command==current) {
+			return _specs[i+1].command ;
 		} ;
 	} ;
     // Wrap around: if current is last, return first
-    if (_all[sizeof(_all)/sizeof(FourCC)-1] == current) {
-        return _all[0];
+    if (_specs[_count-1].command == current) {
+        return _specs[0].command;
     }
-	return _all[0] ;
+	return _specs[0].command ;
 } ;
 
 FourCC CommandList::GetPrev(FourCC current) {
-    uint count=sizeof(_all)/sizeof(FourCC) ;
+    uint count=_count ;
     for (uint i = 1; i < count; i++) {
-        if (_all[i]==current) {
-            return _all[i - 1];
+        if (_specs[i].command==current) {
+            return _specs[i - 1].command;
         } ;
     };
     // Wrap around: if current is first, return last
-    if (_all[0] == current) {
-        return _all[count - 1];
+    if (_specs[0].command == current) {
+        return _specs[count - 1].command;
     }
-	return _all[count-1] ;
+	return _specs[count-1].command ;
 } ;
 
 FourCC CommandList::GetNextAlpha(FourCC current) {
 	char letter=((char *)&current)[0];
 	bool found=false ;
-	for (uint i=0;i<sizeof(_all)/sizeof(FourCC);i++) {
-		char tLetter=((char *)&_all[i])[0];
+	for (uint i=0;i<_count;i++) {
+		char tLetter=((char *)&_specs[i].command)[0];
 		if (!found) {
 			if (tLetter==letter) {
 				found=true ;
 			}
 		} else {
 			if (tLetter!=letter) {
-				return _all[i] ;
+				return _specs[i].command ;
 			}
 		} ;
 	} ;
@@ -104,10 +117,10 @@ FourCC CommandList::GetPrevAlpha(FourCC current) {
 	char letter=((char *)&current)[0];
 	bool found=false ;
 	FourCC tReturn=0xFFFFFFFF ;
-	uint count=sizeof(_all)/sizeof(FourCC) ;
+	uint count=_count ;
 
 	for (uint i=count-1;i>0;i--) {
-		char tLetter=((char *)&_all[i])[0];
+		char tLetter=((char *)&_specs[i].command)[0];
 		if (!found) {
 			if (tLetter==letter) {
 				found=true ;
@@ -115,12 +128,12 @@ FourCC CommandList::GetPrevAlpha(FourCC current) {
 		} else {
 			if (tLetter!=letter) {
 				if (tReturn==0xFFFFFFFF) {
-					tReturn=_all[i] ;
+					tReturn=_specs[i].command ;
 				} else {
 					if (tLetter!=((char *)&tReturn)[0]) {
 						return tReturn ;
 					} else {
-						tReturn=_all[i] ;
+						tReturn=_specs[i].command ;
 					}
 				}
 			}
@@ -132,18 +145,59 @@ FourCC CommandList::GetPrevAlpha(FourCC current) {
 	return current ;
 } ;
 
-FourCC CommandList::GetFirst() { return _all[0]; }
+FourCC CommandList::GetFirst() { return _specs[0].command; }
 
 FourCC CommandList::GetLast() {
-	uint count = sizeof(_all)/sizeof(FourCC) ;
-	return _all[count-1] ;
+	return _specs[_count-1].command ;
 }
 
 bool CommandList::IsFirst(FourCC current) {
-	return current == _all[0] ;
+	return current == _specs[0].command ;
 }
 
 bool CommandList::IsLast(FourCC current) {
-	uint count = sizeof(_all)/sizeof(FourCC) ;
-	return current == _all[count-1] ;
+	return current == _specs[_count-1].command ;
+}
+
+// TREEFROG_COMMAND_SPECS_V1 (Fase 6)
+
+const CommandSpec *CommandList::GetSpec(FourCC command) {
+	for (int i=0;i<_count;i++) {
+		if (_specs[i].command == command) {
+			return &_specs[i] ;
+		}
+	}
+	return 0 ;
+}
+
+const char *CommandList::GetDisplayName(FourCC command) {
+	const CommandSpec *spec = GetSpec(command) ;
+	if (spec) return spec->displayName ;
+	return "----" ;
+}
+
+CommandParamFormat CommandList::GetParamFormat(FourCC command) {
+	const CommandSpec *spec = GetSpec(command) ;
+	if (spec) return spec->paramFormat ;
+	return CMD_PARAM_FORMAT_HEX16 ;
+}
+
+int CommandList::GetParamPrecision(FourCC command) {
+	return (GetParamFormat(command) == CMD_PARAM_FORMAT_HEX8) ? 2 : 4 ;
+}
+
+const char *CommandList::GetParamFormatString(FourCC command) {
+	return (GetParamFormat(command) == CMD_PARAM_FORMAT_HEX8) ? "%2.2X" : "%4.4X" ;
+}
+
+int CommandList::GetParamMin(FourCC command) {
+	return (GetParamFormat(command) == CMD_PARAM_FORMAT_HEX8) ? 0 : 0 ;
+}
+
+int CommandList::GetParamMax(FourCC command) {
+	return (GetParamFormat(command) == CMD_PARAM_FORMAT_HEX8) ? 0xFF : 0xFFFF ;
+}
+
+bool CommandList::GetParamWrap(FourCC command) {
+	return true ;
 }

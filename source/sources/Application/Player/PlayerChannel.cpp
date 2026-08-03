@@ -61,16 +61,34 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
      }
    }
 
-   // TREEFROG_FX_SENDS_V1 (Fase 4):
+   // TREEFROG_FX_SENDS_V1 (Fase 4) + TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6):
    // Accumulate this track's rendered audio into the FxEngine delay/reverb
-   // send buses with the per-track send gains, BEFORE the master mix.  Only
-   // audible (post-volume, non-muted) audio is sent, matching what is heard.
-   // The mixer channels feed the global delay/reverb returns which are summed
-   // back into the master in FxEngine::processSendReturns().
+   // send buses BEFORE the master mix.  Only audible (post-volume, non-muted)
+   // audio is sent, matching what is heard.  The mixer channels feed the
+   // global delay/reverb returns which are summed back into the master in
+   // FxEngine::processSendReturns().
+   //
+   // Fase 6: per-instrument sends.  The instrument's DLY/RVB override wins
+   // when set (>=0); otherwise the per-track Mixer send is inherited (legacy
+   // compat).  DRY (0..100, default 100) scales the effective send gains, so
+   // DRY=100 is bit-identical to Fase 4/5 behaviour.
    if (audible) {
        Mixer *mixer=Mixer::GetInstance() ;
-       fixed dg=fl2fp((float)mixer->GetChannelDelaySend(index_)/100.0f) ;
-       fixed rg=fl2fp((float)mixer->GetChannelReverbSend(index_)/100.0f) ;
+       int dSend=mixer->GetChannelDelaySend(index_) ;
+       int rSend=mixer->GetChannelReverbSend(index_) ;
+       int dry=100 ;
+       if (instr_) {
+           int dOv=instr_->GetFxDelaySendOverride() ;
+           int rOv=instr_->GetFxReverbSendOverride() ;
+           if (dOv!=0xFF) dSend=dOv ;
+           if (rOv!=0xFF) rSend=rOv ;
+           dry=instr_->GetFxDry() ;
+           if (dry>100) dry=100 ;
+           if (dry<0) dry=0 ;
+       }
+       // Effective gain = send% * DRY% / 10000  (both 0..100)
+       fixed dg=fl2fp((float)(dSend*dry)/10000.0f) ;
+       fixed rg=fl2fp((float)(rSend*dry)/10000.0f) ;
        if (dg!=0 || rg!=0) {
            FxEngine::FxEngine::GetInstance().AccumulateChannelSend(
                index_,buffer,samplecount,dg,rg) ;

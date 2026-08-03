@@ -1,5 +1,15 @@
 # Changelog
 
+## FX redesign Fase 6 (per-instrument sends + 5-page mixer + A+B=default)
+
+- Per-instrument FX sends: each sample instrument has DRY, DLY send and RVB send variables. DRY scales the effective send (`gain = send*DRY/10000`); the instrument override wins over the per-track Mixer send, and DRY=100 is bit-identical to the previous behaviour.
+- DLYS/RVBS phrase commands now write both the instrument override and the per-track Mixer send.
+- Mixer FX pages redesigned: MIX / DELAY / REVERB / EQ / COMP (5 pages, 37 parameters). The global SEND/RET rows were removed (sends are per-track/per-instrument, returns stay fixed).
+- The Instrument FX modal is gone: R2+A in the Mixer jumps straight to the Instrument view for the hovered channel.
+- New FX navigation: A+B restores the focused parameter to its default, on both the Mixer FX pages and the Instrument view fields.
+- The legacy "B+A cut instrument / clear table" action moved to L2+A (A+B now means "restore default").
+- The Instrument view shows a live `fx sends: dry/dly/rvb` readout.
+
 ## H38.6
 
 - New dedicated Pitch column in the phrase grid (`N V P I FX1 P1 FX2 P2`): each step can be transposed -24..+24 semitones, edited with L/R (+-1) and A+UP/DOWN (+-10). Persisted in the project (new `PITCHES` buffer) and applied per note at playback. Chop rows (S01..S99) are protected so the pitch never selects a different chop.

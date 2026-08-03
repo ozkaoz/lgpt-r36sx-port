@@ -4,7 +4,6 @@
 #include "Application/Mixer/MixerService.h"
 #include "Application/Model/Project.h"
 #include "Application/Views/UIController.h"
-#include "Application/Views/ModalDialogs/InstrumentFxModal.h"
 #include "Application/Audio/FxEngine/FxEngine.h"
 #include "Application/Utils/fixed.h"
 #include "Application/Utils/char.h"
@@ -15,65 +14,65 @@
 #include <sstream>
 #include <math.h>
 
-// TREEFROG_FX_PAGES_PARAMS_V1 (PLAN_FX_REDESIGN_ES.md, Fase 4.3):
-// Parameter table for the DELAY / REVERB / MASTER pages.  Each row exposes a
-// master-bus parameter as a float in natural units (ms, %, dB, Hz, s, ratio).
-// The UI edits the float and the setter clamps to the documented range; the
-// DSP modules clamp again, so the page is always consistent.
+// TREEFROG_FX_PAGES_PARAMS_V2 (PLAN_FX_REDESIGN_ES.md, Fase 6):
+// Parameter table for the DELAY / REVERB / EQ / COMP pages.  Each row exposes
+// a master-bus parameter as a float in natural units (ms, %, dB, Hz, s,
+// ratio).  The UI edits the float and the setter clamps to the documented
+// range; the DSP modules clamp again, so the page is always consistent.
+// Fase 6: the global SEND/RET rows were removed (sends are per-track /
+// per-instrument; returns are fixed 0.5 helpers), and the old MASTER page
+// was split into EQ and COMP so each fits the 8-line mixer screen.
 struct FxParamSpec {
     const char *label ;        // short name shown on the page
     FxPage page ;              // which page owns this row
     float vmin ;               // minimum (natural units)
     float vmax ;               // maximum (natural units)
+    float vdef ;               // legacy default (natural units), A+B restores
     const char *fmt ;          // printf format for the value
 } ;
 
 static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
     // DELAY page
-    { "DLY SND", FX_PAGE_DELAY,    0.0f,   1.0f,    "%5.2f" },  // FX_P_DLY_SEND
-    { "DLY RET", FX_PAGE_DELAY,    0.0f,   1.0f,    "%5.2f" },  // FX_P_DLY_RET
-    { "DLY TIM", FX_PAGE_DELAY,   10.0f, 2000.0f,   "%5.0f" },  // FX_P_DLY_TIME (ms)
-    { "DLY FBK", FX_PAGE_DELAY,    0.0f,   0.98f,   "%5.2f" },  // FX_P_DLY_FBK
-    { "DLY MIX", FX_PAGE_DELAY,    0.0f,   1.0f,    "%5.2f" },  // FX_P_DLY_MIX
-    { "DLY WID", FX_PAGE_DELAY,    0.0f,   1.0f,    "%5.2f" },  // FX_P_DLY_WID
-    { "DLY P/P", FX_PAGE_DELAY,    0.0f,   1.0f,    "%5.0f" },  // FX_P_DLY_PP (0/1)
-    { "DLY SAT", FX_PAGE_DELAY,    0.0f,   1.0f,    "%5.0f" },  // FX_P_DLY_SAT (0/1)
-    { "DLY BYP", FX_PAGE_DELAY,    0.0f,   1.0f,    "%5.0f" },  // FX_P_DLY_BYP (0/1)
+    { "DLY TIM", FX_PAGE_DELAY,   10.0f, 2000.0f,   0.0f,   "%5.0f" },  // FX_P_DLY_TIME (ms)
+    { "DLY FBK", FX_PAGE_DELAY,    0.0f,   0.98f,   0.0f,   "%5.2f" },  // FX_P_DLY_FBK
+    { "DLY MIX", FX_PAGE_DELAY,    0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_DLY_MIX
+    { "DLY WID", FX_PAGE_DELAY,    0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_DLY_WID
+    { "DLY P/P", FX_PAGE_DELAY,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_DLY_PP (0/1)
+    { "DLY SAT", FX_PAGE_DELAY,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_DLY_SAT (0/1)
+    { "DLY BYP", FX_PAGE_DELAY,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_DLY_BYP (0/1)
     // REVERB page
-    { "RVB SND", FX_PAGE_REVERB,   0.0f,   1.0f,    "%5.2f" },  // FX_P_RVB_SEND
-    { "RVB RET", FX_PAGE_REVERB,   0.0f,   1.0f,    "%5.2f" },  // FX_P_RVB_RET
-    { "RVB PRE", FX_PAGE_REVERB,   0.0f, 100.0f,    "%5.0f" },  // FX_P_RVB_PRE (ms)
-    { "RVB DEC", FX_PAGE_REVERB,   0.2f,   8.0f,    "%5.2f" },  // FX_P_RVB_DEC (s)
-    { "RVB SIZ", FX_PAGE_REVERB,   0.5f,   1.5f,    "%5.2f" },  // FX_P_RVB_SIZ
-    { "RVB DMP", FX_PAGE_REVERB,   0.0f,   1.0f,    "%5.2f" },  // FX_P_RVB_DMP
-    { "RVB WID", FX_PAGE_REVERB,   0.0f,   1.0f,    "%5.2f" },  // FX_P_RVB_WID
-    { "RVB MOD", FX_PAGE_REVERB,   0.0f,   1.0f,    "%5.0f" },  // FX_P_RVB_MODE (0/1)
-    { "RVB MIX", FX_PAGE_REVERB,   0.0f,   1.0f,    "%5.2f" },  // FX_P_RVB_MIX
-    { "RVB BYP", FX_PAGE_REVERB,   0.0f,   1.0f,    "%5.0f" },  // FX_P_RVB_BYP (0/1)
-    // MASTER page - EQ (bands 0..2)
-    { "EQ  BYP", FX_PAGE_MASTER,   0.0f,   1.0f,    "%5.0f" },  // FX_P_EQ_BYP
-    { "LO  FRQ", FX_PAGE_MASTER,  20.0f, 20000.0f,  "%5.0f" },  // FX_P_EQ_LOW_FRQ
-    { "LO  GAI", FX_PAGE_MASTER, -12.0f,  12.0f,    "%5.1f" },  // FX_P_EQ_LOW_GAI
-    { "LO  Q",   FX_PAGE_MASTER,   0.1f,  10.0f,    "%5.2f" },  // FX_P_EQ_LOW_Q
-    { "LO  EN",  FX_PAGE_MASTER,   0.0f,   1.0f,    "%5.0f" },  // FX_P_EQ_LOW_EN
-    { "MID FRQ", FX_PAGE_MASTER,  20.0f, 20000.0f,  "%5.0f" },  // FX_P_EQ_MID_FRQ
-    { "MID GAI", FX_PAGE_MASTER, -12.0f,  12.0f,    "%5.1f" },  // FX_P_EQ_MID_GAI
-    { "MID Q",   FX_PAGE_MASTER,   0.1f,  10.0f,    "%5.2f" },  // FX_P_EQ_MID_Q
-    { "MID EN",  FX_PAGE_MASTER,   0.0f,   1.0f,    "%5.0f" },  // FX_P_EQ_MID_EN
-    { "HI  FRQ", FX_PAGE_MASTER,  20.0f, 20000.0f,  "%5.0f" },  // FX_P_EQ_HI_FRQ
-    { "HI  GAI", FX_PAGE_MASTER, -12.0f,  12.0f,    "%5.1f" },  // FX_P_EQ_HI_GAI
-    { "HI  Q",   FX_PAGE_MASTER,   0.1f,  10.0f,    "%5.2f" },  // FX_P_EQ_HI_Q
-    { "HI  EN",  FX_PAGE_MASTER,   0.0f,   1.0f,    "%5.0f" },  // FX_P_EQ_HI_EN
-    // MASTER page - Compressor
-    { "CMP THR", FX_PAGE_MASTER, -60.0f,   0.0f,    "%5.1f" },  // FX_P_CMP_THR (dB)
-    { "CMP RAT", FX_PAGE_MASTER,   1.0f,  20.0f,    "%5.1f" },  // FX_P_CMP_RAT
-    { "CMP KNE", FX_PAGE_MASTER,   0.0f,  12.0f,    "%5.1f" },  // FX_P_CMP_KNE (dB)
-    { "CMP ATK", FX_PAGE_MASTER,   0.1f, 500.0f,    "%5.1f" },  // FX_P_CMP_ATK (ms)
-    { "CMP REL", FX_PAGE_MASTER,   1.0f, 2000.0f,   "%5.0f" },  // FX_P_CMP_REL (ms)
-    { "CMP MKU", FX_PAGE_MASTER,   0.0f,  24.0f,    "%5.1f" },  // FX_P_CMP_MKU (dB)
-    { "CMP LNK", FX_PAGE_MASTER,   0.0f,   1.0f,    "%5.0f" },  // FX_P_CMP_LINK
-    { "CMP SCL", FX_PAGE_MASTER,   0.0f,   1.0f,    "%5.0f" },  // FX_P_CMP_SC (softclip)
-    { "CMP BYP", FX_PAGE_MASTER,   0.0f,   1.0f,    "%5.0f" },  // FX_P_CMP_BYP
+    { "RVB PRE", FX_PAGE_REVERB,   0.0f, 100.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_PRE (ms)
+    { "RVB DEC", FX_PAGE_REVERB,   0.2f,   8.0f,    1.0f,   "%5.2f" },  // FX_P_RVB_DEC (s)
+    { "RVB SIZ", FX_PAGE_REVERB,   0.5f,   1.5f,    1.0f,   "%5.2f" },  // FX_P_RVB_SIZ
+    { "RVB DMP", FX_PAGE_REVERB,   0.0f,   1.0f,    0.5f,   "%5.2f" },  // FX_P_RVB_DMP
+    { "RVB WID", FX_PAGE_REVERB,   0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_RVB_WID
+    { "RVB MOD", FX_PAGE_REVERB,   0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_MODE (0/1)
+    { "RVB MIX", FX_PAGE_REVERB,   0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_RVB_MIX
+    { "RVB BYP", FX_PAGE_REVERB,   0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_BYP (0/1)
+    // EQ page (3 bands: bypass + freq/gain/Q/enable each)
+    { "EQ  BYP", FX_PAGE_EQ,       0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_EQ_BYP
+    { "LO  FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,100.0f,  "%5.0f" },  // FX_P_EQ_LOW_FRQ
+    { "LO  GAI", FX_PAGE_EQ,      -12.0f,  12.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_LOW_GAI
+    { "LO  Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_LOW_Q
+    { "LO  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_LOW_EN
+    { "MID FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,1000.0f, "%5.0f" },  // FX_P_EQ_MID_FRQ
+    { "MID GAI", FX_PAGE_EQ,      -12.0f,  12.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_MID_GAI
+    { "MID Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_MID_Q
+    { "MID EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_MID_EN
+    { "HI  FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,10000.0f,"%5.0f" },  // FX_P_EQ_HI_FRQ
+    { "HI  GAI", FX_PAGE_EQ,      -12.0f,  12.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_HI_GAI
+    { "HI  Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_HI_Q
+    { "HI  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_HI_EN
+    // COMP page
+    { "CMP THR", FX_PAGE_COMP,   -60.0f,   0.0f,  -24.0f,  "%5.1f" },  // FX_P_CMP_THR (dB)
+    { "CMP RAT", FX_PAGE_COMP,     1.0f,  20.0f,    4.0f,   "%5.1f" },  // FX_P_CMP_RAT
+    { "CMP KNE", FX_PAGE_COMP,     0.0f,  12.0f,    6.0f,   "%5.1f" },  // FX_P_CMP_KNE (dB)
+    { "CMP ATK", FX_PAGE_COMP,     0.1f, 500.0f,   15.0f,   "%5.1f" },  // FX_P_CMP_ATK (ms)
+    { "CMP REL", FX_PAGE_COMP,     1.0f, 2000.0f, 200.0f,   "%5.0f" },  // FX_P_CMP_REL (ms)
+    { "CMP MKU", FX_PAGE_COMP,     0.0f,  24.0f,    0.0f,   "%5.1f" },  // FX_P_CMP_MKU (dB)
+    { "CMP LNK", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_LINK
+    { "CMP SCL", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_SC (softclip)
+    { "CMP BYP", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_BYP
 } ;
 
 // TREEFROG_MIXER_VU_DB_SCALE_V2 (H38.6):
@@ -277,8 +276,17 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 		return ;
 	}
 
-	// Parameter pages (DELAY/REVERB/MASTER): UP/DOWN row, LEFT/RIGHT edit.
+	// Parameter pages (DELAY/REVERB/EQ/COMP): UP/DOWN row, LEFT/RIGHT edit.
 	if (fxPage_!=FX_PAGE_MIX) {
+		// TREEFROG_FX_NAV_A_B_DEFAULT_V1: A+B restores the hovered row to its
+		// legacy default (checked before the arrow edits so it wins the mask).
+		if ((mask&EPBM_A) && (mask&EPBM_B) &&
+		    !(mask & (EPBM_LEFT | EPBM_RIGHT | EPBM_UP | EPBM_DOWN |
+		              EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2 |
+		              EPBM_X | EPBM_Y | EPBM_SELECT | EPBM_START))) {
+			fxResetRow() ;
+			return ;
+		}
 		if (mask&EPBM_A) {
 			if (mask&EPBM_UP) fxEditRow(1,true) ;
 			if (mask&EPBM_DOWN) fxEditRow(-1,true) ;
@@ -337,8 +345,20 @@ void MixerView::processSelectionButtonMask(unsigned int mask) {
 }
 
 void MixerView::showInstrumentFxMenu() {
-	InstrumentFxModal *modal=new InstrumentFxModal(*this,viewData_->mixerCol_) ;
-	DoModal(modal) ;
+	// TREEFROG_MIXER_FX_MENU_V3 (PLAN_FX_REDESIGN_ES.md, Fase 6):
+	// R2+A on a channel bar now switches to the Instrument view for the
+	// instrument attached to that channel (channels 0..7 map to the first
+	// 8 sample instruments).  The old InstrumentFxModal is removed: the
+	// per-instrument FX sends (DRY/DLY/RVB) and the legacy comb/offline FX
+	// live directly in InstrumentView now.
+	int channel=viewData_->mixerCol_ ;
+	if (channel>=0 && channel<SONG_CHANNEL_COUNT) {
+		viewData_->currentInstrument_=channel ;
+	}
+	ViewType vt=VT_INSTRUMENT ;
+	ViewEvent ve(VET_SWITCH_VIEW,&vt) ;
+	SetChanged() ;
+	NotifyObservers(&ve) ;
 }
 
 void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
@@ -543,6 +563,24 @@ void MixerView::fxEditRow(int delta,bool coarse) {
 	((AppWindow &)w_).SetDirty() ;
 }
 
+// TREEFROG_FX_NAV_A_B_DEFAULT_V1 (PLAN_FX_REDESIGN_ES.md, Fase 6):
+// A+B restores the hovered parameter to its legacy default so the whole page
+// can be brought back to the Fase 5 "all defaults" state without hunting.
+void MixerView::fxResetRow() {
+	int count=0 ;
+	int targetId=-1 ;
+	for (int i=0;i<FX_PARAM_COUNT;i++) {
+		if (fxIdOnPage(i,(FxPage)fxPage_)) {
+			if (count==fxRow_) targetId=i ;
+			count++ ;
+		}
+	}
+	if (targetId<0) return ;
+	fxSet(targetId,kFxParams_[targetId].vdef) ;
+	isDirty_=true ;
+	((AppWindow &)w_).SetDirty() ;
+}
+
 void MixerView::fxEditChannelTarget(int delta) {
 	(void)delta ;
 	// Currently a toggle through VOL/DLY/RVB; delta ignored (kept for symmetry).
@@ -554,8 +592,6 @@ void MixerView::fxEditChannelTarget(int delta) {
 float MixerView::fxGet(int id) const {
 	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
 	switch(id) {
-	case FX_P_DLY_SEND: return fp2fl(fx.GetDelaySend()) ;
-	case FX_P_DLY_RET:  return fp2fl(fx.GetDelayReturn()) ;
 	case FX_P_DLY_TIME: return fp2fl(fx.GetDelayTimeMs()) ;
 	case FX_P_DLY_FBK:  return fp2fl(fx.GetDelayFeedback()) ;
 	case FX_P_DLY_MIX:  return fp2fl(fx.GetDelayMix()) ;
@@ -563,8 +599,6 @@ float MixerView::fxGet(int id) const {
 	case FX_P_DLY_PP:   return fx.GetDelayPingPong()?1.0f:0.0f ;
 	case FX_P_DLY_SAT:  return fx.GetDelaySaturation()?1.0f:0.0f ;
 	case FX_P_DLY_BYP:  return fx.GetDelayBypass()?1.0f:0.0f ;
-	case FX_P_RVB_SEND: return fp2fl(fx.GetReverbSend()) ;
-	case FX_P_RVB_RET:  return fp2fl(fx.GetReverbReturn()) ;
 	case FX_P_RVB_PRE:  return fp2fl(fx.GetReverbPredelayMs()) ;
 	case FX_P_RVB_DEC:  return fp2fl(fx.GetReverbDecay()) ;
 	case FX_P_RVB_SIZ:  return fp2fl(fx.GetReverbSize()) ;
@@ -605,8 +639,6 @@ void MixerView::fxSet(int id,float v) {
 	if (v<spec.vmin) v=spec.vmin ;
 	if (v>spec.vmax) v=spec.vmax ;
 	switch(id) {
-	case FX_P_DLY_SEND: fx.SetDelaySend(fl2fp(v)) ; break ;
-	case FX_P_DLY_RET:  fx.SetDelayReturn(fl2fp(v)) ; break ;
 	case FX_P_DLY_TIME: fx.SetDelayTimeMs(fl2fp(v)) ; break ;
 	case FX_P_DLY_FBK:  fx.SetDelayFeedback(fl2fp(v)) ; break ;
 	case FX_P_DLY_MIX:  fx.SetDelayMix(fl2fp(v)) ; break ;
@@ -614,8 +646,6 @@ void MixerView::fxSet(int id,float v) {
 	case FX_P_DLY_PP:   fx.SetDelayPingPong(v>=0.5f) ; break ;
 	case FX_P_DLY_SAT:  fx.SetDelaySaturation(v>=0.5f) ; break ;
 	case FX_P_DLY_BYP:  fx.SetDelayBypass(v>=0.5f) ; break ;
-	case FX_P_RVB_SEND: fx.SetReverbSend(fl2fp(v)) ; break ;
-	case FX_P_RVB_RET:  fx.SetReverbReturn(fl2fp(v)) ; break ;
 	case FX_P_RVB_PRE:  fx.SetReverbPredelayMs(fl2fp(v)) ; break ;
 	case FX_P_RVB_DEC:  fx.SetReverbDecay(fl2fp(v)) ; break ;
 	case FX_P_RVB_SIZ:  fx.SetReverbSize(fl2fp(v)) ; break ;
@@ -680,15 +710,16 @@ void MixerView::drawFxParamPage(FxPage page) {
 	SetColor(CD_NORMAL) ;
 	GUITextProperties props ;
 	DrawString(1,1,page==FX_PAGE_DELAY?"DELAY MASTER":
-	           page==FX_PAGE_REVERB?"REVERB MASTER":"MASTER FX",props) ;
+	           page==FX_PAGE_REVERB?"REVERB MASTER":
+	           page==FX_PAGE_EQ?"MASTER EQ":"MASTER COMP",props) ;
 	for (int i=0;i<FX_PARAM_COUNT;i++) {
 		if (fxIdOnPage(i,page)) {
 			drawFxParamRow(i,1,y,0) ;
 			y++ ;
 		}
 	}
-	// GR meter (compressor) shown on the MASTER page.
-	if (page==FX_PAGE_MASTER) {
+	// GR meter (compressor) shown on the COMP page.
+	if (page==FX_PAGE_COMP) {
 		float gr=fp2fl(FxEngine::FxEngine::GetInstance().GetCompGainReductionDb()) ;
 		SetColor(CD_NORMAL) ;
 		props.invert_=false ;
@@ -749,7 +780,7 @@ void MixerView::drawFxPages() {
 		drawMixSends() ;
 		DrawString(4,19,"A+UP/DN x10  A+L/R x1",props) ;
 		DrawString(4,20,"L/R ch  L->MST  R1+B mute",props) ;
-		DrawString(4,21,"START play  R1+A solo  R2+A FX",props) ;
+		DrawString(4,21,"START play  R1+A solo  R2+A instr",props) ;
 		DrawString(4,23,"R2 edit VOL/DLY/RVB  SELECT FX pages",props) ;
 	} else {
 		drawFxParamPage((FxPage)fxPage_) ;

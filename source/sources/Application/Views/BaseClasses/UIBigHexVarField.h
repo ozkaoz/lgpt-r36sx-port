@@ -11,6 +11,9 @@ public:
 	virtual ~UIBigHexVarField() {} ;
 	virtual void Draw(GUIWindow &w,int offset=0) ;
 	virtual void ProcessArrow(unsigned short mask) ;
+	// TREEFROG_COMMAND_SPECS_V1 (Fase 6): re-target the same variable with a
+	// different digit count / range / wrap without recreating the field.
+	void SetHexMode(int precision,const char *format,int min,int max,bool wrap) ;
 private:
 	unsigned int precision_ ;
 	unsigned int power_ ;

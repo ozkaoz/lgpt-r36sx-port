@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """Phase 4 UI tests: FX pages + full master exposure (PLAN_FX_REDESIGN_ES.md).
 
-Faithful model checks for the Fase 4.3 MixerView page system:
+Faithful model checks for the MixerView page system (Fase 4.3 pages,
+refined in Fase 6: the single MASTER page is split into EQ and COMP, and the
+global SEND/RET rows are gone because sends are per-track / per-instrument):
 
-- SELECT cycles MIX -> DELAY -> REVERB -> MASTER -> MIX
-- DELAY/REVERB/MASTER pages expose master-bus parameters in natural units
+- SELECT cycles MIX -> DELAY -> REVERB -> EQ -> COMP -> MIX
+- DELAY/REVERB/EQ/COMP pages expose master-bus parameters in natural units
 - the FxEngine getters mirror the setters (readback == what was written)
 - the DSP module getters read back their stored values
 - the MIX page per-track sends edit the Mixer model (0..100)
 
 Acceptance:
 - every master parameter has a getter that reads back what the setter wrote
-- the FxParamSpec table covers all 42 parameter ids exactly once per page
+- the FxParamSpec table covers all 37 parameter ids exactly once per page
 - the UI source wires the page cycle, row edit, send edit and GR meter
 """
 import math
@@ -170,61 +172,57 @@ def check_fixed_roundtrip():
 # (id, page, label, vmin, vmax)
 FX_PARAMS = [
     # DELAY
-    (0, "DELAY", "DLY SND", 0.0, 1.0),
-    (1, "DELAY", "DLY RET", 0.0, 1.0),
-    (2, "DELAY", "DLY TIM", 10.0, 2000.0),
-    (3, "DELAY", "DLY FBK", 0.0, 0.98),
-    (4, "DELAY", "DLY MIX", 0.0, 1.0),
-    (5, "DELAY", "DLY WID", 0.0, 1.0),
-    (6, "DELAY", "DLY P/P", 0.0, 1.0),
-    (7, "DELAY", "DLY SAT", 0.0, 1.0),
-    (8, "DELAY", "DLY BYP", 0.0, 1.0),
+    (0, "DELAY", "DLY TIM", 10.0, 2000.0),
+    (1, "DELAY", "DLY FBK", 0.0, 0.98),
+    (2, "DELAY", "DLY MIX", 0.0, 1.0),
+    (3, "DELAY", "DLY WID", 0.0, 1.0),
+    (4, "DELAY", "DLY P/P", 0.0, 1.0),
+    (5, "DELAY", "DLY SAT", 0.0, 1.0),
+    (6, "DELAY", "DLY BYP", 0.0, 1.0),
     # REVERB
-    (9, "REVERB", "RVB SND", 0.0, 1.0),
-    (10, "REVERB", "RVB RET", 0.0, 1.0),
-    (11, "REVERB", "RVB PRE", 0.0, 100.0),
-    (12, "REVERB", "RVB DEC", 0.2, 8.0),
-    (13, "REVERB", "RVB SIZ", 0.5, 1.5),
-    (14, "REVERB", "RVB DMP", 0.0, 1.0),
-    (15, "REVERB", "RVB WID", 0.0, 1.0),
-    (16, "REVERB", "RVB MOD", 0.0, 1.0),
-    (17, "REVERB", "RVB MIX", 0.0, 1.0),
-    (18, "REVERB", "RVB BYP", 0.0, 1.0),
-    # MASTER EQ
-    (19, "MASTER", "EQ  BYP", 0.0, 1.0),
-    (20, "MASTER", "LO  FRQ", 20.0, 20000.0),
-    (21, "MASTER", "LO  GAI", -12.0, 12.0),
-    (22, "MASTER", "LO  Q", 0.1, 10.0),
-    (23, "MASTER", "LO  EN", 0.0, 1.0),
-    (24, "MASTER", "MID FRQ", 20.0, 20000.0),
-    (25, "MASTER", "MID GAI", -12.0, 12.0),
-    (26, "MASTER", "MID Q", 0.1, 10.0),
-    (27, "MASTER", "MID EN", 0.0, 1.0),
-    (28, "MASTER", "HI  FRQ", 20.0, 20000.0),
-    (29, "MASTER", "HI  GAI", -12.0, 12.0),
-    (30, "MASTER", "HI  Q", 0.1, 10.0),
-    (31, "MASTER", "HI  EN", 0.0, 1.0),
-    # MASTER COMP
-    (32, "MASTER", "CMP THR", -60.0, 0.0),
-    (33, "MASTER", "CMP RAT", 1.0, 20.0),
-    (34, "MASTER", "CMP KNE", 0.0, 12.0),
-    (35, "MASTER", "CMP ATK", 0.1, 500.0),
-    (36, "MASTER", "CMP REL", 1.0, 2000.0),
-    (37, "MASTER", "CMP MKU", 0.0, 24.0),
-    (38, "MASTER", "CMP LNK", 0.0, 1.0),
-    (39, "MASTER", "CMP SCL", 0.0, 1.0),
-    (40, "MASTER", "CMP BYP", 0.0, 1.0),
+    (7, "REVERB", "RVB PRE", 0.0, 100.0),
+    (8, "REVERB", "RVB DEC", 0.2, 8.0),
+    (9, "REVERB", "RVB SIZ", 0.5, 1.5),
+    (10, "REVERB", "RVB DMP", 0.0, 1.0),
+    (11, "REVERB", "RVB WID", 0.0, 1.0),
+    (12, "REVERB", "RVB MOD", 0.0, 1.0),
+    (13, "REVERB", "RVB MIX", 0.0, 1.0),
+    (14, "REVERB", "RVB BYP", 0.0, 1.0),
+    # EQ (3 bands: bypass + freq/gain/Q/enable each)
+    (15, "EQ", "EQ  BYP", 0.0, 1.0),
+    (16, "EQ", "LO  FRQ", 20.0, 20000.0),
+    (17, "EQ", "LO  GAI", -12.0, 12.0),
+    (18, "EQ", "LO  Q", 0.1, 10.0),
+    (19, "EQ", "LO  EN", 0.0, 1.0),
+    (20, "EQ", "MID FRQ", 20.0, 20000.0),
+    (21, "EQ", "MID GAI", -12.0, 12.0),
+    (22, "EQ", "MID Q", 0.1, 10.0),
+    (23, "EQ", "MID EN", 0.0, 1.0),
+    (24, "EQ", "HI  FRQ", 20.0, 20000.0),
+    (25, "EQ", "HI  GAI", -12.0, 12.0),
+    (26, "EQ", "HI  Q", 0.1, 10.0),
+    (27, "EQ", "HI  EN", 0.0, 1.0),
+    # COMP
+    (28, "COMP", "CMP THR", -60.0, 0.0),
+    (29, "COMP", "CMP RAT", 1.0, 20.0),
+    (30, "COMP", "CMP KNE", 0.0, 12.0),
+    (31, "COMP", "CMP ATK", 0.1, 500.0),
+    (32, "COMP", "CMP REL", 1.0, 2000.0),
+    (33, "COMP", "CMP MKU", 0.0, 24.0),
+    (34, "COMP", "CMP LNK", 0.0, 1.0),
+    (35, "COMP", "CMP SCL", 0.0, 1.0),
+    (36, "COMP", "CMP BYP", 0.0, 1.0),
 ]
 
 
 def check_param_table_consistency():
     ids = [p[0] for p in FX_PARAMS]
-    assert ids == list(range(41)), "param ids must be contiguous 0..40"
-    assert len(set(ids)) == 41
+    assert ids == list(range(37)), "param ids must be contiguous 0..36"
+    assert len(set(ids)) == 37
     counts = {}
     for _, page, _, _, _ in FX_PARAMS:
         counts[page] = counts.get(page, 0) + 1
-    assert counts == {"DELAY": 9, "REVERB": 10, "MASTER": 22}, counts
+    assert counts == {"DELAY": 7, "REVERB": 8, "EQ": 13, "COMP": 9}, counts
     for _, page, label, lo, hi in FX_PARAMS:
         assert lo <= hi, (label, lo, hi)
     print("param table consistency OK")
@@ -249,14 +247,17 @@ def check_src_ui_wiring():
     for token in ("cycleFxPage", "fxEditRow", "fxMoveRow", "fxGet", "fxSet",
                   "drawFxPages", "drawFxParamPage", "drawMixSends",
                   "FX_PAGE_MIX", "FX_PAGE_DELAY", "FX_PAGE_REVERB",
-                  "FX_PAGE_MASTER", "kFxParams_", "NudgeChannelDelaySend",
-                  "NudgeChannelReverbSend", "GetCompGainReductionDb",
-                  "EPBM_SELECT"):
+                  "FX_PAGE_EQ", "FX_PAGE_COMP", "kFxParams_",
+                  "NudgeChannelDelaySend", "NudgeChannelReverbSend",
+                  "GetCompGainReductionDb", "EPBM_SELECT"):
         assert token in src, token
     h = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
     for token in ("FxPage", "FX_PARAM_COUNT", "fxPage_", "fxRow_",
                   "fxEditTarget_"):
         assert token in h, token
+    # Fase 6: the global SEND/RET rows must be gone from the param table.
+    for token in ("\"DLY SND\"", "\"DLY RET\"", "\"RVB SND\"", "\"RVB RET\""):
+        assert token not in src, token
     print("ui wiring OK")
 
 

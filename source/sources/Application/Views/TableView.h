@@ -54,6 +54,9 @@ class TableView : public View {
     Variable cmdEdit_;
     UIBigHexVarField *cmdEditField_;
     void printHelpLegend(FourCC command, GUITextProperties props);
+    // TREEFROG_COMMAND_SPECS_V1 (Fase 6)
+    void applyCmdEditMode(int paramCol);
+    void applyCmdEditModeForCommand(FourCC command);
 
     struct clipboard {
         bool active_;

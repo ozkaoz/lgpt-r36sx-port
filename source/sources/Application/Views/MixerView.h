@@ -5,28 +5,31 @@
 #include "ViewData.h"
 #include "Application/Model/Song.h"
 
-// TREEFROG_FX_PAGES_V1 (PLAN_FX_REDESIGN_ES.md, Fase 4.3):
-// MixerView gains a page system for the master FX engine.  SELECT cycles
-// MIX -> DELAY -> REVERB -> MASTER -> MIX.  MIX keeps the per-channel bars
-// and adds per-track DLY/RVB send readouts/edits (R2 alone cycles the edit
-// target VOL/DLY/RVB on the hovered channel).  DELAY/REVERB/MASTER are
-// parameter pages: UP/DOWN moves the row cursor, LEFT/RIGHT edits the value,
-// A+UP/DOWN coarse.  MASTER exposes the full 3-band EQ + compressor.
+// TREEFROG_FX_PAGES_V2 (PLAN_FX_REDESIGN_ES.md, Fase 6):
+// MixerView page system for the master FX engine.  SELECT cycles
+// MIX -> DELAY -> REVERB -> EQ -> COMP -> MIX.  MIX keeps the per-channel
+// bars and adds per-track DLY/RVB send readouts/edits (R2 alone cycles the
+// edit target VOL/DLY/RVB on the hovered channel).  DELAY/REVERB/EQ/COMP
+// are parameter pages: UP/DOWN moves the row cursor, LEFT/RIGHT edits the
+// value, A+UP/DOWN coarse.  EQ exposes the 3-band parametric EQ, COMP the
+// compressor (Fase 6 splits the old single MASTER page in two so each page
+// fits the 8-line mixer screen without scrolling).
 enum FxPage {
     FX_PAGE_MIX = 0,
     FX_PAGE_DELAY,
     FX_PAGE_REVERB,
-    FX_PAGE_MASTER,
+    FX_PAGE_EQ,
+    FX_PAGE_COMP,
     FX_PAGE_COUNT
 };
 
-// Parameter rows available on the DELAY/REVERB/MASTER pages (see
+// Parameter rows available on the DELAY/REVERB/EQ/COMP pages (see
 // MixerView.cpp kFxParams_ and fxGet/fxSet).  Also used to size the cursor.
+// Fase 6: the global SEND/RET rows were removed from the DELAY/REVERB pages
+// (sends are now per-track / per-instrument; returns are fixed 0.5 helpers).
 enum FxParamId {
     // DELAY
-    FX_P_DLY_SEND = 0,
-    FX_P_DLY_RET,
-    FX_P_DLY_TIME,
+    FX_P_DLY_TIME = 0,
     FX_P_DLY_FBK,
     FX_P_DLY_MIX,
     FX_P_DLY_WID,
@@ -34,8 +37,6 @@ enum FxParamId {
     FX_P_DLY_SAT,
     FX_P_DLY_BYP,
     // REVERB
-    FX_P_RVB_SEND,
-    FX_P_RVB_RET,
     FX_P_RVB_PRE,
     FX_P_RVB_DEC,
     FX_P_RVB_SIZ,
@@ -44,7 +45,7 @@ enum FxParamId {
     FX_P_RVB_MODE,
     FX_P_RVB_MIX,
     FX_P_RVB_BYP,
-    // MASTER EQ
+    // EQ (3 bands: bypass + freq/gain/Q/enable each)
     FX_P_EQ_BYP,
     FX_P_EQ_LOW_FRQ,
     FX_P_EQ_LOW_GAI,
@@ -58,7 +59,7 @@ enum FxParamId {
     FX_P_EQ_HI_GAI,
     FX_P_EQ_HI_Q,
     FX_P_EQ_HI_EN,
-    // MASTER COMP
+    // COMP
     FX_P_CMP_THR,
     FX_P_CMP_RAT,
     FX_P_CMP_KNE,
@@ -99,6 +100,7 @@ protected:
 	void fxProcessPageButtonMask(unsigned int mask) ;
 	void fxMoveRow(int delta) ;
 	void fxEditRow(int delta,bool coarse) ;
+	void fxResetRow() ;
 	void fxEditChannelTarget(int delta) ;
 	void drawFxPages() ;
 	void drawFxParamPage(FxPage page) ;
