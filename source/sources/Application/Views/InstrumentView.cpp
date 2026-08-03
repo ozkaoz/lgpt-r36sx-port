@@ -105,150 +105,135 @@ void InstrumentView::fillSampleParameters() {
 	SampleInstrument *instrument=(SampleInstrument *)instr  ;
 	GUIPoint position=GetAnchor() ;
 
-//	position._y+=View::fieldSpaceHeight_;
-	Variable *v=instrument->FindVariable(SIP_SAMPLE) ;
+	// TREEFROG_FX_BLOCKS_V1 (PLAN_FX_REDESIGN_ES.md, Fase 8):
+	// Reorganized as vertical blocks.  Row numbers below are screen rows
+	// (GetAnchor()._y==4).  Block headers are drawn by DrawView(), NOT
+	// inserted as UIStaticField, so T_SimpleList<UIField>::GetFirst() stays
+	// the sample field and GetLast() stays the table field (L2+A cut/clear
+	// relies on both).
+	//
+	// Row 4  : INSTRUMENT (header)
+	// Row 5  : sample
+	// Row 6  : volume | pan
+	// Row 7  : root note | detune
+	// Row 8  : FILTER (header)
+	// Row 9  : type | mode
+	// Row 10 : cutoff | reso
+	// Row 11 : attenuate
+	// Row 12 : BITCRUSHER (header)
+	// Row 13 : bit depth | drive
+	// Row 14 : downsample
+	// Row 15 : PLAYBACK (header)
+	// Row 16 : interpolation | loop mode
+	// Row 17 : slices
+	// Row 18 : start
+	// Row 19 : loop start
+	// Row 20 : loop end
+	// Row 21 : EFFECT SENDS (header)
+	// Row 22 : DRY [bar]
+	// Row 23 : DELAY [bar]
+	// Row 24 : REVERB [bar]
+	// Row 25 : AUTOMATION (header)
+	// Row 26 : table auto | table
+
+	Variable *v ;
+	UIIntVarField *f1 ;
+	UIIntVarField *f2 ;
+	GUIPoint col2 ;
+
+	// ----------------------------------------------------------
+	// Block 1: INSTRUMENT (source + level)
+	// ----------------------------------------------------------
+	position._y+=1 ;  // skip header row 4
+	v=instrument->FindVariable(SIP_SAMPLE) ;
 	SamplePool *sp=SamplePool::GetInstance() ;
 	int sampleMax=sp->GetNameListSize()-1 ;
 	if (sampleMax<0) sampleMax=0 ;
-	UIIntVarField *f1=new UIIntVarField(position,*v,"sample: %s",0,sampleMax,1,0x10) ;
+	f1=new UIIntVarField(position,*v,"sample: %s",0,sampleMax,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 	f1->SetFocus() ;
 
-    position._y += 1;
-#ifdef FFMPEG_ENABLED
-    v = instrument->FindVariable(SIP_PRINTFX);
-    f1 = new UIIntVarField(position, *v, "%s", 0, 3, 1, 2);
-    T_SimpleList<UIField>::Insert(f1) ;
-
-    position._x += 7;
-    v = instrument->FindVariable(SIP_IR_WET);
-    f1 = new UIIntVarField(position, *v, "wet:%d%%", 0, 100, 1, 10);
-    T_SimpleList<UIField>::Insert(f1);
-    position._x += 9;
-
-    v = instrument->FindVariable(SIP_IR_PAD);
-    f1 = new UIIntVarField(position, *v, "pad:%dms", 0, 5000, 5, 100);
-    T_SimpleList<UIField>::Insert(f1);
-    position._x -= 16;
-#endif
-    position._y += 2;
-    v=instrument->FindVariable(SIP_VOLUME) ;
-	f1=new UIIntVarField(position,*v,"volume: %d [%2.2X]",0,255,1,10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-
 	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SIP_VOLUME) ;
+	f1=new UIIntVarField(position,*v,"volume: %d",0,255,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
 	v=instrument->FindVariable(SIP_PAN) ;
-	f1=new UIIntVarField(position,*v,"pan: %2.2X",0,0xFE,1,0x10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-
-	// TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6): per-instrument FX sends.
-	// DRY (0..100, default 100) scales the effective delay/reverb sends;
-	// DLY/RVB send (0..100, default -1 = inherit the per-track Mixer send).
-	// These are read at render time by PlayerChannel.
-	position._y+=1 ;
-	UIStaticField *sendLabel=new UIStaticField(position,"fx sends: ") ;
-	T_SimpleList<UIField>::Insert(sendLabel) ;
-	position._x+=10 ;
-	v=instrument->FindVariable(SIP_DRY) ;
-	f1=new UIIntVarField(position,*v,"dry:%3d",0,100,1,10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-	position._x-=10 ;
-	position._y+=1 ;
-	position._x+=10 ;
-	v=instrument->FindVariable(SIP_DLY_SEND) ;
-	f1=new UIIntVarField(position,*v,"dly:%3d",-1,100,1,10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-	position._x+=6 ;
-	v=instrument->FindVariable(SIP_RVB_SEND) ;
-	f1=new UIIntVarField(position,*v,"rvb:%3d",-1,100,1,10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-	position._x-=16 ;
-
+	f2=new UIIntVarField(col2,*v,"pan: %2.2X",0,0xFE,1,0x10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
 
 	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
 	v=instrument->FindVariable(SIP_ROOTNOTE) ;
 	f1=new UINoteVarField(position,*v,"root note: %s",0,0x7F,1,0x0C) ;
 	T_SimpleList<UIField>::Insert(f1) ;
-
-	position._y+=1 ;
 	v=instrument->FindVariable(SIP_FINETUNE) ;
-	f1=new UIIntVarField(position,*v,"detune: %2.2X",0,255,1,0x10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
+	f2=new UIIntVarField(col2,*v,"detune: %2.2X",0,255,1,0x10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
 
-    position._y += 2;
-    v=instrument->FindVariable(SIP_CRUSH);
-	f1=new UIIntVarField(position,*v,"crush: %d",1,0x10,1,4) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-
-    position._x += 10;
-    v = instrument->FindVariable(SIP_CRUSHVOL);
-    f1=new UIIntVarField(position,*v,"drive: %2.2X",0,0xFF,1,0x10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-    position._x -= 10;
-
-    position._y += 1;
-	v=instrument->FindVariable(SIP_DOWNSMPL) ;
-	f1=new UIIntVarField(position,*v,"downsample: %d",0,8,1,4) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-
-
-	position._y+=2 ;
-	UIStaticField *sf=new UIStaticField(position,"flt cut/res:") ;
-	T_SimpleList<UIField>::Insert(sf) ;
-
-	position._x+=13 ;
-	v=instrument->FindVariable(SIP_FILTCUTOFF) ;
-	f1=new UIIntVarField(position,*v,"%2.2X",0,0xFF,1,0x10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-
-	position._x+=3 ;
-	v=instrument->FindVariable(SIP_FILTRESO) ;
-	f1=new UIIntVarField(position,*v,"%2.2X",0,0xFF,1,0x10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-	position._x-=16 ;
-
-	position._y+=1 ;
+	// ----------------------------------------------------------
+	// Block 2: FILTER (type/mode/cutoff/reso/attenuate)
+	// ----------------------------------------------------------
+	position._y+=2 ;  // skip header row 8
+	col2=position ;
+	col2._x+=16 ;
 	v=instrument->FindVariable(SIP_FILTMIX) ;
 	f1=new UIIntVarField(position,*v,"type: %2.2X",0,0xFF,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SIP_FILTMODE) ;
+	f2=new UIIntVarField(col2,*v,"mode: %s",0,2,1,1) ;
+	T_SimpleList<UIField>::Insert(f2) ;
 
 	position._y+=1 ;
-	v=instrument->FindVariable(SIP_FILTMODE) ;
-	f1=new UIIntVarField(position,*v,"Mode: %s",0,2,1,1) ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SIP_FILTCUTOFF) ;
+	f1=new UIIntVarField(position,*v,"cutoff: %2.2X",0,0xFF,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SIP_FILTRESO) ;
+	f2=new UIIntVarField(col2,*v,"reso: %2.2X",0,0xFF,1,0x10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
 
 	position._y+=1 ;
 	v=instrument->FindVariable(SIP_ATTENUATE) ;
 	f1=new UIIntVarField(position,*v,"attenuate: %d [%2.2X]",1,0xFF,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
+	// ----------------------------------------------------------
+	// Block 3: BITCRUSHER (bit depth / drive / downsample).
+	// Deliberately labeled "bit depth", never "compressor".
+	// ----------------------------------------------------------
+	position._y+=2 ;  // skip header row 12
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SIP_CRUSH) ;
+	f1=new UIIntVarField(position,*v,"bit depth: %d",1,0x10,1,4) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SIP_CRUSHVOL) ;
+	f2=new UIIntVarField(col2,*v,"drive: %2.2X",0,0xFF,1,0x10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
 	position._y+=1 ;
-	sf=new UIStaticField(position,"fb tune/mix: ") ;
-	T_SimpleList<UIField>::Insert(sf) ;
-
-	v=instrument->FindVariable(SIP_FBTUNE) ;
-	position._x+=13 ;
-	f1=new UIIntVarField(position,*v,"%2.2X",0,0xFF,1,0x10) ;
+	v=instrument->FindVariable(SIP_DOWNSMPL) ;
+	f1=new UIIntVarField(position,*v,"downsample: %d",0,8,1,4) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
-	position._x+=3 ;
-	v=instrument->FindVariable(SIP_FBMIX) ;
-	f1=new UIIntVarField(position,*v,"%2.2X",0,0xFF,1,0X10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-
-	position._x-=16 ;
-
-	position._y+=2;
+	// ----------------------------------------------------------
+	// Block 4: PLAYBACK
+	// ----------------------------------------------------------
+	position._y+=2 ;  // skip header row 15
+	col2=position ;
+	col2._x+=16 ;
 	v=instrument->FindVariable(SIP_INTERPOLATION) ;
 	f1=new UIIntVarField(position,*v,"interpolation: %s",0,1,1,1) ;
 	T_SimpleList<UIField>::Insert(f1) ;
-
-    position._y+=1 ;
 	v=instrument->FindVariable(SIP_LOOPMODE) ;
-	f1=new UIIntVarField(position,*v,"loop mode: %s",0,SILM_LAST-1,1,1) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-	position._y+=1 ;
+	f2=new UIIntVarField(col2,*v,"loop mode: %s",0,SILM_LAST-1,1,1) ;
+	T_SimpleList<UIField>::Insert(f2) ;
 
+	position._y+=1 ;
 	v=instrument->FindVariable(SIP_SLICES) ;
 	f1=new UIIntVarField(position,*v,"slices: %2.2X",1,0xFF,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
@@ -271,14 +256,65 @@ void InstrumentView::fillSampleParameters() {
 	f1=new UIBigHexVarField(position,*v,7,"loop end: %7.7X",0,sampleSize-1,16) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
-	v=instrument->FindVariable(SIP_TABLEAUTO) ;
-	position._y+=2 ;
-	UIIntVarField *f2=new UIIntVarField(position,*v,"automation: %s",0,1,1,1) ;
-	T_SimpleList<UIField>::Insert(f2) ;
+	// ----------------------------------------------------------
+	// Block 5: EFFECT SENDS (percent bars, TREEFROG_FX_SEND_BAR_V1).
+	// DRY 0..100 (default 100).  DELAY/REVERB -1 = inherit per-track
+	// Mixer send (Fase 6/7), 0..100 = explicit instrument override.
+	// ----------------------------------------------------------
+	position._y+=2 ;  // skip header row 21
+	v=instrument->FindVariable(SIP_DRY) ;
+	f1=new UIIntVarField(position,*v,"dry:%3d",0,100,1,10) ;
+	f1->SetBar("DRY",14) ;
+	T_SimpleList<UIField>::Insert(f1) ;
 
 	position._y+=1 ;
+	v=instrument->FindVariable(SIP_DLY_SEND) ;
+	f1=new UIIntVarField(position,*v,"dly:%3d",-1,100,1,10) ;
+	f1->SetBar("DELAY",14) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+	position._y+=1 ;
+	v=instrument->FindVariable(SIP_RVB_SEND) ;
+	f1=new UIIntVarField(position,*v,"rvb:%3d",-1,100,1,10) ;
+	f1->SetBar("REVERB",14) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+	// ----------------------------------------------------------
+	// Offline render FX (print fx / wet / pad).  Only compiled on
+	// desktop builds: the R36SX build has no FFMPEG_ENABLED so these
+	// fields do not exist there (PLAN_FX_REDESIGN_ES.md, Fase 8).
+	// ----------------------------------------------------------
+#ifdef FFMPEG_ENABLED
+	position._y+=2 ;
+	UIStaticField *offlineHeader=new UIStaticField(position,"OFFLINE RENDER FX: ") ;
+	T_SimpleList<UIField>::Insert(offlineHeader) ;
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=12 ;
+	v=instrument->FindVariable(SIP_PRINTFX) ;
+	f1=new UIIntVarField(position,*v,"print fx: %s",0,3,1,2) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SIP_IR_WET) ;
+	f2=new UIIntVarField(col2,*v,"wet:%d%%",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+	position._y+=1 ;
+	v=instrument->FindVariable(SIP_IR_PAD) ;
+	f1=new UIIntVarField(position,*v,"pad:%dms",0,5000,5,100) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+#endif
+
+	// ----------------------------------------------------------
+	// Block 6: AUTOMATION (must remain the last fields so that
+	// T_SimpleList<UIField>::GetLast() is the table field).
+	// ----------------------------------------------------------
+	position._y+=2 ;  // skip header row 25
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SIP_TABLEAUTO) ;
+	f2=new UIIntVarField(position,*v,"table auto: %s",0,1,1,1) ;
+	T_SimpleList<UIField>::Insert(f2) ;
 	v=instrument->FindVariable(SIP_TABLE) ;
-	f1=new UIIntVarOffField(position,*v,"table: %2.2X",0x00,0x7F,1,0x10) ;
+	f1=new UIIntVarOffField(col2,*v,"table: %2.2X",0x00,0x7F,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
 } ;
@@ -627,6 +663,21 @@ void InstrumentView::DrawView() {
     SetColor(CD_NORMAL);
     sprintf(title, "Instrument %2.2X", viewData_->currentInstrument_);
     DrawString(pos._x, pos._y, title, props);
+
+    // TREEFROG_FX_BLOCKS_V1 (PLAN_FX_REDESIGN_ES.md, Fase 8): block
+    // headers for fillSampleParameters().  Drawn here (not as fields) so
+    // the field list's first/last stay sample/table for L2+A cut/clear.
+    if (getInstrumentType()==IT_SAMPLE) {
+        GUIPoint hp = GetAnchor();
+        SetColor(CD_HILITE1);
+        props.invert_ = false;
+        DrawString(hp._x, hp._y,     "INSTRUMENT", props);
+        DrawString(hp._x, hp._y + 4, "FILTER", props);
+        DrawString(hp._x, hp._y + 8, "BITCRUSHER", props);
+        DrawString(hp._x, hp._y + 11, "PLAYBACK", props);
+        DrawString(hp._x, hp._y + 17, "EFFECT SENDS", props);
+        DrawString(hp._x, hp._y + 21, "AUTOMATION", props);
+    }
 
     // Draw fields
 

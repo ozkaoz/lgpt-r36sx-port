@@ -403,6 +403,92 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 - **Conflicto resuelto**: como `A+B` y `B+A` comparten el mismo bitmask, la acción legacy "B+A cortar instrumento / limpiar tabla" se mueve a `L2+A`.
 - Test `tests/test_fx_phase6_nav_ab_default.py` -> `FX_NAV_AB_DEFAULT_PHASE6_OK` (37 params / 5 páginas, defaults == `AllParamsAtLegacyDefault`, reset idempotente, guards de fuente).
 
+### Fase 7 — Compatibilidad sends por pista (hecho y verificado)
+
+**Estrategia elegida: migración controlada NO destructiva por herencia**
+- Instrumento sin override (default `-1`/`0xFF`) hereda el send per-track del `Mixer`.
+- El override del instrumento gana solo para ese instrumento.
+- Ambas capas se guardan: atributos `DELAYSEND`/`REVERBSEND` en `CHANNEL` + PARAMs instrumento `DRY`/`DLY_SEND`/`RVB_SEND`. El send per-track nunca se borra.
+- Marcador de estrategia añadido como comentario en `PlayerChannel.cpp` (bloque "Fase 7").
+- Test `tests/test_fx_phase7_track_send_compat.py` -> `FX_TRACK_SEND_COMPAT_PHASE7_OK` (8 checks: classic idéntico, exploratory preservado, override gana solo a ese instrumento, dos instrumentos misma pista distintos, round-trip ambas capas, track send nunca zeroed, no-FXMASTER defaults, guards de fuente).
+
+### Fase 8 — Reorganización InstrumentView en bloques (hecho y verificado)
+
+**8.1 — `fillSampleParameters()` reorganizado en bloques verticales (2 columnas)**
+- `INSTRUMENT`: sample / volume|pan / root note|detune.
+- `FILTER`: type|mode / cutoff|reso / attenuate.
+- `BITCRUSHER`: bit depth|drive / downsample — etiquetado "bit depth", **nunca** "compressor".
+- `PLAYBACK`: interpolation|loop mode / slices / start / loop start / loop end.
+- `EFFECT SENDS`: `DRY`/`DELAY`/`REVERB` con render de barra porcentual (`SetBar`).
+- `AUTOMATION`: table auto|table (sigue siendo el último campo).
+- Headers de bloque dibujados en `DrawView()` (NO como `UIStaticField`), para que `GetFirst()` siga siendo sample y `GetLast()` siga siendo table (L2+A cortar/limpiar dependen de ambos).
+- Layout completo cabe por encima del mapa/notas (y<=26; mapa/notas en y=27-29), vs. el layout anterior que desbordaba a y=32.
+
+**8.2 — `UIIntVarField::SetBar(label,width)` (render de barra de send)**
+- Miembros `barLabel_`/`barWidth_` (NULL/0 por defecto; no cambia el rendering de los campos existentes).
+- En modo barra: `"LABEL [====----]  85%"` (0..100) o `"LABEL: INH"` para `-1` (inherit).
+- `SIP_DLY_SEND`/`SIP_RVB_SEND` usan min -1 -> `INH` cuando heredan el send per-track.
+
+**8.3 — LEGACY COMB y OFFLINE RENDER FX**
+- `fb tune`/`fb mix` retirados de la edición (conservan sus variables `SIP_FBTUNE`/`SIP_FBMIX` para load/playback/IDs; ya no aparecen en `InstrumentView.cpp`).
+- `print fx`/`wet`/`pad` movidos a un bloque `OFFLINE RENDER FX` detrás de `#ifdef FFMPEG_ENABLED`; el build R36SX no define `FFMPEG_ENABLED`, así que no se compilan ahí.
+
+**8.4 — Verificación**
+- Test `tests/test_fx_phase8_instrument_blocks.py` -> `FX_INSTRUMENT_BLOCKS_PHASE8_OK` (filas <=26 y encima de y=27, headers en DrawView y no como campos, sample primero / table último, "bit depth" sin "compressor", matemática de barra + `INH`, fb retirado pero persistente, bloque offline guardado).
+- `g++ -fpermissive` de `UIIntVarField.cpp` e `InstrumentView.cpp` limpio; `host_syntax_check.sh` -> `HOST_SYNTAX_CHECK_U2523_OK`.
+
+### Fase 9 — Página MIX: FX RETURNS (hecho y verificado)
+
+**9.1 — Sends per-track fuera de la página MIX**
+- Eliminado `drawMixSends()` (readouts `Dxx`/`Rxx` bajo las barras de canal) y la edición de sends per-track desde el Mixer: `NudgeChannelDelaySend`/`NudgeChannelReverbSend` ya no se usan en la vista. Los sends son por instrumento (Fase 6/7, editados en InstrumentView); el send per-track sobrevive solo como capa de herencia/compatibilidad (persistido, DLYS/RVBS siguen escribiéndolo).
+- `fxEditTarget_` ahora cicla `VOL -> DLY RET -> RVB RET` (R2 solo). `VOL` edita el volumen del canal hovereado; `DLY RET`/`RVB RET` editan los RETORNNOS maestro (nivel wet del delay/reverb hacia el bus maestro).
+
+**9.2 — FX RETURNS en la página MIX**
+- `drawMixReturns()` dibuja `RET D:50% R:50% FX RETURNS` en la fila 16, resaltando el retorno activo (`fxEditTarget_==1/2`).
+- Helpers `fxReturnPercent`/`fxReturnFromPercent` (fixed Q15 0..1 <-> porcentaje 0..100, clamping) y `nudgeDelayReturn`/`nudgeReverbReturn`.
+- `FxEngine::SetDelayReturn`/`SetReverbReturn` ya existían y se persisten como `DLYRET`/`RVBRET` en `FXMASTER`.
+
+**9.3 — Verificación**
+- `tests/test_fx_phase4_ui.py` actualizado -> `FX_UI_PHASE43_OK` (check `mix return edit` + guards).
+- Test nuevo `tests/test_fx_phase9_mixer_returns.py` -> `FX_MIXER_RETURNS_PHASE9_OK` (round-trip percent<->fixed, ciclo de target, semántica global no per-canal, guards de fuente y persistencia).
+- `g++ -fpermissive` de `MixerView.cpp` limpio.
+
+### Fase 10 — Auditoría wet-only DLY MIX / RVB MIX (hecho y verificado)
+
+- Confirmado: las filas globales `DLY SND/DLY RET/RVB SND/RVB RET` NO existen en la tabla de parámetros (retiradas en Fase 6); los sends son per-track/per-instrumento y los retornos son el control `FX RETURNS` de la Fase 9.
+- Auditoría wet-only: `DLY MIX`/`RVB MIX` son crossfades dry/wet dentro del efecto (`dryMix = 1 - wetMix`), modelados y verificados por los tests de Fase 2. Su default es `1.0` (full wet) tanto en el constructor de FxEngine (`SetMix(i2fp(1))`) como en `kFxParams_`, por lo que en el estado por defecto el retorno es wet-only (sin fuga de seco). Bajar MIX introduce componente seco en el retorno: es el crossfade documentado, no una regresión.
+- Test nuevo `tests/test_fx_phase10_wetonly_audit.py` -> `FX_WETONLY_AUDIT_PHASE10_OK` (sin filas SEND/RET, defaults full-wet, mix=1.0 sin fuga de seco, crossfade sin discontinuidad, guards de fuente).
+
+### Fase 11 — Indicador de página [n/5] (hecho y verificado)
+
+- Los títulos de las páginas de parámetros muestran `[n/5]`: `DELAY MASTER [2/5]`, `REVERB MASTER [3/5]`, `MASTER EQ [4/5]`, `MASTER COMP [5/5]`.
+- La página MIX muestra `SELECT [1/5]` en el hint de la fila 23.
+- Verificado por `tests/test_fx_phase4_ui.py` -> `FX_UI_PHASE43_OK` (compile de MixerView con los títulos).
+
+### Fase 12 — Menú EQ dedicado con layout de bandas (hecho y verificado)
+
+- El EQ es un menú aparte, exclusivo: la página EQ ya no usa la lista genérica de parámetros, sino un dibujo dedicado (`drawEqPage()`/`drawEqRow()`) con bloques LOW/MID/HIGH.
+- Layout por bandas en 40 columnas (x=13, centrado en 320 px):
+  - Fila 2: `EQ BYPASS [ ON ]` (bypass arriba, ON/OFF).
+  - Cada banda (filas 4/10/16 el nombre, luego EN/FRQ/GAI/Q en filas siguientes): header de banda LOW/MID/HIGH; `EN [ ON ]` / `FRQ    100.0 Hz` (unidad Hz) / `GAIN   +0.0 dB` (signo explícito) / `Q        1.00`.
+  - Cada parámetro tiene su propia fila seleccionable: la fila seleccionada es inequívoca (inversión completa) y la banda completa permanece visible durante la edición.
+- El enum `FX_P_EQ_*` se reordenó para que cada banda sea EN primero y luego FRQ/GAI/Q, de modo que UP/DOWN recorre la banda en el mismo orden visual que dibuja el menú. Los tests Fase 4/6 se actualizaron al nuevo orden (mismos IDs 15..27, mismas cuentas por página).
+- Navegación de frecuencia musical (también aplicada como capa base para Fase 14): fina (L/R) = semitono ×2^(1/12), gruesa (A+UP/DOWN) = octava ×2, clamp 20..20000 Hz. El recorrido completo tarda ~120 pulsaciones finas o ~10 gruesas, proporcional en todo el rango.
+- Nuevo test `tests/test_fx_phase12_eq_menu.py` -> `FX_EQ_MENU_PHASE12_OK`: orden/valores por defecto, pasos musicales, alcance del rango y guards de fuente.
+- Compilado: `MixerView.cpp` con `g++ -fpermissive` -> `MIXERVIEW_SYNTAX_OK`; suite FX completa en verde; `HOST_SYNTAX_CHECK_U2523_OK`.
+
+### Fase 13 — Menú COMP dedicado con BYP primero y GR visible (hecho y verificado)
+
+- La página COMP es un menú exclusivo (`drawCompPage()`), no la lista genérica. CMP BYP es la PRIMERA fila (nunca queda fuera de pantalla).
+- Layout centrado en 40 columnas (x=8 etiquetas, x=24 columna de valores) con 9 parámetros en filas 2..10 y el medidor de reducción en la fila 12:
+  - `Bypass [OFF]` / `Threshold -24.0 dB` / `Ratio 4.0:1` / `Knee 6.0 dB` / `Attack 15.0 ms` / `Release 200.0 ms` / `Makeup 0.0 dB` / `Stereo Link ON` / `Soft Clip ON`.
+  - `Gain Reduction -00.0 dB` (readout, no seleccionable) siempre visible bajo los parámetros.
+- Ratio se muestra como `x:1`; booleanos como ON/OFF; unidades (dB/ms); fila seleccionada inequívoca; hints de navegación fuera del área de parámetros (filas 22-23); sin solapamiento (parámetros en 2..10, GR en 12).
+- SIN indicador de clipping: el motor no expone una lectura real y fiable de clip de audio (`GetRtViolations` es telemetría RT de buffers que debe permanecer 0), así que no se añade ningún medidor de clip.
+- El soft clip se etiqueta siempre "Soft Clip" en la UI (no "limiter", que solo se usaría si se implementara y documentara un limitador independiente).
+- El enum `FX_P_CMP_*` se reordenó a BYP,THR,RAT,KNE,ATK,REL,MKU,LNK,SC (mismos IDs 28..36); tests Fase 4/6 actualizados.
+- Nuevo test `tests/test_fx_phase13_comp_menu.py` -> `FX_COMP_MENU_PHASE13_OK`.
+
 ---
 
 ## G. Diseño de clases / APIs (FxEngine)

@@ -72,6 +72,18 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
    // when set (>=0); otherwise the per-track Mixer send is inherited (legacy
    // compat).  DRY (0..100, default 100) scales the effective send gains, so
    // DRY=100 is bit-identical to Fase 4/5 behaviour.
+   //
+   // Fase 7 (PLAN_FX_REDESIGN_ES.md): controlled non-destructive migration.
+   // Projects saved by the exploratory tag keep their per-track DELAYSEND /
+   // REVERBSEND in the Mixer CHANNEL attributes AND may carry instrument
+   // PARAMs for DRY / DLY send / RVB send.  On load:
+   //   - instruments without an override (default -1) inherit the per-track
+   //     Mixer send, so legacy exploratory songs reproduce exactly as before;
+   //   - instruments with an override keep it, so a track using several
+   //     instruments never loses the send of any of them;
+   //   - saving writes both layers again, so no original value is lost.
+   // The per-track sends are never deleted; they are simply superseded on a
+   // per-instrument basis when an explicit instrument send exists.
    if (audible) {
        Mixer *mixer=Mixer::GetInstance() ;
        int dSend=mixer->GetChannelDelaySend(index_) ;

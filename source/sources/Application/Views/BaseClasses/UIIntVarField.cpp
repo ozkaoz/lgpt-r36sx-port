@@ -27,6 +27,14 @@ UIIntVarField::UIIntVarField(
 	xOffset_=xOffset ;
 	yOffset_=yOffset ;
   displayOffset_ = displayOffset;
+	barLabel_=0 ;
+	barWidth_=0 ;
+} ;
+
+// TREEFROG_FX_SEND_BAR_V1 (Fase 8): switch this field to percent-bar mode.
+void UIIntVarField::SetBar(const char *label,int width) {
+	barLabel_=label ;
+	barWidth_=width ;
 } ;
 
 void UIIntVarField::Draw(GUIWindow &w,int offset) {
@@ -41,8 +49,32 @@ void UIIntVarField::Draw(GUIWindow &w,int offset) {
 	} else {
 		((AppWindow&)w).SetColor(CD_NORMAL) ;
 	}
-	Variable::Type type=src_.GetType() ;
 	char buffer[80] ;
+
+	// TREEFROG_FX_SEND_BAR_V1 (Fase 8): percent-bar rendering for sends.
+	// The value is the percentage (0..100); -1 means "inherit" (no bar).
+	if (barLabel_) {
+		int value=src_.GetInt()+displayOffset_ ;
+		if (value<0) {
+			sprintf(buffer,"%s: INH   ",barLabel_) ;
+		} else {
+			int v=value ;
+			if (v<0) v=0 ;
+			if (v>100) v=100 ;
+			int filled=(barWidth_*v)/100 ;
+			char bar[32] ;
+			int i=0 ;
+			bar[i++]='[' ;
+			for (int b=0;b<barWidth_;b++) bar[i++]=(b<filled)?'=':'-' ;
+			bar[i++]=']' ;
+			bar[i]=0 ;
+			sprintf(buffer,"%s: %s %3d%%",barLabel_,bar,value) ;
+		}
+		w.DrawString(buffer,position,props) ;
+		return ;
+	}
+
+	Variable::Type type=src_.GetType() ;
 	switch (type) {
 		case Variable::INT:
 			{

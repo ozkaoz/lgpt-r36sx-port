@@ -3,18 +3,20 @@
 
 Faithful model checks for the MixerView page system (Fase 4.3 pages,
 refined in Fase 6: the single MASTER page is split into EQ and COMP, and the
-global SEND/RET rows are gone because sends are per-track / per-instrument):
+global SEND/RET rows are gone because sends are per-track / per-instrument;
+Fase 9: the MIX page per-track D/R send readouts are gone too and replaced by
+an editable FX RETURNS readout for the master delay/reverb return levels):
 
 - SELECT cycles MIX -> DELAY -> REVERB -> EQ -> COMP -> MIX
 - DELAY/REVERB/EQ/COMP pages expose master-bus parameters in natural units
 - the FxEngine getters mirror the setters (readback == what was written)
 - the DSP module getters read back their stored values
-- the MIX page per-track sends edit the Mixer model (0..100)
+- the MIX page edit target cycles VOL -> DLY RET -> RVB RET (0..100%)
 
 Acceptance:
 - every master parameter has a getter that reads back what the setter wrote
 - the FxParamSpec table covers all 37 parameter ids exactly once per page
-- the UI source wires the page cycle, row edit, send edit and GR meter
+- the UI source wires the page cycle, row edit, return edit and GR meter
 """
 import math
 from pathlib import Path
@@ -188,30 +190,31 @@ FX_PARAMS = [
     (12, "REVERB", "RVB MOD", 0.0, 1.0),
     (13, "REVERB", "RVB MIX", 0.0, 1.0),
     (14, "REVERB", "RVB BYP", 0.0, 1.0),
-    # EQ (3 bands: bypass + freq/gain/Q/enable each)
+    # EQ (3 bands, banded menu Fase 12: bypass + EN/FRQ/GAI/Q per band, EN
+    # first so UP/DOWN walks the band in the same order drawEqPage renders)
     (15, "EQ", "EQ  BYP", 0.0, 1.0),
-    (16, "EQ", "LO  FRQ", 20.0, 20000.0),
-    (17, "EQ", "LO  GAI", -12.0, 12.0),
-    (18, "EQ", "LO  Q", 0.1, 10.0),
-    (19, "EQ", "LO  EN", 0.0, 1.0),
-    (20, "EQ", "MID FRQ", 20.0, 20000.0),
-    (21, "EQ", "MID GAI", -12.0, 12.0),
-    (22, "EQ", "MID Q", 0.1, 10.0),
-    (23, "EQ", "MID EN", 0.0, 1.0),
-    (24, "EQ", "HI  FRQ", 20.0, 20000.0),
-    (25, "EQ", "HI  GAI", -12.0, 12.0),
-    (26, "EQ", "HI  Q", 0.1, 10.0),
-    (27, "EQ", "HI  EN", 0.0, 1.0),
-    # COMP
-    (28, "COMP", "CMP THR", -60.0, 0.0),
-    (29, "COMP", "CMP RAT", 1.0, 20.0),
-    (30, "COMP", "CMP KNE", 0.0, 12.0),
-    (31, "COMP", "CMP ATK", 0.1, 500.0),
-    (32, "COMP", "CMP REL", 1.0, 2000.0),
-    (33, "COMP", "CMP MKU", 0.0, 24.0),
-    (34, "COMP", "CMP LNK", 0.0, 1.0),
-    (35, "COMP", "CMP SCL", 0.0, 1.0),
-    (36, "COMP", "CMP BYP", 0.0, 1.0),
+    (16, "EQ", "LO  EN", 0.0, 1.0),
+    (17, "EQ", "LO  FRQ", 20.0, 20000.0),
+    (18, "EQ", "LO  GAI", -12.0, 12.0),
+    (19, "EQ", "LO  Q", 0.1, 10.0),
+    (20, "EQ", "MID EN", 0.0, 1.0),
+    (21, "EQ", "MID FRQ", 20.0, 20000.0),
+    (22, "EQ", "MID GAI", -12.0, 12.0),
+    (23, "EQ", "MID Q", 0.1, 10.0),
+    (24, "EQ", "HI  EN", 0.0, 1.0),
+    (25, "EQ", "HI  FRQ", 20.0, 20000.0),
+    (26, "EQ", "HI  GAI", -12.0, 12.0),
+    (27, "EQ", "HI  Q", 0.1, 10.0),
+    # COMP (dedicated menu Fase 13: BYP first, then THR/RAT/KNE/ATK/REL/MKU/LNK/SC)
+    (28, "COMP", "CMP BYP", 0.0, 1.0),
+    (29, "COMP", "CMP THR", -60.0, 0.0),
+    (30, "COMP", "CMP RAT", 1.0, 20.0),
+    (31, "COMP", "CMP KNE", 0.0, 12.0),
+    (32, "COMP", "CMP ATK", 0.1, 500.0),
+    (33, "COMP", "CMP REL", 1.0, 2000.0),
+    (34, "COMP", "CMP MKU", 0.0, 24.0),
+    (35, "COMP", "CMP LNK", 0.0, 1.0),
+    (36, "COMP", "CMP SCL", 0.0, 1.0),
 ]
 
 
@@ -228,33 +231,58 @@ def check_param_table_consistency():
     print("param table consistency OK")
 
 
-def check_mix_send_edit():
-    # MIX page per-track sends: values are integers 0..100 in the Mixer.
-    sends = [0] * 8
-    for i in range(8):
-        sends[i] = max(0, min(100, sends[i] + 7))
-    assert all(0 <= s <= 100 for s in sends)
-    # Edit target cycles VOL -> DLY -> RVB.
+def check_mix_return_edit():
+    # MIX page master returns: global 0..100% with Q15 round-trip (Fase 9).
+    def fl2fp(f):
+        return int(round(f * SCALE))
+
+    def fp2fl(a):
+        return a / SCALE
+
+    def percent(ret_fp):
+        f = fp2fl(ret_fp)
+        f = max(0.0, min(1.0, f))
+        return int(round(f * 100.0))
+
+    def from_percent(p):
+        p = max(0, min(100, p))
+        return fl2fp(p * 0.01)
+
+    ret = fl2fp(0.5)
+    for delta in (7, -3, 50, -100, 60):
+        ret = from_percent(percent(ret) + delta)
+        assert 0 <= percent(ret) <= 100
+    assert percent(from_percent(0)) == 0
+    assert percent(from_percent(100)) == 100
+    assert percent(from_percent(50)) == 50
+    # Edit target cycles VOL -> DLY RET -> RVB RET.
     t = 0
     for expected in (1, 2, 0):
         t = (t + 1) % 3
         assert t == expected
-    print("mix send edit OK")
+    print("mix return edit OK")
 
 
 def check_src_ui_wiring():
     src = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
     for token in ("cycleFxPage", "fxEditRow", "fxMoveRow", "fxGet", "fxSet",
-                  "drawFxPages", "drawFxParamPage", "drawMixSends",
+                  "drawFxPages", "drawFxParamPage", "drawMixReturns",
                   "FX_PAGE_MIX", "FX_PAGE_DELAY", "FX_PAGE_REVERB",
                   "FX_PAGE_EQ", "FX_PAGE_COMP", "kFxParams_",
-                  "NudgeChannelDelaySend", "NudgeChannelReverbSend",
+                  "nudgeDelayReturn", "nudgeReverbReturn",
+                  "GetDelayReturn", "GetReverbReturn",
+                  "SetDelayReturn", "SetReverbReturn",
+                  "fxReturnPercent", "fxReturnFromPercent",
                   "GetCompGainReductionDb", "EPBM_SELECT"):
         assert token in src, token
     h = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
     for token in ("FxPage", "FX_PARAM_COUNT", "fxPage_", "fxRow_",
-                  "fxEditTarget_"):
+                  "fxEditTarget_", "nudgeDelayReturn", "nudgeReverbReturn"):
         assert token in h, token
+    # Fase 9: the per-track send readout helper is gone from the MIX page.
+    assert "drawMixSends" not in src
+    assert "NudgeChannelDelaySend" not in src
+    assert "NudgeChannelReverbSend" not in src
     # Fase 6: the global SEND/RET rows must be gone from the param table.
     for token in ("\"DLY SND\"", "\"DLY RET\"", "\"RVB SND\"", "\"RVB RET\""):
         assert token not in src, token
@@ -296,7 +324,7 @@ def check_src_getters():
 check_dsp_readback()
 check_fixed_roundtrip()
 check_param_table_consistency()
-check_mix_send_edit()
+check_mix_return_edit()
 check_src_ui_wiring()
 check_src_getters()
 print("FX_UI_PHASE43_OK")

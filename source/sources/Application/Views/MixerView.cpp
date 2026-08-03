@@ -49,21 +49,26 @@ static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
     { "RVB MOD", FX_PAGE_REVERB,   0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_MODE (0/1)
     { "RVB MIX", FX_PAGE_REVERB,   0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_RVB_MIX
     { "RVB BYP", FX_PAGE_REVERB,   0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_BYP (0/1)
-    // EQ page (3 bands: bypass + freq/gain/Q/enable each)
+    // EQ page (3 bands, dedicated banded menu - Fase 12).  Per band the rows
+    // are EN / FRQ / GAI / Q so UP/DOWN walks the band in the same visual
+    // order drawEqPage() renders.  Frequencies default to 100/1000/10000 Hz.
     { "EQ  BYP", FX_PAGE_EQ,       0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_EQ_BYP
+    { "LO  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_LOW_EN
     { "LO  FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,100.0f,  "%5.0f" },  // FX_P_EQ_LOW_FRQ
     { "LO  GAI", FX_PAGE_EQ,      -12.0f,  12.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_LOW_GAI
     { "LO  Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_LOW_Q
-    { "LO  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_LOW_EN
+    { "MID EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_MID_EN
     { "MID FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,1000.0f, "%5.0f" },  // FX_P_EQ_MID_FRQ
     { "MID GAI", FX_PAGE_EQ,      -12.0f,  12.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_MID_GAI
     { "MID Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_MID_Q
-    { "MID EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_MID_EN
+    { "HI  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_HI_EN
     { "HI  FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,10000.0f,"%5.0f" },  // FX_P_EQ_HI_FRQ
     { "HI  GAI", FX_PAGE_EQ,      -12.0f,  12.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_HI_GAI
     { "HI  Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_HI_Q
-    { "HI  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_HI_EN
-    // COMP page
+    // COMP page (dedicated menu - Fase 13: BYP first so it is never
+    // off-screen, then THR/RAT/KNE/ATK/REL/MKU/LNK/SC in the order
+    // drawCompPage() renders; the GR meter sits below the parameters).
+    { "CMP BYP", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_BYP
     { "CMP THR", FX_PAGE_COMP,   -60.0f,   0.0f,  -24.0f,  "%5.1f" },  // FX_P_CMP_THR (dB)
     { "CMP RAT", FX_PAGE_COMP,     1.0f,  20.0f,    4.0f,   "%5.1f" },  // FX_P_CMP_RAT
     { "CMP KNE", FX_PAGE_COMP,     0.0f,  12.0f,    6.0f,   "%5.1f" },  // FX_P_CMP_KNE (dB)
@@ -72,7 +77,6 @@ static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
     { "CMP MKU", FX_PAGE_COMP,     0.0f,  24.0f,    0.0f,   "%5.1f" },  // FX_P_CMP_MKU (dB)
     { "CMP LNK", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_LINK
     { "CMP SCL", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_SC (softclip)
-    { "CMP BYP", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_BYP
 } ;
 
 // TREEFROG_MIXER_VU_DB_SCALE_V2 (H38.6):
@@ -88,6 +92,30 @@ static float mixVULevel(float peak) {
 	if (level < 0.0f) level = 0.0f ;
 	if (level > 1.0f) level = 1.0f ;
 	return level ;
+}
+
+// TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9):
+// Master FX returns are stored as fixed (Q15) 0..1 levels in FxEngine.
+// These helpers convert to/from the integer percent (0..100) the MIX page
+// edits, clamped so the value always round-trips.
+static int fxReturnPercent(fixed ret) {
+	float f=fp2fl(ret) ;
+	if (f<0.0f) f=0.0f ;
+	if (f>1.0f) f=1.0f ;
+	return (int)(f*100.0f+0.5f) ;
+}
+static fixed fxReturnFromPercent(int p) {
+	if (p<0) p=0 ;
+	if (p>100) p=100 ;
+	return fl2fp((float)p*0.01f) ;
+}
+void MixerView::nudgeDelayReturn(int delta) {
+	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
+	fx.SetDelayReturn(fxReturnFromPercent(fxReturnPercent(fx.GetDelayReturn())+delta)) ;
+}
+void MixerView::nudgeReverbReturn(int delta) {
+	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
+	fx.SetReverbReturn(fxReturnFromPercent(fxReturnPercent(fx.GetReverbReturn())+delta)) ;
 }
 
 MixerView::MixerView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
@@ -153,17 +181,17 @@ void MixerView::updateVolume(int delta) {
 		adjustMasterVolume(delta) ;
 		return ;
 	}
-	// TREEFROG_FX_PAGES_V1 (Fase 4.3): on the MIX page the R2-cycled edit
+	// TREEFROG_FX_PAGES_V3 (Fase 9): on the MIX page the R2-cycled edit
 	// target selects whether UP/DOWN edits the channel volume or one of the
-	// per-track FX sends.
+	// master FX returns (sends are per-instrument now, edited in Instrument).
 	if (fxPage_==FX_PAGE_MIX) {
 		if (fxEditTarget_==1) {
-			Mixer::GetInstance()->NudgeChannelDelaySend(viewData_->mixerCol_,delta) ;
+			nudgeDelayReturn(delta) ;
 			isDirty_=true ;
 			return ;
 		}
 		if (fxEditTarget_==2) {
-			Mixer::GetInstance()->NudgeChannelReverbSend(viewData_->mixerCol_,delta) ;
+			nudgeReverbReturn(delta) ;
 			isDirty_=true ;
 			return ;
 		}
@@ -266,8 +294,8 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 			showInstrumentFxMenu() ;
 			return ;
 		}
-		// R2 alone cycles the per-channel edit target on the MIX page:
-		// VOL -> DLY -> RVB -> VOL (TREEFROG_FX_PAGES_V1, Fase 4.3).
+		// R2 alone cycles the MIX-page edit target:
+		// VOL -> DLY RET -> RVB RET (TREEFROG_FX_PAGES_V3, Fase 9).
 		if (fxPage_==FX_PAGE_MIX) {
 			fxEditTarget_=(fxEditTarget_+1)%3 ;
 			isDirty_=true ;
@@ -541,6 +569,26 @@ void MixerView::fxMoveRow(int delta) {
 	((AppWindow &)w_).SetDirty() ;
 }
 
+// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12 + Fase 14):
+// Frequency editing is musical, never linear 1 Hz / 10 Hz.  Fine (L/R) steps
+// by one semitone (x2^(1/12)), coarse (A+UP/DOWN) by one octave (x2), and the
+// value is clamped to 20..20000 Hz.  This traverses the full range in ~120
+// fine presses or ~10 coarse presses and stays musically meaningful.
+static bool fxIsFrequency(int id) {
+	return id==FX_P_EQ_LOW_FRQ || id==FX_P_EQ_MID_FRQ || id==FX_P_EQ_HI_FRQ ;
+}
+void MixerView::fxEditFrequency(int id,int delta,bool coarse) {
+	const FxParamSpec &spec=kFxParams_[id] ;
+	float v=fxGet(id) ;
+	float factor=coarse?2.0f:1.05946309436f ;  // octave / semitone
+	if (delta<0) factor=1.0f/factor ;
+	int steps=delta<0?-delta:delta ;
+	for (int s=0;s<steps;s++) v*=factor ;
+	if (v<spec.vmin) v=spec.vmin ;
+	if (v>spec.vmax) v=spec.vmax ;
+	fxSet(id,v) ;
+}
+
 void MixerView::fxEditRow(int delta,bool coarse) {
 	int count=0 ;
 	int targetId=-1 ;
@@ -552,6 +600,12 @@ void MixerView::fxEditRow(int delta,bool coarse) {
 	}
 	if (targetId<0) return ;
 	const FxParamSpec &spec=kFxParams_[targetId] ;
+	if (fxIsFrequency(targetId)) {
+		fxEditFrequency(targetId,delta,coarse) ;
+		isDirty_=true ;
+		((AppWindow &)w_).SetDirty() ;
+		return ;
+	}
 	float step=(coarse?10.0f:1.0f) ;
 	// Bool-ish rows (fmt %5.0f, range 0..1) step by 1.
 	if (spec.vmax-spec.vmin<=1.5f) step=1.0f ;
@@ -581,13 +635,7 @@ void MixerView::fxResetRow() {
 	((AppWindow &)w_).SetDirty() ;
 }
 
-void MixerView::fxEditChannelTarget(int delta) {
-	(void)delta ;
-	// Currently a toggle through VOL/DLY/RVB; delta ignored (kept for symmetry).
-	fxEditTarget_=(fxEditTarget_+1)%3 ;
-	isDirty_=true ;
-	((AppWindow &)w_).SetDirty() ;
-}
+// (Fase 9) nudgeDelayReturn/nudgeReverbReturn defined above; see MixerView.h.
 
 float MixerView::fxGet(int id) const {
 	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
@@ -709,56 +757,176 @@ void MixerView::drawFxParamPage(FxPage page) {
 	int y=2 ;
 	SetColor(CD_NORMAL) ;
 	GUITextProperties props ;
-	DrawString(1,1,page==FX_PAGE_DELAY?"DELAY MASTER":
-	           page==FX_PAGE_REVERB?"REVERB MASTER":
-	           page==FX_PAGE_EQ?"MASTER EQ":"MASTER COMP",props) ;
+	// TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 11): the title shows
+	// the page position [n/5] so the SELECT cycle is always visible.
+	char pageTitle[24] ;
+	int pageNum=(int)page+1 ;
+	switch(page) {
+	case FX_PAGE_DELAY:  sprintf(pageTitle,"DELAY MASTER [%d/5]",pageNum) ; break ;
+	case FX_PAGE_REVERB: sprintf(pageTitle,"REVERB MASTER [%d/5]",pageNum) ; break ;
+	case FX_PAGE_EQ:     sprintf(pageTitle,"MASTER EQ [%d/5]",pageNum) ; break ;
+	default:             sprintf(pageTitle,"MASTER COMP [%d/5]",pageNum) ; break ;
+	}
+	DrawString(1,1,pageTitle,props) ;
+	// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12): the EQ page is a
+	// dedicated exclusive menu with a banded LOW/MID/HIGH layout (EN/FRQ/GAI/Q
+	// per band), so it does not use the generic parameter list.
+	if (page==FX_PAGE_EQ) {
+		drawEqPage() ;
+		DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
+		DrawString(1,23,"SELECT page  START play",props) ;
+		return ;
+	}
+	// TREEFROG_COMP_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 13): the COMP page
+	// is a dedicated exclusive menu (BYP first, centered labeled rows, GR
+	// meter always visible) instead of the generic parameter list.
+	if (page==FX_PAGE_COMP) {
+		drawCompPage() ;
+		DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
+		DrawString(1,23,"SELECT page  START play",props) ;
+		return ;
+	}
 	for (int i=0;i<FX_PARAM_COUNT;i++) {
 		if (fxIdOnPage(i,page)) {
 			drawFxParamRow(i,1,y,0) ;
 			y++ ;
 		}
 	}
-	// GR meter (compressor) shown on the COMP page.
-	if (page==FX_PAGE_COMP) {
-		float gr=fp2fl(FxEngine::FxEngine::GetInstance().GetCompGainReductionDb()) ;
-		SetColor(CD_NORMAL) ;
-		props.invert_=false ;
-		DrawString(22,2,"GR",props) ;
-		char buffer[16] ;
-		sprintf(buffer,"%5.1f dB",gr) ;
-		DrawString(22,3,buffer,props) ;
-		DrawString(22,4,"A+UP/DN x10",props) ;
-		DrawString(22,5,"A+L/R x1",props) ;
-	}
 	DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
 	DrawString(1,23,"SELECT page  START play",props) ;
 }
 
-void MixerView::drawMixSends() {
-	// TREEFROG_FX_PAGES_V1 (Fase 4.3): under each channel bar show the DLY and
-	// RVB send values; the row being edited by UP/DOWN is marked.
-	const int x0=8 ;
-	const int dx=4 ;
+// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12): dedicated EQ menu.
+// The band labels come from the row position inside the band (EN/FRQ/GAIN/Q)
+// because the band itself is announced by the LOW/MID/HIGH header row drawn
+// by drawEqPage(); every param keeps its own selectable row so the current
+// row is always unambiguous.  Values are right-aligned with units: frequencies
+// in Hz, gain with an explicit sign in dB, enables as ON/OFF.
+static const char *eqParamLabel(int id) {
+	if (id==FX_P_EQ_BYP) return "BYPASS" ;
+	if (id==FX_P_EQ_LOW_EN||id==FX_P_EQ_MID_EN||id==FX_P_EQ_HI_EN) return "EN" ;
+	if (id==FX_P_EQ_LOW_FRQ||id==FX_P_EQ_MID_FRQ||id==FX_P_EQ_HI_FRQ) return "FRQ" ;
+	if (id==FX_P_EQ_LOW_GAI||id==FX_P_EQ_MID_GAI||id==FX_P_EQ_HI_GAI) return "GAIN" ;
+	return "Q" ;
+}
+static const char *eqBandName(int id) {
+	if (id<=FX_P_EQ_LOW_Q) return "LOW" ;
+	if (id<=FX_P_EQ_MID_Q) return "MID" ;
+	return "HIGH" ;
+}
+
+void MixerView::drawEqRow(int id,int x,int y) {
 	GUITextProperties props ;
-	char buffer[8] ;
-	Mixer *mixer=Mixer::GetInstance() ;
-	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
-		int dly=mixer->GetChannelDelaySend(i) ;
-		int rvb=mixer->GetChannelReverbSend(i) ;
-		int x=x0+i*dx ;
-		bool selected=(!masterSelected_ && i==viewData_->mixerCol_) ;
-		// DLY row (under the volume number)
-		SetColor((selected&&fxEditTarget_==1)?CD_HILITE2:CD_NORMAL) ;
-		props.invert_=(selected&&fxEditTarget_==1) ;
-		sprintf(buffer,"D%2d",dly) ;
-		DrawString(x-1,16,buffer,props) ;
-		// RVB row
-		SetColor((selected&&fxEditTarget_==2)?CD_HILITE2:CD_NORMAL) ;
-		props.invert_=(selected&&fxEditTarget_==2) ;
-		sprintf(buffer,"R%2d",rvb) ;
-		DrawString(x-1,17,buffer,props) ;
-		props.invert_=false ;
+	char buffer[16] ;
+	bool selected=(fxRowForId(id)==fxRow_) ;
+	bool on=(fxGet(id)>=0.5f) ;
+	SetColor(selected?CD_HILITE2:CD_NORMAL) ;
+	props.invert_=selected ;
+	if (id==FX_P_EQ_BYP||id==FX_P_EQ_LOW_EN||id==FX_P_EQ_MID_EN||id==FX_P_EQ_HI_EN) {
+		sprintf(buffer,"%-6s[ %s ]",eqParamLabel(id),on?"ON":"OFF") ;
+	} else if (fxIsFrequency(id)) {
+		sprintf(buffer,"%-6s%6.0f Hz",eqParamLabel(id),fxGet(id)) ;
+	} else if (id==FX_P_EQ_LOW_GAI||id==FX_P_EQ_MID_GAI||id==FX_P_EQ_HI_GAI) {
+		sprintf(buffer,"%-6s%+5.1f dB",eqParamLabel(id),fxGet(id)) ;
+	} else {
+		sprintf(buffer,"%-6s%5.2f",eqParamLabel(id),fxGet(id)) ;
 	}
+	DrawString(x,y,buffer,props) ;
+	props.invert_=false ;
+	SetColor(CD_NORMAL) ;
+}
+
+void MixerView::drawEqPage() {
+	// Title (row 1) and hints (rows 22/23) are drawn by drawFxParamPage();
+	// here only the banded body is rendered.  Rows: bypass at y=2, then each
+	// band is a header line (y=4/10/16) followed by EN/FRQ/GAIN/Q.  All bands
+	// stay on screen so editing never hides the rest of the EQ.
+	const int x=13 ;
+	GUITextProperties props ;
+	drawEqRow(FX_P_EQ_BYP,x,2) ;
+	const int bandBase[3]={FX_P_EQ_LOW_EN,FX_P_EQ_MID_EN,FX_P_EQ_HI_EN} ;
+	for (int b=0;b<3;b++) {
+		int yHeader=4+b*6 ;
+		SetColor(CD_NORMAL) ;
+		props.invert_=false ;
+		DrawString(x,yHeader,eqBandName(bandBase[b]),props) ;
+		for (int p=0;p<4;p++) {
+			drawEqRow(bandBase[b]+p,x,yHeader+1+p) ;
+		}
+	}
+}
+
+// TREEFROG_COMP_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 13): dedicated COMP
+// menu.  BYP is the first row so it is never off-screen; rows are centered
+// with a fixed value column, ratio shows as x:1, booleans as ON/OFF, and the
+// GR meter (a readout, not a selectable row) stays visible below the
+// parameters.  No clipping indicator: the engine exposes no reliable real
+// audio clip reading (GetRtViolations is buffer RT telemetry, must stay 0).
+void MixerView::drawCompPage() {
+	const int labelX=8 ;
+	const int valueX=labelX+16 ;
+	GUITextProperties props ;
+	char buffer[20] ;
+	const char *labels[9]={"Bypass","Threshold","Ratio","Knee",
+	                       "Attack","Release","Makeup","Stereo Link","Soft Clip"} ;
+	for (int p=0;p<9;p++) {
+		int id=FX_P_CMP_BYP+p ;  // enum is BYP first, contiguous
+		const FxParamSpec &spec=kFxParams_[id] ;
+		bool selected=(fxRowForId(id)==fxRow_) ;
+		float v=fxGet(id) ;
+		SetColor(selected?CD_HILITE2:CD_NORMAL) ;
+		props.invert_=selected ;
+		if (spec.vmax-spec.vmin<=1.5f) {
+			sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ;
+		} else {
+			switch (id) {
+			case FX_P_CMP_RAT: sprintf(buffer,"%3.1f:1",v) ; break ;
+			case FX_P_CMP_KNE: sprintf(buffer,"%5.1f dB",v) ; break ;
+			case FX_P_CMP_ATK: sprintf(buffer,"%5.1f ms",v) ; break ;
+			case FX_P_CMP_REL: sprintf(buffer,"%5.1f ms",v) ; break ;
+			default:           sprintf(buffer,"%+5.1f dB",v) ; break ;  // THR, MKU
+			}
+		}
+		DrawString(labelX,p+2,labels[p],props) ;
+		DrawString(valueX,p+2,buffer,props) ;
+		props.invert_=false ;
+		SetColor(CD_NORMAL) ;
+	}
+	// GR meter: always visible below the parameters.
+	float gr=fp2fl(FxEngine::FxEngine::GetInstance().GetCompGainReductionDb()) ;
+	float mag=(gr<0.0f)?-gr:gr ;
+	SetColor(CD_NORMAL) ;
+	props.invert_=false ;
+	sprintf(buffer,"-%05.1f dB",mag) ;
+	DrawString(labelX,12,"Gain Reduction",props) ;
+	DrawString(valueX,12,buffer,props) ;
+}
+
+void MixerView::drawMixReturns() {
+	// TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9): the MIX page
+	// shows the master FX returns (wet levels of the delay/reverb into the
+	// master bus) instead of the old per-track D/R send readouts, which are
+	// now per-instrument (Fase 6/7) and edited in InstrumentView.  The
+	// return level being edited by UP/DOWN is highlighted.
+	GUITextProperties props ;
+	char buffer[16] ;
+	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
+	int dly=fxReturnPercent(fx.GetDelayReturn()) ;
+	int rvb=fxReturnPercent(fx.GetReverbReturn()) ;
+	SetColor(CD_NORMAL) ;
+	props.invert_=false ;
+	DrawString(0,16,"RET",props) ;
+	SetColor((fxEditTarget_==1)?CD_HILITE2:CD_NORMAL) ;
+	props.invert_=(fxEditTarget_==1) ;
+	sprintf(buffer,"D:%3d",dly) ;
+	DrawString(4,16,buffer,props) ;
+	SetColor((fxEditTarget_==2)?CD_HILITE2:CD_NORMAL) ;
+	props.invert_=(fxEditTarget_==2) ;
+	sprintf(buffer,"R:%3d",rvb) ;
+	DrawString(11,16,buffer,props) ;
+	props.invert_=false ;
+	SetColor(CD_NORMAL) ;
+	DrawString(18,16,"FX RETURNS",props) ;
 }
 
 void MixerView::drawFxPages() {
@@ -777,11 +945,11 @@ void MixerView::drawFxPages() {
 		for (int i=0;i<8;i++) {
 			drawVolumeBar(i,x0+i*dx,y0,height) ;
 		}
-		drawMixSends() ;
+		drawMixReturns() ;
 		DrawString(4,19,"A+UP/DN x10  A+L/R x1",props) ;
 		DrawString(4,20,"L/R ch  L->MST  R1+B mute",props) ;
 		DrawString(4,21,"START play  R1+A solo  R2+A instr",props) ;
-		DrawString(4,23,"R2 edit VOL/DLY/RVB  SELECT FX pages",props) ;
+		DrawString(4,23,"R2 edit VOL/RET  SELECT [1/5]",props) ;
 	} else {
 		drawFxParamPage((FxPage)fxPage_) ;
 	}

@@ -36,21 +36,22 @@ PARAMS = [
     ("RVB MOD", "REVERB", 0.0, 1.0, 0.0),
     ("RVB MIX", "REVERB", 0.0, 1.0, 1.0),
     ("RVB BYP", "REVERB", 0.0, 1.0, 0.0),
-    # EQ
+    # EQ (banded menu Fase 12: bypass + EN/FRQ/GAI/Q per band, EN first)
     ("EQ  BYP", "EQ", 0.0, 1.0, 1.0),
+    ("LO  EN", "EQ", 0.0, 1.0, 0.0),
     ("LO  FRQ", "EQ", 20.0, 20000.0, 100.0),
     ("LO  GAI", "EQ", -12.0, 12.0, 0.0),
     ("LO  Q", "EQ", 0.1, 10.0, 1.0),
-    ("LO  EN", "EQ", 0.0, 1.0, 0.0),
+    ("MID EN", "EQ", 0.0, 1.0, 0.0),
     ("MID FRQ", "EQ", 20.0, 20000.0, 1000.0),
     ("MID GAI", "EQ", -12.0, 12.0, 0.0),
     ("MID Q", "EQ", 0.1, 10.0, 1.0),
-    ("MID EN", "EQ", 0.0, 1.0, 0.0),
+    ("HI  EN", "EQ", 0.0, 1.0, 0.0),
     ("HI  FRQ", "EQ", 20.0, 20000.0, 10000.0),
     ("HI  GAI", "EQ", -12.0, 12.0, 0.0),
     ("HI  Q", "EQ", 0.1, 10.0, 1.0),
-    ("HI  EN", "EQ", 0.0, 1.0, 0.0),
-    # COMP
+    # COMP (dedicated menu Fase 13: BYP first, then THR/RAT/KNE/ATK/REL/MKU/LNK/SC)
+    ("CMP BYP", "COMP", 0.0, 1.0, 1.0),
     ("CMP THR", "COMP", -60.0, 0.0, -24.0),
     ("CMP RAT", "COMP", 1.0, 20.0, 4.0),
     ("CMP KNE", "COMP", 0.0, 12.0, 6.0),
@@ -59,7 +60,6 @@ PARAMS = [
     ("CMP MKU", "COMP", 0.0, 24.0, 0.0),
     ("CMP LNK", "COMP", 0.0, 1.0, 1.0),
     ("CMP SCL", "COMP", 0.0, 1.0, 1.0),
-    ("CMP BYP", "COMP", 0.0, 1.0, 1.0),
 ]
 
 
@@ -103,16 +103,17 @@ def check_legacy_defaults():
     assert PARAMS[15][4] == 1.0
     for i in range(16, 28):
         assert PARAMS[i][4] in (0.0, 1.0, 100.0, 1000.0, 10000.0)
-    # comp bypass on, thr -24 ratio 4 knee 6 attack 15 release 200 make-up 0
-    assert PARAMS[35][4] == 1.0  # CMP BYP
-    assert PARAMS[28][4] == -24.0
-    assert PARAMS[29][4] == 4.0
-    assert PARAMS[30][4] == 6.0
-    assert PARAMS[31][4] == 15.0
-    assert PARAMS[32][4] == 200.0
-    assert PARAMS[33][4] == 0.0
-    assert PARAMS[34][4] == 1.0  # LINK
-    assert PARAMS[35][4] == 1.0  # SCL
+    # comp (Fase 13 order, BYP first): bypass on, thr -24 ratio 4 knee 6
+    # attack 15 release 200 make-up 0, link+softclip on
+    assert PARAMS[28][4] == 1.0   # CMP BYP
+    assert PARAMS[29][4] == -24.0  # CMP THR
+    assert PARAMS[30][4] == 4.0   # CMP RAT
+    assert PARAMS[31][4] == 6.0   # CMP KNE
+    assert PARAMS[32][4] == 15.0  # CMP ATK
+    assert PARAMS[33][4] == 200.0  # CMP REL
+    assert PARAMS[34][4] == 0.0   # CMP MKU
+    assert PARAMS[35][4] == 1.0   # CMP LNK
+    assert PARAMS[36][4] == 1.0   # CMP SCL
     print("legacy defaults match AllParamsAtLegacyDefault OK")
 
 

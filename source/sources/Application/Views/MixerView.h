@@ -5,15 +5,18 @@
 #include "ViewData.h"
 #include "Application/Model/Song.h"
 
-// TREEFROG_FX_PAGES_V2 (PLAN_FX_REDESIGN_ES.md, Fase 6):
+// TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9):
 // MixerView page system for the master FX engine.  SELECT cycles
 // MIX -> DELAY -> REVERB -> EQ -> COMP -> MIX.  MIX keeps the per-channel
-// bars and adds per-track DLY/RVB send readouts/edits (R2 alone cycles the
-// edit target VOL/DLY/RVB on the hovered channel).  DELAY/REVERB/EQ/COMP
-// are parameter pages: UP/DOWN moves the row cursor, LEFT/RIGHT edits the
-// value, A+UP/DOWN coarse.  EQ exposes the 3-band parametric EQ, COMP the
-// compressor (Fase 6 splits the old single MASTER page in two so each page
-// fits the 8-line mixer screen without scrolling).
+// bars plus an FX RETURNS readout (master DLY/RVB return levels).  The
+// per-track DLY/RVB send readouts were removed in Fase 9: sends are
+// per-instrument now (edited in InstrumentView), and the per-track sends
+// survive only as the Fase 7 inheritance/compatibility layer.  R2 alone
+// cycles the MIX-page edit target VOL -> DLY RET -> RVB RET.  DELAY/REVERB/
+// EQ/COMP are parameter pages: UP/DOWN moves the row cursor, LEFT/RIGHT
+// edits the value, A+UP/DOWN coarse.  EQ exposes the 3-band parametric EQ,
+// COMP the compressor (Fase 6 splits the old single MASTER page in two so
+// each page fits the 8-line mixer screen without scrolling).
 enum FxPage {
     FX_PAGE_MIX = 0,
     FX_PAGE_DELAY,
@@ -45,21 +48,27 @@ enum FxParamId {
     FX_P_RVB_MODE,
     FX_P_RVB_MIX,
     FX_P_RVB_BYP,
-    // EQ (3 bands: bypass + freq/gain/Q/enable each)
+    // EQ (3 bands, dedicated banded menu - Fase 12: bypass + enable/freq/
+    // gain/Q each; EN is first so UP/DOWN walks the band in the same visual
+    // order the EQ menu draws)
     FX_P_EQ_BYP,
+    FX_P_EQ_LOW_EN,
     FX_P_EQ_LOW_FRQ,
     FX_P_EQ_LOW_GAI,
     FX_P_EQ_LOW_Q,
-    FX_P_EQ_LOW_EN,
+    FX_P_EQ_MID_EN,
     FX_P_EQ_MID_FRQ,
     FX_P_EQ_MID_GAI,
     FX_P_EQ_MID_Q,
-    FX_P_EQ_MID_EN,
+    FX_P_EQ_HI_EN,
     FX_P_EQ_HI_FRQ,
     FX_P_EQ_HI_GAI,
     FX_P_EQ_HI_Q,
-    FX_P_EQ_HI_EN,
     // COMP
+    // COMP (dedicated menu - Fase 13: BYP first so it is never off-screen;
+    // THR/RAT/KNE/ATK/REL/MKU/LNK/SC follow in the same order the COMP menu
+    // draws them, with the GR meter below)
+    FX_P_CMP_BYP,
     FX_P_CMP_THR,
     FX_P_CMP_RAT,
     FX_P_CMP_KNE,
@@ -68,7 +77,6 @@ enum FxParamId {
     FX_P_CMP_MKU,
     FX_P_CMP_LINK,
     FX_P_CMP_SC,
-    FX_P_CMP_BYP,
     FX_PARAM_COUNT
 };
 
@@ -100,12 +108,27 @@ protected:
 	void fxProcessPageButtonMask(unsigned int mask) ;
 	void fxMoveRow(int delta) ;
 	void fxEditRow(int delta,bool coarse) ;
+	// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12/14): musical
+	// frequency editing (semitones / octaves) used by fxEditRow on EQ rows.
+	void fxEditFrequency(int id,int delta,bool coarse) ;
 	void fxResetRow() ;
-	void fxEditChannelTarget(int delta) ;
 	void drawFxPages() ;
 	void drawFxParamPage(FxPage page) ;
 	void drawFxParamRow(int id,int x,int y,int col) ;
-	void drawMixSends() ;
+	// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12): dedicated EQ
+	// menu (exclusive page) with banded LOW/MID/HIGH layout, ON/OFF, Hz and
+	// signed-dB values.  drawEqRow draws one row; drawEqPage is dispatched by
+	// drawFxParamPage.
+	void drawEqPage() ;
+	void drawEqRow(int id,int x,int y) ;
+	// TREEFROG_COMP_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 13): dedicated COMP
+	// menu (exclusive page) with BYP first, centered labeled rows with units,
+	// ratio as x:1, booleans as ON/OFF, and the GR meter always visible below.
+	void drawCompPage() ;
+	// TREEFROG_FX_PAGES_V3 (Fase 9): master FX returns on the MIX page.
+	void nudgeDelayReturn(int delta) ;
+	void nudgeReverbReturn(int delta) ;
+	void drawMixReturns() ;
 	float fxGet(int id) const ;
 	void fxSet(int id,float v) ;
 	int fxRowForId(int id) const ;
@@ -138,6 +161,7 @@ private:
 	// TREEFROG_FX_PAGES_V1 (Fase 4.3)
 	int fxPage_ ;                 // current FxPage
 	int fxRow_ ;                  // row cursor within the current page
-	int fxEditTarget_ ;           // 0=VOL 1=DLY 2=RVB on the MIX page
+	// TREEFROG_FX_PAGES_V3 (Fase 9): 0=VOL 1=DLY RET 2=RVB RET on the MIX page
+	int fxEditTarget_ ;
 } ;
 #endif
