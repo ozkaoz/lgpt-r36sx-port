@@ -56,24 +56,26 @@ def check_master_pages_dispatched():
 
 
 def check_master_hierarchy_colors():
-    # Title on top of the hierarchy, then rows: label CD_NORMAL, value
-    # CD_HILITE1, edited row inverted CD_HILITE2.
+    # RC3: the FX page title is drawn centered via UiDraw::DrawCenteredTitleAt,
+    # which internally applies CD_HILITE1 (verified in UiDraw.cpp).  Rows keep
+    # the hierarchy: label CD_NORMAL, value CD_HILITE1, edited row CD_HILITE2.
     fn = MV_CPP.index("void MixerView::drawFxParamPage")
     fn_end = MV_CPP.index("void MixerView::drawMasterFxRow")
     fn_seg = MV_CPP[fn:fn_end]
-    # Inside drawFxParamPage: the title SetColor(CD_HILITE1) comes right
-    # before the pageTitle DrawString, then the color resets to CD_NORMAL.
-    title_color = fn_seg.index("SetColor(CD_HILITE1)")
-    page_title_pos = fn_seg.index("pageTitle,props)")
-    assert 0 < page_title_pos - title_color < 200, "title must use CD_HILITE1"
-    assert "SetColor(CD_NORMAL)" in fn_seg[page_title_pos:page_title_pos + 80]
+    # Centered title call in drawFxParamPage using the RC3 UiDraw API.
+    title_pos = fn_seg.index("UiDraw::DrawCenteredTitleAt(*this,1,pageTitle)")
+    assert "sprintf(pageTitle" in fn_seg[:title_pos]
+    # The dedicated pages no longer draw the old (1,1) title or hint rows.
+    assert "DrawString(1,1,pageTitle" not in fn_seg
+    assert "UP/DN row" not in fn_seg
+    assert "SELECT page" not in fn_seg
     # drawMasterFxRow: label CD_NORMAL, value CD_HILITE1, edited row inverted.
     row = MV_CPP.index("void MixerView::drawMasterFxRow")
     seg = MV_CPP[row:row + 700]
     assert "SetColor(CD_NORMAL)" in seg           # label
     assert "selected?CD_HILITE2:CD_HILITE1" in seg  # value + edited row
     assert "props.invert_=selected" in seg
-    print("hierarchy colors (HILITE1 title, NORMAL label, HILITE1 value, "
+    print("hierarchy colors (centered UiDraw title, NORMAL label, HILITE1 value, "
           "HILITE2 invert) OK")
 
 
@@ -106,11 +108,13 @@ def check_master_page_formats():
     rv = MV_CPP[MV_CPP.index("void MixerView::drawReverbPage"):
                MV_CPP.index("void MixerView::drawEqPage")]
     assert '"%4.0f ms"' in dl                       # delay time ms
-    assert '"%s",v>=0.5f?"ON":"OFF"' in dl          # ping-pong/sat/bypass
+    assert '"%s",v>=0.5f?"ON":"OFF"' in dl          # ping-pong/sat
     assert '"%4.0f ms"' in rv                       # predelay ms
     assert '"%.2f s"' in rv                         # decay seconds
     assert 'v>=0.5f?"NORMAL":"ECO"' in rv           # reverb mode
-    assert 'v>=0.5f?"ON":"OFF"' in rv               # reverb bypass
+    # RC3: reverb bypass renders through the unified UiDraw toggle
+    # (UI_STYLE_GUIDE point 4) instead of a raw ON/OFF sprintf.
+    assert "UiDraw::DrawToggle" in rv               # reverb bypass toggle
     print("master page value formats (ms, s, ON/OFF, ECO/NORMAL) OK")
 
 

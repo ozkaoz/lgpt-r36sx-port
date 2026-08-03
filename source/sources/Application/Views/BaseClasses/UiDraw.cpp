@@ -38,6 +38,16 @@ void UiDraw::DrawCenteredTitle(View &view, const char *title) {
     view.DrawString(clampX(x), 0, title, props);
 }
 
+void UiDraw::DrawCenteredTitleAt(View &view, int y, const char *title) {
+    int len = (int)strlen(title);
+    int x = (kScreenWidth - len) / 2;
+    if (x < 0) x = 0;
+    GUITextProperties props;
+    view.SetColor(CD_HILITE1);
+    props.invert_ = false;
+    view.DrawString(clampX(x), clampY(y), title, props);
+}
+
 void UiDraw::DrawSectionHeader(View &view, int x, int y, const char *header) {
     GUITextProperties props;
     view.SetColor(CD_HILITE1);

@@ -4,6 +4,7 @@
 #include "Application/Mixer/MixerService.h"
 #include "Application/Model/Project.h"
 #include "Application/Views/UIController.h"
+#include "Application/Views/BaseClasses/UiDraw.h"
 #include "Application/Audio/FxEngine/FxEngine.h"
 #include "Application/Utils/fixed.h"
 #include "Application/Utils/char.h"
@@ -807,8 +808,9 @@ void MixerView::drawFxParamPage(FxPage page) {
 	int y=2 ;
 	GUITextProperties props ;
 	// TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 11): the title shows
-	// the page position [n/5] so the SELECT cycle is always visible.  RC2
-	// (point 4): the title sits in CD_HILITE1 (top of the hierarchy).
+	// the page position [n/5] so the SELECT cycle is always visible.  RC3
+	// (PLAN_RC3 point 2/26): the title is centered with UiDraw and the
+	// permanent hint lines moved to HelpRegistry (SELECT+R1).
 	char pageTitle[24] ;
 	int pageNum=(int)page+1 ;
 	switch(page) {
@@ -817,22 +819,16 @@ void MixerView::drawFxParamPage(FxPage page) {
 	case FX_PAGE_EQ:     sprintf(pageTitle,"MASTER EQ [%d/5]",pageNum) ; break ;
 	default:             sprintf(pageTitle,"MASTER COMP [%d/5]",pageNum) ; break ;
 	}
-	SetColor(CD_HILITE1) ;
-	DrawString(1,1,pageTitle,props) ;
-	SetColor(CD_NORMAL) ;
+	UiDraw::DrawCenteredTitleAt(*this,1,pageTitle) ;
 	// TREEFROG_FX_MASTER_PAGES_RC2 (PLAN_FX_REDESIGN_ES.md, RC2 point 4): the
 	// DELAY and REVERB pages are dedicated two-column menus (label / value)
 	// with a clear hierarchy instead of the generic parameter list.
 	if (page==FX_PAGE_DELAY) {
 		drawDelayPage() ;
-		DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
-		DrawString(1,23,"SELECT page  START play",props) ;
 		return ;
 	}
 	if (page==FX_PAGE_REVERB) {
 		drawReverbPage() ;
-		DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
-		DrawString(1,23,"SELECT page  START play",props) ;
 		return ;
 	}
 	// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12): the EQ page is a
@@ -840,8 +836,6 @@ void MixerView::drawFxParamPage(FxPage page) {
 	// per band), so it does not use the generic parameter list.
 	if (page==FX_PAGE_EQ) {
 		drawEqPage() ;
-		DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
-		DrawString(1,23,"SELECT page  START play",props) ;
 		return ;
 	}
 	// TREEFROG_COMP_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 13): the COMP page
@@ -849,8 +843,6 @@ void MixerView::drawFxParamPage(FxPage page) {
 	// meter always visible) instead of the generic parameter list.
 	if (page==FX_PAGE_COMP) {
 		drawCompPage() ;
-		DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
-		DrawString(1,23,"SELECT page  START play",props) ;
 		return ;
 	}
 	for (int i=0;i<FX_PARAM_COUNT;i++) {
@@ -859,8 +851,6 @@ void MixerView::drawFxParamPage(FxPage page) {
 			y++ ;
 		}
 	}
-	DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
-	DrawString(1,23,"SELECT page  START play",props) ;
 }
 
 // TREEFROG_FX_MASTER_PAGES_RC2 (PLAN_FX_REDESIGN_ES.md, RC2 point 4):
@@ -892,14 +882,19 @@ void MixerView::drawDelayPage() {
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
+		bool selected=(fxRowForId(id)==fxRow_) ;
+		if (id==FX_P_DLY_BYP) {
+			// RC3: unified toggle via UiDraw (UI_STYLE_GUIDE point 4).
+			UiDraw::DrawToggle(*this,x+6,2+p,v>=0.5f,selected) ;
+			continue ;
+		}
 		switch(id) {
 		case FX_P_DLY_TIME: sprintf(buffer,"%4.0f ms",v) ; break ;
 		case FX_P_DLY_PP:
-		case FX_P_DLY_SAT:
-		case FX_P_DLY_BYP:  sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ; break ;
+		case FX_P_DLY_SAT:  sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ; break ;
 		default:            sprintf(buffer,"%.2f",v) ; break ;  // FBK/MIX/WID
 		}
-		drawMasterFxRow(labels[p],buffer,(fxRowForId(id)==fxRow_),x,2+p,valueX) ;
+		drawMasterFxRow(labels[p],buffer,selected,x,2+p,valueX) ;
 	}
 }
 
@@ -915,14 +910,18 @@ void MixerView::drawReverbPage() {
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
+		bool selected=(fxRowForId(id)==fxRow_) ;
+		if (id==FX_P_RVB_BYP) {
+			UiDraw::DrawToggle(*this,x+6,2+p,v>=0.5f,selected) ;
+			continue ;
+		}
 		switch(id) {
 		case FX_P_RVB_PRE:  sprintf(buffer,"%4.0f ms",v) ; break ;
 		case FX_P_RVB_DEC:  sprintf(buffer,"%.2f s",v) ; break ;
 		case FX_P_RVB_MODE: sprintf(buffer,"%s",v>=0.5f?"NORMAL":"ECO") ; break ;
-		case FX_P_RVB_BYP:  sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ; break ;
 		default:            sprintf(buffer,"%.2f",v) ; break ;  // SIZ/DMP/WID
 		}
-		drawMasterFxRow(labels[p],buffer,(fxRowForId(id)==fxRow_),x,2+p,valueX) ;
+		drawMasterFxRow(labels[p],buffer,selected,x,2+p,valueX) ;
 	}
 }
 
@@ -967,10 +966,10 @@ void MixerView::drawEqRow(int id,int x,int y) {
 }
 
 void MixerView::drawEqPage() {
-	// Title (row 1) and hints (rows 22/23) are drawn by drawFxParamPage();
-	// here only the banded body is rendered.  Rows: bypass at y=2, then each
-	// band is a header line (y=4/10/16) followed by EN/FRQ/GAIN/Q.  All bands
-	// stay on screen so editing never hides the rest of the EQ.
+	// Title (row 1) is drawn by drawFxParamPage(); hints moved to the
+	// HelpOverlay (SELECT+R1).  Rows: bypass at y=2, then each band is a
+	// header line (y=4/10/16) followed by EN/FRQ/GAIN/Q.  All bands stay on
+	// screen so editing never hides the rest of the EQ.
 	const int x=13 ;
 	GUITextProperties props ;
 	drawEqRow(FX_P_EQ_BYP,x,2) ;
@@ -1076,10 +1075,6 @@ void MixerView::drawFxPages() {
 			drawVolumeBar(i,x0+i*dx,y0,height) ;
 		}
 		drawMixReturns() ;
-		DrawString(4,19,"A+UP/DN x10  A+L/R x1",props) ;
-		DrawString(4,20,"L/R ch  L->MST  R1+B mute",props) ;
-		DrawString(4,21,"START play  R1+A solo  R2+A instr",props) ;
-		DrawString(4,23,"R2 edit VOL/RET  SELECT [1/5]",props) ;
 	} else {
 		drawFxParamPage((FxPage)fxPage_) ;
 	}

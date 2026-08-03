@@ -20,6 +20,10 @@ class UiDraw {
     // (screenWidth - textWidth)/2 per the RC3 plan.
     static void DrawCenteredTitle(View &view, const char *title);
 
+    // Centered title on an explicit row (for sub-pages whose row 0 is the
+    // app header).  Same centering rule, same CD_HILITE1 style.
+    static void DrawCenteredTitleAt(View &view, int y, const char *title);
+
     // Section header on its own row, left aligned, CD_HILITE1.
     static void DrawSectionHeader(View &view, int x, int y,
                                   const char *header);

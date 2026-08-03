@@ -85,6 +85,10 @@ static const HelpLine kMixerLines_[] = {
     {"SELECT", "page cycle"},
     {"R1+A", "solo"},
     {"R1+B", "mute"},
+    {"UP/DN", "row"},
+    {"L/R", "edit"},
+    {"A", "coarse"},
+    {"START", "play"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
 };
