@@ -34,10 +34,12 @@ de proyectos.**
 
 Confirmado gráfico: la forma de onda real se renderiza por overlay
 framebuffer (`tf_vline`/`tf_rect`) con amplitud por columna, región
-seleccionada, marcadores de corte, eje central y cursor. Los tres marcos
-ASCII restantes (frame principal, overlay de progreso de operación y panel
-Pitch/Env) se documentan como excepciones legítimas en
-`OBSOLETE_FEATURE_AUDIT` y `UI_VISUAL_AUDIT`.
+seleccionada, marcadores de corte, eje central y cursor. El frame principal
+usa celdas sólidas CD_BORDER y el submenú Pitch/Env (`drawPitchScreen`)
+sigue el lenguaje gráfico del port (título centrado + bloque de filas
+centrado, sin caja ASCII); el overlay de progreso de operación se conserva
+como excepción documentada en `UI_VISUAL_AUDIT`. Los títulos se renombraron
+a "Graphical Chopper" y "PITCH/ENV" (sin sufijos de versión).
 
 ### 4. Widgets ASCII y leyendas (puntos 17/26)
 

@@ -70,17 +70,18 @@ def check_help_registry():
 
 def check_ascii_widget_allowlist():
     # RC4 P6 (PLAN_RC4 11.7): the Chopper's structural frame is now drawn
-    # with solid CD_BORDER cells, so only the two intentional blocking
-    # overlays keep inverted ASCII boxes (operation progress + Pitch/Env
-    # panel) plus the `--`/`----` value placeholders.
-    # 2 boxes x 2 border lines = 4 `+----+` lines remain.
+    # with solid CD_BORDER cells.  RC6: the Pitch/Env panel follows the
+    # port-wide menu language (centered title + label/value block), so only
+    # the intentional operation-progress overlay keeps an inverted ASCII box
+    # plus the `--`/`----` value placeholders.
+    # 1 box x 2 border lines = 2 `+----+` lines remain.
     frames = CHO.count("+------")
-    assert frames == 4, frames
+    assert frames == 2, frames
     assert "----------- no sample loaded -----------" in CHO  # placeholder text
     for view in (MV, IV):
         assert "=====" not in view and "+-----" not in view
         assert not __import__("re").search(r'"[^"]*\*{3}[^"]*"', view)
-    print("ASCII widget allowlist: 2 Chopper blocking overlays, no others OK")
+    print("ASCII widget allowlist: 1 Chopper operation overlay, no others OK")
 
 
 check_mixerview_master()

@@ -247,12 +247,21 @@ región seleccionada (banda + raíles finos), marcadores de corte, eje central
 y cursor. El marco estructural de la banda se dibuja ahora con celdas sólidas
 CD_BORDER (P6); ya no usa caracteres ASCII de caja.
 
-El overlay de progreso de operación (`drawOperationOverlay`) y el panel
-Pitch/Env (`drawPitchScreen`) usan marcos invertidos propios que
-sobrescriben visualmente la banda durante el procesamiento/edición; se
-conservan como excepción documentada del punto 24/17 (no son
+El overlay de progreso de operación (`drawOperationOverlay`) usa un marco
+invertido propio que sobrescribe visualmente la banda durante el
+procesamiento; se conserva como excepción documentada del punto 24/17 (no es
 `DrawModalFrame` porque el bloqueo sólido sobre la forma de onda es
 intencional).
+
+### RC6: Chopper (punto 18) y submenú PITCH/ENV
+- El título del frame se renombró a "Graphical Chopper" (sin sufijo de
+  versión) y el submenú Pitch/Env a "PITCH/ENV".
+- `drawPitchScreen` dejó el marco ASCII y sigue ahora el lenguaje gráfico del
+  port (igual que los demás submenús): título centrado vía
+  `UiDraw::DrawCenteredTitleAt` en `ml.startY-1` sobre un bloque centrado con
+  `UiDraw::MakeCenteredMenuLayout` (7 filas: cabecera I/S/C + 6 parámetros),
+  fila editada invertida en CD_HILITE2, sin caja de caracteres. La única
+  excepción ASCII restante en el Chopper es `drawOperationOverlay`.
 
 ## Checklist por vista
 

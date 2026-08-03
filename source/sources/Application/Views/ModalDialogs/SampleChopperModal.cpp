@@ -6,6 +6,7 @@
 #include "Application/Instruments/SampleInstrument.h"
 #include "Application/Instruments/CommandList.h"
 #include "Application/Player/Player.h"
+#include "Application/Views/BaseClasses/UiDraw.h"
 #include "System/FileSystem/FileSystem.h"
 #include "Services/Time/TimeService.h"
 #if defined(PLATFORM_TREEFROG)
@@ -2198,8 +2199,7 @@ void SampleChopperModal::refreshCurrentInstrumentAfterSampleEdit(int newSize) {
 
 void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
     if (!pitchMode_) return;
-    char msg[64];
-    char line[64];
+    char buffer[40];
 
 #if defined(PLATFORM_TREEFROG)
     /* U2.29: pitch mode must own the whole center panel area. Disable the
@@ -2211,37 +2211,43 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
     tf_rect(0, 188, 320, 44, tf_rgb565(10, 10, 24));
 #endif
 
-    const int x = 1;
-    const int y = 8;
-    SetColor(CD_HILITE1);
-    props.invert_ = true;
-    drawStringAbs(x, y + 0,  "+------------------------------------+", props);
-    snprintf(line, sizeof(line), "PITCH/ENV U2.36");
-    snprintf(msg, sizeof(msg), "| %-34.34s |", line);
-    drawStringAbs(x, y + 1, msg, props);
-    snprintf(line, sizeof(line), "I%02X S%02X C%02d/%02d", instrumentIndex_, sampleIndex_, selectedChop_ + 1, (boundaryCount_ > 1 ? boundaryCount_ - 1 : 1));
-    snprintf(msg, sizeof(msg), "| %-34.34s |", line);
-    drawStringAbs(x, y + 2, msg, props);
-    snprintf(line, sizeof(line), "%cPitch:%+3d st", pitchEditParam_ == 0 ? '>' : ' ', pitchSemitones_);
-    snprintf(msg, sizeof(msg), "| %-34.34s |", line);
-    drawStringAbs(x, y + 3, msg, props);
-    snprintf(line, sizeof(line), "%cAttack:%4d ms", pitchEditParam_ == 1 ? '>' : ' ', pitchAttackMs_);
-    snprintf(msg, sizeof(msg), "| %-34.34s |", line);
-    drawStringAbs(x, y + 4, msg, props);
-    snprintf(line, sizeof(line), "%cSustain:%3d %%", pitchEditParam_ == 2 ? '>' : ' ', pitchSustainPercent_);
-    snprintf(msg, sizeof(msg), "| %-34.34s |", line);
-    drawStringAbs(x, y + 5, msg, props);
-    snprintf(line, sizeof(line), "%cRelease:%4d ms", pitchEditParam_ == 3 ? '>' : ' ', pitchReleaseMs_);
-    snprintf(msg, sizeof(msg), "| %-34.34s |", line);
-    drawStringAbs(x, y + 6, msg, props);
-    snprintf(line, sizeof(line), "%cScope:%-6s", pitchEditParam_ == 4 ? '>' : ' ', pitchScope_ ? "Chop" : "Sample");
-    snprintf(msg, sizeof(msg), "| %-34.34s |", line);
-    drawStringAbs(x, y + 7, msg, props);
-    snprintf(line, sizeof(line), "%cSample:%02X", pitchEditParam_ == 5 ? '>' : ' ', sampleIndex_);
-    snprintf(msg, sizeof(msg), "| %-34.34s |", line);
-    drawStringAbs(x, y + 8, msg, props);
-    drawStringAbs(x, y + 9,  "+------------------------------------+", props);
+    // RC6: the Pitch/Env submenu follows the port-wide graphical language
+    // (same as the other submenus): a centered title on the row just above a
+    // centered label/value block, no ASCII box.  Each row highlights the
+    // edited parameter by inverting on CD_HILITE2.
+    MenuLayout ml = UiDraw::MakeCenteredMenuLayout(7, 11, 10, 2);
+    UiDraw::DrawCenteredTitleAt(*this, ml.startY - 1, "PITCH/ENV");
+
+    snprintf(buffer, sizeof(buffer), "I%02X S%02X C%02d/%02d",
+             instrumentIndex_, sampleIndex_,
+             selectedChop_ + 1,
+             (boundaryCount_ > 1 ? boundaryCount_ - 1 : 1));
+    SetColor(CD_NORMAL);
     props.invert_ = false;
+    DrawString(ml.labelX, ml.startY, buffer, props);
+
+    static const char *labels[6] = {"Pitch", "Attack", "Sustain",
+                                    "Release", "Scope", "Sample"};
+    for (int i = 0; i < 6; i++) {
+        bool selected = (pitchEditParam_ == i);
+        char value[16];
+        switch (i) {
+        case 0: snprintf(value, sizeof(value), "%+3d st", pitchSemitones_); break;
+        case 1: snprintf(value, sizeof(value), "%4d ms", pitchAttackMs_); break;
+        case 2: snprintf(value, sizeof(value), "%3d %%", pitchSustainPercent_); break;
+        case 3: snprintf(value, sizeof(value), "%4d ms", pitchReleaseMs_); break;
+        case 4: snprintf(value, sizeof(value), "%s", pitchScope_ ? "Chop" : "Sample"); break;
+        default: snprintf(value, sizeof(value), "%02X", sampleIndex_); break;
+        }
+        SetColor(CD_NORMAL);
+        props.invert_ = false;
+        DrawString(ml.labelX, ml.startY + 1 + i, labels[i], props);
+        SetColor(selected ? CD_HILITE2 : CD_HILITE1);
+        props.invert_ = selected;
+        DrawString(ml.valueX, ml.startY + 1 + i, value, props);
+        props.invert_ = false;
+        SetColor(CD_NORMAL);
+    }
 
     SetColor(CD_NORMAL);
     drawStringAbs(1, 24, "UD item LR value    B preview", props);
@@ -2902,7 +2908,7 @@ void SampleChopperModal::drawFrame(GUITextProperties &props) {
     }
     props.invert_ = false;
     SetColor(CD_HILITE2);
-    drawStringAbs(2, 2, "Graphical Chopper U2.36", props);
+    drawStringAbs(2, 2, "Graphical Chopper", props);
 }
 
 void SampleChopperModal::drawSampleInfo(GUITextProperties &props) {
