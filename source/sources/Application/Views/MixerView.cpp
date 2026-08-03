@@ -569,17 +569,43 @@ void MixerView::fxMoveRow(int delta) {
 	((AppWindow &)w_).SetDirty() ;
 }
 
-// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12 + Fase 14):
-// Frequency editing is musical, never linear 1 Hz / 10 Hz.  Fine (L/R) steps
-// by one semitone (x2^(1/12)), coarse (A+UP/DOWN) by one octave (x2), and the
-// value is clamped to 20..20000 Hz.  This traverses the full range in ~120
-// fine presses or ~10 coarse presses and stays musically meaningful.
-static bool fxIsFrequency(int id) {
-	return id==FX_P_EQ_LOW_FRQ || id==FX_P_EQ_MID_FRQ || id==FX_P_EQ_HI_FRQ ;
+// TREEFROG_FX_EDIT_CURVE_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12 + Fase 14):
+// Wide-range proportional parameters are edited on a musical/log curve, never
+// with a linear 1/10 step: fine (L/R) steps by one semitone (x2^(1/12)),
+// coarse (A+UP/DOWN) by one octave (x2).  The relative error is constant, so
+// the whole range is traversable in a bounded number of presses and editing
+// stays musically meaningful.  Applies to EQ frequencies and to every other
+// wide-range time/ratio parameter (delay time, reverb pre-delay/decay,
+// compressor attack/release/ratio).
+static bool fxUsesCurve(int id) {
+	switch (id) {
+	case FX_P_EQ_LOW_FRQ:
+	case FX_P_EQ_MID_FRQ:
+	case FX_P_EQ_HI_FRQ:
+	case FX_P_DLY_TIME:
+	case FX_P_RVB_PRE:
+	case FX_P_RVB_DEC:
+	case FX_P_CMP_ATK:
+	case FX_P_CMP_REL:
+	case FX_P_CMP_RAT:
+		return true ;
+	default:
+		return false ;
+	}
 }
-void MixerView::fxEditFrequency(int id,int delta,bool coarse) {
+void MixerView::fxEditCurve(int id,int delta,bool coarse) {
 	const FxParamSpec &spec=kFxParams_[id] ;
 	float v=fxGet(id) ;
+	// Values below the floor snap to it so proportional editing never
+	// multiplies zero (e.g. DLY TIM defaults to 0 while vmin is 10).  If the
+	// floor itself is 0 (e.g. RVB PRE), the first upward edit starts from 1%
+	// of the range instead of being stuck at 0.
+	if (delta>0) {
+		if (v<spec.vmin) v=spec.vmin ;
+		else if (v<=0.0f) v=(spec.vmax-spec.vmin)*0.01f ;
+	} else if (delta<0 && v>spec.vmax) {
+		v=spec.vmax ;
+	}
 	float factor=coarse?2.0f:1.05946309436f ;  // octave / semitone
 	if (delta<0) factor=1.0f/factor ;
 	int steps=delta<0?-delta:delta ;
@@ -600,8 +626,8 @@ void MixerView::fxEditRow(int delta,bool coarse) {
 	}
 	if (targetId<0) return ;
 	const FxParamSpec &spec=kFxParams_[targetId] ;
-	if (fxIsFrequency(targetId)) {
-		fxEditFrequency(targetId,delta,coarse) ;
+	if (fxUsesCurve(targetId)) {
+		fxEditCurve(targetId,delta,coarse) ;
 		isDirty_=true ;
 		((AppWindow &)w_).SetDirty() ;
 		return ;
@@ -824,7 +850,7 @@ void MixerView::drawEqRow(int id,int x,int y) {
 	props.invert_=selected ;
 	if (id==FX_P_EQ_BYP||id==FX_P_EQ_LOW_EN||id==FX_P_EQ_MID_EN||id==FX_P_EQ_HI_EN) {
 		sprintf(buffer,"%-6s[ %s ]",eqParamLabel(id),on?"ON":"OFF") ;
-	} else if (fxIsFrequency(id)) {
+	} else if (fxUsesCurve(id)) {
 		sprintf(buffer,"%-6s%6.0f Hz",eqParamLabel(id),fxGet(id)) ;
 	} else if (id==FX_P_EQ_LOW_GAI||id==FX_P_EQ_MID_GAI||id==FX_P_EQ_HI_GAI) {
 		sprintf(buffer,"%-6s%+5.1f dB",eqParamLabel(id),fxGet(id)) ;

@@ -489,6 +489,17 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 - El enum `FX_P_CMP_*` se reordenó a BYP,THR,RAT,KNE,ATK,REL,MKU,LNK,SC (mismos IDs 28..36); tests Fase 4/6 actualizados.
 - Nuevo test `tests/test_fx_phase13_comp_menu.py` -> `FX_COMP_MENU_PHASE13_OK`.
 
+### Fase 14 — Curva de edición general fina/gruesa (hecho y verificado)
+
+- La edición de curva musical/logarítmica de la Fase 12 se generaliza a todos los parámetros proporcionales de rango amplio mediante `fxUsesCurve(id)` + `fxEditCurve(id,delta,coarse)`:
+  - Frecuencias EQ (LO/MID/HI FRQ), `DLY TIM`, `RVB PRE`, `RVB DEC`, `CMP ATK`, `CMP REL`, `CMP RAT`.
+  - Fina (L/R) = semitono ×2^(1/12); gruesa (A+UP/DOWN) = octava ×2; error relativo constante.
+  - Recorrido completo acotado: p.ej. CMP REL 1..2000 ms en ~132 pulsaciones finas / ~11 gruesas; DLY TIM 10..2000 ms en ~92 finas / ~8 gruesas; RVB DEC 0.2..8 s en ~64 finas.
+- Valores bajo el suelo no se quedan atascados: si `v < vmin` (p.ej. DLY TIM con default 0 y vmin 10) la primera pulsación arriba hace snap al suelo; si el propio suelo es 0 (RVB PRE) la primera pulsación parte de 1% del rango (1 ms).
+- Clamp en [vmin, vmax] en ambos sentidos.
+- El resto de parámetros (lineal 1/fino, 10/grueso) queda igual.
+- Nuevo test `tests/test_fx_phase14_curve_editing.py` -> `FX_EDIT_CURVE_PHASE14_OK`.
+
 ---
 
 ## G. Diseño de clases / APIs (FxEngine)

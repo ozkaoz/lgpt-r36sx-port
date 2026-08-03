@@ -1,5 +1,11 @@
 # Changelog
 
+## FX redesign Fase 14 (general fine/coarse curve editing)
+
+- The Fase 12 musical curve edit is generalized: `fxUsesCurve()` + `fxEditCurve()` apply semitone fine (L/R) / octave coarse (A+UP/DOWN) proportional steps to every wide-range time/ratio param — EQ frequencies plus `DLY TIM`, `RVB PRE`, `RVB DEC`, `CMP ATK`, `CMP REL`, `CMP RAT`. Relative error is constant, so the full range is reachable in a bounded number of presses (e.g. CMP REL 1..2000 ms in ~132 fine / ~11 coarse).
+- Below-floor values never get stuck: values below vmin snap to the floor on the first upward edit (e.g. DLY TIM default 0, vmin 10); when the floor is 0 (RVB PRE) the first edit starts at 1% of the range. Clamped to [vmin, vmax] both ways. Other (linear) params keep fine=1 / coarse=10.
+- New test `test_fx_phase14_curve_editing.py` -> `FX_EDIT_CURVE_PHASE14_OK`; MixerView compiles, full FX suite green, `HOST_SYNTAX_CHECK_U2523_OK`.
+
 ## FX redesign Fase 13 (dedicated COMP menu with BYP first and visible GR)
 
 - The COMP page is now a dedicated, exclusive menu (`drawCompPage()`); CMP BYP is the first row so it is never off-screen. Centered rows with a fixed value column: `Bypass`, `Threshold -24.0 dB`, `Ratio 4.0:1` (rendered as x:1), `Knee 6.0 dB`, `Attack 15.0 ms`, `Release 200.0 ms`, `Makeup 0.0 dB`, `Stereo Link ON`, `Soft Clip ON` (booleans as ON/OFF, units shown).

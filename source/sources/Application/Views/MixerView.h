@@ -108,9 +108,11 @@ protected:
 	void fxProcessPageButtonMask(unsigned int mask) ;
 	void fxMoveRow(int delta) ;
 	void fxEditRow(int delta,bool coarse) ;
-	// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12/14): musical
-	// frequency editing (semitones / octaves) used by fxEditRow on EQ rows.
-	void fxEditFrequency(int id,int delta,bool coarse) ;
+	// TREEFROG_FX_EDIT_CURVE_V1 (PLAN_FX_REDESIGN_ES.md, Fase 14): musical/log
+	// curve editing (semitones / octaves) used by fxEditRow on wide-range
+	// proportional params (EQ freqs, delay time, reverb pre/decay, comp
+	// attack/release/ratio).
+	void fxEditCurve(int id,int delta,bool coarse) ;
 	void fxResetRow() ;
 	void drawFxPages() ;
 	void drawFxParamPage(FxPage page) ;

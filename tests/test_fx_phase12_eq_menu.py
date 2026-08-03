@@ -143,7 +143,7 @@ def check_source_guards():
     # Row renderer + musical frequency editing helpers.
     assert "void MixerView::drawEqRow" in MIX
     assert "void MixerView::drawEqPage" in MIX
-    assert "fxIsFrequency" in MIX
+    assert "fxUsesCurve" in MIX
     assert "1.05946309436" in MIX or "2.0 ** (1.0 / 12.0)" in MIX
     # Units and ON/OFF rendering in the EQ menu.
     assert "[ %s ]" in MIX and '"ON"' in MIX and '"OFF"' in MIX
