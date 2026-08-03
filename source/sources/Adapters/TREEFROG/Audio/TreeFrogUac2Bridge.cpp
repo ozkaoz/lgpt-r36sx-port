@@ -76,8 +76,19 @@ enum {
     U241_LOCAL_CONSOLE = 0,
     U241_WINDOWS = 1,
     U241_ANDROID = 2,
-    /* Backward-compatible alias retained for older call sites and logs. */
-    U241_USB_DUPLEX = U241_WINDOWS
+    U241_USB_OUT = 3,
+    U241_MIDI = 4,
+    /* Backward-compatible aliases retained for older call sites and logs. */
+    U241_USB_DUPLEX = U241_WINDOWS,
+    U241_USB_IN = U241_ANDROID
+};
+
+enum {
+    U241_DEVICE_NONE = 0,
+    U241_DEVICE_WINDOWS = 1,
+    U241_DEVICE_ANDROID = 2,
+    U241_DEVICE_SP404 = 3,
+    U241_DEVICE_MIDI = 4
 };
 
 static int g_fifo_fd = -1;
@@ -173,6 +184,10 @@ static const char *kAoaResult = "/tmp/r36sx_lgpt_usb/aoa_result";
 static const char *kAoaAccessory = "/tmp/r36sx_lgpt_usb/aoa_bulk_accessory_present";
 static const char *kAoaStream = "/tmp/r36sx_lgpt_usb/aoa_bulk_stream_ready";
 static const char *kAoaPcmFifo = "/tmp/r36sx_aoa_bulk_pcm_fifo";
+static const char *kSp404Card = "/tmp/r36sx_lgpt_usb/sp404_card";
+static const char *kSp404Fifo = "/tmp/r36sx_sp404_pcm_fifo";
+static const char *kMidiRawmidi = "/tmp/r36sx_lgpt_usb/midi_rawmidi";
+static const char *kMidiFifo = "/tmp/r36sx_midi_pcm_fifo";
 static const char *kH32TransitionStatus =
     "/tmp/r36sx_lgpt_usb/h35_transition_status";
 static time_t g_physical_volume_mtime = 0;
@@ -399,8 +414,10 @@ static int marker_fresh(const char *p, int max_age_sec) {
 
 static const char *mode_name(int mode) {
     switch (mode) {
-    case U241_WINDOWS: return "Windows";
-    case U241_ANDROID: return "Android";
+    case U241_WINDOWS: return "USB duplex";
+    case U241_ANDROID: return "USB in";
+    case U241_USB_OUT: return "USB out";
+    case U241_MIDI: return "MIDI";
     case U241_LOCAL_CONSOLE:
     default: return "Local console";
     }
@@ -408,8 +425,10 @@ static const char *mode_name(int mode) {
 
 static const char *mode_token(int mode) {
     switch (mode) {
-    case U241_WINDOWS: return "WINDOWS";
-    case U241_ANDROID: return "ANDROID";
+    case U241_WINDOWS: return "USB_DUPLEX";
+    case U241_ANDROID: return "USB_IN";
+    case U241_USB_OUT: return "USB_OUT";
+    case U241_MIDI: return "MIDI";
     case U241_LOCAL_CONSOLE:
     default: return "LOCAL_CONSOLE";
     }
@@ -417,8 +436,10 @@ static const char *mode_token(int mode) {
 
 static const char *policy_token(int mode) {
     switch (mode) {
-    case U241_WINDOWS: return "WINDOWS_OTG";
-    case U241_ANDROID: return "ANDROID_OTG";
+    case U241_WINDOWS: return "USB_DUPLEX_OTG";
+    case U241_ANDROID: return "USB_IN_OTG";
+    case U241_USB_OUT: return "USB_OUT_OTG";
+    case U241_MIDI: return "MIDI_OTG";
     case U241_LOCAL_CONSOLE:
     default: return "LOCAL_CONSOLE";
     }
@@ -426,8 +447,10 @@ static const char *policy_token(int mode) {
 
 static const char *branch_name_for_mode(int mode) {
     switch (mode) {
-    case U241_WINDOWS: return "audio_driver_windows";
-    case U241_ANDROID: return "audio_driver_android";
+    case U241_WINDOWS: return "audio_driver_usb_duplex";
+    case U241_ANDROID: return "audio_driver_usb_in";
+    case U241_USB_OUT: return "audio_driver_usb_out";
+    case U241_MIDI: return "audio_driver_midi";
     case U241_LOCAL_CONSOLE:
     default: return "audio_driver_local_console";
     }
@@ -459,9 +482,13 @@ static void write_active_branch_file(int mode) {
 static const char *mode_desc(int mode) {
     switch (mode) {
     case U241_WINDOWS:
-        return "UAC2 duplex with Windows";
+        return "OUT+IN full duplex with PC/SP404";
     case U241_ANDROID:
-        return "Android AOA audio capture";
+        return "IN only: capture from Android/device";
+    case U241_USB_OUT:
+        return "OUT only: send mix to USB device";
+    case U241_MIDI:
+        return "MIDI: USB piano/controller";
     case U241_LOCAL_CONSOLE:
     default:
         return "Console sound, OTG may stay connected";
@@ -471,13 +498,20 @@ static const char *mode_desc(int mode) {
 static int selectable_mode(int mode) {
     return mode == U241_LOCAL_CONSOLE ||
         mode == U241_WINDOWS ||
-        mode == U241_ANDROID;
+        mode == U241_ANDROID ||
+        mode == U241_USB_OUT ||
+        mode == U241_MIDI;
 }
 
 static int mode_from_text(const char *s) {
     if (!s) return U241_LOCAL_CONSOLE;
-    if (strstr(s, "ANDROID") || strstr(s, "AOA"))
+    if (strstr(s, "ANDROID") || strstr(s, "AOA") ||
+        strstr(s, "USB_IN"))
         return U241_ANDROID;
+    if (strstr(s, "USB_OUT"))
+        return U241_USB_OUT;
+    if (strstr(s, "MIDI"))
+        return U241_MIDI;
     if (strstr(s, "WINDOWS") || strstr(s, "USB_DUPLEX") ||
         strstr(s, "USB_IN_OUT") || strstr(s, "USB_INPUT_OUTPUT") ||
         strstr(s, "FULL_DUPLEX") || strstr(s, "USB_OUT_AUTO_MUTE") ||
@@ -604,6 +638,67 @@ static int android_stream_ready_raw(void) {
     return 1;
 }
 
+static int sp404_card_present_raw(void) {
+    if (!exists_file(kSp404Card)) return 0;
+    if (file_contains(kSp404Card, "none")) return 0;
+    if (file_contains(kSp404Card, "FAILED")) return 0;
+    return 1;
+}
+
+static int midi_device_present_raw(void) {
+    if (!exists_file(kMidiRawmidi)) return 0;
+    if (file_contains(kMidiRawmidi, "none")) return 0;
+    if (file_contains(kMidiRawmidi, "FAILED")) return 0;
+    return 1;
+}
+
+/* Unified device detection. Windows is the only peripheral (gadget) role;
+ * Android, SP404MKII and MIDI instruments are all host-role devices. */
+static int detected_device(void) {
+    if (udc_configured_raw()) return U241_DEVICE_WINDOWS;
+    if (android_stream_ready_raw()) return U241_DEVICE_ANDROID;
+    if (sp404_card_present_raw()) return U241_DEVICE_SP404;
+    if (midi_device_present_raw()) return U241_DEVICE_MIDI;
+    return U241_DEVICE_NONE;
+}
+
+static int mode_has_out(int mode) {
+    return mode == U241_WINDOWS || mode == U241_USB_OUT;
+}
+
+static int mode_has_in(int mode) {
+    return mode == U241_WINDOWS || mode == U241_ANDROID;
+}
+
+static const char *device_out_fifo(int device) {
+    switch (device) {
+    case U241_DEVICE_SP404: return kSp404Fifo;
+    case U241_DEVICE_MIDI: return kMidiFifo;
+    default: return kFifo;
+    }
+}
+
+static int sp404_runtime_contract_code(void) {
+    if (!sp404_card_present_raw()) return 30;
+    if (!exists_file(kSp404Fifo)) return 31;
+    if (!daemon_pid_alive()) return 32;
+    if (!file_contains(kDaemonVersion, "R36SX_SP404_AUDIO_DAEMON_ABI=1"))
+        return 33;
+    if (!file_contains(kCaptureAbi, "R36SX_SP404_CAPTURE_ABI=1"))
+        return 34;
+    if (!file_contains(kAudioRate, "48000")) return 35;
+    return 0;
+}
+
+static int midi_runtime_contract_code(void) {
+    if (!midi_device_present_raw()) return 40;
+    if (!exists_file(kMidiFifo)) return 41;
+    if (!daemon_pid_alive()) return 42;
+    if (!file_contains(kDaemonVersion, "R36SX_MIDI_DAEMON_ABI=1"))
+        return 43;
+    return 0;
+}
+
 static int android_runtime_contract_code(void) {
     if (!exists_file(kAoaPcmFifo)) return 21;
     if (!daemon_pid_alive()) return 22;
@@ -619,8 +714,12 @@ static int android_runtime_contract_code(void) {
 
 static int runtime_contract_code(void) {
     if (g_driver_mode == U241_LOCAL_CONSOLE) return 0;
+    if (g_driver_mode == U241_MIDI)
+        return midi_runtime_contract_code();
     if (g_driver_mode == U241_ANDROID)
         return android_runtime_contract_code();
+    if (detected_device() == U241_DEVICE_SP404)
+        return sp404_runtime_contract_code();
     /*
      * U2.51.4 WAIT_HOST_READY CONTRACT
      *
@@ -681,6 +780,16 @@ static const char *runtime_contract_reason(int code) {
     case 25: return "android-runtime-not-stereo";
     case 26: return "android-runtime-rate-mismatch";
     case 27: return "android-receiver-state-missing";
+    case 30: return "sp404-card-missing";
+    case 31: return "sp404-pcm-fifo-missing";
+    case 32: return "sp404-daemon-not-alive";
+    case 33: return "sp404-daemon-version-mismatch";
+    case 34: return "sp404-capture-abi-mismatch";
+    case 35: return "sp404-runtime-rate-mismatch";
+    case 40: return "midi-device-missing";
+    case 41: return "midi-pcm-fifo-missing";
+    case 42: return "midi-daemon-not-alive";
+    case 43: return "midi-daemon-version-mismatch";
     default: return "unknown";
     }
 }
@@ -791,22 +900,42 @@ static void refresh_usb_state(void) {
     g_last_usb_refresh_ms = now_ms;
     g_last_usb_check_submit = g_submit_count;
     /*
-     * Android AOA is the opposite topology: R36SX is USB host.  Its readiness
-     * must be derived from the AOA stream marker, never from /sys/class/udc.
+     * Unified device detection. Android AOA, SP404MKII and MIDI are host-role
+     * topologies: R36SX is USB host and readiness comes from the stream/card/
+     * rawmidi markers, never from /sys/class/udc. Windows is the peripheral
+     * (gadget) role and uses the configured UDC.
      */
-    const int raw = (g_driver_mode == U241_ANDROID) ?
-        android_stream_ready_raw() : udc_configured_raw();
+    const int device = detected_device();
+    const int raw =
+        (device == U241_DEVICE_WINDOWS) ? udc_configured_raw() :
+        (device == U241_DEVICE_ANDROID) ? android_stream_ready_raw() :
+        (device == U241_DEVICE_SP404) ? sp404_card_present_raw() :
+        (device == U241_DEVICE_MIDI) ? midi_device_present_raw() : 0;
     if (raw != g_usb_raw) {
         g_usb_raw = raw;
         g_raw_configured_since = raw ? (g_submit_count ? g_submit_count : 1) : 0;
         log_msg(raw ?
-            (g_driver_mode == U241_ANDROID ?
-                "android AOA stream ready raw" : "udc configured raw") :
-            (g_driver_mode == U241_ANDROID ?
-                "android AOA stream stopped raw" : "udc not configured raw"));
+            (device == U241_DEVICE_ANDROID ?
+                "android AOA stream ready raw" :
+                device == U241_DEVICE_SP404 ?
+                    "sp404 host card ready raw" :
+                    device == U241_DEVICE_MIDI ?
+                        "midi rawmidi ready raw" :
+                        "udc configured raw") :
+            (device == U241_DEVICE_ANDROID ?
+                "android AOA stream stopped raw" :
+                device == U241_DEVICE_SP404 ?
+                    "sp404 host card stopped raw" :
+                    device == U241_DEVICE_MIDI ?
+                        "midi rawmidi stopped raw" :
+                        "udc not configured raw"));
     }
-    int marker = marker_fresh(kActiveMarker, 2);
-    int out_now = (g_driver_mode == U241_ANDROID) ? raw : (raw || marker);
+    /*
+     * OUT is only routed when the selected mode requests playback. Windows and
+     * SP404 both expose an OUT path; Android AOA and MIDI are input-only.
+     */
+    const int marker = marker_fresh(kActiveMarker, 2);
+    int out_now = mode_has_out(g_driver_mode) ? (raw || marker) : 0;
     if (out_now != g_usb_out_allowed) {
         g_usb_out_allowed = out_now;
         log_msg(out_now ? "usb out allowed" : "usb out stopped");
@@ -836,7 +965,7 @@ static int should_mute_now(void) {
      *
      * disable_mute_local is retained only as an explicit diagnostic override.
      */
-    return (g_driver_mode == U241_USB_DUPLEX) &&
+    return mode_has_out(g_driver_mode) &&
            !nomute_file_present() &&
            g_usb_raw;
 }
@@ -895,13 +1024,16 @@ static void ensure_setup_started(void) {
     refresh_mode_from_file(1);
     reap_setup_child_nonblocking();
 
-    if (g_driver_mode == U241_ANDROID) {
-        /* The Android AOA runtime is owned by the SD apply script and the
-         * AOA supervisor.  The core never forks the Windows gadget setup for
-         * Android, otherwise it would fight the host-role runtime. */
+    if (g_driver_mode == U241_ANDROID ||
+        g_driver_mode == U241_USB_OUT ||
+        g_driver_mode == U241_MIDI) {
+        /* The Android AOA, SP404MKII and MIDI runtimes are owned by the SD
+         * apply script and their supervisors. The core never forks the Windows
+         * gadget setup for host-role modes, otherwise it would fight the
+         * host-role runtime. */
         if (!g_android_managed_logged) {
             g_android_managed_logged = 1;
-            log_msg("android runtime managed by SD apply script");
+            log_msg("host-role runtime managed by SD apply script");
         }
         g_setup_started = 1;
         return;
@@ -991,7 +1123,8 @@ static void ensure_fifo_open_nonblocking(void) {
     if (g_fifo_fd >= 0) return;
     if (!enable_file_present()) return;
     ensure_setup_started();
-    g_fifo_fd = open(kFifo, O_WRONLY | O_NONBLOCK);
+    const char *out_fifo = device_out_fifo(detected_device());
+    g_fifo_fd = open(out_fifo, O_WRONLY | O_NONBLOCK);
     if (g_fifo_fd < 0) {
         if ((g_submit_count % 240) == 0) log_msg("fifo open pending");
         return;
@@ -1409,7 +1542,7 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
     if ((g_submit_count % 12) == 0) refresh_passive_physical_volume_file();
     if ((g_submit_count % 60) == 0) refresh_capture_status();
 
-    if (g_driver_mode != U241_USB_DUPLEX || !g_usb_out_allowed) {
+    if (!mode_has_out(g_driver_mode) || !g_usb_out_allowed) {
         close_fifo_if_open("fifo closed local-or-usb-inactive");
         return;
     }
@@ -1743,8 +1876,10 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
     if (runtime_ready_fast()) {
         if (g_driver_mode == U241_LOCAL_CONSOLE)
             close_fifo_if_open("fifo closed fast local-console switch");
-        if (g_driver_mode == U241_ANDROID)
-            close_fifo_if_open("fifo closed fast android switch");
+        if (g_driver_mode == U241_ANDROID ||
+            g_driver_mode == U241_USB_OUT ||
+            g_driver_mode == U241_MIDI)
+            close_fifo_if_open("fifo closed fast host-role switch");
         log_msg("driver mode fast apply runtime-ready");
     } else {
         launch_apply_profile_once(g_driver_mode);
@@ -1760,14 +1895,14 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
 
 const char *TreeFrogUac2Bridge_CycleDriverMode(void) {
 #if TREEFROG_UAC2_BRIDGE
-    int next = (g_driver_mode + 1) % 3;
+    int next = (g_driver_mode + 1) % 5;
     return TreeFrogUac2Bridge_SetDriverMode(next);
 #else
     return "DISABLED";
 #endif
 }
 
-int TreeFrogUac2Bridge_GetDriverModeCount(void) { return 3; }
+int TreeFrogUac2Bridge_GetDriverModeCount(void) { return 5; }
 
 const char *TreeFrogUac2Bridge_GetDriverModeNameByIndex(int mode) {
 #if TREEFROG_UAC2_BRIDGE
@@ -1796,10 +1931,57 @@ int TreeFrogUac2Bridge_IsDriverModeSelectable(int mode) {
 #endif
 }
 
+const char *TreeFrogUac2Bridge_GetUsbDeviceText(void) {
+#if TREEFROG_UAC2_BRIDGE
+    refresh_usb_state();
+    switch (detected_device()) {
+    case U241_DEVICE_WINDOWS: return "Windows";
+    case U241_DEVICE_ANDROID: return "Android";
+    case U241_DEVICE_SP404: return "SP404MKII";
+    case U241_DEVICE_MIDI: return "MIDI";
+    default: return "None";
+    }
+#else
+    return "disabled";
+#endif
+}
+
+int TreeFrogUac2Bridge_ModeHasOut(int mode) {
+#if TREEFROG_UAC2_BRIDGE
+    return mode_has_out(mode);
+#else
+    (void)mode;
+    return 0;
+#endif
+}
+
+int TreeFrogUac2Bridge_ModeHasIn(int mode) {
+#if TREEFROG_UAC2_BRIDGE
+    return mode_has_in(mode);
+#else
+    (void)mode;
+    return 0;
+#endif
+}
+
 const char *TreeFrogUac2Bridge_GetUsbStateText(void) {
 #if TREEFROG_UAC2_BRIDGE
     refresh_usb_state();
+    const int device = detected_device();
     if (g_driver_mode == U241_LOCAL_CONSOLE) return "Local active";
+    if (g_driver_mode == U241_MIDI) {
+        if (midi_device_present_raw() && marker_fresh(kActiveMarker, 2))
+            return "MIDI active";
+        if (midi_device_present_raw()) return "MIDI device ready";
+        return "MIDI waiting";
+    }
+    if (g_driver_mode == U241_USB_OUT) {
+        if (g_usb_raw && marker_fresh(kActiveMarker, 2))
+            return "USB out active";
+        if (g_usb_raw) return "USB out ready";
+        if (device == U241_DEVICE_SP404) return "SP404 warming";
+        return "USB out inactive";
+    }
     if (g_driver_mode == U241_ANDROID) {
         if (android_stream_ready_raw() && marker_fresh(kActiveMarker, 2))
             return "Android active";
@@ -1808,6 +1990,12 @@ const char *TreeFrogUac2Bridge_GetUsbStateText(void) {
         if (file_contains(kAoaState, "WAIT")) return "Android waiting";
         if (file_contains(kAoaResult, "FAILED")) return "Android warning";
         return "Android starting";
+    }
+    if (device == U241_DEVICE_SP404) {
+        if (g_usb_raw && marker_fresh(kActiveMarker, 2))
+            return "SP404 active";
+        if (g_usb_raw) return "SP404 ready";
+        return "SP404 warming";
     }
     if (g_usb_raw && marker_fresh(kActiveMarker, 2)) return "USB active";
     if (g_usb_raw) return "USB warming";
@@ -1852,11 +2040,13 @@ int TreeFrogUac2Bridge_StartUsbCapture(
 #if TREEFROG_UAC2_BRIDGE
     if (!wav_path || !wav_path[0]) return 0;
 
-    if (g_driver_mode == U241_LOCAL_CONSOLE) {
+    if (g_driver_mode == U241_LOCAL_CONSOLE ||
+        g_driver_mode == U241_USB_OUT ||
+        g_driver_mode == U241_MIDI) {
         snprintf(
             g_capture_status,
             sizeof(g_capture_status),
-            "Select Windows in Audio Driver");
+            "Select USB duplex/in in Audio Driver");
         g_capture_state = TREEFROG_USB_CAPTURE_ERROR;
         snprintf(
             g_capture_error,
@@ -2057,6 +2247,8 @@ int TreeFrogUac2Bridge_IsUsbReady(void) {
 #if TREEFROG_UAC2_BRIDGE
     if (g_driver_mode == U241_LOCAL_CONSOLE) return 0;
     refresh_usb_state();
+    if (g_driver_mode == U241_MIDI)
+        return midi_device_present_raw() && runtime_ready_fast();
     if (g_driver_mode == U241_ANDROID)
         return android_stream_ready_raw() && runtime_ready_fast();
     return g_usb_raw && runtime_ready_fast();
@@ -2090,6 +2282,25 @@ int TreeFrogUac2Bridge_IsRecordingDaemonReady(void) {
     if (newline) *newline = 0;
 
     if (!daemon_pid_alive()) return 0;
+    if (g_driver_mode == U241_MIDI) {
+        if (strcmp(g_capture_abi, "R36SX_MIDI_CAPTURE_ABI=1") != 0)
+            return 0;
+        if (!file_contains(
+                kDaemonVersion,
+                "R36SX_MIDI_DAEMON_ABI=1"))
+            return 0;
+        return exists_file(kMidiFifo) && midi_device_present_raw();
+    }
+    if (g_driver_mode == U241_USB_OUT &&
+        detected_device() == U241_DEVICE_SP404) {
+        if (strcmp(g_capture_abi, "R36SX_SP404_CAPTURE_ABI=1") != 0)
+            return 0;
+        if (!file_contains(
+                kDaemonVersion,
+                "R36SX_SP404_AUDIO_DAEMON_ABI=1"))
+            return 0;
+        return exists_file(kSp404Fifo) && sp404_card_present_raw();
+    }
     if (g_driver_mode == U241_ANDROID) {
         if (strcmp(g_capture_abi, "R36SX_CAPTURE_ABI=4") != 0)
             return 0;
@@ -2100,6 +2311,15 @@ int TreeFrogUac2Bridge_IsRecordingDaemonReady(void) {
         return exists_file(kAoaPcmFifo) && android_stream_ready_raw();
     }
     if (g_driver_mode == U241_WINDOWS) {
+        if (detected_device() == U241_DEVICE_SP404) {
+            if (strcmp(g_capture_abi, "R36SX_SP404_CAPTURE_ABI=1") != 0)
+                return 0;
+            if (!file_contains(
+                    kDaemonVersion,
+                    "R36SX_SP404_AUDIO_DAEMON_ABI=1"))
+                return 0;
+            return exists_file(kSp404Fifo) && sp404_card_present_raw();
+        }
         if (strcmp(g_capture_abi, "R36SX_CAPTURE_ABI=2") != 0)
             return 0;
         if (!file_contains(

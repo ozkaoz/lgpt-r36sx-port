@@ -1,0 +1,92 @@
+#!/bin/sh
+# H38.4 host-side runtime supervisor for the unified audio driver.
+# Owns the SP404MKII (host UAC2) and USB-MIDI daemons. It only runs when the
+# musb controller is in host role and a host-side policy (SP404/USB OUT/MIDI)
+# is selected. Selection and role switching are owned by the H38.2 apply script.
+set -u
+ROOT="${LGPT_SD_ROOT:-/mnt/sdcard}"
+BASE="$ROOT/lgpt/otg"
+BIN="$BASE/bin"
+LOGROOT="${LGPT_LOGROOT:-/tmp/r36sx_lgpt_logs}"
+RUNTIME="${LGPT_RUNTIME_DIR:-/tmp/r36sx_lgpt_usb}"
+POLICY_FILE="$RUNTIME/audio_driver_policy"
+LOG="$LOGROOT/H38_HOST_RUNTIME_SUPERVISOR.log"
+LOCK="${LGPT_H38_HOST_RUNTIME_LOCK:-/tmp/r36sx_h38_host_runtime.lock}"
+SUP_PID="$RUNTIME/h38_host_supervisor_pid"
+SP404_DAEMON="$BIN/r36s_sp404_host_audio_io"
+MIDI_DAEMON="$BIN/r36s_midi_host_io"
+SP404_FIFO="/tmp/r36sx_sp404_pcm_fifo"
+MIDI_FIFO="/tmp/r36sx_midi_pcm_fifo"
+STOP=0
+mkdir -p "$LOGROOT" "$RUNTIME" 2>/dev/null || exit 20
+log(){ printf '%s H38_HOST_SUPERVISOR %s\n' "$(date 2>/dev/null || echo no-date)" "$*" >>"$LOG" 2>/dev/null || true; }
+atomic_write(){ p="$1"; v="$2"; d="$(dirname "$p")"; mkdir -p "$d" 2>/dev/null || true; t="${p}.h38tmp.$$"; rm -f "$t" 2>/dev/null || true; printf '%s\n' "$v" >"$t" 2>/dev/null && mv -f "$t" "$p" 2>/dev/null; }
+pid_alive(){ p="$1"; [ -n "$p" ] && kill -0 "$p" 2>/dev/null; }
+policy_host(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG|USB_DUPLEX_OTG|MIDI_OTG) return 0;; *) return 1;; esac; }
+sp404_wanted(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG|USB_DUPLEX_OTG) return 0;; *) return 1;; esac; }
+midi_wanted(){ [ "$(cat "$POLICY_FILE" 2>/dev/null || true)" = "MIDI_OTG" ]; }
+terminate_pid(){ p="$1"; name="$2"; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
+cleanup(){
+  STOP=1
+  for p in "$RUNTIME/sp404_daemon_pid" "$RUNTIME/midi_daemon_pid"; do
+    dp="$(cat "$p" 2>/dev/null || true)"
+    terminate_pid "$dp" "$(basename "$p")"
+  done
+  rm -f "$SUP_PID" "$RUNTIME/sp404_daemon_pid" "$RUNTIME/midi_daemon_pid" 2>/dev/null || true
+  rm -rf "$LOCK" 2>/dev/null || true
+  log "EXIT supervisor=$$"
+}
+trap 'STOP=1' INT TERM HUP
+trap cleanup EXIT
+if ! mkdir "$LOCK" 2>/dev/null; then
+  old="$(cat "$SUP_PID" 2>/dev/null || true)"
+  if pid_alive "$old"; then log "ALREADY_RUNNING pid=$old"; exit 0; fi
+  rm -rf "$LOCK" 2>/dev/null || true
+  mkdir "$LOCK" 2>/dev/null || { log "LOCK_BUSY"; exit 40; }
+fi
+atomic_write "$SUP_PID" "$$" || true
+log "START supervisor=$$"
+# Run the host-side device probe so SP404/MIDI markers are current.
+[ -r "$BIN/otg_h37_host_device_detect.sh" ] && /bin/sh "$BIN/otg_h37_host_device_detect.sh" >>"$LOG" 2>&1 || true
+sp_pid=0
+mi_pid=0
+backoff=1
+while [ "$STOP" -eq 0 ] && policy_host; do
+  run_sp404=0; run_midi=0
+  sp404_wanted && run_sp404=1
+  midi_wanted && run_midi=1
+
+  if [ "$run_sp404" -eq 1 ]; then
+    if ! pid_alive "$sp_pid"; then
+      [ -x "$SP404_DAEMON" ] || { log "ERROR missing_sp404_daemon=$SP404_DAEMON"; exit 31; }
+      [ -p "$SP404_FIFO" ] || { rm -f "$SP404_FIFO" 2>/dev/null || true; mkfifo "$SP404_FIFO" 2>/dev/null || true; }
+      "$SP404_DAEMON" "$SP404_FIFO" >>"$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log" 2>&1 &
+      sp_pid=$!
+      atomic_write "$RUNTIME/sp404_daemon_pid" "$sp_pid" || true
+      log "SP404_DAEMON_STARTED pid=$sp_pid"
+      sleep 0.3
+    fi
+  else
+    if pid_alive "$sp_pid"; then terminate_pid "$sp_pid" sp404; sp_pid=0; fi
+  fi
+
+  if [ "$run_midi" -eq 1 ]; then
+    if ! pid_alive "$mi_pid"; then
+      [ -x "$MIDI_DAEMON" ] || { log "ERROR missing_midi_daemon=$MIDI_DAEMON"; exit 32; }
+      midi_node="$(cat "$RUNTIME/midi_rawmidi" 2>/dev/null || echo none)"
+      case "$midi_node" in none|''|FAILED) log "MIDI_DEVICE_NONE wait=$backoff"; sleep "$backoff"; [ "$backoff" -lt 4 ] && backoff=$((backoff+1)); continue;; esac
+      [ -p "$MIDI_FIFO" ] || { rm -f "$MIDI_FIFO" 2>/dev/null || true; mkfifo "$MIDI_FIFO" 2>/dev/null || true; }
+      "$MIDI_DAEMON" "/dev/snd/$midi_node" "$MIDI_FIFO" >>"$LOGROOT/H38_MIDI_HOST_DAEMON.log" 2>&1 &
+      mi_pid=$!
+      atomic_write "$RUNTIME/midi_daemon_pid" "$mi_pid" || true
+      log "MIDI_DAEMON_STARTED pid=$mi_pid node=$midi_node"
+      sleep 0.3
+    fi
+  else
+    if pid_alive "$mi_pid"; then terminate_pid "$mi_pid" midi; mi_pid=0; fi
+  fi
+
+  sleep 1
+  backoff=1
+done
+log "POLICY_EXIT policy=$(cat "$POLICY_FILE" 2>/dev/null || echo missing)"

@@ -1,0 +1,6 @@
+filename:       /mnt/d/R36S/PORT LPTRACKER/BUILD/HOST_USB_AUDIO/snd-usbmidi-lib.ko
+license:        Dual BSD/GPL
+description:    USB Audio/MIDI helper module
+author:         Clemens Ladisch <clemens@ladisch.de>
+depends:        
+vermagic:       4.4.186-release preempt MIPS32_R2 32BIT 

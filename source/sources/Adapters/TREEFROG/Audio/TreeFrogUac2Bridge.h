@@ -27,6 +27,14 @@ const char *TreeFrogUac2Bridge_GetDriverModeDescriptionByIndex(int mode);
 int TreeFrogUac2Bridge_IsDriverModeSelectable(int mode);
 const char *TreeFrogUac2Bridge_GetUsbStateText(void);
 
+/* Unified device detection. Returns a human-readable name for the currently
+ * detected USB endpoint (Windows/Android/SP404/MIDI) or "None". */
+const char *TreeFrogUac2Bridge_GetUsbDeviceText(void);
+
+/* Direction capabilities of a mode index, for modal helpers. */
+int TreeFrogUac2Bridge_ModeHasOut(int mode);
+int TreeFrogUac2Bridge_ModeHasIn(int mode);
+
 enum TreeFrogUsbCaptureState {
     TREEFROG_USB_CAPTURE_IDLE = 0,
     TREEFROG_USB_CAPTURE_STARTING = 1,

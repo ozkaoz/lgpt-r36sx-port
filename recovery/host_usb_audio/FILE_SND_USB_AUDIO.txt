@@ -1,0 +1,1 @@
+/mnt/d/R36S/PORT LPTRACKER/BUILD/HOST_USB_AUDIO/snd-usb-audio.ko: ELF 32-bit LSB relocatable, MIPS, MIPS32 rel2 version 1 (SYSV), not stripped

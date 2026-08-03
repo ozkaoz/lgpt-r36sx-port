@@ -27,9 +27,12 @@ void AudioDriverModal::DrawView() {
     props.invert_ = false;
 
     SetColor(CD_NORMAL);
-    snprintf(line, sizeof(line), "USB: %-29.29s",
-             TreeFrogUac2Bridge_GetUsbStateText());
+    snprintf(line, sizeof(line), "Dev: %-27.27s",
+             TreeFrogUac2Bridge_GetUsbDeviceText());
     DrawString(1, 2, line, props);
+    snprintf(line, sizeof(line), "USB: %-28.28s",
+             TreeFrogUac2Bridge_GetUsbStateText());
+    DrawString(1, 3, line, props);
 
     const int count = TreeFrogUac2Bridge_GetDriverModeCount();
     for (int i = 0; i < count; ++i) {
@@ -38,22 +41,22 @@ void AudioDriverModal::DrawView() {
         snprintf(line, sizeof(line), "%c %-30.30s",
                  i == selected_ ? '>' : ' ',
                  TreeFrogUac2Bridge_GetDriverModeNameByIndex(i));
-        DrawString(1, 4 + i * 3, line, props);
+        DrawString(1, 5 + i * 2, line, props);
         props.invert_ = false;
         SetColor(CD_NORMAL);
-        DrawString(3, 5 + i * 3,
+        DrawString(3, 6 + i * 2,
                    TreeFrogUac2Bridge_GetDriverModeDescriptionByIndex(i),
                    props);
     }
 
     SetColor(CD_NORMAL);
     if (waitForRelease_) {
-        DrawString(1, 14, "Release SELECT/R2 or opening keys", props);
+        DrawString(1, 16, "Release SELECT/R2 or opening keys", props);
     } else {
-        DrawString(1, 14, "A apply+restart   B cancel", props);
+        DrawString(1, 16, "A apply+restart   B cancel", props);
     }
-    DrawString(1, 15, "Restart is automatic; stay in LGPT", props);
-    DrawString(1, 16, "Sampler: Instrument R1 + RIGHT", props);
+    DrawString(1, 17, "Restart is automatic; stay in LGPT", props);
+    DrawString(1, 18, "Sampler: Instrument R1 + RIGHT", props);
 }
 
 void AudioDriverModal::ProcessButtonMask(unsigned short mask, bool pressed) {
