@@ -2,7 +2,9 @@
 
 Little Piggy Tracker port for the R36SX V2.6 handheld, integrated with TreeFrogUI and bidirectional USB-C OTG audio.
 
-**Current stable version: H38.6 (ABI7, three-mode audio: Local / Windows / Android)**
+**Current release candidate: RC3 (Bacon 1.1 - FX Dev full)** — modernización
+visual integral con ayuda contextual, páginas FX master modernizadas y
+chopper gráfico. Ver [CHANGELOG](CHANGELOG.md).
 
 ## Main features
 
@@ -18,7 +20,24 @@ Little Piggy Tracker port for the R36SX V2.6 handheld, integrated with TreeFrogU
 - Safe sample rename and deletion from the sample browser.
 - Chopper global Undo/Redo with `L1+X` and `R1+X`.
 - Chord-aware input handling for the R36SX controls.
+- Contextual help overlay (`SELECT+R1`) with per-view controls.
 - TreeFrogUI integration for kernel `4.4.186-release`.
+
+## How it works — navigation
+
+| Combination | Action |
+|---|---|
+| `R1 + LEFT/RIGHT` | Switch main view (Song / Chain / Phrase / Instrument / Table / Groove / Mixer) |
+| `SELECT + R1` | Contextual help overlay (latched; release to close) |
+| `SELECT + R2` | Audio Driver dialog (USB mode) |
+| `START` | Play / Stop |
+
+In the **Mixer**, `SELECT` cycles the pages MIX → DELAY → REVERB → EQ → COMP.
+On the FX pages, `UP/DN` moves the row, `L/R` edits, `A` is coarse, and
+`BYPASS` is always the first row (`ON = effect disabled`). See
+[docs/CONTROLS_EN.md](docs/CONTROLS_EN.md) (English) /
+[docs/CONTROLS_ES.md](docs/CONTROLS_ES.md) (Español) for the full key map,
+sample browser and chopper shortcuts.
 
 ## Download
 
