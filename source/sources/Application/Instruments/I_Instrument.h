@@ -75,5 +75,15 @@ public:
 	  virtual int GetFxReverbSendOverride() { return 0xFF; }
 	  virtual int GetFxDry() { return 100; }
 
+	  // TREEFROG_SEND_LIVE_V1 (Fase 15):
+	  // Live per-channel FX send overrides, read by PlayerChannel at render
+	  // time.  Return 0xFF ("unset" / inherit the per-track Mixer send) unless
+	  // the instrument keeps a live value per active channel.  A new note
+	  // trigger restores the live value from GetFx*SendOverride(); phrase and
+	  // table DLYS/RVBS automation only ever writes these live values.
+
+	  virtual int GetLiveDelaySend(int) { return 0xFF; }
+	  virtual int GetLiveReverbSend(int) { return 0xFF; }
+
 };
 #endif

@@ -5,9 +5,11 @@ Mirrors the Fase 9 MIX page cleanup:
 
 - The per-track D/R send readouts are gone from the MIX page (drawMixSends is
   removed and NudgeChannelDelaySend/NudgeChannelReverbSend are no longer wired
-  into the view).  Sends are per-instrument now (Fase 6/7, edited in
+  into the view).  Sends are per-instrument now (Fase 6/15, edited in
   InstrumentView); the per-track sends survive only as the Fase 7
-  inheritance/compatibility layer (still persisted, still written by DLYS/RVBS).
+  inheritance/compatibility layer (still persisted).  Since Fase 15, DLYS/RVBS
+  automation writes only the live per-channel instrument override, never the
+  per-track Mixer send.
 - The MIX page edit target cycles VOL -> DLY RET -> RVB RET.  VOL edits the
   hovered channel volume; DLY RET / RVB RET edit the MASTER return levels of
   the delay/reverb into the master bus (FxEngine SetDelayReturn/SetReverbReturn).

@@ -86,6 +86,12 @@ public:
 	   virtual int GetFxReverbSendOverride() ;
 	   virtual int GetFxDry() ;
 
+	   // TREEFROG_SEND_LIVE_V1 (Fase 15): live per-channel FX send overrides
+	   // (0xFF = "inherit Mixer", 0..100 = explicit).  A new trigger restores
+	   // them from the base overrides above; DLYS/RVBS automation writes them.
+	   virtual int GetLiveDelaySend(int channel) ;
+	   virtual int GetLiveReverbSend(int channel) ;
+
 	   bool IsMulti() ;
 
 	  // Engine playback  start callback

@@ -62,6 +62,15 @@ struct renderParams {
 	fixed basePan_ ; // panning
 	fixed pan_ ;
 
+	// TREEFROG_SEND_LIVE_V1 (PLAN_FX_REDESIGN_ES.md, Fase 15):
+	// Live per-channel FX send overrides (-1 = inherit the per-track Mixer
+	// send, 0..100 = explicit).  A new note trigger restores them from the
+	// instrument's persisted base (DRY / DLY send / RVB send); phrase and
+	// table DLYS/RVBS automation only ever writes these live values, so the
+	// persisted instrument base is never clobbered by automation.
+	int dlySend_ ;
+	int rvbSend_ ;
+
 	std::vector<I_SRPUpdater *> updaters_ ;
 	std::vector<I_SRPUpdater *> activeUpdaters_ ;
 

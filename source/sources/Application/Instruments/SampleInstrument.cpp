@@ -130,15 +130,18 @@ SampleInstrument::SampleInstrument() {
      irWet_ = new Variable("effect amount", SIP_IR_WET, 45);
      Insert(irWet_);
 
-     // TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6): per-instrument FX sends.
-     // DRY (0..100, default 100) scales the effective sends.  DLY/RVB sends
-     // are 0..100 overrides; -1 means "inherit the per-track Mixer send".
-     // They are persisted automatically as instrument PARAMs.
+     // TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6) / TREEFROG_SEND_LIVE_V1 (Fase 15):
+     // per-instrument FX sends.  DRY (0..100, default 100) scales the effective
+     // sends.  DLY/RVB sends are 0..100 overrides, default 0 (no send); -1
+     // (only reachable from projects saved by older builds) means "inherit the
+     // per-track Mixer send".  They are persisted automatically as instrument
+     // PARAMs.  Since Fase 15, phrase/table DLYS/RVBS automation never writes
+     // these persisted values: it only modulates the live per-channel override.
      dry_ = new Variable("dry", SIP_DRY, 100, 100);
      Insert(dry_);
-     dlySend_ = new Variable("dly send", SIP_DLY_SEND, -1, 100);
+     dlySend_ = new Variable("dly send", SIP_DLY_SEND, 0, 100);
      Insert(dlySend_);
-     rvbSend_ = new Variable("rvb send", SIP_RVB_SEND, -1, 100);
+     rvbSend_ = new Variable("rvb send", SIP_RVB_SEND, 0, 100);
      Insert(rvbSend_);
 
      // Initalize instrument's voices update list
@@ -155,6 +158,10 @@ SampleInstrument::SampleInstrument() {
          rp->updaters_.push_back(&rp->speedRamp_);
          rp->updaters_.push_back(&rp->legato_);
          rp->updaters_.push_back(&rp->pfin_);
+         // TREEFROG_SEND_LIVE_V1 (Fase 15): live FX send overrides start in the
+         // "inherit" state until the first trigger resets them from the base.
+         rp->dlySend_ = -1;
+         rp->rvbSend_ = -1;
 	} ;
 
  // Reset table state
@@ -395,6 +402,14 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 	// Init downsampling
 
 		rp->downsample_=downsample_->GetInt() ;
+
+	// TREEFROG_SEND_LIVE_V1 (Fase 15): a new trigger restores the live FX
+	// sends from the instrument's persisted base.  Phrase/table DLYS/RVBS
+	// automation from this point modulates the live values only, so a note
+	// that re-starts the instrument always begins from the base sends.
+
+		rp->dlySend_=GetFxDelaySendOverride() ;
+		rp->rvbSend_=GetFxReverbSendOverride() ;
 
 		// Disable all updaters for new voice
 		
@@ -1077,6 +1092,23 @@ int SampleInstrument::GetFxDry() {
 	return (v<0)?0:v ;
 } ;
 
+// TREEFROG_SEND_LIVE_V1 (Fase 15): live per-channel FX send overrides.
+// Return 0xFF ("inherit the per-track Mixer send") when the live value is -1,
+// else the live 0..100 value.  Start() restores the live value from the base
+// overrides on a clean trigger; DLYS/RVBS phrase/table automation writes it.
+
+int SampleInstrument::GetLiveDelaySend(int channel) {
+	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return 0xFF ;
+	int v=renderParams_[channel].dlySend_ ;
+	return (v<0)?0xFF:v ;
+} ;
+
+int SampleInstrument::GetLiveReverbSend(int channel) {
+	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return 0xFF ;
+	int v=renderParams_[channel].rvbSend_ ;
+	return (v<0)?0xFF:v ;
+} ;
+
 void SampleInstrument::SetRowVolume(int channel,unsigned char vol) {
 	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return ;
 	renderParams *rp=renderParams_+channel ;
@@ -1569,21 +1601,20 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 		// pure fixed-point assignments, and never allocate.
 		case I_CMD_DLYS:
 			{
-				// TREEFROG_INSTRUMENT_SENDS_V1 (Fase 6): DLYS drives both the
-				// per-track Mixer send (legacy UI / persistence) and this
-				// instrument's override.  PlayerChannel prefers the instrument
-				// override at render time; instruments without an override
-				// keep inheriting the per-track Mixer send (compat).
+				// TREEFROG_SEND_LIVE_V1 (Fase 15): DLYS modulates the LIVE
+				// per-channel delay send override only.  It never writes the
+				// persisted instrument base (DRY/DLY/RVB) nor the per-track
+				// Mixer send, so phrase/table automation can't clobber saved
+				// values; a new trigger restores the base.  PlayerChannel
+				// reads this live override at render time.
 				int send=(int)((long)(value&0xFF)*100)/255 ;
-				dlySend_->SetInt(send) ;
-				Mixer::GetInstance()->SetChannelDelaySend(channel,send) ;
+				renderParams_[channel].dlySend_=send ;
 			}
 			break ;
 		case I_CMD_RVBS:
 			{
 				int send=(int)((long)(value&0xFF)*100)/255 ;
-				rvbSend_->SetInt(send) ;
-				Mixer::GetInstance()->SetChannelReverbSend(channel,send) ;
+				renderParams_[channel].rvbSend_=send ;
 			}
 			break ;
 		case I_CMD_DLYT:

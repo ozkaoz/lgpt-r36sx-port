@@ -381,9 +381,9 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 
 **6.1 — Sends FX por instrumento (hecho y verificado)**
 - `I_Instrument.h`: virtuals no-virt-pure `GetFxDelaySendOverride()`/`GetFxReverbSendOverride()` (default `0xFF` = "hereda el send per-track del Mixer") y `GetFxDry()` (default 100). `MidiInstrument` queda intacto.
-- `SampleInstrument`: variables persistidas `DRY` (`SIP_DRY`, 0..100, default 100), `DLY send` (`SIP_DLY_SEND`, 0..100, default -1 = inherit) y `RVB send` (`SIP_RVB_SEND`, idem). Se serializan como PARAMs ordinarios.
+- `SampleInstrument`: variables persistidas `DRY` (`SIP_DRY`, 0..100, default 100), `DLY send` (`SIP_DLY_SEND`, 0..100, default -1 = inherit) y `RVB send` (`SIP_RVB_SEND`, idem). Se serializan como PARAMs ordinarios. *(Fase 15: el default de los sends pasa a `0`; `-1` solo permanece en proyectos guardados por builds anteriores.)*
 - `PlayerChannel::Render`: `gain = (send% * DRY%) / 10000.0f` con `fl2fp`; el override del instrumento gana; si no hay override se hereda el send per-track del Mixer. `DRY=100` es bit-idéntico a Fase 4/5.
-- Handlers `I_CMD_DLYS`/`I_CMD_RVBS`: escriben el override del instrumento Y el send per-track del `Mixer` (UI legacy + persistencia consistentes).
+- Handlers `I_CMD_DLYS`/`I_CMD_RVBS`: escribían el override del instrumento Y el send per-track del `Mixer` (UI legacy + persistencia consistentes). *(Fase 15: ya no tocan ninguna de las dos; escriben solo la capa live por canal — ver Fase 15.)*
 - Test `tests/test_fx_phase6_instrument_sends.py` -> `FX_INSTRUMENT_SENDS_PHASE6_OK` (default hereda track, DRY=100 == Fase 4, DRY escala lineal, override gana, DLYS/RVBS tocan Mixer, guards de fuente).
 
 **6.2 — Rediseño MixerView: 5 páginas (hecho y verificado)**
@@ -440,7 +440,7 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 ### Fase 9 — Página MIX: FX RETURNS (hecho y verificado)
 
 **9.1 — Sends per-track fuera de la página MIX**
-- Eliminado `drawMixSends()` (readouts `Dxx`/`Rxx` bajo las barras de canal) y la edición de sends per-track desde el Mixer: `NudgeChannelDelaySend`/`NudgeChannelReverbSend` ya no se usan en la vista. Los sends son por instrumento (Fase 6/7, editados en InstrumentView); el send per-track sobrevive solo como capa de herencia/compatibilidad (persistido, DLYS/RVBS siguen escribiéndolo).
+- Eliminado `drawMixSends()` (readouts `Dxx`/`Rxx` bajo las barras de canal) y la edición de sends per-track desde el Mixer: `NudgeChannelDelaySend`/`NudgeChannelReverbSend` ya no se usan en la vista. Los sends son por instrumento (Fase 6/7/15, editados en InstrumentView); el send per-track sobrevive solo como capa de herencia/compatibilidad (persistido). *(Fase 15: DLYS/RVBS ya no escriben el send per-track; solo la capa live por canal.)*
 - `fxEditTarget_` ahora cicla `VOL -> DLY RET -> RVB RET` (R2 solo). `VOL` edita el volumen del canal hovereado; `DLY RET`/`RVB RET` editan los RETORNNOS maestro (nivel wet del delay/reverb hacia el bus maestro).
 
 **9.2 — FX RETURNS en la página MIX**
@@ -499,6 +499,18 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 - Clamp en [vmin, vmax] en ambos sentidos.
 - El resto de parámetros (lineal 1/fino, 10/grueso) queda igual.
 - Nuevo test `tests/test_fx_phase14_curve_editing.py` -> `FX_EDIT_CURVE_PHASE14_OK`.
+
+### Fase 15 — Capa de envíos FX en vivo por canal (hecho y verificado)
+
+**Objetivo**: la automatización Phrase/Table (`DLYS`/`RVBS`) deja de escribir valores persistidos y pasa a modular un valor *live* por canal; el valor base (persistido) solo lo toca el usuario (InstrumentView) y se restaura en cada trigger.
+
+- `SampleRenderingParams.h`: campos `int dlySend_`, `int rvbSend_` por canal (-1 = heredar el send per-track del Mixer, 0..100 = override explícito). Sin alloc; puros ints.
+- `SampleInstrument` ctor: los envíos live arrancan en `-1` (heredar); defaults de las variables persistidas pasan a `DRY=100`, `DLY send=0`, `RVB send=0`. `-1` solo persiste en proyectos guardados por builds anteriores (compat Fase 7).
+- `SampleInstrument::Start(channel,note,cleanstart)`: en `cleanstart` (trigger limpio) restaura `rp->dlySend_=GetFxDelaySendOverride()` y `rp->rvbSend_=GetFxReverbSendOverride()`. El legato (`cleanstart=false`) NO resetea la capa live (la automatización en curso no se corta). Cambiar de instrumento en una pista = nuevo trigger -> envíos del nuevo instrumento.
+- Handlers `I_CMD_DLYS`/`I_CMD_RVBS`: escriben SOLO `renderParams_[channel].dlySend_`/`rvbSend_`. Ya no tocan `dlySend_`/`rvbSend_` (variables persistidas) ni `Mixer::SetChannelDelaySend/ReverbSend`. Así la automatización nunca corrompe los valores guardados (el requisito "persistido = solo edición del usuario").
+- `I_Instrument.h`/`SampleInstrument`: virtuales `GetLiveDelaySend(int channel)` / `GetLiveReverbSend(int channel)` (base devuelve `0xFF` = heredar; `SampleInstrument` lee la capa live del canal, con guarda de rango).
+- `PlayerChannel::Render`: lee `GetLiveDelaySend(index_)`/`GetLiveReverbSend(index_)` en lugar de los overrides de base; el resto (0xFF hereda, 0..100 gana, `gain = send%*DRY%/10000`) no cambia.
+- Tests actualizados (Fase 6/7, phase4 guards, phase9 docstring) al nuevo contrato y test nuevo `tests/test_fx_phase15_live_sends.py` -> `FX_LIVE_SENDS_PHASE15_OK` (defaults 100/0/0, instrumento default en silencio, hereda `-1` legacy exacto, automatización live-only sin tocar base, trigger restaura base, legato conserva live, canales independientes, cambio de instrumento aplica su base, guards de fuente).
 
 ---
 

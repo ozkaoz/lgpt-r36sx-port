@@ -84,14 +84,18 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
    //   - saving writes both layers again, so no original value is lost.
    // The per-track sends are never deleted; they are simply superseded on a
    // per-instrument basis when an explicit instrument send exists.
+   // TREEFROG_SEND_LIVE_V1 (Fase 15): the override source is now the LIVE
+   // per-channel value (GetLiveDelaySend/GetLiveReverbSend).  It equals the
+   // instrument base on a new trigger and is modulated by phrase/table
+   // DLYS/RVBS automation without ever writing the persisted base.
    if (audible) {
        Mixer *mixer=Mixer::GetInstance() ;
        int dSend=mixer->GetChannelDelaySend(index_) ;
        int rSend=mixer->GetChannelReverbSend(index_) ;
        int dry=100 ;
        if (instr_) {
-           int dOv=instr_->GetFxDelaySendOverride() ;
-           int rOv=instr_->GetFxReverbSendOverride() ;
+           int dOv=instr_->GetLiveDelaySend(index_) ;
+           int rOv=instr_->GetLiveReverbSend(index_) ;
            if (dOv!=0xFF) dSend=dOv ;
            if (rOv!=0xFF) rSend=rOv ;
            dry=instr_->GetFxDry() ;

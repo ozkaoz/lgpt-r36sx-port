@@ -145,8 +145,10 @@ def check_src_handlers():
     for cmd in ("I_CMD_DLYS", "I_CMD_RVBS", "I_CMD_DLYT", "I_CMD_DLYF",
                 "I_CMD_RVDC", "I_CMD_RVSZ", "I_CMD_CMPT"):
         assert ("case %s:" % cmd) in src, cmd
-    for token in ("Mixer::GetInstance()->SetChannelDelaySend",
-                  "Mixer::GetInstance()->SetChannelReverbSend",
+    # TREEFROG_SEND_LIVE_V1 (Fase 15): DLYS/RVBS now write the live per-channel
+    # override (renderParams_[channel].*) instead of the Mixer per-track send.
+    for token in ("renderParams_[channel].dlySend_",
+                  "renderParams_[channel].rvbSend_",
                   "SetDelayTimeMs", "SetDelayFeedback", "SetReverbDecay",
                   "SetReverbSize", "SetCompThresholdDb"):
         assert token in src, token
