@@ -1,5 +1,43 @@
 # Changelog
 
+## Release candidate: Bacon 1.1 - FX Dev (RC5)
+
+- **Estado**: iteración exclusivamente de layout/renderizado sobre RC4
+  (P0-P8). Centra horizontal y verticalmente cada bloque tipo menú sobre la
+  cuadrícula real de 40x30 y corrige el centrado global de modales. **No
+  toca el motor FX/DSP, FxEngine, la persistencia, la navegación, los
+  colores, el footer, el Chopper ni las cuadrículas del tracker.**
+- **Geometría centralizada**: constantes de pantalla/banda en `UiDraw.h`
+  (`kScreenWidth=40`, `kScreenHeight=30`, `kMenuBandTop=3`,
+  `kMenuBandBottom=25`, `kFooterTop=27`, `kFooterBottom=29`). El cuerpo de
+  un menú se centra en las filas 3..25, nunca en toda la pantalla.
+- **API de layout ampliada**: `UiDraw::CenterTextX(text, viewportWidth)` y
+  `UiDraw::MakeCenteredMenuLayout(rowCount[, labelWidth, valueWidth,
+  spacing[, viewportWidth, contentTop, contentBottom]])` con margen máximo de
+  1 celda (2 para separadores impares) y clamp correcto. Los layouts ya no
+  asumen 40 columnas ni la banda 1..29.
+- **Modales**: `ModalView::SetWindow` usa `(30-height)/2+topOffset_`,
+  guarda `width_`/`height_` con getters y clampa el marco completo (bordes en
+  `top-2..top+height+1`) a las filas 0..29. `TreeFrogProjectExitModal` centra
+  su título e items dentro de las 28 columnas locales del modal y usa de
+  verdad el `MenuLayout` (se elimina `(void)ml`).
+- **Páginas MASTER del Mixer** (DELAY/REVERB/EQ/COMP): cada bloque centrado
+  en banda 3..25 y centrado horizontal con columnas label/valor calculadas.
+  `DrawBypassRow(labelX, valueX, y, ...)` usa la misma columna de valor que
+  las filas de parámetros (la firma antigua delega en la nueva).
+- **Mixer principal**: 9 barras VU (MST + 8 canales) de 1 sola celda de
+  ancho, uniformemente espaciadas cada 4 columnas; `bankWidth=33`,
+  `firstMeterX=3`. `drawVolumeBar`/`drawMasterBar` dibujan una sola columna
+  (`totalCells=height`, sin loop `c<2`). Textos MST/00..07/valores centrados
+  sobre el eje de cada barra; FX RETURNS ocupa su propia fila (antes podía
+  colisionar con un mute).
+- **Tests**: nuevo modelo geométrico `tests/test_ui_centered_layout.py`
+  (12 comprobaciones de bounding box, paridad de anchos/altos, posiciones
+  de los 9 metros y enums FX intactos); actualizados los tests RC3/RC4
+  para comprobar semántica y layout en vez de coordenadas mágicas. Suite
+  completa en verde (`AUDIT_CLEAN_MAIN_U2523_OK`) y build del target
+  (`BUILD_U2523_OK`, `SHA256SUMS.txt`).
+
 ## Release candidate: Bacon 1.1 - FX Dev (RC3 full)
 
 - **Estado**: fase completa de la modernización visual integral

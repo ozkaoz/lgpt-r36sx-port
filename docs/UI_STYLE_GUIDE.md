@@ -1,8 +1,20 @@
 # UI_STYLE_GUIDE — Guía de estilo de la interfaz LGPT R36SX
 
-Versión: RC4 (P0-P6 completos; P7-P8 en curso).
+Versión: RC5 (layout por bandas/viewport, menús y modales centrados de verdad).
 Pantalla lógica: 40x30 caracteres (AppWindow flush loop).
-Área segura: fila 0 = título, filas 1-25 = contenido, filas 26-29 = map/notes.
+Constantes compartidas en `UiDraw.h`: `kScreenWidth=40`,
+`kScreenHeight=30`, `kTitleRow=0`, `kSubtitleRow=1`, `kMenuBandTop=3`,
+`kMenuBandBottom=25`, `kFooterTop=27`, `kFooterBottom=29`.
+
+Área segura por familia:
+- Fila 0 = título de página.
+- Fila 1 = título de subpágina (páginas FX).
+- Filas 3..25 = banda en la que se centra el **cuerpo** de un menú/formulario.
+- Fila 26 = separación; filas 27..29 = map/notes (footer).
+
+El cuerpo de un menú principal se centra dentro de las filas 3..25, **nunca**
+dentro de toda la pantalla ni dentro de 1..29 (el footer no participa en el
+centrado).
 
 Esta guía es la fuente normativa de la auditoría visual (UI_VISUAL_AUDIT.md).
 Cualquier desviación debe documentarse y justificarse allí.
@@ -76,13 +88,30 @@ relleno repetidos (`====`, `####`, sprites ASCII) en widgets de nivel/envío.
 centrado. El contenido no sobresale del marco. Aplicable a selector de
 comandos, diálogos de confirmación y ayuda.
 
-### 6b. Menús verticales centrados (RC4 P4)
+### 6b. Menús verticales centrados (RC5)
 
-`UiDraw::CenterTextX` centra un texto en la pantalla de 40 celdas
-(`(40-len)/2`) y `UiDraw::MakeCenteredMenuLayout` calcula el bloque centrado
-de un menú vertical (columnas label/valor opcionales, centrado vertical en la
-banda 1..29). Los menús de modales con items se dibujan con estos helpers, no
-con coordenadas fijas pegadas al borde.
+Un menú vertical se centra con `UiDraw::MakeCenteredMenuLayout`:
+
+    MakeCenteredMenuLayout(rowCount, labelWidth, valueWidth, spacing,
+                           viewportWidth = kScreenWidth,
+                           contentTop    = kMenuBandTop,
+                           contentBottom = kMenuBandBottom)
+
+Devuelve `startX`/`startY` del bloque y las columnas `labelX`/`valueX`.
+Reglas:
+- Margen izquierdo/derecho del centrado horizontal: diferencia máxima de
+  **1 celda** (2 para separadores impares).
+- Margen superior/inferior dentro de `contentTop..contentBottom`: diferencia
+  máxima de **1 celda** (2 para separadores impares).
+- `contentTop`/`contentBottom` por defecto son la banda 3..25 (el footer no
+  se incluye). Un modal pasa su viewport local.
+- `UiDraw::CenterTextX(text, viewportWidth)` centra un texto sobre un
+  viewport (40 o el interior del modal).
+
+Los menús de modales con items y los bloques de las páginas MASTER del Mixer
+se dibujan con estos helpers, no con coordenadas fijas pegadas al borde.
+La fila de bypass de cada página usa la **misma** columna `valueX` que sus
+filas de parámetros (`DrawBypassRow(labelX, valueX, y, ...)`).
 
 ### 6c. Mensajes de estado y error (RC4 P5)
 

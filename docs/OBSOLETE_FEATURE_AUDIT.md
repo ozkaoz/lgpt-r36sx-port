@@ -1,6 +1,7 @@
 # OBSOLETE_FEATURE_AUDIT — Auditoría de funciones obsoletas de la UI LGPT R36SX
 
-Versión: RC4 (P0-P6 completos; P7 auditorías).
+Versión: RC5 (layout centrado; las primitivas RC4 de layout ganan
+consumidores reales). Actualizado también el estado RC5 al cierre del plan.
 Objetivo: listar funciones obsoletas/sin uso con su file:line y decisión.
 Decisiones: REMOVE / KEEP_HIDDEN / KEEP_COMPAT.
 
@@ -39,14 +40,14 @@ Escaneo `UiDraw::*` en todo el árbol (fuera de `BaseClasses/UiDraw.*`):
 | `DrawCenteredTitle` | 1 (MixerView) | KEEP |
 | `DrawCenteredTitleAt` | 1 (MixerView) | KEEP |
 | `DrawSectionHeader` | 7 (InstrumentView) | KEEP |
-| `DrawBypassRow` | 4 (MixerView DELAY/REVERB/EQ/COMP) | KEEP |
+| `DrawBypassRow` | 4 (MixerView DELAY/REVERB/EQ/COMP, RC5 con variante `labelX,valueX,y`) | KEEP |
 | `DrawTabs` | 1 (HelpOverlay, RC4 P6) | KEEP |
 | `DrawScrollIndicator` | 1 (HelpOverlay, RC4 P6) | KEEP |
 | `DrawSelectionRegion` | 1 (HelpOverlay, RC4 P5) | KEEP |
 | `DrawStatusMessage` | 1 (SampleManagerDialog, RC4 P5) | KEEP |
 | `DrawErrorMessage` | 1 (SampleManagerDialog, RC4 P5) | KEEP |
-| `CenterTextX` | 2 (ProjectView, RC4 P4) | KEEP |
-| `MakeCenteredMenuLayout` | 1 (ProjectView, RC4 P4) | KEEP |
+| `CenterTextX` | 1 (ProjectView modal, RC5 con viewport local) | KEEP |
+| `MakeCenteredMenuLayout` | 1 (ProjectView) + 4 (páginas MASTER DELAY/REVERB/EQ/COMP, RC5) | KEEP |
 | `DrawValueRow` | 0 | KEEP_HIDDEN — primitiva RC3 disponible; sin vista adoptante aún (P8: migrar drawMasterFxRow u otra fila label/valor) |
 | `DrawSolidBar` | 0 | KEEP_HIDDEN — primitiva RC3 disponible; los secuenciadores dibujan barras con loops propios (ChainView:676, GrooveView:180, PhraseView:1608) |
 | `DrawBipolarBar` | 0 | KEEP_HIDDEN — primitiva RC3 disponible, sin adoptante |

@@ -424,41 +424,41 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	DrawString(x,y,hex,props) ;
 	props.invert_=false ;
 
-	// TREEFROG_MIXER_LIVE_BAR_V4 (H38.7):
+	// TREEFROG_MIXER_LIVE_BAR_V4 (H38.7) + RC5:
 	// The bar fill follows the real-time output level (GetChannelPeak), so a
 	// low volume reads as a small wave and a loud volume as a big one. The
 	// channel volume setting is drawn as an accent marker cell plus the
-	// numeric value below. Selected bars stay purple, muted bars dim.
-	int totalCells=2*height ;
+	// numeric value below. Selected bars stay purple, muted bars dim.  RC5:
+	// each row is a single cell (one-column meter) so the 9 meters of the
+	// MIX page fit the centered bank; totalCells == height.
+	int totalCells=height ;
 	int filledCells=int(mixVULevel(peak)*float(volume)*0.01f*float(totalCells)) ;
 	if (filledCells>totalCells) filledCells=totalCells ;
 	int volMarker=(volume*totalCells+99)/100 ;
 	if (volMarker>totalCells) volMarker=totalCells ;
 	for (int row=0;row<height;row++) {
-		for (int c=0;c<2;c++) {
-			int cellFromBottom=totalCells-(2*row+c) ;
-			bool on=(cellFromBottom<=filledCells) ;
-			bool marker=((!on)&&(cellFromBottom==volMarker)) ;
-			if (selected) {
-				SetColor(on?CD_HILITE2:CD_HILITE1) ;
-				props.invert_=on ;
-			} else if (muted) {
-				SetColor(CD_BORDER) ;
-				props.invert_=false ;
+		int cellFromBottom=totalCells-row ;
+		bool on=(cellFromBottom<=filledCells) ;
+		bool marker=((!on)&&(cellFromBottom==volMarker)) ;
+		if (selected) {
+			SetColor(on?CD_HILITE2:CD_HILITE1) ;
+			props.invert_=on ;
+		} else if (muted) {
+			SetColor(CD_BORDER) ;
+			props.invert_=false ;
+		} else {
+			if (on) {
+				SetColor(CD_NORMAL) ;
+				props.invert_=true ;
+			} else if (marker) {
+				SetColor(CD_HILITE2) ;
+				props.invert_=true ;
 			} else {
-				if (on) {
-					SetColor(CD_NORMAL) ;
-					props.invert_=true ;
-				} else if (marker) {
-					SetColor(CD_HILITE2) ;
-					props.invert_=true ;
-				} else {
-					SetColor(CD_HILITE1) ;
-					props.invert_=false ;
-				}
+				SetColor(CD_HILITE1) ;
+				props.invert_=false ;
 			}
-			DrawString(x+c,y+1+row," ",props) ;
 		}
+		DrawString(x,y+1+row," ",props) ;
 	}
 
 	SetColor(selected?CD_HILITE2:(muted?CD_BORDER:CD_NORMAL)) ;
@@ -502,33 +502,31 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	props.invert_=false ;
 	DrawString(x-1,y,"MST",props) ;
 
-	int totalCells=2*height ;
+	int totalCells=height ;
 	int filledCells=int(masterLevel*float(volume)*0.01f*float(totalCells)) ;
 	if (filledCells>totalCells) filledCells=totalCells ;
 	int volMarker=(volume*totalCells+99)/100 ;
 	if (volMarker>totalCells) volMarker=totalCells ;
 	for (int row=0;row<height;row++) {
-		for (int c=0;c<2;c++) {
-			int cellFromBottom=totalCells-(2*row+c) ;
-			bool on=(cellFromBottom<=filledCells) ;
-			bool marker=((!on)&&(cellFromBottom==volMarker)) ;
-			if (masterSelected_) {
-				SetColor(on?CD_HILITE2:CD_HILITE1) ;
-				props.invert_=on ;
+		int cellFromBottom=totalCells-row ;
+		bool on=(cellFromBottom<=filledCells) ;
+		bool marker=((!on)&&(cellFromBottom==volMarker)) ;
+		if (masterSelected_) {
+			SetColor(on?CD_HILITE2:CD_HILITE1) ;
+			props.invert_=on ;
+		} else {
+			if (on) {
+				SetColor(CD_PLAY) ;
+				props.invert_=true ;
+			} else if (marker) {
+				SetColor(CD_HILITE2) ;
+				props.invert_=true ;
 			} else {
-				if (on) {
-					SetColor(CD_PLAY) ;
-					props.invert_=true ;
-				} else if (marker) {
-					SetColor(CD_HILITE2) ;
-					props.invert_=true ;
-				} else {
-					SetColor(CD_HILITE1) ;
-					props.invert_=false ;
-				}
+				SetColor(CD_HILITE1) ;
+				props.invert_=false ;
 			}
-			DrawString(x+c,y+1+row," ",props) ;
 		}
+		DrawString(x,y+1+row," ",props) ;
 	}
 
 	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
@@ -872,20 +870,21 @@ void MixerView::drawMasterFxRow(const char *label,const char *value,
 
 void MixerView::drawDelayPage() {
 	char buffer[16] ;
-	const int x=2 ;
-	const int valueX=x+12 ;
 	static const char *labels[7]={"BYPASS","TIME","FEEDBACK","MIX",
 	                              "WIDTH","PING/PONG","SATURATE"} ;
 	static const int ids[7]={FX_P_DLY_BYP,FX_P_DLY_TIME,FX_P_DLY_FBK,
 	                         FX_P_DLY_MIX,FX_P_DLY_WID,FX_P_DLY_PP,
 	                         FX_P_DLY_SAT} ;
+	// RC5: the whole 7-row block is centered in the safe menu band 3..25
+	// (label column 9 = "PING/PONG", value column 8, two-cell spacing).
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,9,8,2) ;
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
 		bool selected=(fxRowForId(id)==fxRow_) ;
+		int y=ml.startY+p ;
 		if (id==FX_P_DLY_BYP) {
-			// RC4 P2: unified Bypass row via UiDraw (PLAN_RC4 section 12).
-			UiDraw::DrawBypassRow(*this,x,2+p,v>=0.5f,selected) ;
+			UiDraw::DrawBypassRow(*this,ml.labelX,ml.valueX,y,v>=0.5f,selected) ;
 			continue ;
 		}
 		switch(id) {
@@ -894,25 +893,27 @@ void MixerView::drawDelayPage() {
 		case FX_P_DLY_SAT:  sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ; break ;
 		default:            sprintf(buffer,"%.2f",v) ; break ;  // FBK/MIX/WID
 		}
-		drawMasterFxRow(labels[p],buffer,selected,x,2+p,valueX) ;
+		drawMasterFxRow(labels[p],buffer,selected,ml.labelX,y,ml.valueX) ;
 	}
 }
 
 void MixerView::drawReverbPage() {
 	char buffer[16] ;
-	const int x=2 ;
-	const int valueX=x+12 ;
 	static const char *labels[7]={"BYPASS","PREDELAY","DECAY","SIZE",
 	                              "DAMPING","WIDTH","MODE"} ;
 	static const int ids[7]={FX_P_RVB_BYP,FX_P_RVB_PRE,FX_P_RVB_DEC,
 	                         FX_P_RVB_SIZ,FX_P_RVB_DMP,FX_P_RVB_WID,
 	                         FX_P_RVB_MODE} ;
+	// RC5: centered 7-row block in the safe menu band 3..25 (label column
+	// 8 = "PREDELAY", value column 8, two-cell spacing).
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,8,8,2) ;
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
 		bool selected=(fxRowForId(id)==fxRow_) ;
+		int y=ml.startY+p ;
 		if (id==FX_P_RVB_BYP) {
-			UiDraw::DrawBypassRow(*this,x,2+p,v>=0.5f,selected) ;
+			UiDraw::DrawBypassRow(*this,ml.labelX,ml.valueX,y,v>=0.5f,selected) ;
 			continue ;
 		}
 		switch(id) {
@@ -921,7 +922,7 @@ void MixerView::drawReverbPage() {
 		case FX_P_RVB_MODE: sprintf(buffer,"%s",v>=0.5f?"NORMAL":"ECO") ; break ;
 		default:            sprintf(buffer,"%.2f",v) ; break ;  // SIZ/DMP/WID
 		}
-		drawMasterFxRow(labels[p],buffer,selected,x,2+p,valueX) ;
+		drawMasterFxRow(labels[p],buffer,selected,ml.labelX,y,ml.valueX) ;
 	}
 }
 
@@ -944,50 +945,54 @@ static const char *eqBandName(int id) {
 	return "HIGH" ;
 }
 
-void MixerView::drawEqRow(int id,int x,int y) {
+void MixerView::drawEqRow(int id,int labelX,int valueX,int y) {
 	GUITextProperties props ;
 	char buffer[16] ;
 	bool selected=(fxRowForId(id)==fxRow_) ;
 	bool on=(fxGet(id)>=0.5f) ;
-	// RC4 P2: EQ Bypass renders through the unified row; the band EN toggles
-	// keep the "[ ON ]" inline style (they are a per-band enable).
+	// RC4 P2 + RC5: EQ Bypass renders through the unified row; the band EN
+	// toggles keep the "[ ON ]" inline style (they are a per-band enable).
+	// RC5 splits label and value into the centered columns.
 	if (id==FX_P_EQ_BYP) {
-		UiDraw::DrawBypassRow(*this,x,y,on,selected) ;
+		UiDraw::DrawBypassRow(*this,labelX,valueX,y,on,selected) ;
 		return ;
 	}
 	SetColor(selected?CD_HILITE2:CD_NORMAL) ;
 	props.invert_=selected ;
 	if (id==FX_P_EQ_LOW_EN||id==FX_P_EQ_MID_EN||id==FX_P_EQ_HI_EN) {
-		sprintf(buffer,"%-6s[ %s ]",eqParamLabel(id),on?"ON":"OFF") ;
+		sprintf(buffer,"[ %s ]",on?"ON":"OFF") ;
 	} else if (fxUsesCurve(id)) {
-		sprintf(buffer,"%-6s%6.0f Hz",eqParamLabel(id),fxGet(id)) ;
+		sprintf(buffer,"%6.0f Hz",fxGet(id)) ;
 	} else if (id==FX_P_EQ_LOW_GAI||id==FX_P_EQ_MID_GAI||id==FX_P_EQ_HI_GAI) {
-		sprintf(buffer,"%-6s%+5.1f dB",eqParamLabel(id),fxGet(id)) ;
+		sprintf(buffer,"%+5.1f dB",fxGet(id)) ;
 	} else {
-		sprintf(buffer,"%-6s%5.2f",eqParamLabel(id),fxGet(id)) ;
+		sprintf(buffer,"%5.2f",fxGet(id)) ;
 	}
-	DrawString(x,y,buffer,props) ;
+	DrawString(labelX,y,eqParamLabel(id),props) ;
+	DrawString(valueX,y,buffer,props) ;
 	props.invert_=false ;
 	SetColor(CD_NORMAL) ;
 }
 
 void MixerView::drawEqPage() {
 	// Title (row 1) is drawn by drawFxParamPage(); hints moved to the
-	// HelpOverlay (SELECT+R1).  Rows: bypass at y=2, then each band is a
-	// header line (y=4/10/16) followed by EN/FRQ/GAIN/Q.  All bands stay on
-	// screen so editing never hides the rest of the EQ.
-	const int x=13 ;
+	// HelpOverlay (SELECT+R1).  Rows: bypass first, then each band is a
+	// header line followed by EN/FRQ/GAIN/Q.  RC5 centers the whole 16-row
+	// block in the safe menu band 3..25 (label column 6, value column 9,
+	// two-cell spacing) so the full EQ stays on screen and balanced.
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(16,6,9,2) ;
 	GUITextProperties props ;
-	drawEqRow(FX_P_EQ_BYP,x,2) ;
+	drawEqRow(FX_P_EQ_BYP,ml.labelX,ml.valueX,ml.startY) ;
 	const int bandBase[3]={FX_P_EQ_LOW_EN,FX_P_EQ_MID_EN,FX_P_EQ_HI_EN} ;
+	int yHeader=ml.startY+1 ;
 	for (int b=0;b<3;b++) {
-		int yHeader=4+b*6 ;
 		SetColor(CD_NORMAL) ;
 		props.invert_=false ;
-		DrawString(x,yHeader,eqBandName(bandBase[b]),props) ;
+		DrawString(ml.labelX,yHeader,eqBandName(bandBase[b]),props) ;
 		for (int p=0;p<4;p++) {
-			drawEqRow(bandBase[b]+p,x,yHeader+1+p) ;
+			drawEqRow(bandBase[b]+p,ml.labelX,ml.valueX,yHeader+1+p) ;
 		}
+		yHeader+=5 ;
 	}
 }
 
@@ -998,8 +1003,11 @@ void MixerView::drawEqPage() {
 // parameters.  No clipping indicator: the engine exposes no reliable real
 // audio clip reading (GetRtViolations is buffer RT telemetry, must stay 0).
 void MixerView::drawCompPage() {
-	const int labelX=8 ;
-	const int valueX=labelX+16 ;
+	// RC5: the whole 9-row block is centered in the safe menu band 3..25
+	// (label column 11 = "Stereo Link", value column 8, three-cell spacing so
+	// the 14-cell "Gain Reduction" line below fits beside its value); the GR
+	// meter stays visible one row below the last parameter.
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(9,11,8,3) ;
 	GUITextProperties props ;
 	char buffer[20] ;
 	const char *labels[9]={"Bypass","Threshold","Ratio","Knee",
@@ -1009,10 +1017,11 @@ void MixerView::drawCompPage() {
 		const FxParamSpec &spec=kFxParams_[id] ;
 		bool selected=(fxRowForId(id)==fxRow_) ;
 		float v=fxGet(id) ;
-		// RC4 P2: COMP bypass through the unified row; the rest keep the
-		// label/value two-column layout.
+		int y=ml.startY+p ;
+		// RC4 P2 + RC5: COMP bypass through the unified row; the rest keep the
+		// label/value two-column layout on the centered block.
 		if (p==0) {
-			UiDraw::DrawBypassRow(*this,labelX,p+2,v>=0.5f,selected) ;
+			UiDraw::DrawBypassRow(*this,ml.labelX,ml.valueX,y,v>=0.5f,selected) ;
 			props.invert_=false ;
 			SetColor(CD_NORMAL) ;
 			continue ;
@@ -1030,8 +1039,8 @@ void MixerView::drawCompPage() {
 			default:           sprintf(buffer,"%+5.1f dB",v) ; break ;  // THR, MKU
 			}
 		}
-		DrawString(labelX,p+2,labels[p],props) ;
-		DrawString(valueX,p+2,buffer,props) ;
+		DrawString(ml.labelX,y,labels[p],props) ;
+		DrawString(ml.valueX,y,buffer,props) ;
 		props.invert_=false ;
 		SetColor(CD_NORMAL) ;
 	}
@@ -1041,16 +1050,18 @@ void MixerView::drawCompPage() {
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
 	sprintf(buffer,"-%05.1f dB",mag) ;
-	DrawString(labelX,12,"Gain Reduction",props) ;
-	DrawString(valueX,12,buffer,props) ;
+	int grY=ml.startY+9 ;
+	DrawString(ml.labelX,grY,"Gain Reduction",props) ;
+	DrawString(ml.valueX,grY,buffer,props) ;
 }
 
-void MixerView::drawMixReturns() {
+void MixerView::drawMixReturns(int y) {
 	// TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9): the MIX page
 	// shows the master FX returns (wet levels of the delay/reverb into the
 	// master bus) instead of the old per-track D/R send readouts, which are
 	// now per-instrument (Fase 6/7) and edited in InstrumentView.  The
-	// return level being edited by UP/DOWN is highlighted.
+	// return level being edited by UP/DOWN is highlighted.  RC5: the row is
+	// drawn on its own line below the meters (y), still inside the safe band.
 	GUITextProperties props ;
 	char buffer[16] ;
 	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
@@ -1058,18 +1069,18 @@ void MixerView::drawMixReturns() {
 	int rvb=fxReturnPercent(fx.GetReverbReturn()) ;
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
-	DrawString(0,16,"RET",props) ;
+	DrawString(0,y,"RET",props) ;
 	SetColor((fxEditTarget_==1)?CD_HILITE2:CD_NORMAL) ;
 	props.invert_=(fxEditTarget_==1) ;
 	sprintf(buffer,"D:%3d",dly) ;
-	DrawString(4,16,buffer,props) ;
+	DrawString(4,y,buffer,props) ;
 	SetColor((fxEditTarget_==2)?CD_HILITE2:CD_NORMAL) ;
 	props.invert_=(fxEditTarget_==2) ;
 	sprintf(buffer,"R:%3d",rvb) ;
-	DrawString(11,16,buffer,props) ;
+	DrawString(11,y,buffer,props) ;
 	props.invert_=false ;
 	SetColor(CD_NORMAL) ;
-	DrawString(18,16,"FX RETURNS",props) ;
+	DrawString(18,y,"FX RETURNS",props) ;
 }
 
 void MixerView::drawFxPages() {
@@ -1077,18 +1088,30 @@ void MixerView::drawFxPages() {
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
 	if (fxPage_==FX_PAGE_MIX) {
-		// Classic mixer bars + per-track send readouts.
-		const int x0=8 ;
-		const int y0=2 ;
-		const int height=11 ;
-		const int dx=4 ;
-		DrawString(0,y0,"CH",props) ;
-		DrawString(0,y0+height+2,"VL",props) ;
-		drawMasterBar(x0-dx,y0,height) ;
-		for (int i=0;i<8;i++) {
-			drawVolumeBar(i,x0+i*dx,y0,height) ;
+		// RC5 (centered single-cell meters): the MIX page lays out 9 meters
+		// (MST + 8 channels) of one cell each, uniformly spaced every 4
+		// columns across the full 40-cell width.  The bank is exactly
+		// bankWidth=(9-1)*4+1=33 cells, so firstMeterX=(40-33)/2=3 leaves a
+		// 3-cell left and a 4-cell right margin (one-cell tolerance).  The
+		// whole block (labels, bars, volume numbers, mute markers and the
+		// FX RETURNS line) is centered vertically in the safe band 3..25.
+		const int meterCount=SONG_CHANNEL_COUNT+1 ;
+		const int meterWidth=1 ;
+		const int meterPitch=4 ;
+		const int bankWidth=(meterCount-1)*meterPitch+meterWidth ;
+		const int firstMeterX=(UiDraw::kScreenWidth-bankWidth)/2 ;
+		const int labelY=6 ;
+		const int barHeight=12 ;
+		const int numY=labelY+barHeight+2 ;
+		const int muteY=numY+1 ;
+		const int retY=muteY+1 ;
+		DrawString(0,labelY,"CH",props) ;
+		DrawString(0,numY,"VL",props) ;
+		drawMasterBar(firstMeterX,labelY,barHeight) ;
+		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+			drawVolumeBar(i,firstMeterX+(i+1)*meterPitch,labelY,barHeight) ;
 		}
-		drawMixReturns() ;
+		drawMixReturns(retY) ;
 	} else {
 		drawFxParamPage((FxPage)fxPage_) ;
 	}

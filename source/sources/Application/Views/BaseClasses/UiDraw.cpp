@@ -12,56 +12,66 @@
  */
 
 namespace {
-const int kScreenWidth = 40;
-const int kScreenHeight = 30;
+// Screen geometry lives in UiDraw::kScreenWidth/kScreenHeight (UiDraw.h);
+// this TU references them through the class constants.
 
 // Clamp helpers keep every draw inside the logical screen bounds.
 int clampX(int x) {
     if (x < 0) return 0;
-    if (x >= kScreenWidth) return kScreenWidth - 1;
+    if (x >= UiDraw::kScreenWidth) return UiDraw::kScreenWidth - 1;
     return x;
 }
 int clampY(int y) {
     if (y < 0) return 0;
-    if (y >= kScreenHeight) return kScreenHeight - 1;
+    if (y >= UiDraw::kScreenHeight) return UiDraw::kScreenHeight - 1;
     return y;
 }
 
 // RC4 P4 (PLAN_RC4 section 8): the left margin of a horizontally centered
-// text.  Odd-width text shifts the half cell to the right, matching the
-// title centering rule (tolerance of one cell on odd widths).
-int centerX(int len) { return (kScreenWidth - len) / 2; }
+// text inside a viewport of viewportWidth cells.  Odd-width text shifts the
+// half cell to the right, matching the title centering rule (tolerance of
+// one cell on odd widths).
+int centerX(int len, int viewportWidth) {
+    if (viewportWidth <= 0) viewportWidth = UiDraw::kScreenWidth;
+    return (viewportWidth - len) / 2;
+}
 }  // namespace
 
-// RC4 P4 (PLAN_RC4 section 8): centers `text` on the 40-cell screen.
-int UiDraw::CenterTextX(const char *text) {
+// RC4 P4 (PLAN_RC4 section 8) + RC5: centers `text` inside a viewport.
+int UiDraw::CenterTextX(const char *text, int viewportWidth) {
     if (!text) return 0;
     int len = (int)strlen(text);
-    return centerX(len);
+    return centerX(len, viewportWidth);
 }
 
-// RC4 P4: computes a centered block layout for a vertical value menu.
+// RC4 P4 + RC5: computes a centered block layout for a vertical value menu.
 // The block is (labelWidth + spacing + valueWidth) cells wide and
 // rowCount + 2 rows tall (title + rows + bottom pad), vertically centered
-// in contentTop..contentBottom (defaulting to the 1..29 band).
+// in contentTop..contentBottom (defaulting to the safe menu band 3..25).
+// Coordinates are local to a viewport viewportWidth cells wide: full-screen
+// views use kScreenWidth, modal views their inner width.
 MenuLayout UiDraw::MakeCenteredMenuLayout(int rowCount, int labelWidth,
                                           int valueWidth,
-                                          int preferredSpacing) {
+                                          int preferredSpacing,
+                                          int viewportWidth, int contentTop,
+                                          int contentBottom) {
     MenuLayout ml;
-    ml.screenWidth = kScreenWidth;
-    ml.screenHeight = kScreenHeight;
-    ml.contentTop = 1;
-    ml.contentBottom = kScreenHeight - 1;
+    ml.screenWidth = UiDraw::kScreenWidth;
+    ml.screenHeight = UiDraw::kScreenHeight;
+    ml.contentTop = (contentTop >= 0) ? contentTop : UiDraw::kMenuBandTop;
+    ml.contentBottom = (contentBottom >= 0) ? contentBottom
+                                            : UiDraw::kMenuBandBottom;
+    if (viewportWidth <= 0) viewportWidth = UiDraw::kScreenWidth;
     if (preferredSpacing < 0) preferredSpacing = 0;
 
     // Block width = label + spacing + value.  The value column is optional
     // (valueWidth <= 0 means a single column menu).
     int valueSpan = (valueWidth > 0) ? (preferredSpacing + valueWidth) : 0;
     ml.blockWidth = labelWidth + valueSpan;
-    if (ml.blockWidth > kScreenWidth) {
-        ml.blockWidth = kScreenWidth;
+    if (ml.blockWidth > viewportWidth) {
+        ml.blockWidth = viewportWidth;
     }
-    ml.startX = centerX(ml.blockWidth);
+    ml.startX = centerX(ml.blockWidth, viewportWidth);
 
     // The block spans the rows it occupies; its height is the visible row
     // count, and the block is centered vertically in the content band.
@@ -81,7 +91,7 @@ MenuLayout UiDraw::MakeCenteredMenuLayout(int rowCount, int labelWidth,
 
 void UiDraw::DrawCenteredTitle(View &view, const char *title) {
     int len = (int)strlen(title);
-    int x = (kScreenWidth - len) / 2;
+    int x = (UiDraw::kScreenWidth - len) / 2;
     if (x < 0) x = 0;
     GUITextProperties props;
     view.SetColor(CD_HILITE1);
@@ -91,7 +101,7 @@ void UiDraw::DrawCenteredTitle(View &view, const char *title) {
 
 void UiDraw::DrawCenteredTitleAt(View &view, int y, const char *title) {
     int len = (int)strlen(title);
-    int x = (kScreenWidth - len) / 2;
+    int x = (UiDraw::kScreenWidth - len) / 2;
     if (x < 0) x = 0;
     GUITextProperties props;
     view.SetColor(CD_HILITE1);
@@ -207,7 +217,7 @@ void UiDraw::DrawTabs(View &view, int y, const char *left,
     snprintf(buffer, sizeof(buffer), "<- %s [%s] %s ->", left, current, right);
     view.SetColor(CD_HILITE1);
     int len = (int)strlen(buffer);
-    int x = (kScreenWidth - len) / 2;
+    int x = (UiDraw::kScreenWidth - len) / 2;
     if (x < 0) x = 0;
     view.DrawString(clampX(x), clampY(y), buffer, props);
     view.SetColor(CD_NORMAL);
@@ -215,10 +225,10 @@ void UiDraw::DrawTabs(View &view, int y, const char *left,
 
 void UiDraw::DrawModalFrame(View &view, int width, int height,
                             const char *title) {
-    if (width > kScreenWidth - 2) width = kScreenWidth - 2;
-    if (height > kScreenHeight - 2) height = kScreenHeight - 2;
-    int x0 = (kScreenWidth - width) / 2;
-    int y0 = (kScreenHeight - height) / 2;
+    if (width > UiDraw::kScreenWidth - 2) width = UiDraw::kScreenWidth - 2;
+    if (height > UiDraw::kScreenHeight - 2) height = UiDraw::kScreenHeight - 2;
+    int x0 = (UiDraw::kScreenWidth - width) / 2;
+    int y0 = (UiDraw::kScreenHeight - height) / 2;
     GUITextProperties props;
     props.invert_ = false;
     view.SetColor(CD_BORDER);
@@ -262,24 +272,30 @@ void UiDraw::DrawSeparator(View &view, int y, int x, int width) {
     view.SetColor(CD_NORMAL);
 }
 
-void UiDraw::DrawBypassRow(View &view, int x, int y, bool on, bool selected) {
-    // RC4 P2 (PLAN_RC4 section 12): unified Bypass row for the four master
-    // FX pages (DELAY/REVERB/EQ/COMP).  The Bypass is the first logical and
-    // visual row on every page, and it renders identically everywhere:
-    // "BYPASS" label in CD_NORMAL with a centered "[ ON ]"/"[ OFF ]" toggle
-    // that inverts on CD_HILITE2 when the row is selected.
+void UiDraw::DrawBypassRow(View &view, int labelX, int valueX, int y, bool on,
+                          bool selected) {
+    // RC4 P2 (PLAN_RC4 section 12) + RC5: unified Bypass row for the four
+    // master FX pages (DELAY/REVERB/EQ/COMP).  The Bypass is the first
+    // logical and visual row on every page, and it renders identically
+    // everywhere: "BYPASS" label in CD_NORMAL with an "[ ON ]"/"[ OFF ]"
+    // toggle at valueX that inverts on CD_HILITE2 when the row is selected.
     GUITextProperties props;
     view.SetColor(CD_NORMAL);
     props.invert_ = false;
-    view.DrawString(clampX(x), clampY(y), "BYPASS", props);
+    view.DrawString(clampX(labelX), clampY(y), "BYPASS", props);
 
     char toggle[16];
     snprintf(toggle, sizeof(toggle), "[ %s ]", on ? "ON" : "OFF");
     view.SetColor(selected ? CD_HILITE2 : (on ? CD_HILITE1 : CD_MUTE));
     props.invert_ = selected;
-    view.DrawString(clampX(x + 8), clampY(y), toggle, props);
+    view.DrawString(clampX(valueX), clampY(y), toggle, props);
     props.invert_ = false;
     view.SetColor(CD_NORMAL);
+}
+
+void UiDraw::DrawBypassRow(View &view, int x, int y, bool on, bool selected) {
+    // Legacy single-column form: the toggle sits 8 cells right of the label.
+    DrawBypassRow(view, x, x + 8, y, on, selected);
 }
 
 void UiDraw::DrawSelectionRegion(View &view, int x, int y, int w, int h) {
@@ -288,8 +304,8 @@ void UiDraw::DrawSelectionRegion(View &view, int x, int y, int w, int h) {
     view.SetColor(CD_HILITE2);
     int x0 = clampX(x);
     int y0 = clampY(y);
-    int wmax = kScreenWidth - x0;
-    int hmax = kScreenHeight - y0;
+    int wmax = UiDraw::kScreenWidth - x0;
+    int hmax = UiDraw::kScreenHeight - y0;
     if (w > wmax) w = wmax;
     if (h > hmax) h = hmax;
     for (int ry = 0; ry < h; ry++) {

@@ -29,9 +29,17 @@ def check_mixerview_master():
     assert "DrawString(1,1,pageTitle" not in MV
     assert "UP/DN row" not in MV
     assert "SELECT page" not in MV
-    # RC4 P2: Bypass on DELAY/REVERB renders through the unified bypass row
-    # helper (DrawBypassRow), replacing the old x+6 toggle.
-    assert "UiDraw::DrawBypassRow(*this,x,2+p," in MV
+    # RC4 P2 + RC5: Bypass on DELAY/REVERB renders through the unified bypass
+    # row helper (DrawBypassRow) on the centered master-page block; the old
+    # ad-hoc x+6 toggle is gone.  The check is semantic (the helper is used on
+    # the page, the block is laid out by MakeCenteredMenuLayout), not a literal
+    # call-site match, because RC5 recentered the pages.
+    dl = MV[MV.index("void MixerView::drawDelayPage"):
+           MV.index("void MixerView::drawReverbPage")]
+    rv = MV[MV.index("void MixerView::drawReverbPage"):
+           MV.index("void MixerView::drawEqPage")]
+    assert "DrawBypassRow" in dl and "DrawBypassRow" in rv
+    assert "MakeCenteredMenuLayout" in dl and "MakeCenteredMenuLayout" in rv
     assert "DrawToggle(*this,x+6,2+p," not in MV
     # MIX page legend rows migrated to Help.
     assert "A+UP/DN x10" not in MV

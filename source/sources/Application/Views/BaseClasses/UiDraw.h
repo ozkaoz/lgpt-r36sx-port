@@ -33,18 +33,42 @@ struct MenuLayout {
 
 class UiDraw {
   public:
-    // RC4 P4 (PLAN_RC4 section 8): x that centers `text` on the 40-cell
-    // screen: (40 - len) / 2.
-    static int CenterTextX(const char *text);
+    // Shared screen geometry and safe layout bands.  The logical screen is
+    // 40x30 characters.  Menu-style blocks stay inside kMenuBandTop..kMenuBandBottom
+    // (rows 3..25): row 26 is the status/buffer line and rows 27..29 are the
+    // footer, which centering never overlaps.  Header text uses rows
+    // kTitleRow (0) and kSubtitleRow (1).
+    enum {
+        kScreenWidth = 40,
+        kScreenHeight = 30,
+        kTitleRow = 0,
+        kSubtitleRow = 1,
+        kMenuBandTop = 3,
+        kMenuBandBottom = 25,
+        kFooterTop = 27,
+        kFooterBottom = 29
+    };
 
-    // RC4 P4: computes a centered block layout for a vertical menu of
+    // RC4 P4 (PLAN_RC4 section 8) + RC5: x that centers `text` inside a
+    // viewport of viewportWidth cells: (viewportWidth - len) / 2.  With the
+    // default viewport this centers on the whole 40-cell screen; modal views
+    // pass their own inner width so the x is local to the modal.
+    static int CenterTextX(const char *text,
+                           int viewportWidth = kScreenWidth);
+
+    // RC4 P4 + RC5: computes a centered block layout for a vertical menu of
     // `rowCount` rows whose label column is labelWidth cells and value
     // column valueWidth cells, with preferredSpacing between them.  The
-    // block spans rows contentTop..contentBottom and is centered on the
-    // 40x30 screen.
+    // block spans rows contentTop..contentBottom inside a viewport
+    // viewportWidth cells wide and is centered on that viewport.  Returns
+    // local coordinates (relative to the viewport origin); modal views use
+    // their inner width and band, full-screen views use the defaults.
     static MenuLayout MakeCenteredMenuLayout(int rowCount, int labelWidth,
                                              int valueWidth,
-                                             int preferredSpacing);
+                                             int preferredSpacing,
+                                             int viewportWidth = kScreenWidth,
+                                             int contentTop = kMenuBandTop,
+                                             int contentBottom = kMenuBandBottom);
     // Centered title at row 0 using CD_HILITE1.  x is computed as
     // (screenWidth - textWidth)/2 per the RC3 plan.
     static void DrawCenteredTitle(View &view, const char *title);
@@ -78,7 +102,12 @@ class UiDraw {
 
     // RC4 P2 (PLAN_RC4 section 12): unified Bypass row for the four master
     // FX pages.  "BYPASS" label + "[ ON ]"/"[ OFF ]" toggle, inverted on
-    // CD_HILITE2 when selected.
+    // CD_HILITE2 when selected.  labelX is the label column; valueX the
+    // toggle column.
+    static void DrawBypassRow(View &view, int labelX, int valueX, int y,
+                              bool on, bool selected = false);
+
+    // Legacy Bypass row with a single x: the toggle sits at x+8.
     static void DrawBypassRow(View &view, int x, int y, bool on,
                               bool selected = false);
 

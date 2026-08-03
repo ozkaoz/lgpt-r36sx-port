@@ -153,8 +153,9 @@ def check_source_guards():
     assert '%+5.1f dB' in MIX
     # Band headers LOW/MID/HIGH rendered by drawEqPage.
     assert '"LOW"' in MIX and '"MID"' in MIX and '"HIGH"' in MIX
-    # Header declares the EQ menu methods.
-    assert "drawEqPage()" in MIX_H and "drawEqRow(int id,int x,int y)" in MIX_H
+    # Header declares the EQ menu methods (RC5: drawEqRow takes the centered
+    # label/value columns).
+    assert "drawEqPage()" in MIX_H and "drawEqRow(int id,int labelX,int valueX,int y)" in MIX_H
     # Enum is EN-first per band (order marker comment in the header).
     assert "FX_P_EQ_LOW_EN" in MIX_H and "FX_P_EQ_LOW_FRQ" in MIX_H
     l = MIX_H.index("FX_P_EQ_LOW_EN")

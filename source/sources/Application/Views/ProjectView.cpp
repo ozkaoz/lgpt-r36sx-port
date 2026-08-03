@@ -130,10 +130,14 @@ public:
     virtual void DrawView() {
         SetWindow(28,6);
         GUITextProperties props;
-        // RC4 P4: centered title and menu block (PLAN_RC4 section 8).
+        // RC4 P4 + RC5: the title and the menu block center on the modal's
+        // own viewport (28x6), not the 40x30 screen: every coordinate below
+        // is local and DrawString() adds the window origin automatically.
+        const int vw = GetWindowWidth();
+        const int vh = GetWindowHeight();
         SetColor(UiColors::Resolve(UI_COLOR_TITLE));
         props.invert_ = false;
-        DrawString(UiDraw::CenterTextX("Project Exit"), 0, "Project Exit",
+        DrawString(UiDraw::CenterTextX("Project Exit", vw), 0, "Project Exit",
                    props);
         SetColor(CD_NORMAL);
 
@@ -142,13 +146,12 @@ public:
             "Exit to TreeFrogUI",
             "Cancel"
         };
-        MenuLayout ml = UiDraw::MakeCenteredMenuLayout(3, 20, 0, 0);
-        (void)ml;
+        MenuLayout ml = UiDraw::MakeCenteredMenuLayout(3, 20, 0, 0, vw, 0,
+                                                       vh - 1);
         for (int i=0;i<3;i++) {
             props.invert_ = (i==selected_);
             SetColor((i==selected_)?CD_HILITE2:CD_NORMAL);
-            int x = UiDraw::CenterTextX(items[i]);
-            DrawString(x, 2+i, items[i], props);
+            DrawString(ml.labelX, ml.startY + i, items[i], props);
         }
         props.invert_ = false;
     }

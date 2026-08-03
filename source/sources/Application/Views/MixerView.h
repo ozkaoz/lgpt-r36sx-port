@@ -135,7 +135,7 @@ protected:
 	// signed-dB values.  drawEqRow draws one row; drawEqPage is dispatched by
 	// drawFxParamPage.
 	void drawEqPage() ;
-	void drawEqRow(int id,int x,int y) ;
+	void drawEqRow(int id,int labelX,int valueX,int y) ;
 	// TREEFROG_COMP_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 13): dedicated COMP
 	// menu (exclusive page) with BYP first, centered labeled rows with units,
 	// ratio as x:1, booleans as ON/OFF, and the GR meter always visible below.
@@ -143,7 +143,7 @@ protected:
 	// TREEFROG_FX_PAGES_V3 (Fase 9): master FX returns on the MIX page.
 	void nudgeDelayReturn(int delta) ;
 	void nudgeReverbReturn(int delta) ;
-	void drawMixReturns() ;
+	void drawMixReturns(int y) ;
 	float fxGet(int id) const ;
 	void fxSet(int id,float v) ;
 	int fxRowForId(int id) const ;

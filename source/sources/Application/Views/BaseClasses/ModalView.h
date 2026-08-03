@@ -21,11 +21,19 @@ class ModalView : public View {
                             GUITextProperties &props);
     void EndModal(int returnCode);
 
+    // RC5: geometry of the window set by SetWindow(), in local coordinates.
+    // Derived modals use these to center their content on their own
+    // viewport (e.g. the ProjectExit menu) instead of the full screen.
+    int GetWindowWidth() { return width_; }
+    int GetWindowHeight() { return height_; }
+
   private:
     bool finished_;
     int returnCode_;
     int left_;
     int top_;
     int topOffset_;
+    int width_;
+    int height_;
 };
 #endif

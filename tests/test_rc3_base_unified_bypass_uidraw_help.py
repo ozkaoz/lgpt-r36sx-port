@@ -123,10 +123,11 @@ def check_uidraw_primitives():
     idx = UIDRAW_CPP.index("void UiDraw::DrawCenteredTitle")
     assert "0" in UIDRAW_CPP[idx:idx + 400]
     assert "- len) / 2" in UIDRAW_CPP[idx:idx + 400]
-    # Clamping helpers bound every draw to 40x30.
+    # Clamping helpers bound every draw to 40x30 (RC5: the constants live
+    # in the UiDraw class, so the checks reference UiDraw::kScreen*).
     assert "clampX" in UIDRAW_CPP and "clampY" in UIDRAW_CPP
-    assert "x >= kScreenWidth" in UIDRAW_CPP
-    assert "y >= kScreenHeight" in UIDRAW_CPP
+    assert "x >= UiDraw::kScreenWidth" in UIDRAW_CPP
+    assert "y >= UiDraw::kScreenHeight" in UIDRAW_CPP
     # View grants UiDraw access to its draw primitives.
     view_h = (ROOT / "source/sources/Application/Views/BaseClasses/View.h").read_text()
     assert "friend class UiDraw" in view_h

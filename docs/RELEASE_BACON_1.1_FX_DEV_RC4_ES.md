@@ -30,10 +30,14 @@ persistencia ni la compatibilidad de proyectos.**
   (sección MIXER). No quedan hints permanentes en Song/Chain/Phrase/Table/
   Groove/Instrument/Project.
 
-### P4 - Menús centrados
+### P4 - Primitivas de centrado (primer paso, no centrado real)
 - `UiDraw::CenterTextX` (`(40-len)/2`) y `UiDraw::MakeCenteredMenuLayout`
-  (bloque centrado vertical en banda 1..29). Primer consumidor:
-  `TreeFrogProjectExitModal` (título e items centrados).
+  (bloque centrado vertical en banda 1..29). Aclaración: en RC4 **solo se
+  introducen las primitivas y un primer consumidor** (`TreeFrogProjectExitModal`
+  centra su título e items), **no** se centraron todavía los bloques de las
+  páginas MASTER del Mixer ni el resto de menús. El centrado completo de
+  bloques tipo menú, los layouts por viewport/banda y el centrado real de
+  modales sobre las 30 filas se entregan en RC5.
 
 ### P5 - UiDraw global + colores de severidad
 - `CD_WARNING`/`CD_ERROR` añadidos al enum y mapeados a colores reales en

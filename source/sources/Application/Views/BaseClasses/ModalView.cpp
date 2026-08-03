@@ -1,8 +1,10 @@
 // TREEFROG_V42_NO_WHITE_BOX_UI
 #include "ModalView.h"
+#include "UiDraw.h"
 
 ModalView::ModalView(View &v)
-    : View(v.w_, v.viewData_), finished_(false), returnCode_(0), topOffset_(0){};
+    : View(v.w_, v.viewData_), finished_(false), returnCode_(0), topOffset_(0),
+      width_(0), height_(0){};
 
 ModalView::~ModalView(){};
 
@@ -37,13 +39,22 @@ void ModalView::SetWindow(int width, int height) {
         height = 26;
     };
 
-    left_ = 20 - width / 2;
-    // TREEFROG_MODAL_CENTER_V1: exact vertical centering on the 40x20 grid
-    // so odd-height dialogs (command grid) sit truly centered.
-    top_ = (20 - height) / 2 + topOffset_;
+    left_ = (UiDraw::kScreenWidth - width) / 2;
+    // RC5 (40x30 grid): the window centers vertically on the full 30-row
+    // screen (previously it centered on a 20-row grid, pushing windows
+    // toward the top).  The top border lives at row top_-2 and the bottom
+    // border at top_+height+1, so top_ is clamped to keep both borders
+    // inside rows 0..29.
+    top_ = (UiDraw::kScreenHeight - height) / 2 + topOffset_;
     if (top_ < 2) {
         top_ = 2;
     }
+    int maxTop = UiDraw::kScreenHeight - 1 - height - 1;
+    if (top_ > maxTop) {
+        top_ = maxTop;
+    }
+    width_ = width;
+    height_ = height;
     ClearRect(-1, -1, width + 2, height + 2);
 
     SetColor(CD_BORDER);
