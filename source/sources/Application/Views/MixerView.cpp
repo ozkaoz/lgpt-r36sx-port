@@ -884,8 +884,8 @@ void MixerView::drawDelayPage() {
 		float v=fxGet(id) ;
 		bool selected=(fxRowForId(id)==fxRow_) ;
 		if (id==FX_P_DLY_BYP) {
-			// RC3: unified toggle via UiDraw (UI_STYLE_GUIDE point 4).
-			UiDraw::DrawToggle(*this,x+6,2+p,v>=0.5f,selected) ;
+			// RC4 P2: unified Bypass row via UiDraw (PLAN_RC4 section 12).
+			UiDraw::DrawBypassRow(*this,x,2+p,v>=0.5f,selected) ;
 			continue ;
 		}
 		switch(id) {
@@ -912,7 +912,7 @@ void MixerView::drawReverbPage() {
 		float v=fxGet(id) ;
 		bool selected=(fxRowForId(id)==fxRow_) ;
 		if (id==FX_P_RVB_BYP) {
-			UiDraw::DrawToggle(*this,x+6,2+p,v>=0.5f,selected) ;
+			UiDraw::DrawBypassRow(*this,x,2+p,v>=0.5f,selected) ;
 			continue ;
 		}
 		switch(id) {
@@ -949,9 +949,15 @@ void MixerView::drawEqRow(int id,int x,int y) {
 	char buffer[16] ;
 	bool selected=(fxRowForId(id)==fxRow_) ;
 	bool on=(fxGet(id)>=0.5f) ;
+	// RC4 P2: EQ Bypass renders through the unified row; the band EN toggles
+	// keep the "[ ON ]" inline style (they are a per-band enable).
+	if (id==FX_P_EQ_BYP) {
+		UiDraw::DrawBypassRow(*this,x,y,on,selected) ;
+		return ;
+	}
 	SetColor(selected?CD_HILITE2:CD_NORMAL) ;
 	props.invert_=selected ;
-	if (id==FX_P_EQ_BYP||id==FX_P_EQ_LOW_EN||id==FX_P_EQ_MID_EN||id==FX_P_EQ_HI_EN) {
+	if (id==FX_P_EQ_LOW_EN||id==FX_P_EQ_MID_EN||id==FX_P_EQ_HI_EN) {
 		sprintf(buffer,"%-6s[ %s ]",eqParamLabel(id),on?"ON":"OFF") ;
 	} else if (fxUsesCurve(id)) {
 		sprintf(buffer,"%-6s%6.0f Hz",eqParamLabel(id),fxGet(id)) ;
@@ -1003,6 +1009,14 @@ void MixerView::drawCompPage() {
 		const FxParamSpec &spec=kFxParams_[id] ;
 		bool selected=(fxRowForId(id)==fxRow_) ;
 		float v=fxGet(id) ;
+		// RC4 P2: COMP bypass through the unified row; the rest keep the
+		// label/value two-column layout.
+		if (p==0) {
+			UiDraw::DrawBypassRow(*this,labelX,p+2,v>=0.5f,selected) ;
+			props.invert_=false ;
+			SetColor(CD_NORMAL) ;
+			continue ;
+		}
 		SetColor(selected?CD_HILITE2:CD_NORMAL) ;
 		props.invert_=selected ;
 		if (spec.vmax-spec.vmin<=1.5f) {

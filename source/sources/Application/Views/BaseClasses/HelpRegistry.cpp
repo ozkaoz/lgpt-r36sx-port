@@ -94,23 +94,33 @@ static const HelpLine kMixerLines_[] = {
     {"SELECT+R2", "audio driver"},
 };
 
+static const HelpSection kSections_[] = {
+    {"SONG", kSongLines_, (int)(sizeof(kSongLines_) / sizeof(HelpLine))},
+    {"CHAIN", kChainLines_, (int)(sizeof(kChainLines_) / sizeof(HelpLine))},
+    {"PHRASE", kPhraseLines_, (int)(sizeof(kPhraseLines_) / sizeof(HelpLine))},
+    {"PROJECT", kProjectLines_, (int)(sizeof(kProjectLines_) / sizeof(HelpLine))},
+    {"INSTRUMENT", kInstrumentLines_, (int)(sizeof(kInstrumentLines_) / sizeof(HelpLine))},
+    {"TABLE", kTableLines_, (int)(sizeof(kTableLines_) / sizeof(HelpLine))},
+    {"TABLE", kTableLines_, (int)(sizeof(kTableLines_) / sizeof(HelpLine))},
+    {"GROOVE", kGrooveLines_, (int)(sizeof(kGrooveLines_) / sizeof(HelpLine))},
+    {"MIXER", kMixerLines_, (int)(sizeof(kMixerLines_) / sizeof(HelpLine))},
+};
+static const int kSectionCount_ =
+    (int)(sizeof(kSections_) / sizeof(HelpSection));
+
 const HelpSection *HelpRegistry::GetSection(ViewType vt) {
-    static const HelpSection sections_[] = {
-        {"SONG", kSongLines_, (int)(sizeof(kSongLines_) / sizeof(HelpLine))},
-        {"CHAIN", kChainLines_, (int)(sizeof(kChainLines_) / sizeof(HelpLine))},
-        {"PHRASE", kPhraseLines_, (int)(sizeof(kPhraseLines_) / sizeof(HelpLine))},
-        {"PROJECT", kProjectLines_, (int)(sizeof(kProjectLines_) / sizeof(HelpLine))},
-        {"INSTRUMENT", kInstrumentLines_, (int)(sizeof(kInstrumentLines_) / sizeof(HelpLine))},
-        {"TABLE", kTableLines_, (int)(sizeof(kTableLines_) / sizeof(HelpLine))},
-        {"TABLE", kTableLines_, (int)(sizeof(kTableLines_) / sizeof(HelpLine))},
-        {"GROOVE", kGrooveLines_, (int)(sizeof(kGrooveLines_) / sizeof(HelpLine))},
-        {"MIXER", kMixerLines_, (int)(sizeof(kMixerLines_) / sizeof(HelpLine))},
-    };
     if (vt < VT_SONG || vt > VT_MIXER) return 0;
-    return &sections_[vt];
+    return &kSections_[vt];
 }
 
 int HelpRegistry::GetLineCount(const HelpSection *section) {
     if (!section) return 0;
     return section->lineCount;
+}
+
+int HelpRegistry::GetSectionCount() { return kSectionCount_; }
+
+const HelpSection *HelpRegistry::GetSectionAt(int index) {
+    if (index < 0 || index >= kSectionCount_) return 0;
+    return &kSections_[index];
 }

@@ -4,29 +4,76 @@
 #include <stdio.h>
 
 /*
- * TREEFROG_HELP_OVERLAY_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, point 13).
+ * TREEFROG_HELP_OVERLAY_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, point 13)
+ * + RC4 P0/P1 (PLAN_RC4 sections 11.1/11.2).
  *
- * Rendering of the context-help overlay.  The window is framed by
- * ModalView::SetWindow, titled with the context name, and lists the key /
- * action lines for the active view.  It never prevents playback and never
- * forwards input while latched.
+ * Navigable context-help overlay.  The window is framed by ModalView::SetWindow
+ * and lists the key / action lines for the active view, letting the user
+ * browse the whole registry before closing.  It never prevents playback.
+ *
+ * RC4: the overlay is a real modal and closes deterministically with B or with
+ * SELECT+R1 again; every event reaching it is consumed so nothing propagates to
+ * the view underneath.  It must call EndModal() (the RC3 version ignored all
+ * input and never closed, locking the app once the opening chord was released).
  */
 
 HelpOverlay::HelpOverlay(View &view)
-    : ModalView(view), helpViewType_(view.GetViewType()) {}
+    : ModalView(view),
+      helpViewType_(view.GetViewType()),
+      sectionIndex_(0),
+      lineScroll_(0),
+      showIndex_(false) {
+    // The browser opens on the section of the view that invoked it.
+    StartAt(helpViewType_);
+}
 
 HelpOverlay::~HelpOverlay() {}
+
+void HelpOverlay::StartAt(ViewType vt) {
+    const HelpSection *sec = HelpRegistry::GetSection(vt);
+    int n = HelpRegistry::GetSectionCount();
+    sectionIndex_ = 0;
+    for (int i = 0; i < n; i++) {
+        if (HelpRegistry::GetSectionAt(i) == sec) {
+            sectionIndex_ = i;
+            break;
+        }
+    }
+    lineScroll_ = 0;
+    showIndex_ = false;
+    ClampCursor();
+};
+
+void HelpOverlay::ClampCursor() {
+    int n = HelpRegistry::GetSectionCount();
+    if (sectionIndex_ < 0) sectionIndex_ = 0;
+    if (sectionIndex_ >= n) sectionIndex_ = n - 1;
+    const HelpSection *s = HelpRegistry::GetSectionAt(sectionIndex_);
+    if (s) {
+        int max = s->lineCount - kMaxWindowLines_;
+        if (max < 0) max = 0;
+        if (lineScroll_ < 0) lineScroll_ = 0;
+        if (lineScroll_ > max) lineScroll_ = max;
+    } else {
+        lineScroll_ = 0;
+    }
+}
 
 void HelpOverlay::DrawView() {
     // 36 wide, 11 tall keeps every row inside the 40x30 safe area.
     SetWindow(36, 11);
 
-    const HelpSection *section = HelpRegistry::GetSection(helpViewType_);
+    const HelpSection *section =
+        HelpRegistry::GetSectionAt(sectionIndex_);
 
     GUITextProperties props;
     char title[48];
-    snprintf(title, sizeof(title), "HELP - %s",
-             section ? section->title : "SONG");
+    if (showIndex_) {
+        snprintf(title, sizeof(title), "HELP REGISTRY");
+    } else {
+        snprintf(title, sizeof(title), "HELP - %s",
+                 section ? section->title : "?");
+    }
     // Title bar (top of the overlay hierarchy).
     SetColor(CD_HILITE2);
     props.invert_ = false;
@@ -35,26 +82,97 @@ void HelpOverlay::DrawView() {
     SetColor(CD_NORMAL);
     props.invert_ = false;
 
-    if (section) {
-        int n = HelpRegistry::GetLineCount(section);
-        if (n > 8) n = 8;
-        for (int i = 0; i < n; i++) {
-            char line[40];
-            snprintf(line, sizeof(line), "%s  %s", section->lines[i].keys,
-                     section->lines[i].action);
+    if (showIndex_) {
+        // Section index: show each registered section name with a highlight
+        // on the current one.
+        int n = HelpRegistry::GetSectionCount();
+        char line[40];
+        for (int i = 0; i < n && i < kMaxWindowLines_; i++) {
+            const HelpSection *s = HelpRegistry::GetSectionAt(i);
+            props.invert_ = (i == sectionIndex_);
+            snprintf(line, sizeof(line), "%s",
+                     s ? s->title : "?");
+            DrawString(0, 2 + i, line, props);
+        }
+        props.invert_ = false;
+    } else if (section) {
+        int total = section->lineCount;
+        int shown = total - lineScroll_;
+        if (shown > kMaxWindowLines_) shown = kMaxWindowLines_;
+        for (int i = 0; i < shown; i++) {
+            int li = lineScroll_ + i;
+            if (li < 0 || li >= total) break;
+            char line[48];
+            snprintf(line, sizeof(line), "%s  %s",
+                     section->lines[li].keys,
+                     section->lines[li].action);
             DrawString(0, 2 + i, line, props);
         }
     }
     SetColor(CD_NORMAL);
-    DrawString(0, 10, "Release SELECT+R1 to close", props);
+    DrawString(0, 10, "B close  UP/DN  L/R next", props);
 }
 
 void HelpOverlay::ProcessButtonMask(unsigned short mask, bool pressed) {
-    // The overlay is purely informational: it closes when the originating
-    // chord is released.  All button traffic while open is ignored so it
-    // can never change state underneath the user.
-    (void)mask;
-    (void)pressed;
+    // RC4 P0/P1 (PLAN_RC4 sections 11.1/11.2): the overlay is a real modal
+    // that must close deterministically and consume every event while open,
+    // so nothing propagates to the view underneath.  Navigation only acts on
+    // presses (auto-repeat is handled by the view system).
+    if (!pressed) return;
+
+    const unsigned short helpCombo = EPBM_SELECT | EPBM_R;
+    // B or the opening chord always close the overlay.
+    if ((mask & EPBM_B) != 0 ||
+        (mask & helpCombo) == helpCombo) {
+        EndModal(0);
+        return;
+    }
+
+    // Navigation (only when the registry is non-empty).
+    if (HelpRegistry::GetSectionCount() > 0) {
+        if (showIndex_) {
+            // In index mode the same controls move the section cursor and
+            // A opens the highlighted section.
+            if ((mask & EPBM_UP) != 0) {
+                sectionIndex_--;
+            } else if ((mask & EPBM_DOWN) != 0) {
+                sectionIndex_++;
+            } else if ((mask & EPBM_A) != 0) {
+                showIndex_ = false;
+            } else if ((mask & EPBM_L) != 0 ||
+                       (mask & EPBM_L2) != 0) {
+                sectionIndex_ = 0;
+            } else if ((mask & EPBM_R) != 0 ||
+                       (mask & EPBM_R2) != 0) {
+                sectionIndex_ = HelpRegistry::GetSectionCount() - 1;
+            }
+            ClampCursor();
+        } else {
+            // Content mode: UP/DOWN scroll, L/R next/prev section,
+            // L1/R1 first/last, L/R also move, A toggles the index.
+            if ((mask & EPBM_UP) != 0) {
+                lineScroll_--;
+            } else if ((mask & EPBM_DOWN) != 0) {
+                lineScroll_++;
+            } else if ((mask & EPBM_L) != 0) {
+                sectionIndex_--;
+                lineScroll_ = 0;
+            } else if ((mask & EPBM_R) != 0) {
+                sectionIndex_++;
+                lineScroll_ = 0;
+            } else if ((mask & EPBM_L2) != 0) {
+                sectionIndex_ = 0;
+                lineScroll_ = 0;
+            } else if ((mask & EPBM_R2) != 0) {
+                sectionIndex_ = HelpRegistry::GetSectionCount() - 1;
+                lineScroll_ = 0;
+            } else if ((mask & EPBM_A) != 0) {
+                showIndex_ = true;
+                lineScroll_ = 0;
+            }
+            ClampCursor();
+        }
+    }
 }
 
 void HelpOverlay::OnPlayerUpdate(PlayerEventType, unsigned int) {}

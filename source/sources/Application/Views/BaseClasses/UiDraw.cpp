@@ -210,3 +210,23 @@ void UiDraw::DrawSeparator(View &view, int y, int x, int width) {
     }
     view.SetColor(CD_NORMAL);
 }
+
+void UiDraw::DrawBypassRow(View &view, int x, int y, bool on, bool selected) {
+    // RC4 P2 (PLAN_RC4 section 12): unified Bypass row for the four master
+    // FX pages (DELAY/REVERB/EQ/COMP).  The Bypass is the first logical and
+    // visual row on every page, and it renders identically everywhere:
+    // "BYPASS" label in CD_NORMAL with a centered "[ ON ]"/"[ OFF ]" toggle
+    // that inverts on CD_HILITE2 when the row is selected.
+    GUITextProperties props;
+    view.SetColor(CD_NORMAL);
+    props.invert_ = false;
+    view.DrawString(clampX(x), clampY(y), "BYPASS", props);
+
+    char toggle[16];
+    snprintf(toggle, sizeof(toggle), "[ %s ]", on ? "ON" : "OFF");
+    view.SetColor(selected ? CD_HILITE2 : (on ? CD_HILITE1 : CD_MUTE));
+    props.invert_ = selected;
+    view.DrawString(clampX(x + 8), clampY(y), toggle, props);
+    props.invert_ = false;
+    view.SetColor(CD_NORMAL);
+}

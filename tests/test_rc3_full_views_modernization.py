@@ -29,8 +29,10 @@ def check_mixerview_master():
     assert "DrawString(1,1,pageTitle" not in MV
     assert "UP/DN row" not in MV
     assert "SELECT page" not in MV
-    # Bypass on DELAY/REVERB renders through the unified toggle.
-    assert MV.count("UiDraw::DrawToggle(*this,x+6,2+p,") == 2
+    # RC4 P2: Bypass on DELAY/REVERB renders through the unified bypass row
+    # helper (DrawBypassRow), replacing the old x+6 toggle.
+    assert "UiDraw::DrawBypassRow(*this,x,2+p," in MV
+    assert "DrawToggle(*this,x+6,2+p," not in MV
     # MIX page legend rows migrated to Help.
     assert "A+UP/DN x10" not in MV
     assert "L/R ch  L->MST" not in MV

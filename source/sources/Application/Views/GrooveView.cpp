@@ -2,6 +2,7 @@
 #include "GrooveView.h"
 #include "Application/Model/Groove.h"
 #include "Application/Utils/char.h"
+#include "Application/Views/BaseClasses/UiColors.h"
 
 GrooveView::GrooveView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
 	position_=0 ;
@@ -134,7 +135,8 @@ void GrooveView::DrawView() {
 
 	char title[40] ;
 
-	SetColor(CD_NORMAL) ;
+	// RC4 P3 (PLAN_RC4): page titles render with the semantic title role.
+	SetColor(UiColors::Resolve(UI_COLOR_TITLE)) ;
 
 	sprintf(title,"Groove: %2.2x",viewData_->currentGroove_) ;
 	DrawString(pos._x,pos._y,title,props) ;

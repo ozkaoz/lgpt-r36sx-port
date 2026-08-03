@@ -8,6 +8,7 @@
 #include "System/Console/Trace.h"
 #include "System/System/System.h"
 #include "UIController.h"
+#include "Application/Views/BaseClasses/UiColors.h"
 #include <iostream>
 #include <sstream>
 #include <stdlib.h>
@@ -1113,7 +1114,8 @@ void SongView::DrawView() {
 
     // Draw title
 
-    SetColor(CD_NORMAL);
+    // RC4 P3 (PLAN_RC4): page titles render with the semantic title role.
+    SetColor(UiColors::Resolve(UI_COLOR_TITLE));
 
     Player *player = Player::GetInstance();
 

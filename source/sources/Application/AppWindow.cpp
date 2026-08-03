@@ -675,12 +675,13 @@ bool AppWindow::onEvent(GUIEvent &event) {
         // TREEFROG_HELP_OVERLAY_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md):
         // SELECT+R1 opens the context help overlay (latched, non-modal
         // state change); SELECT+R2 keeps the Audio Driver dialog.
+        // RC4 P1 (PLAN_RC4 section 11.3): Help may open over an already-open
+        // dialog via PushModal, which suspends and later restores it.
         if ((_mask & helpCombo) == helpCombo &&
-            _currentView &&
-            !_currentView->HasModal()) {
+            _currentView) {
             if (!_helpShortcutLatched) {
                 _helpShortcutLatched = true;
-                _currentView->ReplaceModal(
+                _currentView->PushModal(
                     new HelpOverlay(*_currentView),
                     HelpOverlayApplyCallback);
                 _isDirty = true;
@@ -759,12 +760,14 @@ bool AppWindow::onEvent(GUIEvent &event) {
          * keep the original global controls and Song combinations untouched.
          * The audio shortcut cannot replace a modal that is already open.
          * SELECT+R1 opens the help overlay with the same latch discipline.
+         * RC4 P1 (PLAN_RC4 11.3): Help may open over an active dialog via
+         * PushModal (suspend + restore) instead of replacing it.
          */
         if ((_mask & helpCombo) == helpCombo &&
-            _currentView && !_currentView->HasModal()) {
+            _currentView) {
             if (!_helpShortcutLatched) {
                 _helpShortcutLatched = true;
-                _currentView->ReplaceModal(
+                _currentView->PushModal(
                     new HelpOverlay(*_currentView),
                     HelpOverlayApplyCallback);
                 _isDirty = true;

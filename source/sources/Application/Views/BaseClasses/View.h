@@ -139,6 +139,11 @@ class View : public Observable {
 
     void DoModal(ModalView *view, ModalViewCallback cb = 0);
     void ReplaceModal(ModalView *view, ModalViewCallback cb = 0);
+    // RC4 P1 (PLAN_RC4 section 11.3): opens a modal over an already-open
+    // one.  The active modal (if any) is suspended and restored when the
+    // pushed modal finishes, so Help can be shown over dialogs without
+    // destroying them.
+    bool PushModal(ModalView *view, ModalViewCallback cb = 0);
     bool HasModal() const;
     ViewType GetViewType() const { return viewType_; }
 
@@ -194,6 +199,12 @@ class View : public Observable {
     static bool initPrivate_;
     ModalView *modalView_;
     ModalViewCallback modalViewCallback_;
+    // RC4 P1 (PLAN_RC4 section 11.3): modal suspended while another modal is
+    // pushed on top (used to show Help over an active dialog).
+    ModalView *suspendedModal_;
+    ModalViewCallback suspendedModalCallback_;
+    // Restores the suspended modal after the pushed one finishes.
+    void RestoreSuspendedModal();
 
   public:
     static int margin_;

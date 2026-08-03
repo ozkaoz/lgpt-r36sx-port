@@ -25,7 +25,14 @@ estado de cada vista se rastrea en el checklist por vista.
 | 30-32 | Tests (colores/toggles/barras/layout) | RC2 + RC3 suite PASS |
 | 18 | Graphical Chopper modernizado | Implementado (overlay framebuffer) |
 
-## Avances fase completa
+## Avances fase completa + RC4 P3
+
+### Títulos de página con rol semántico (RC4 P3, PLAN_RC4)
+Las vistas secuenciadoras y contenedoras dibujan ahora su título de página con
+el rol semántico `UI_COLOR_TITLE` (`UiColors::Resolve`) en lugar de
+`SetColor(CD_NORMAL)` bruto. Son cambios de rol 1:1 (CD_NORMAL → CD_HILITE1),
+sin alterar la geometría/layout de ninguna vista:
+- SongView, ChainView, PhraseView, TableView, GrooveView, ProjectView.
 
 ### MixerView (MASTER pages)
 - Título de página centrado en fila 1 con `UiDraw::DrawCenteredTitleAt`
@@ -69,8 +76,8 @@ intencional).
 - [x] Mixer MASTER: título centrado (DrawCenteredTitleAt), toggles de bypass,
       leyendas a Help.
 - [x] Instrument: cabeceras de sección vía UiDraw, hint USB a Help.
-- [ ] Song: filas con jerarquía, hints mínimos.
-- [ ] Chain: título centrado, cursor coherente.
-- [ ] Phrase: título centrado, notas con CD_NORMAL/HILITE.
-- [ ] Table: título centrado, comandos con barras/valores sólidos.
+- [x] Song: título con rol semántico (UI_COLOR_TITLE), filas con jerarquía.
+- [x] Chain: título con rol semántico, cursor coherente.
+- [x] Phrase: título con rol semántico, notas con CD_NORMAL/HILITE.
+- [x] Table: título con rol semántico, comandos con barras/valores sólidos.
 - [ ] Modales: marco unificado, título centrado, sin desbordes.

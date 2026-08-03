@@ -18,6 +18,8 @@ View::View(GUIWindow &w,ViewData *viewData):
 	w_(w),
 	modalView_(0),
 	modalViewCallback_(0),
+	suspendedModal_(0),
+	suspendedModalCallback_(0),
 	hasFocus_(false)
 {
   if (!initPrivate_) 
@@ -227,6 +229,34 @@ bool View::HasModal() const {
     return modalView_ != 0;
 };
 
+// RC4 P1 (PLAN_RC4 section 11.3): push a modal on top of the current one.
+// The active modal is suspended (kept alive, hidden) and restored by
+// RestoreSuspendedModal when the pushed modal finishes.  Returns true if a
+// modal was actually suspended (i.e. Help opened over an open dialog).
+bool View::PushModal(ModalView *view, ModalViewCallback cb) {
+    bool hadModal = (modalView_ != 0);
+    if (hadModal) {
+        suspendedModal_ = modalView_;
+        suspendedModalCallback_ = modalViewCallback_;
+    }
+    modalView_ = view;
+    modalViewCallback_ = cb;
+    if (modalView_) modalView_->OnFocus();
+    isDirty_ = true;
+    return hadModal;
+};
+
+void View::RestoreSuspendedModal() {
+    if (suspendedModal_) {
+        modalView_ = suspendedModal_;
+        modalViewCallback_ = suspendedModalCallback_;
+        suspendedModal_ = 0;
+        suspendedModalCallback_ = 0;
+        if (modalView_) modalView_->OnFocus();
+        isDirty_ = true;
+    }
+}
+
 
 void View::Redraw() {
 	if (modalView_) {
@@ -258,6 +288,9 @@ void View::ProcessButton(unsigned short mask, bool pressed, long eventWhen) {
 				modalViewCallback_(*this,*modalView_) ;
 			}
 			SAFE_DELETE(modalView_) ;
+			// RC4 P1 (PLAN_RC4 section 11.3): if Help was pushed over a
+			// dialog, restore the suspended modal now that Help is done.
+			RestoreSuspendedModal() ;
 			isDirty_=true ;
 		}
 	} else {
@@ -298,6 +331,9 @@ void View::UpdateActiveModalFrame(unsigned long frameClock) {
             modalViewCallback_(*this, *modalView_);
 
         SAFE_DELETE(modalView_);
+        // RC4 P1 (PLAN_RC4 section 11.3): restore the modal suspended under
+        // a pushed Help overlay.
+        RestoreSuspendedModal();
         isDirty_ = true;
         ((AppWindow &)w_).SetDirty();
     }

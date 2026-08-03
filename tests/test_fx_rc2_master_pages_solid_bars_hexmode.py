@@ -112,9 +112,9 @@ def check_master_page_formats():
     assert '"%4.0f ms"' in rv                       # predelay ms
     assert '"%.2f s"' in rv                         # decay seconds
     assert 'v>=0.5f?"NORMAL":"ECO"' in rv           # reverb mode
-    # RC3: reverb bypass renders through the unified UiDraw toggle
-    # (UI_STYLE_GUIDE point 4) instead of a raw ON/OFF sprintf.
-    assert "UiDraw::DrawToggle" in rv               # reverb bypass toggle
+    # RC4 P2: reverb bypass renders through the unified UiDraw bypass row
+    # (PLAN_RC4 section 12) instead of a raw ON/OFF sprintf.
+    assert "DrawBypassRow" in rv               # reverb bypass row
     print("master page value formats (ms, s, ON/OFF, ECO/NORMAL) OK")
 
 

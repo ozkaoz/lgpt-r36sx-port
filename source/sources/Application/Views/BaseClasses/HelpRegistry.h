@@ -30,8 +30,14 @@ class HelpRegistry {
     // Returns the help section for a view type, or 0 if the view has none.
     static const HelpSection *GetSection(ViewType vt);
 
-    // Number of lines in a section (bounded for the 8-line overlay window).
+    // Number of lines in a section (bounded for the overlay window).
     static int GetLineCount(const HelpSection *section);
+
+    // RC4 P1 (PLAN_RC4 section 11.2): navigable help browses every section
+    // by index.  GetSectionCount returns the number of registered sections
+    // and GetSectionAt(i) returns section i (0-based) for the browser.
+    static int GetSectionCount();
+    static const HelpSection *GetSectionAt(int index);
 };
 
 #endif  // _HELP_REGISTRY_H_

@@ -47,6 +47,12 @@ class UiDraw {
     static void DrawToggle(View &view, int x, int y, bool on,
                            bool selected = false);
 
+    // RC4 P2 (PLAN_RC4 section 12): unified Bypass row for the four master
+    // FX pages.  "BYPASS" label + "[ ON ]"/"[ OFF ]" toggle, inverted on
+    // CD_HILITE2 when selected.
+    static void DrawBypassRow(View &view, int x, int y, bool on,
+                              bool selected = false);
+
     // Progress indicator (e.g. sample load) with 3-cell blocks out of width.
     static void DrawProgressBar(View &view, int x, int y, int width,
                                 int filled);

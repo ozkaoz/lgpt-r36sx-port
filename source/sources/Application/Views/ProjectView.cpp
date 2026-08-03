@@ -4,6 +4,7 @@
 #include "Application/Model/Scale.h"
 #include "Application/Persistency/PersistencyService.h"
 #include "Application/Views/ModalDialogs/MessageBox.h"
+#include "Application/Views/BaseClasses/UiColors.h"
 #include "Application/Views/ModalDialogs/NewProjectDialog.h"
 #include "Application/Views/ModalDialogs/SelectProjectDialog.h"
 #include "Application/Views/ModalDialogs/AudioDriverModal.h"
@@ -322,7 +323,8 @@ void ProjectView::DrawView() {
 	char projectString[80] ;
     sprintf(projectString, "LGPT R36SX - Bacon 1.1");
 
-    SetColor(CD_NORMAL);
+    // RC4 P3 (PLAN_RC4): app title renders with the semantic title role.
+    SetColor(UiColors::Resolve(UI_COLOR_TITLE));
     DrawString(pos._x,pos._y,projectString,props) ;
 
     FieldView::Redraw();

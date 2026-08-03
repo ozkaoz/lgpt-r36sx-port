@@ -15,7 +15,10 @@ Points 19/20 - UiDraw primitives exist (DrawCenteredTitle, DrawValueRow,
            UI_COLOR_* roles onto CD_*.
 Points 10/12/13 - HelpRegistry has a section per ViewType, HelpOverlay opens
            on SELECT+R1 with its own latch, SELECT+R2 keeps the audio
-           driver latch, and the overlay never forwards input while latched.
+           driver latch, and the overlay never forwards input while open.
+RC4 P0 (PLAN_RC4 11.1) - the overlay is a real modal that closes
+           deterministically with B or SELECT+R1 (EndModal), consuming every
+           event so nothing propagates to the view underneath.
 Point 30 - tests for the toggle/bar/layout primitives.
 Point 32 - no primitive draws outside 0<=x<40 / 0<=y<30 (clamping).
 """
@@ -66,6 +69,31 @@ def check_bypass_first():
     print("bypass unified as first row on all four master pages OK")
 
 
+def check_bypass_uidraw():
+    # RC4 P2 (PLAN_RC4 section 12): the four master pages render Bypass
+    # through the shared UiDraw::DrawBypassRow (label + toggle), not ad-hoc.
+    assert "DrawBypassRow" in UIDRAW_H
+    assert "DrawBypassRow" in UIDRAW_CPP
+    assert "\"BYPASS\"" in UIDRAW_CPP
+    assert "[ %s ]" in UIDRAW_CPP.replace("\\n", "").replace("\n", "")
+    assert "CD_MUTE" in UIDRAW_CPP
+    assert "CD_HILITE2" in UIDRAW_CPP
+    # Every master page delegates its bypass row to the helper.
+    dl = MIX_CPP[MIX_CPP.index("void MixerView::drawDelayPage"):
+                 MIX_CPP.index("void MixerView::drawReverbPage")]
+    assert "DrawBypassRow" in dl
+    rv = MIX_CPP[MIX_CPP.index("void MixerView::drawReverbPage"):
+                 MIX_CPP.index("void MixerView::drawEqRow")]
+    assert "DrawBypassRow" in rv
+    eq = MIX_CPP[MIX_CPP.index("void MixerView::drawEqRow"):
+                 MIX_CPP.index("void MixerView::drawEqPage")]
+    assert "DrawBypassRow" in eq
+    cm = MIX_CPP[MIX_CPP.index("void MixerView::drawCompPage"):
+                 MIX_CPP.index("void MixerView::drawMixReturns")]
+    assert "DrawBypassRow" in cm
+    print("DrawBypassRow unified on DELAY/REVERB/EQ/COMP OK")
+
+
 def check_bypass_row_model():
     # Model: the row order puts bypass at 0 and preserves every other row.
     delay_ids = ["FX_P_DLY_TIME", "FX_P_DLY_FBK", "FX_P_DLY_MIX",
@@ -113,7 +141,18 @@ def check_uicolors():
         assert token in UICOL_H, token
     assert "CD_HILITE1" in UICOL_H
     assert "CD_MUTE" in UICOL_H
-    print("UiColors semantic roles OK")
+    # RC4 P3 (PLAN_RC4): sequencing views render page titles with the
+    # semantic role instead of raw CD_NORMAL.
+    groove = (ROOT / "source/sources/Application/Views/GrooveView.cpp").read_text()
+    project = (ROOT / "source/sources/Application/Views/ProjectView.cpp").read_text()
+    song = (ROOT / "source/sources/Application/Views/SongView.cpp").read_text()
+    chain = (ROOT / "source/sources/Application/Views/ChainView.cpp").read_text()
+    phrase = (ROOT / "source/sources/Application/Views/PhraseView.cpp").read_text()
+    table = (ROOT / "source/sources/Application/Views/TableView.cpp").read_text()
+    for src, name in ((groove, "Groove"), (project, "Project"), (song, "Song"),
+                      (chain, "Chain"), (phrase, "Phrase"), (table, "Table")):
+        assert "UiColors::Resolve(UI_COLOR_TITLE)" in src, name
+    print("UiColors semantic roles + sequencing-view title adoption OK")
 
 
 def check_layout_model():
@@ -127,25 +166,48 @@ def check_layout_model():
 # ---------------------------------------------------------------------------
 def check_help_registry():
     for token in ("HelpRegistry", "GetSection", "GetLineCount", "HelpLine",
-                  "HelpSection"):
+                  "HelpSection", "GetSectionCount", "GetSectionAt"):
         assert token in HELPREG_H, token
     # One section per ViewType (VT_SONG..VT_MIXER) plus the array.
-    sec = HELPREG_CPP[HELPREG_CPP.index("const HelpSection *HelpRegistry::GetSection"):]
+    sec = HELPREG_CPP[HELPREG_CPP.index("kSections_["):]
     assert "\"SONG\"" in sec
     assert "\"MIXER\"" in sec
-    assert "&sections_[vt]" in sec
-    print("HelpRegistry context sections OK")
+    assert "GetSectionCount" in HELPREG_CPP
+    assert "GetSectionAt" in HELPREG_CPP
+    print("HelpRegistry context sections + index OK")
 
 
 def check_help_overlay():
     for token in ("HelpOverlay", "DrawView", "ProcessButtonMask",
-                  "SetWindow", "Release SELECT+R1"):
+                  "SetWindow", "EndModal(0)", "EPBM_B",
+                  "EPBM_SELECT | EPBM_R"):
         assert token in HELPOVL_CPP, token
-    # Latch: overlay ignores all input while open (informational only).
-    assert "(void)mask" in HELPOVL_CPP
+    # RC4 P0: every event (press and release) is consumed while Help is open.
+    assert "if (!pressed)" in HELPOVL_CPP
+    # RC4 P1: navigable overlay - section index, scroll, section switching.
+    assert "GetSectionCount" in HELPOVL_CPP
+    assert "GetSectionAt" in HELPOVL_CPP
+    assert "sectionIndex_" in HELPOVL_CPP and "lineScroll_" in HELPOVL_CPP
+    assert "showIndex_" in HELPOVL_CPP
+    for nav in ("EPBM_UP", "EPBM_DOWN", "EPBM_L", "EPBM_R", "EPBM_L2",
+                "EPBM_R2", "EPBM_A"):
+        assert nav in HELPOVL_CPP, nav
     # Context from the active view type.
     assert "GetViewType" in HELPOVL_CPP
-    print("HelpOverlay latch + context OK")
+    print("HelpOverlay navigable modal close OK")
+
+
+def check_view_push_modal():
+    view_h = (ROOT / "source/sources/Application/Views/BaseClasses/View.h").read_text()
+    view_cpp = (ROOT / "source/sources/Application/Views/BaseClasses/View.cpp").read_text()
+    # PushModal suspends the active modal and restores it on close (RC4 11.3).
+    assert "bool PushModal" in view_h
+    assert "suspendedModal_" in view_h and "RestoreSuspendedModal" in view_h
+    assert "bool View::PushModal" in view_cpp
+    assert "void View::RestoreSuspendedModal" in view_cpp
+    assert "suspendedModal_ = modalView_" in view_cpp
+    assert "RestoreSuspendedModal()" in view_cpp
+    print("View PushModal suspend/restore OK")
 
 
 def check_appwindow_shortcut():
@@ -161,9 +223,12 @@ def check_appwindow_shortcut():
     assert "_audioShortcutLatched" in APPW_H and "_audioShortcutLatched" in APPW_CPP
     # Latched overlays swallow the event so the view cannot change page.
     assert "_helpShortcutLatched || _audioShortcutLatched" in APPW_CPP
-    # The help shortcut must not fire when a modal is already open.
-    assert "!_currentView->HasModal()" in APPW_CPP
-    print("AppWindow SELECT+R1 help / SELECT+R2 audio latch OK")
+    # RC4 P1: Help opens over an active dialog via PushModal (no HasModal guard).
+    assert "PushModal" in APPW_CPP
+    # The audio driver shortcut still refuses to replace an active modal.
+    assert "new AudioDriverModal" in APPW_CPP
+    assert "_currentView->HasModal()" in APPW_CPP
+    print("AppWindow SELECT+R1 help / SELECT+R2 audio latch + PushModal OK")
 
 
 def check_makefile_registration():
@@ -174,12 +239,14 @@ def check_makefile_registration():
 
 
 check_bypass_first()
+check_bypass_uidraw()
 check_bypass_row_model()
 check_uidraw_primitives()
 check_uicolors()
 check_layout_model()
 check_help_registry()
 check_help_overlay()
+check_view_push_modal()
 check_appwindow_shortcut()
 check_makefile_registration()
 print("RC3_BASE_UNIFIED_BYPASS_UIDRAW_HELP_OK")

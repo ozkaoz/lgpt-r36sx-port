@@ -5,6 +5,7 @@
 #include "Application/Model/Table.h"
 #include "Application/Utils/HelpLegend.h"
 #include "Application/Utils/char.h"
+#include "Application/Views/BaseClasses/UiColors.h"
 #include "Application/Views/CommandSelectorCommon.h"
 #include "ModalDialogs/SampleChopperModal.h"
 #include "Application/Views/ModalDialogs/CommandSelectorModal.h"
@@ -1621,7 +1622,8 @@ void PhraseView::DrawView() {
 
     char title[20];
 
-    SetColor(CD_NORMAL);
+    // RC4 P3 (PLAN_RC4): page titles render with the semantic title role.
+    SetColor(UiColors::Resolve(UI_COLOR_TITLE));
     sprintf(title, "Phrase %2.2x", viewData_->currentPhrase_);
     DrawString(pos._x, pos._y, title, props);
 

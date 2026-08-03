@@ -3,6 +3,7 @@
 #include "Application/Utils/char.h"
 #include "System/Console/Trace.h"
 #include "UIController.h"
+#include "Application/Views/BaseClasses/UiColors.h"
 
 ChainView::ChainView(GUIWindow &w, ViewData *viewData) : View(w, viewData) {
     updatingPhrase_ = false;
@@ -688,7 +689,8 @@ void ChainView::DrawView() {
     // Draw title
 
     char title[20];
-    SetColor(CD_NORMAL);
+    // RC4 P3 (PLAN_RC4): page titles render with the semantic title role.
+    SetColor(UiColors::Resolve(UI_COLOR_TITLE));
     sprintf(title, "Chain %2.2x", viewData_->currentChain_);
     DrawString(pos._x, pos._y, title, props);
 
