@@ -7,11 +7,12 @@
 
 #include "Application/Instruments/CommandList.h"
 
-// TREEFROG_BEATMAKING_FX_V1:
+// TREEFROG_BEATMAKING_FX_V1 / TREEFROG_COMMAND_SPECS_V1 (Fase 6):
 // Display names for the phrase commands, shown in the phrase grid, the table
 // editor and the command selector. The stored FourCC is never changed, so
 // projects stay compatible; only the on-screen name follows the expected
-// beatmaking labels (FBM/FBT/NDL/FLT/EQ/BTS/PFI).
+// beatmaking labels.  RC2 normalized the labels to table T1
+// (CFM/CFT/NDL/FCR/FCU/FRS/BCR/PFT + DSE/RSE/DTM/DFB/RDC/RSZ/CTH).
 // TREEFROG_COMMAND_SPECS_V1 (Fase 6): the names (and the per-command hex
 // editor format) now live in CommandList::_specs_; this function just copies
 // the central label so the grid, the table and the selector never drift.

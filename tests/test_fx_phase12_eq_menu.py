@@ -139,7 +139,9 @@ def check_source_guards():
     assert "drawEqPage()" in MIX
     assert "drawFxParamPage" in MIX
     idx = MIX.index("void MixerView::drawFxParamPage")
-    assert "drawEqPage()" in MIX[idx:idx + 1500]
+    # Window allows for the RC2 DELAY/REVERB dedicated-page dispatches that
+    # now precede the EQ dispatch inside drawFxParamPage.
+    assert "drawEqPage()" in MIX[idx:idx + 2400]
     # Row renderer + musical frequency editing helpers.
     assert "void MixerView::drawEqRow" in MIX
     assert "void MixerView::drawEqPage" in MIX

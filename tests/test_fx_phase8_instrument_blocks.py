@@ -10,8 +10,9 @@ Mirrors the reorganized fillSampleParameters() layout:
   T_SimpleList<UIField>::GetFirst() stays the sample field and GetLast() stays
   the table field (L2+A cut/clear depend on both).
 - BITCRUSHER is labeled "bit depth", never "compressor".
-- EFFECT SENDS rows use the percent-bar rendering (SetBar DRY/DELAY/REVERB):
-  "LABEL [====----]  85%" for 0..100 and "LABEL: INH" for -1 (inherit).
+- EFFECT SENDS rows use the percent-bar rendering (SetBar DRY/DELAY/REVERB).
+  RC2 (point 5) renders the bar as a solid block of inverted cells (MixerView
+  style): "LABEL [solid fill]  85%" for 0..100 and "LABEL: INH" for -1.
 - Legacy COMB parameters (fb tune/fb mix) are retired from editing while
   their variables keep existing (load/playback/IDs preserved).
 - Offline render FX (print fx/wet/pad) stay behind #ifdef FFMPEG_ENABLED and
@@ -129,27 +130,38 @@ def check_bitcrusher_label():
 
 
 def bar_render(value, width):
-    """Mirror UIIntVarField::Draw() bar branch."""
+    """Mirror UIIntVarField::Draw() bar branch (RC2 solid-bar rendering).
+
+    Returns (filled, percent) where filled is the number of inverted cells
+    (the solid fill) and percent the value displayed after the bar; -1 -> INH.
+    """
     if value < 0:
         return "INH"
     v = max(0, min(100, value))
     filled = (width * v) // 100
-    return "[" + "=" * filled + "-" * (width - filled) + "]" + " %3d%%" % v
+    return (filled, v)
 
 
 def check_bar_render():
+    # Solid-bar math: filled cells = width*v/100, always in [0,width].
     assert bar_render(-1, 14) == "INH"
-    assert bar_render(0, 14).count("=") == 0
-    assert bar_render(100, 14).count("=") == 14
-    assert bar_render(50, 14).count("=") == 7
-    assert bar_render(85, 14).count("=") == 11  # 14*85//100
+    assert bar_render(0, 14)[0] == 0
+    assert bar_render(100, 14)[0] == 14
+    assert bar_render(50, 14)[0] == 7
+    assert bar_render(85, 14)[0] == 11  # 14*85//100
+    assert bar_render(7, 14)[1] == 7    # percent shows the raw clamped value
     for label, (tok1, tok2) in LABEL_TOKENS.items():
         assert tok1 in IV_CPP, (label, tok1)
         assert tok2 in IV_CPP, (label, tok2)
     assert "barLabel_" in UIH_CPP and "barWidth_" in UIH_CPP
     assert "barLabel_" in UIH_H and "barWidth_" in UIH_H
     assert "SetBar" in UIH_H
-    print("send bars (SetBar DRY/DELAY/REVERB + INH) OK")
+    # RC2 solid-bar source guards: inverted-cell fill + INH clear path.
+    assert "props.invert_=true" in UIH_CPP
+    assert "props.invert_=false" in UIH_CPP
+    assert 'sprintf(buffer,"%s: INH",barLabel_)' in UIH_CPP
+    assert "CD_HILITE1" in UIH_CPP
+    print("send bars (SetBar DRY/DELAY/REVERB, solid inverted cells, INH) OK")
 
 
 def check_fb_retired():

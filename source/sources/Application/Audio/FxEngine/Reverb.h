@@ -4,16 +4,33 @@
 #include "Application/Utils/fixed.h"
 
 /*
- * FxEngine::Reverb -- plate/room reverb (PLAN_FX_REDESIGN_ES.md, Fase 2).
+ * FxEngine::Reverb -- plate/room reverb (PLAN_FX_REDESIGN_ES.md, Fase 2;
+ * RC2 wet-only audit, section 3).
  *
  * Simplified Schroeder/Dattorro topology, all buffers static (zero malloc in
- * Process).  Signal path: input HP/LP one-poles -> predelay -> parallel comb
- * filters (with per-comb damping LP in the loop, gain derived from RT60) ->
- * series allpass diffusers -> mid/side width -> DC blocker.
+ * Process).  Signal path: input HP/LP one-poles (+ fixed -3 dB input
+ * headroom) -> predelay -> parallel comb filters (per-comb damping LP in the
+ * loop, RT60-driven gains) with a normalized /nCombs sum -> series allpass
+ * diffusers (3 in NORMAL, 1 in ECO) -> mid/side width -> DC blocker.
+ *
+ * RC2 (section 3.1) makes this a true send/return wet-only processor: the
+ * dry signal already lives in the master bus, so Process() delivers ONLY the
+ * processed (wet) signal.  There is no internal dry*dryMix + wet*wetMix mix
+ * anymore.  The legacy RVB MIX value is still read and persisted (mix_) for
+ * project compatibility but is inert in the DSP: the reverb runs 100% wet
+ * and the audible level is set by the instrument send + the mixer return.
+ * While REVERB BYPASS is ON the wet gain glides to zero (the tail keeps
+ * running internally and reappears when bypass is released); the dry master
+ * signal is never affected by the reverb.
+ *
+ * RC2 (section 3.2) avoids relying on the hard clamp for level control:
+ * the parallel comb sum is normalized by the number of active combs (headroom
+ * preserved before the allpasses) and the input carries a -3 dB fixed
+ * headroom.  saturate() stays only as final out-of-range protection.
  *
  * Modes:
  *   ECO    -- 2 combs + 1 allpass per channel (cheap, darker)
- *   NORMAL -- 4 combs + 2 allpasses per channel (denser)
+ *   NORMAL -- 4 combs + 3 allpasses per channel (denser, RC2 diffusion)
  *
  * Protection: per-stage clamp to +/-1 (no runaway), RT60-driven comb gains
  * < 1 always (no feedback blow-up), output DC blocker (no DC buildup).
@@ -29,7 +46,7 @@ public:
     static const int kPredelayMax = 4800;    // 100 ms @ 48 kHz, per channel
     static const int kNumCombs = 8;          // 4 L + 4 R (NORMAL uses all)
     static const int kCombMaxLen = 2048;     // covers size up to ~1.5x
-    static const int kNumAllpass = 4;        // 2 L + 2 R
+    static const int kNumAllpass = 6;        // 3 L + 3 R (NORMAL uses all)
     static const int kAllpassMaxLen = 1024;
 
     Reverb();
@@ -44,8 +61,11 @@ public:
     void SetInputLP(fixed hz);
     void SetWidth(fixed width);          // 0..1 mid/side
     void SetMode(Mode mode);
-    void SetBypass(bool on);             // crossfade to dry, tail runs on
-    void SetMix(fixed mix);              // dry/wet 0..1, smoothed
+    void SetBypass(bool on);             // wet gain -> 0 (tail keeps running)
+    // RC2 (section 3.1): the legacy dry/wet mix is gone.  SetMix/GetMix still
+    // store/return the persisted RVB MIX value (project compatibility) but it
+    // is inert in the DSP, which is fixed 100% wet.
+    void SetMix(fixed mix);
 
     // Interleaved stereo in/out (frames frames).
     void Process(const fixed *in, fixed *out, int frames);
@@ -81,6 +101,7 @@ private:
     fixed combGain_[kNumCombs];
     fixed combDamp_[kNumCombs];
     fixed combState_[kNumCombs];
+    fixed combNorm_;             // 1/nCombs normalized parallel-sum gain (RC2)
 
     fixed allpassBuf_[kNumAllpass][kAllpassMaxLen];
     int apIdx_[kNumAllpass];
@@ -103,8 +124,8 @@ private:
     fixed damping_;
     fixed width_;
     bool bypass_;
-    fixed mix_;
-    fixed mixCur_;
+    fixed mix_;            // legacy persisted RVB MIX (inert in DSP, RC2)
+    fixed mixCur_;         // smoothed wet gain: 1.0 full wet, 0 while bypassed
     unsigned long rtViolations_;
 };
 

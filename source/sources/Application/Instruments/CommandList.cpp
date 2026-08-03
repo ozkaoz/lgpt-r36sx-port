@@ -2,14 +2,16 @@
 #include "CommandList.h"
 #include <string.h>
 
-// TREEFROG_COMMAND_SPECS_V1 (Fase 6):
+// TREEFROG_COMMAND_SPECS_V1 (Fase 6) / TREEFROG_FX_LABELS_RC2 (RC2):
 // Single source of truth for the phrase command list.  The first entry is the
 // empty command (I_CMD_NONE, index 0) which the UI skips; navigation helpers
 // below operate on this table so the popup grid and the hex editor stay in
-// sync.  Display names follow the beatmaking labels (FBM/FBT/NDL/FLT/EQ/RES/
-// BTS/PFI) and the Fase 4 FX-engine codes (DSN/RSN/DTM/DFB/RDC/RSZ/CTH).
-// The stored FourCC is never changed (project compatibility); the parameter
-// editor format is per-command (HEX16 for legacy, HEX8 for Fase 4 FX).
+// sync.  RC2 normalized the visible abbreviations to table T1: the on-screen
+// label now always reads as a 3-letter mnemonic of its meaning (CFM/CFT for
+// the legacy comb, FCU/FRS/FCR for the filter family, DSE/RSE for the sends,
+// etc.).  The stored FourCC is never changed (project compatibility); the
+// parameter editor format is per-command (HEX16 for legacy, HEX8 for Fase 4
+// FX).
 static const CommandSpec _specs[] = {
 	// command,                       displayName,       paramFormat
 	{ I_CMD_NONE,                     "----",            CMD_PARAM_FORMAT_HEX16 },
@@ -20,14 +22,14 @@ static const CommandSpec _specs[] = {
 	// PTCH was removed (H38.7): pitch now lives in its own phrase column.
 	// Engine processing is untouched: projects using other commands still
 	// play and are editable from their views.
-	{ I_CMD_FBMX,                     "FBM ",            CMD_PARAM_FORMAT_HEX16 },
-	{ I_CMD_FBTN,                     "FBT ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_FBMX,                     "CFM ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_FBTN,                     "CFT ",            CMD_PARAM_FORMAT_HEX16 },
 	{ I_CMD_DLAY,                     "NDL ",            CMD_PARAM_FORMAT_HEX16 },
-	{ I_CMD_FLTR,                     "FLT ",            CMD_PARAM_FORMAT_HEX16 },
-	{ I_CMD_FCUT,                     "EQ  ",            CMD_PARAM_FORMAT_HEX16 },
-	{ I_CMD_FRES,                     "RES ",            CMD_PARAM_FORMAT_HEX16 },
-	{ I_CMD_CRSH,                     "BTS ",            CMD_PARAM_FORMAT_HEX16 },
-	{ I_CMD_PFIN,                     "PFI ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_FLTR,                     "FCR ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_FCUT,                     "FCU ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_FRES,                     "FRS ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_CRSH,                     "BCR ",            CMD_PARAM_FORMAT_HEX16 },
+	{ I_CMD_PFIN,                     "PFT ",            CMD_PARAM_FORMAT_HEX16 },
 	// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4) /
 	// TREEFROG_SEND_LIVE_V1 (Fase 15):
 	// Master-bus FX automation, monotonic 00-FF on the low param byte:
@@ -35,8 +37,8 @@ static const CommandSpec _specs[] = {
 	// the persisted base nor the per-track Mixer send), DLYT/DLYF the master
 	// delay, RVDC/RVSZ the master reverb, CMPT the master comp threshold.
 	// These commands only read (value & 0xFF), so the editor is 2-digit HEX8.
-	{ I_CMD_DLYS,                     "DSN ",            CMD_PARAM_FORMAT_HEX8 },
-	{ I_CMD_RVBS,                     "RSN ",            CMD_PARAM_FORMAT_HEX8 },
+	{ I_CMD_DLYS,                     "DSE ",            CMD_PARAM_FORMAT_HEX8 },
+	{ I_CMD_RVBS,                     "RSE ",            CMD_PARAM_FORMAT_HEX8 },
 	{ I_CMD_DLYT,                     "DTM ",            CMD_PARAM_FORMAT_HEX8 },
 	{ I_CMD_DLYF,                     "DFB ",            CMD_PARAM_FORMAT_HEX8 },
 	{ I_CMD_RVDC,                     "RDC ",            CMD_PARAM_FORMAT_HEX8 },

@@ -583,6 +583,67 @@ Todos verificados por la suite automatizada (Fase 0-17) y los guards de fuente: 
 
 ---
 
+## RC2 — Normalización T1, selector por familias, reverb wet-only y pulido de UI (hecho y verificado)
+
+Release candidate RC2 sobre las Fases 0-18 (RC1). Ocho puntos:
+
+**1. Etiquetas FX visibles normalizadas (tabla T1).** Los `displayNames`
+de `CommandList` se reescriben según T1; los **FourCC internos
+(`I_CMD_*`) no cambian**, así que los proyectos se cargan/reproducen igual.
+`FBMX->CFM`, `FBTN->CFT`, `DLAY->NDL`, `FLTR->FCR`, `FCUT->FCU`,
+`FRES->FRS`, `CRSH->BCR`, `PFIN->PFT`, `DLYS->DSE`, `RVBS->RSE`,
+`DLYT->DTM`, `DLYF->DFB`, `RVDC->RDC`, `RVSZ->RSZ`, `CMPT->CTH`.
+`HelpLegend` se alinea (solo copia de `GetDisplayName`).
+
+**2. Selector FX por familias con paginación.** `CommandSelectorModal` se
+reorganiza: FX 1/2 (INST: NDL/PFT/BCR; FILTER: FCU/FRS/FCR; DELAY:
+DSE/DTM/DFB; REVERB: RSE/RSZ/RDC; MASTER: CTH) y FX 2/2 (LEGACY COMB:
+CFM/CFT). `kCellPitch` 5->6, `getRows()` constante (título+header+3 filas)
+para suprimir cursores de playback; el cruce de borde horizontal cambia de
+página. No se rellenan huecos con parámetros arbitrarios; los proyectos con
+FBMX/FBTN siguen reproduciéndose, muestran CFM/CFT y se editan.
+
+**3. Reverb wet-only.** `Reverb::Process` entrega solo señal procesada
+(húmeda): el seco ya vive en el bus master, no hay `dry*dryMix`. `mixCur_`
+es la ganancia wet amortiguada (1.0 lleno, 0 con bypass, la cola sigue
+sonando); `RVB MIX` deja de ser dry/wet: la fila y `FX_P_RVB_MIX` se
+retiran de la UI, y `SetMix/GetMix` solo persisten un valor inerte
+(compatibilidad de proyectos). Headroom de entrada fijo -3 dB
+(`FX_REVERB_INPUT_HEADROOM`), suma de combs normalizada (`combNorm_ =
+1/nCombs`) y un 3er allpass por canal en NORMAL (más difusión). El **Delay
+conserva su dry/wet** (`DLY MIX` sigue). Routing verificado: el retorno
+wet se suma al master con `reverbReturn_`.
+
+**4. Páginas DELAY MASTER / REVERB MASTER dedicadas.** `drawDelayPage()`
+/ `drawReverbPage()` / `drawMasterFxRow()`: menús de dos columnas con
+jerarquía de colores (título `CD_HILITE1`, label `CD_NORMAL`, valor
+`CD_HILITE1`, fila editada invertida `CD_HILITE2`). 7 filas por página;
+formatos con unidades (`TIME ms`, `DECAY s`, toggles `ON/OFF`, modo reverb
+`ECO`/`NORMAL`). Título `[n/5]` conservado.
+
+**5. Barras sólidas en InstrumentView.** El render de barra de
+`UIIntVarField` (EFFECT SENDS DRY/DELAY/REVERB) usa celdas invertidas
+sólidas (estilo MixerView) en vez del ASCII `[====----]`; `-1` muestra
+`INH` y limpia la barra. El resto de `UIIntVarField` no cambia.
+
+**6. `UIBigHexVarField::SetHexMode` corregido.** Ya no fuerza `position_=0`:
+el cursor de nibble se conserva (clamp al nuevo rango de precisión) y el
+valor completo se clampa (o envuelve según `wrap`) al nuevo `[min,max]` al
+cambiar el comando de la celda.
+
+**7. Pruebas RC2.** Nuevo `test_fx_rc2_master_pages_solid_bars_hexmode.py`
+-> `FX_RC2_MASTER_PAGES_SOLID_BARS_HEXMODE_OK`. Actualizados a wet-only:
+`test_fx_phase10_wetonly_audit`, `test_fx_phase4_ui`,
+`test_fx_phase6_nav_ab_default`. Ventanas EQ/COMP ampliadas en
+`test_fx_phase12_eq_menu` / `test_fx_phase13_comp_menu`; barras sólidas en
+`test_fx_phase8_instrument_blocks`.
+
+**8. Publicación RC2.** Prerelease `Bacon-1.1-FX-Dev-RC2` con core, daemon
+y `SHA256SUMS.txt`; docs (`docs/RELEASE_BACON_1.1_FX_DEV_ES.md`,
+`CHANGELOG.md`) y audit completo en verde (`AUDIT_CLEAN_MAIN_U2523_OK`).
+
+---
+
 ## G. Diseño de clases / APIs (FxEngine)
 
 ```

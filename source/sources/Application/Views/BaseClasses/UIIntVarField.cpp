@@ -51,26 +51,55 @@ void UIIntVarField::Draw(GUIWindow &w,int offset) {
 	}
 	char buffer[80] ;
 
-	// TREEFROG_FX_SEND_BAR_V1 (Fase 8): percent-bar rendering for sends.
-	// The value is the percentage (0..100); -1 means "inherit" (no bar).
+	// TREEFROG_FX_SEND_BAR_V1 (Fase 8) + RC2 (PLAN_FX_REDESIGN_ES.md, point 5):
+	// percent-bar rendering for the EFFECT SENDS rows.  The value is the
+	// percentage (0..100); -1 means "inherit" (INH, no bar).  RC2 renders the
+	// bar as a solid block of inverted cells (MixerView style) instead of the
+	// ASCII "[====----]": filled cells are CD_NORMAL inverted, empty cells are
+	// CD_HILITE1 non-inverted, so the send reads as a solid meter.  Default
+	// off, so every existing UIIntVarField keeps its exact current rendering.
 	if (barLabel_) {
 		int value=src_.GetInt()+displayOffset_ ;
+		ColorDefinition baseCol=focus_?CD_HILITE2:CD_NORMAL ;
+		((AppWindow&)w).SetColor(baseCol) ;
+		props.invert_=false ;
 		if (value<0) {
-			sprintf(buffer,"%s: INH   ",barLabel_) ;
-		} else {
-			int v=value ;
-			if (v<0) v=0 ;
-			if (v>100) v=100 ;
-			int filled=(barWidth_*v)/100 ;
-			char bar[32] ;
-			int i=0 ;
-			bar[i++]='[' ;
-			for (int b=0;b<barWidth_;b++) bar[i++]=(b<filled)?'=':'-' ;
-			bar[i++]=']' ;
-			bar[i]=0 ;
-			sprintf(buffer,"%s: %s %3d%%",barLabel_,bar,value) ;
+			sprintf(buffer,"%s: INH",barLabel_) ;
+			w.DrawString(buffer,position,props) ;
+			GUIPoint clearPos=position ;
+			clearPos._x+=(int)strlen(buffer) ;
+			for (int c=0;c<barWidth_+5;c++) {  // clear stale bar + percent
+				w.DrawString(" ",clearPos,props) ;
+				clearPos._x++ ;
+			}
+			return ;
 		}
-		w.DrawString(buffer,position,props) ;
+		int v=value ;
+		if (v<0) v=0 ;
+		if (v>100) v=100 ;
+		int filled=(barWidth_*v)/100 ;
+		GUIPoint barPos=position ;
+		char label[24] ;
+		sprintf(label,"%s: ",barLabel_) ;
+		w.DrawString(label,barPos,props) ;
+		barPos._x+=(int)strlen(label) ;
+		int i=0 ;
+		for (;i<filled;i++) {
+			((AppWindow&)w).SetColor(CD_NORMAL) ;
+			props.invert_=true ;
+			w.DrawString(" ",barPos,props) ;
+			barPos._x++ ;
+		}
+		for (;i<barWidth_;i++) {
+			((AppWindow&)w).SetColor(CD_HILITE1) ;
+			props.invert_=false ;
+			w.DrawString(" ",barPos,props) ;
+			barPos._x++ ;
+		}
+		((AppWindow&)w).SetColor(baseCol) ;
+		props.invert_=false ;
+		sprintf(buffer," %3d%%",value) ;
+		w.DrawString(buffer,barPos,props) ;
 		return ;
 	}
 

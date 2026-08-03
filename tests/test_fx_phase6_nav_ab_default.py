@@ -17,7 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # (label, page, vmin, vmax, vdef)  -- natural units, mirrors MixerView.cpp
-# Fase 6: 5 pages, DELAY(7) REVERB(8) EQ(13) COMP(9) = 37, MIX page has no rows.
+# Fase 6, RC2 (point 3.1): RVB MIX was removed (wet-only reverb), so the
+# pages are DELAY(7) REVERB(7) EQ(13) COMP(9) = 36, MIX page has no rows.
 PARAMS = [
     # DELAY
     ("DLY TIM", "DELAY", 10.0, 2000.0, 0.0),
@@ -34,7 +35,6 @@ PARAMS = [
     ("RVB DMP", "REVERB", 0.0, 1.0, 0.5),
     ("RVB WID", "REVERB", 0.0, 1.0, 1.0),
     ("RVB MOD", "REVERB", 0.0, 1.0, 0.0),
-    ("RVB MIX", "REVERB", 0.0, 1.0, 1.0),
     ("RVB BYP", "REVERB", 0.0, 1.0, 0.0),
     # EQ (banded menu Fase 12: bypass + EN/FRQ/GAI/Q per band, EN first)
     ("EQ  BYP", "EQ", 0.0, 1.0, 1.0),
@@ -74,10 +74,10 @@ def reset_row(row, vdef):
 
 def check_count_and_pages():
     from collections import Counter
-    assert len(PARAMS) == 37, len(PARAMS)
+    assert len(PARAMS) == 36, len(PARAMS)
     counts = Counter(p[1] for p in PARAMS)
-    assert counts == {"DELAY": 7, "REVERB": 8, "EQ": 13, "COMP": 9}, counts
-    print("37 params / 5 pages (DELAY 7, REVERB 8, EQ 13, COMP 9) OK")
+    assert counts == {"DELAY": 7, "REVERB": 7, "EQ": 13, "COMP": 9}, counts
+    print("36 params / 5 pages (DELAY 7, REVERB 7, EQ 13, COMP 9) OK")
 
 
 def check_legacy_defaults():
@@ -90,30 +90,29 @@ def check_legacy_defaults():
     assert PARAMS[4][4] == 0.0
     assert PARAMS[5][4] == 0.0
     assert PARAMS[6][4] == 0.0
-    # reverb pre 0/dec 1/siz 1/dmp 0.5/wid 1/mode 0/mix 1/bypass 0
+    # reverb pre 0/dec 1/siz 1/dmp 0.5/wid 1/mode 0/bypass 0 (RC2: no MIX row)
     assert PARAMS[7][4] == 0.0
     assert PARAMS[8][4] == 1.0
     assert PARAMS[9][4] == 1.0
     assert PARAMS[10][4] == 0.5
     assert PARAMS[11][4] == 1.0
     assert PARAMS[12][4] == 0.0
-    assert PARAMS[13][4] == 1.0
-    assert PARAMS[14][4] == 0.0
+    assert PARAMS[13][4] == 0.0
     # EQ bypass on (dry) + bands off at 100/1000/10000, gain 0, Q 1
-    assert PARAMS[15][4] == 1.0
-    for i in range(16, 28):
+    assert PARAMS[14][4] == 1.0
+    for i in range(15, 27):
         assert PARAMS[i][4] in (0.0, 1.0, 100.0, 1000.0, 10000.0)
     # comp (Fase 13 order, BYP first): bypass on, thr -24 ratio 4 knee 6
     # attack 15 release 200 make-up 0, link+softclip on
-    assert PARAMS[28][4] == 1.0   # CMP BYP
-    assert PARAMS[29][4] == -24.0  # CMP THR
-    assert PARAMS[30][4] == 4.0   # CMP RAT
-    assert PARAMS[31][4] == 6.0   # CMP KNE
-    assert PARAMS[32][4] == 15.0  # CMP ATK
-    assert PARAMS[33][4] == 200.0  # CMP REL
-    assert PARAMS[34][4] == 0.0   # CMP MKU
-    assert PARAMS[35][4] == 1.0   # CMP LNK
-    assert PARAMS[36][4] == 1.0   # CMP SCL
+    assert PARAMS[27][4] == 1.0   # CMP BYP
+    assert PARAMS[28][4] == -24.0  # CMP THR
+    assert PARAMS[29][4] == 4.0   # CMP RAT
+    assert PARAMS[30][4] == 6.0   # CMP KNE
+    assert PARAMS[31][4] == 15.0  # CMP ATK
+    assert PARAMS[32][4] == 200.0  # CMP REL
+    assert PARAMS[33][4] == 0.0   # CMP MKU
+    assert PARAMS[34][4] == 1.0   # CMP LNK
+    assert PARAMS[35][4] == 1.0   # CMP SCL
     print("legacy defaults match AllParamsAtLegacyDefault OK")
 
 

@@ -1,29 +1,114 @@
-# LGPT R36SX - Bacon 1.1 - FX Dev (release candidate)
+# LGPT R36SX - Bacon 1.1 - FX Dev (release candidate RC2)
 
 **ESTADO: RELEASE CANDIDATE — NO ES UNA VERSIÓN ESTABLE.**
 
-Este release candidate integra el **rediseño completo del motor FX**
-(Fases 0-18 de `docs/PLAN_FX_REDESIGN_ES.md`) sobre la línea Bacon.
-Está pensado para probar en tarjeta SD; no se recomienda como build de
-trabajo diario hasta validar los problemas conocidos de la sección final.
+Release candidate RC2 sobre RC1 (Bacon 1.1 - FX Dev). Integra la
+normalización de etiquetas FX (tabla T1), el selector de comandos FX por
+familias con paginación, la reverb wet-only, las páginas dedicadas
+DELAY/REVERB MASTER con jerarquía de colores, las barras sólidas de
+EFFECT SENDS en InstrumentView y la corrección del cursor de edición
+hexadecimal. Pensado para probar en tarjeta SD; ver "Problemas conocidos".
+
+## Cambios RC2
+
+### 1. Etiquetas FX normalizadas (tabla T1)
+
+Las etiquetas visibles de comandos FX se alinean con la tabla T1. Los
+**FourCC internos (`I_CMD_*`) no cambian**: los proyectos guardados se
+cargan y reproducen igual (bit-identicos), solo cambia lo que se muestra.
+
+| Comando | Antes | Ahora |
+|---|---|---|
+| FBMX | `FBMX` | `CFM` |
+| FBTN | `FBTN` | `CFT` |
+| DLAY | `DLAY` | `NDL` |
+| FLTR | `FLTR` | `FCR` |
+| FCUT | `FCUT` | `FCU` |
+| FRES | `FRES` | `FRS` |
+| CRSH | `CRSH` | `BCR` |
+| PFIN | `PFIN` | `PFT` |
+| DLYS | `DLYS` | `DSE` |
+| RVBS | `RVBS` | `RSE` |
+| DLYT | `DLYT` | `DTM` |
+| DLYF | `DLYF` | `DFB` |
+| RVDC | `RVDC` | `RDC` |
+| RVSZ | `RVSZ` | `RSZ` |
+| CMPT | `CMPT` | `CTH` |
+
+### 2. Selector FX por familias con paginación
+
+El selector de comandos FX (Table/Phrase) se reorganiza por familias:
+
+- **FX 1/2**: `INST` (NDL/PFT/BCR), `FILTER` (FCU/FRS/FCR), `DELAY`
+  (DSE/DTM/DFB), `REVERB` (RSE/RSZ/RDC), `MASTER` (CTH).
+- **FX 2/2**: `LEGACY COMB` (CFM/CFT).
+
+Los proyectos antiguos con `FBMX`/`FBTN` siguen reproduciéndose: muestran
+`CFM`/`CFT` y son editables. La paginación salta automáticamente de página
+en el cruce de borde horizontal.
+
+### 3. Reverb wet-only (envio/retorno real)
+
+- `RVB MIX` ya **no existe en la UI** (la fila y `FX_P_RVB_MIX` se retiraron
+  del Mixer). El nivel audible se controla con el send del instrumento y el
+  `REVERB RETURN` del Mixer, no con un crossfade interno.
+- El DSP es wet-only: la salida solo contiene la señal procesada (húmeda);
+  el seco ya vive en el bus master. `RVB MIX` persistido en proyectos viejos
+  se sigue leyendo/escribiendo pero es inerte (compatibilidad).
+- **Headroom**: -3 dB de entrada fijo antes de los difusores.
+- **Densidad**: suma de combs normalizada (`combNorm_` = 1/nCombs) + un 3er
+  allpass por canal en modo NORMAL (más difusión, sin recorte).
+- El **Delay conserva su dry/wet** actual (`DLY MIX` sigue en la página).
+
+### 4. Páginas DELAY MASTER / REVERB MASTER rediseñadas
+
+Menús dedicados de dos columnas (label / valor) con jerarquía de colores:
+
+- Título en `CD_HILITE1` con posición `[2/5]`/`[3/5]`.
+- Label de fila en `CD_NORMAL`, valor en `CD_HILITE1`.
+- Fila editada invertida en `CD_HILITE2`.
+- Formatos con unidades: `TIME ms`, `DECAY s`, toggles `ON/OFF`, modo reverb
+  `ECO`/`NORMAL`. 7 filas en cada página (REVERB sin `RVB MIX`).
+
+### 5. Barras sólidas en InstrumentView
+
+Las barras de `EFFECT SENDS` (DRY/DELAY/REVERB) se dibujan ahora como un
+bloque sólido de celdas invertidas (estilo MixerView) en vez del ASCII
+`[====----]`; `-1` sigue mostrando `INH` (inherit) y limpia la barra vieja.
+
+### 6. Cursor de edición hexadecimal corregido
+
+`UIBigHexVarField::SetHexMode` ya no fuerza `position_=0`: el cursor de
+nibble conserva el dígito que se estaba editando (solo se clampa al nuevo
+rango de precisión) y el valor completo se clampa (o se envuelve, según
+`wrap`) al nuevo `[min,max]` al cambiar el comando de la celda.
+
+### 7. Pruebas RC2
+
+- Nuevo `tests/test_fx_rc2_master_pages_solid_bars_hexmode.py`
+  -> `FX_RC2_MASTER_PAGES_SOLID_BARS_HEXMODE_OK`.
+- Actualizados a la semantica wet-only: `test_fx_phase10_wetonly_audit.py`,
+  `test_fx_phase4_ui.py`, `test_fx_phase6_nav_ab_default.py`.
+- Ventanas de dispatch EQ/COMP ampliadas en `test_fx_phase12_eq_menu.py` y
+  `test_fx_phase13_comp_menu.py`; barras solidas en
+  `test_fx_phase8_instrument_blocks.py`.
+- Suite completa en verde (ver "Resultados de pruebas").
 
 ## Binario instalable
 
 | Artefacto | Ruta | SHA-256 |
 |---|---|---|
-| Core (libretro MIPS) | `BUILD/U2523/lgpt_r36sx_u2523.so` | `fddc4b042742da0745edf4f24edeee66543e67b900ecb03b87196bc41f8764ec` |
+| Core (libretro MIPS) | `BUILD/U2523/lgpt_r36sx_u2523.so` | `c114863b8c43d6ae1300dd672edc5b6980970f59ec08bc29ceb658b58126bc20` |
 | Daemon USB ABI7 | `BUILD/U2523/r36s_u2523_usb_audio_io` | `53258f2b8b3749c866af248814eb147f0762a1b17cfffb644adb573167b52815` |
 
 - El daemon conserva el SHA-256 golden de Bacon 1.0 (ABI7 inalterado).
 - `BUILD/U2523/SHA256SUMS.txt` contiene ambos hashes.
 - La copia instalada en SD tiene los mismos hashes (`VERIFY_U2523_OK`,
-  `ERRORS=0`, ver `LGPT_OTG_LOGS/INSTALL_STATE_U2523.txt`).
+  `ERRORS=0`).
 
 ## Commit fuente
 
-- Commit del release: `626e3f67ad24f04e62ee5ac67c77346221f485ea`
-  (FX redesign phases 7-18 + branding Bacon 1.1 + suite de aceptación).
-- Tag: `Bacon-1.1-FX-Dev-RC1`.
+- Commit del release: se fija al publicar RC2 (tag `Bacon-1.1-FX-Dev-RC2`).
 
 ## Arquitectura FX (resultado del rediseño)
 
@@ -36,38 +121,17 @@ trabajo diario hasta validar los problemas conocidos de la sección final.
 - **Mixer** controla volúmenes de pista y los **retornos de efectos**
   globales (`DLYRET`/`RVBRET`).
 - **Delay / Reverb** configuran los procesadores compartidos (páginas
-  dedicadas `[2/5]`/`[3/5]`).
+  dedicadas `[2/5]`/`[3/5]`; reverb wet-only desde RC2).
 - **EQ / Compressor** procesan la salida máster (páginas dedicadas
   `[4/5]`/`[5/5]`; `EQ BYPASS`/`CMP BYP` visibles y editables).
 
 ## Resultados de pruebas
 
-- Suite automatizada completa en verde: `AUDIT_CLEAN_MAIN_U2523_OK`,
-  **176 checks OK**, incluidos los 21 tests FX
-  (`test_fx_phase*.py`, Fases 0-17) y la suite u-series
-  (U2510/U2514/U2517/U2520/U2521/U2522/U2523).
-- Tests corregidos en este release (fallos preexistentes, ajenos al
-  rediseño FX):
-  - `test_u2520_transactional_record_source.py`: marcador de ruta temp
-    actualizado a `/tmp/r36sx_lgpt_record` (diseño tmpfs real usado por
-    `UsbRecordModal` e `ImportSampleDialog`; la grabación runtime vive en
-    tmpfs y se publica a FAT32 solo al guardar).
-  - `test_u2521_browser_rename.py`: el modal `ImportBrowserRenameModal`
-    fue sustituido en H38.x por el editor de texto unificado
-    (`TreeFrogTextEditor`); el test verifica ahora el flujo real
-    (rename/delete case-safe con confirmación).
-  - `test_u2522_nested_rename_frame_forwarding.py`: verifica el puente
-    `OnFrameUpdate`/`UpdateActiveModalFrame` del editor anidado.
-  - `test_u2523_rename_caret_alignment.py`: verifica el alineado del caret
-    en `TreeFrogTextEditor.cpp` (destino real del editor de rename).
-
-## Resumen del audit
-
-- Audit completo (`scripts/audit.sh`): 27/27 grupos OK, `AUDIT_CLEAN_MAIN_U2523_OK`.
-- `host_syntax_check` y `mips_fx_syntax_fase5` en verde.
-- El core contiene los markers de build: `U2523_RENAME_CARET_ALIGNMENT_GITHUB_FINAL`,
-  `U2520_PENDING_TAKE_RECORD_EDITOR_PHYSICAL_EDGE_READY`, `R36SX_CAPTURE_ABI=2`
-  y el branding `LGPT R36SX - Bacon 1.1`.
+- Suite automatizada completa en verde: `AUDIT_CLEAN_MAIN_U2523_OK`
+  (176 checks OK, 27/27 grupos de audit), incluidos los 22 tests FX
+  (`test_fx_phase*.py`, Fases 0-17 + RC2) y la suite u-series.
+- `host_syntax_check` en verde; build MIPS con `BUILD_U2523_OK`; instalación
+  y verificación en SD con `VERIFY_U2523_OK`/`ERRORS=0`.
 
 ## Cambios de formato de proyecto (persistencia)
 
@@ -103,21 +167,17 @@ Todo el proceso en un paso:
 SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/build_install.sh
 ```
 
-Opción B — copiar el contenido del ZIP copy-to-SD-root a la raíz de la
-tarjeta (`cubegm/`, `lgpt/`, `roms/`, `LGPT_OTG_LOGS/`, `ANDROID/`) y
-arrancar LGPT desde EmulationStation.
-
 ## Rollback
 
 `scripts/install.sh` deja una copia de seguridad en
 `PROJECT_ROOT/BACKUPS/LGPT_BEFORE_U2523_<timestamp>/`
-(este RC: `BACKUPS/LGPT_BEFORE_U2523_20260803_013014`).
+(este RC: `BACKUPS/LGPT_BEFORE_U2523_20260803_031938`).
 
 ```bash
 # Restaura el core, daemon, launcher, scripts OTG y perfil de audio previos
 SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/restore.sh
 # o con ruta explícita:
-SD_MOUNT=/mnt/f bash scripts/restore.sh "/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260803_013014"
+SD_MOUNT=/mnt/f bash scripts/restore.sh "/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260803_031938"
 ```
 
 ## Problemas conocidos
@@ -127,9 +187,10 @@ SD_MOUNT=/mnt/f bash scripts/restore.sh "/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT
   de "physical edge" del editor de takes de USB record está pendiente de
   resolver (el flujo transaccional tmpfs->FAT32 ya está verificado).
 - **Capturas de pantalla en resolución real R36SX pendientes**: la
-  validación visual de cada página del Mixer/Instrument se entregará al
-  flashear en hardware (no hay pantalla R36SX en esta máquina).
-- Este es un **release candidate**: la línea FX (0-18) es nueva y no tiene
-  tiempo de uso en hardware real.
+  validación visual de las páginas rediseñadas (DELAY/REVERB MASTER, barras
+  solidas, selector FX por familias) se entregará al flashear en hardware
+  (no hay pantalla R36SX en esta máquina).
+- Este es un **release candidate**: la línea FX (0-18) + RC2 es nueva y no
+  tiene tiempo de uso en hardware real.
 - `scripts/publish_bacon_to_github.sh` (Bacon 1.0) sigue siendo el flujo de
   publicación estable; este RC se publica como **prerelease**.

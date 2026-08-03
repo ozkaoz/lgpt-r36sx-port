@@ -13,16 +13,31 @@ UIBigHexVarField::UIBigHexVarField(GUIPoint &position,Variable &v,int precision,
 
 // TREEFROG_COMMAND_SPECS_V1 (Fase 6): re-target precision/range/format in
 // place (used when the edited cell's command switches between the 4-digit
-// legacy format and the 2-digit Fase 4 FX format).  position_ is reset to the
-// least significant digit so the nibble cursor stays coherent after the
-// switch.
+// legacy format and the 2-digit Fase 4 FX format).  RC2 (point 6): the nibble
+// cursor keeps its digit and is only clamped into the new range instead of
+// being forced to position_=0 (a mode switch no longer jumps the caret to the
+// least significant digit), and the whole stored value is clamped/wrapped into
+// the new [min,max] range so the variable never stays out of range.
 void UIBigHexVarField::SetHexMode(int precision,const char *format,int min,int max,bool wrap) {
 	precision_=(precision>0)?(unsigned int)(precision-1):0 ;
 	format_=format ;
 	min_=min ;
 	max_=max ;
 	wrap_=wrap ;
-	position_=0 ;
+	if (position_>precision_) {
+		position_=precision_ ;
+	}
+	int value=src_.GetInt() ;
+	const int span=max_-min_+1 ;
+	if (wrap_ && span>0) {
+		int rel=(value-min_)%span ;  // C++ % can be negative; normalize
+		if (rel<0) rel+=span ;
+		value=min_+rel ;
+	} else {
+		if (value>max_) value=max_ ;
+		if (value<min_) value=min_ ;
+	}
+	src_.SetInt(value) ;
 } ; 
 
 void UIBigHexVarField::Draw(GUIWindow &w,int offset) {

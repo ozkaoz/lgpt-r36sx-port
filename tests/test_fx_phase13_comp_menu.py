@@ -73,7 +73,9 @@ def check_source_guards():
     assert "void MixerView::drawCompPage" in MIX
     assert "drawCompPage()" in MIX_H
     idx = MIX.index("void MixerView::drawFxParamPage")
-    assert "drawCompPage()" in MIX[idx:idx + 1600]
+    # Window allows for the RC2 DELAY/REVERB dedicated-page dispatches that
+    # now precede the COMP dispatch inside drawFxParamPage.
+    assert "drawCompPage()" in MIX[idx:idx + 2400]
     # BYP is the first COMP table row (never off-screen).
     byp = MIX.index("{ \"CMP BYP\"")
     thr = MIX.index("{ \"CMP THR\"")

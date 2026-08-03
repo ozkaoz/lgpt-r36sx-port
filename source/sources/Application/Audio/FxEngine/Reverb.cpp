@@ -8,12 +8,18 @@ namespace FxEngine {
 #define FX_REVERB_MIN_RT60 0.05f   // seconds
 #define FX_REVERB_MAX_RT60 8.0f
 
+// RC2 (section 3.2): fixed -3 dB input headroom so the network never relies
+// on the hard clamp for level control.
+#define FX_REVERB_INPUT_HEADROOM fl2fp(0.70710678f)
+
 // Comb lengths (in samples at ~44.1k/48k base) for L and R channels.
 // Slightly de-correlated L/R lengths give a wide stereo image.
 static const int kCombBase[4] = {1116, 1188, 1277, 1356};
 static const int kCombBaseR[4] = {1131, 1203, 1293, 1377};
-static const int kAllpassBase[2] = {556, 441};
-static const int kAllpassBaseR[2] = {561, 445};
+// RC2 (section 3.3): a third series allpass per channel (Dattorro-inspired
+// short diffuser) thickens the tail and reduces metallic ringing in NORMAL.
+static const int kAllpassBase[3] = {556, 441, 225};
+static const int kAllpassBaseR[3] = {561, 445, 231};
 
 Reverb::Reverb()
     : predelayWrite_(0), predelayLen_(0),
@@ -22,6 +28,7 @@ Reverb::Reverb()
       predelayMs_(0), decay_(fl2fp(1.0f)), decayTarget_(fl2fp(1.0f)),
       size_(i2fp(1)), damping_(fl2fp(0.5f)), width_(i2fp(1)),
       bypass_(false), mix_(i2fp(1)), mixCur_(i2fp(1)),
+      combNorm_(i2fp(1)),
       rtViolations_(0) {
     for (int i = 0; i < 2; i++) {
         inLpState_[i] = inHpState_[i] = dcState_[i] = 0;
@@ -60,7 +67,9 @@ void Reverb::Reset() {
     for (int i = 0; i < 2; i++) {
         inLpState_[i] = inHpState_[i] = dcState_[i] = 0;
     }
-    mixCur_ = mix_;
+    // Wet-only (RC2): the smoothed wet gain starts at full wet; the legacy
+    // persisted mix_ no longer shapes the output.
+    mixCur_ = i2fp(1);
     decay_ = decayTarget_;
 }
 
@@ -146,6 +155,8 @@ void Reverb::SetMix(fixed mix) {
     float m = fp2fl(mix);
     if (m < 0.0f) m = 0.0f;
     if (m > 1.0f) m = 1.0f;
+    // RC2 (section 3.1): stored for persistence/migration only; the DSP is
+    // fixed 100% wet and never reintroduces dry into the return.
     mix_ = fl2fp(m);
 }
 
@@ -154,9 +165,15 @@ void Reverb::recomputeCombs() {
     float rateScale = (float)rate_ / 44100.0f;
     float sizeScale = fp2fl(size_);
 
-    // ECO: 2 combs + 1 allpass per channel; NORMAL: 4 combs + 2 allpasses.
+    // ECO: 2 combs + 1 allpass per channel; NORMAL: 4 combs + 3 allpasses
+    // (RC2, section 3.3: denser diffusion).
     int combs = (mode_ == ECO) ? 2 : 4;
-    int aps = (mode_ == ECO) ? 1 : 2;
+    int aps = (mode_ == ECO) ? 1 : 3;
+
+    // RC2 (section 3.2): normalized parallel-comb sum.  Four combs sum to
+    // roughly the level of one (headroom preserved before the allpasses)
+    // instead of accumulating 4x and relying on the hard clamp.
+    combNorm_ = i2fp(1) / combs;
 
     // Fill L combs (0..combs-1) and R combs (kNumCombs/2 .. +combs-1).
     for (int c = 0; c < combs; c++) {
@@ -244,16 +261,22 @@ void Reverb::Process(const fixed *in, fixed *out, int frames) {
 
     glideDecay();
 
-    // Smoothed dry/wet mix (bypass crossfades wet->dry, tail keeps running).
-    fixed targetMix = bypass_ ? 0 : mix_;
-    mixCur_ = mixCur_ + fp_mul(FX_REVERB_MIX_SMOOTH, targetMix - mixCur_);
-    fixed wetMix = mixCur_;
-    fixed dryMix = i2fp(1) - wetMix;
+    // RC2 (section 3.1): wet-only send/return.  The reverb delivers only the
+    // processed (wet) signal; the dry signal already lives in the master bus,
+    // so there is no dry*dryMix term.  mixCur_ is the smoothed wet gain: full
+    // wet at 1.0, gliding to 0 while bypassed.  The tail keeps running
+    // internally and reappears when bypass is released.
+    fixed targetGain = bypass_ ? 0 : i2fp(1);
+    mixCur_ = mixCur_ + fp_mul(FX_REVERB_MIX_SMOOTH, targetGain - mixCur_);
+    fixed wetGain = mixCur_;
 
     int idx = 0;
     for (int i = 0; i < frames; i++) {
-        fixed xL = saturate(inputFilter(in[idx], 0));
-        fixed xR = saturate(inputFilter(in[idx + 1], 1));
+        // RC2 (section 3.2): fixed -3 dB input headroom.
+        fixed xL = saturate(fp_mul(saturate(inputFilter(in[idx], 0)),
+                                   FX_REVERB_INPUT_HEADROOM));
+        fixed xR = saturate(fp_mul(saturate(inputFilter(in[idx + 1], 1)),
+                                   FX_REVERB_INPUT_HEADROOM));
 
         // Predelay write.
         predelay_[predelayWrite_] = xL;
@@ -297,11 +320,13 @@ void Reverb::Process(const fixed *in, fixed *out, int frames) {
                 sumR += outR;
             }
         }
-        sumL = saturate(sumL);
-        sumR = saturate(sumR);
+        // RC2 (section 3.2): normalized sum (headroom before the allpasses);
+        // saturate stays as final protection only.
+        sumL = saturate(fp_mul(sumL, combNorm_));
+        sumR = saturate(fp_mul(sumR, combNorm_));
 
         // Series allpass diffusers (L and R banks) on the comb sum.
-        int nAps = (mode_ == ECO) ? 1 : 2;
+        int nAps = (mode_ == ECO) ? 1 : 3;
         fixed wetL = sumL;
         fixed wetR = sumR;
         for (int c = 0; c < nAps; c++) {
@@ -344,8 +369,8 @@ void Reverb::Process(const fixed *in, fixed *out, int frames) {
         wetL = wetL - dcState_[0];
         wetR = wetR - dcState_[1];
 
-        out[idx] = saturate(fp_mul(xL, dryMix) + fp_mul(saturate(wetL), wetMix));
-        out[idx + 1] = saturate(fp_mul(xR, dryMix) + fp_mul(saturate(wetR), wetMix));
+        out[idx] = saturate(fp_mul(saturate(wetL), wetGain));
+        out[idx + 1] = saturate(fp_mul(saturate(wetR), wetGain));
 
         predelayWrite_ += 2;
         if (predelayWrite_ >= kPredelayMax * 2) predelayWrite_ = 0;

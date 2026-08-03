@@ -1,5 +1,37 @@
 # Changelog
 
+## Release candidate: Bacon 1.1 - FX Dev (RC2)
+
+- **Estado**: release candidate sobre RC1. Añade la **normalización de
+  etiquetas FX visibles (tabla T1)** sin tocar los FourCC internos (los
+  proyectos siguen siendo bit-identicos): `FBMX->CFM`, `FBTN->CFT`,
+  `DLAY->NDL`, `FLTR->FCR`, `FCUT->FCU`, `FRES->FRS`, `CRSH->BCR`,
+  `PFIN->PFT`, `DLYS->DSE`, `RVBS->RSE`, `DLYT->DTM`, `DLYF->DFB`,
+  `RVDC->RDC`, `RVSZ->RSZ`, `CMPT->CTH`.
+- **Selector FX por familias con paginación**: FX 1/2 (INST/FILTER/DELAY/
+  REVERB/MASTER) y FX 2/2 (LEGACY COMB, CFM/CFT); los proyectos con
+  FBMX/FBTN siguen reproduciéndose y siendo editables.
+- **Reverb wet-only**: `RVB MIX` retirado de la UI (inerte en el DSP),
+  headroom -3 dB de entrada, suma de combs normalizada (`combNorm_`) y 3er
+  allpass por canal en NORMAL. El Delay conserva su dry/wet.
+- **Páginas DELAY/REVERB MASTER dedicadas**: menús de dos columnas con
+  jerarquía de colores (título `CD_HILITE1`, label `CD_NORMAL`, valor
+  `CD_HILITE1`, fila editada invertida `CD_HILITE2`) y unidades
+  (`ms`, `s`, `ON/OFF`, `ECO`/`NORMAL`).
+- **Barras sólidas en InstrumentView**: EFFECT SENDS con bloque sólido de
+  celdas invertidas (estilo MixerView) en vez de `[====----]`; `INH` limpia
+  la barra.
+- **`UIBigHexVarField::SetHexMode` corregido**: conserva el cursor de nibble
+  (clamp al rango) y clampa/envuelve el valor al nuevo `[min,max]`.
+- **Pruebas**: suite completa en verde (`AUDIT_CLEAN_MAIN_U2523_OK`).
+  Nuevo `test_fx_rc2_master_pages_solid_bars_hexmode.py`; actualizados
+  `test_fx_phase10_wetonly_audit`, `test_fx_phase4_ui`,
+  `test_fx_phase6_nav_ab_default`, `test_fx_phase12_eq_menu`,
+  `test_fx_phase13_comp_menu` y `test_fx_phase8_instrument_blocks`.
+- **Binario**: `BUILD/U2523/lgpt_r36sx_u2523.so`
+  (SHA-256 `c114863b8c43d6ae1300dd672edc5b6980970f59ec08bc29ceb658b58126bc20`),
+  daemon ABI7 golden inalterado. Detalles en `docs/RELEASE_BACON_1.1_FX_DEV_ES.md`.
+
 ## Release candidate: Bacon 1.1 - FX Dev (RC1)
 
 - **Estado**: release candidate (no estable) sobre la línea Bacon. Integra el

@@ -40,13 +40,17 @@ enum FxParamId {
     FX_P_DLY_SAT,
     FX_P_DLY_BYP,
     // REVERB
+    // RC2 (point 3.1): the legacy RVB MIX row was removed from the UI.  The
+    // reverb is a true wet-only send/return processor now: RVB MIX no longer
+    // acts as a dry/wet control (the engine keeps reading/persisting it but it
+    // is inert), and the audible level is set by the instrument send + the
+    // Mixer REVERB RETURN.  The page shows PRE/DEC/SIZ/DMP/WID/MODE/BYP.
     FX_P_RVB_PRE,
     FX_P_RVB_DEC,
     FX_P_RVB_SIZ,
     FX_P_RVB_DMP,
     FX_P_RVB_WID,
     FX_P_RVB_MODE,
-    FX_P_RVB_MIX,
     FX_P_RVB_BYP,
     // EQ (3 bands, dedicated banded menu - Fase 12: bypass + enable/freq/
     // gain/Q each; EN is first so UP/DOWN walks the band in the same visual
@@ -117,6 +121,15 @@ protected:
 	void drawFxPages() ;
 	void drawFxParamPage(FxPage page) ;
 	void drawFxParamRow(int id,int x,int y,int col) ;
+	// TREEFROG_FX_MASTER_PAGES_RC2 (PLAN_FX_REDESIGN_ES.md, RC2 point 4):
+	// dedicated DELAY MASTER / REVERB MASTER pages with a clear visual
+	// hierarchy (title in CD_HILITE1, row label in CD_NORMAL, value in
+	// CD_HILITE1, edited row inverted in CD_HILITE2).  drawMasterFxRow draws
+	// one two-column row; drawDelayPage/drawReverbPage lay the pages out.
+	void drawMasterFxRow(const char *label,const char *value,bool selected,
+	                     int x,int y,int valueX) ;
+	void drawDelayPage() ;
+	void drawReverbPage() ;
 	// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12): dedicated EQ
 	// menu (exclusive page) with banded LOW/MID/HIGH layout, ON/OFF, Hz and
 	// signed-dB values.  drawEqRow draws one row; drawEqPage is dispatched by

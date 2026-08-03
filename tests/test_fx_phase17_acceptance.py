@@ -64,18 +64,22 @@ def fl2fp(f):
 # ---------------------------------------------------------------------------
 # Canonical command table (parsed from CommandList.cpp _specs[])
 # ---------------------------------------------------------------------------
+# TREEFROG_FX_LABELS_RC2 (RC2): display names follow table T1.  The stored
+# FourCC (and therefore the param editor format) is unchanged; only the
+# on-screen 3-letter label was normalized (CFM/CFT/NDL/FCR/FCU/FRS/BCR/PFT
+# and DSE/RSE/DTM/DFB/RDC/RSZ/CTH).
 SPECS = {
     "I_CMD_NONE": ("----", "HEX16"),
-    "I_CMD_FBMX": ("FBM ", "HEX16"),
-    "I_CMD_FBTN": ("FBT ", "HEX16"),
+    "I_CMD_FBMX": ("CFM ", "HEX16"),
+    "I_CMD_FBTN": ("CFT ", "HEX16"),
     "I_CMD_DLAY": ("NDL ", "HEX16"),
-    "I_CMD_FLTR": ("FLT ", "HEX16"),
-    "I_CMD_FCUT": ("EQ  ", "HEX16"),
-    "I_CMD_FRES": ("RES ", "HEX16"),
-    "I_CMD_CRSH": ("BTS ", "HEX16"),
-    "I_CMD_PFIN": ("PFI ", "HEX16"),
-    "I_CMD_DLYS": ("DSN ", "HEX8"),
-    "I_CMD_RVBS": ("RSN ", "HEX8"),
+    "I_CMD_FLTR": ("FCR ", "HEX16"),
+    "I_CMD_FCUT": ("FCU ", "HEX16"),
+    "I_CMD_FRES": ("FRS ", "HEX16"),
+    "I_CMD_CRSH": ("BCR ", "HEX16"),
+    "I_CMD_PFIN": ("PFT ", "HEX16"),
+    "I_CMD_DLYS": ("DSE ", "HEX8"),
+    "I_CMD_RVBS": ("RSE ", "HEX8"),
     "I_CMD_DLYT": ("DTM ", "HEX8"),
     "I_CMD_DLYF": ("DFB ", "HEX8"),
     "I_CMD_RVDC": ("RDC ", "HEX8"),
@@ -279,8 +283,8 @@ def check_nomenclature():
     # no "compressor" label on the crush variable
     assert 'new Variable("crush",SIP_CRUSH' in SI_CPP
     assert "compressor" not in SI_CPP.split("SIP_CRUSH")[0][-120:].lower()
-    # EQ is a command label (FCUT="EQ ") in the central table, not the reso row
-    assert re.search(r'\{ I_CMD_FCUT,\s+"EQ  "', CL_CPP)
+    # EQ is a command label (FCUT="FCU ") in the central table, not the reso row
+    assert re.search(r'\{ I_CMD_FCUT,\s+"FCU "', CL_CPP)
     assert "EQ" not in SI_CPP.split("SIP_FILTRESO")[0][-80:].lower()
     # the grid/table/selector all copy the central name
     assert 'CommandList::GetDisplayName(command)' in HELP

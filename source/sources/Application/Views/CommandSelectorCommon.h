@@ -8,15 +8,22 @@ namespace CommandSelectorCommon {
 
 static const int kColumns = 5;
 
-static const int kCellPitch = 5;
+// TREEFROG_SELECTOR_FAMILIES_RC2 (RC2): the family header row of the FX
+// selector needs 6 chars per column (INST FILTER DELAY REVERB MASTER), so the
+// cell pitch grew from 5 to 6.  This keeps every column exactly under its
+// family header.
+static const int kCellPitch = 6;
 static const int kScreenCenterX = 20;
 inline int getPopupInnerWidth() { return kColumns * kCellPitch; }
 inline int getPopupStartX() { return kScreenCenterX - (getPopupInnerWidth() / 2); }
 inline int getDisplayCount() { return CommandList::GetCount() - 1; }
 
+// TREEFROG_SELECTOR_FAMILIES_RC2 (RC2): the FX selector is paginated
+// (FX 1/2 = families, FX 2/2 = legacy comb).  Page 1 is the tallest popup:
+// title + family header + 3 command rows = 5.  Return that max so the play
+// cursor / live indicators are always suppressed over the whole popup.
 inline int getRows() {
-    int count = getDisplayCount();
-    return (count + kColumns - 1) / kColumns;
+    return 5;
 }
 
 inline int getPopupStartY(const GUIPoint &anchor) {

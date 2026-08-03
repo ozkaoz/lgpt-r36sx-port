@@ -41,13 +41,15 @@ static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
     { "DLY SAT", FX_PAGE_DELAY,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_DLY_SAT (0/1)
     { "DLY BYP", FX_PAGE_DELAY,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_DLY_BYP (0/1)
     // REVERB page
+    // RC2 (point 3.1): the RVB MIX row was removed.  The reverb is wet-only
+    // (no dry/wet crossfade); the audible level is the instrument send + the
+    // Mixer REVERB RETURN (MIX page FX RETURNS), not an internal mix.
     { "RVB PRE", FX_PAGE_REVERB,   0.0f, 100.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_PRE (ms)
     { "RVB DEC", FX_PAGE_REVERB,   0.2f,   8.0f,    1.0f,   "%5.2f" },  // FX_P_RVB_DEC (s)
     { "RVB SIZ", FX_PAGE_REVERB,   0.5f,   1.5f,    1.0f,   "%5.2f" },  // FX_P_RVB_SIZ
     { "RVB DMP", FX_PAGE_REVERB,   0.0f,   1.0f,    0.5f,   "%5.2f" },  // FX_P_RVB_DMP
     { "RVB WID", FX_PAGE_REVERB,   0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_RVB_WID
     { "RVB MOD", FX_PAGE_REVERB,   0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_MODE (0/1)
-    { "RVB MIX", FX_PAGE_REVERB,   0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_RVB_MIX
     { "RVB BYP", FX_PAGE_REVERB,   0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_BYP (0/1)
     // EQ page (3 bands, dedicated banded menu - Fase 12).  Per band the rows
     // are EN / FRQ / GAI / Q so UP/DOWN walks the band in the same visual
@@ -679,7 +681,6 @@ float MixerView::fxGet(int id) const {
 	case FX_P_RVB_DMP:  return fp2fl(fx.GetReverbDamping()) ;
 	case FX_P_RVB_WID:  return fp2fl(fx.GetReverbWidth()) ;
 	case FX_P_RVB_MODE: return (float)fx.GetReverbMode() ;
-	case FX_P_RVB_MIX:  return fp2fl(fx.GetReverbMix()) ;
 	case FX_P_RVB_BYP:  return fx.GetReverbBypass()?1.0f:0.0f ;
 	case FX_P_EQ_BYP:   return fx.GetEqBypass()?1.0f:0.0f ;
 	case FX_P_EQ_LOW_FRQ: return fp2fl(fx.GetEqBandFreq(0)) ;
@@ -726,7 +727,6 @@ void MixerView::fxSet(int id,float v) {
 	case FX_P_RVB_DMP:  fx.SetReverbDamping(fl2fp(v)) ; break ;
 	case FX_P_RVB_WID:  fx.SetReverbWidth(fl2fp(v)) ; break ;
 	case FX_P_RVB_MODE: fx.SetReverbMode((int)v) ; break ;
-	case FX_P_RVB_MIX:  fx.SetReverbMix(fl2fp(v)) ; break ;
 	case FX_P_RVB_BYP:  fx.SetReverbBypass(v>=0.5f) ; break ;
 	case FX_P_EQ_BYP:   fx.SetEqBypass(v>=0.5f) ; break ;
 	case FX_P_EQ_LOW_FRQ: fx.SetEqBandFreq(0,fl2fp(v)) ; break ;
@@ -781,10 +781,10 @@ void MixerView::drawFxParamRow(int id,int x,int y,int col) {
 
 void MixerView::drawFxParamPage(FxPage page) {
 	int y=2 ;
-	SetColor(CD_NORMAL) ;
 	GUITextProperties props ;
 	// TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 11): the title shows
-	// the page position [n/5] so the SELECT cycle is always visible.
+	// the page position [n/5] so the SELECT cycle is always visible.  RC2
+	// (point 4): the title sits in CD_HILITE1 (top of the hierarchy).
 	char pageTitle[24] ;
 	int pageNum=(int)page+1 ;
 	switch(page) {
@@ -793,7 +793,24 @@ void MixerView::drawFxParamPage(FxPage page) {
 	case FX_PAGE_EQ:     sprintf(pageTitle,"MASTER EQ [%d/5]",pageNum) ; break ;
 	default:             sprintf(pageTitle,"MASTER COMP [%d/5]",pageNum) ; break ;
 	}
+	SetColor(CD_HILITE1) ;
 	DrawString(1,1,pageTitle,props) ;
+	SetColor(CD_NORMAL) ;
+	// TREEFROG_FX_MASTER_PAGES_RC2 (PLAN_FX_REDESIGN_ES.md, RC2 point 4): the
+	// DELAY and REVERB pages are dedicated two-column menus (label / value)
+	// with a clear hierarchy instead of the generic parameter list.
+	if (page==FX_PAGE_DELAY) {
+		drawDelayPage() ;
+		DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
+		DrawString(1,23,"SELECT page  START play",props) ;
+		return ;
+	}
+	if (page==FX_PAGE_REVERB) {
+		drawReverbPage() ;
+		DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
+		DrawString(1,23,"SELECT page  START play",props) ;
+		return ;
+	}
 	// TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12): the EQ page is a
 	// dedicated exclusive menu with a banded LOW/MID/HIGH layout (EN/FRQ/GAI/Q
 	// per band), so it does not use the generic parameter list.
@@ -820,6 +837,69 @@ void MixerView::drawFxParamPage(FxPage page) {
 	}
 	DrawString(1,22,"UP/DN row  L/R edit  A coarse",props) ;
 	DrawString(1,23,"SELECT page  START play",props) ;
+}
+
+// TREEFROG_FX_MASTER_PAGES_RC2 (PLAN_FX_REDESIGN_ES.md, RC2 point 4):
+// One two-column row of a DELAY/REVERB master page.  Hierarchy: the row
+// label renders in CD_NORMAL, the value in CD_HILITE1; the edited row
+// inverts with CD_HILITE2 so the current target always stands out.
+void MixerView::drawMasterFxRow(const char *label,const char *value,
+                                bool selected,int x,int y,int valueX) {
+	GUITextProperties props ;
+	SetColor(CD_NORMAL) ;
+	props.invert_=false ;
+	DrawString(x,y,label,props) ;
+	SetColor(selected?CD_HILITE2:CD_HILITE1) ;
+	props.invert_=selected ;
+	DrawString(valueX,y,value,props) ;
+	props.invert_=false ;
+	SetColor(CD_NORMAL) ;
+}
+
+void MixerView::drawDelayPage() {
+	char buffer[16] ;
+	const int x=2 ;
+	const int valueX=x+12 ;
+	static const char *labels[7]={"TIME","FEEDBACK","MIX","WIDTH",
+	                              "PING/PONG","SATURATE","BYPASS"} ;
+	static const int ids[7]={FX_P_DLY_TIME,FX_P_DLY_FBK,FX_P_DLY_MIX,
+	                         FX_P_DLY_WID,FX_P_DLY_PP,FX_P_DLY_SAT,
+	                         FX_P_DLY_BYP} ;
+	for (int p=0;p<7;p++) {
+		int id=ids[p] ;
+		float v=fxGet(id) ;
+		switch(id) {
+		case FX_P_DLY_TIME: sprintf(buffer,"%4.0f ms",v) ; break ;
+		case FX_P_DLY_PP:
+		case FX_P_DLY_SAT:
+		case FX_P_DLY_BYP:  sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ; break ;
+		default:            sprintf(buffer,"%.2f",v) ; break ;  // FBK/MIX/WID
+		}
+		drawMasterFxRow(labels[p],buffer,(fxRowForId(id)==fxRow_),x,2+p,valueX) ;
+	}
+}
+
+void MixerView::drawReverbPage() {
+	char buffer[16] ;
+	const int x=2 ;
+	const int valueX=x+12 ;
+	static const char *labels[7]={"PREDELAY","DECAY","SIZE","DAMPING",
+	                              "WIDTH","MODE","BYPASS"} ;
+	static const int ids[7]={FX_P_RVB_PRE,FX_P_RVB_DEC,FX_P_RVB_SIZ,
+	                         FX_P_RVB_DMP,FX_P_RVB_WID,FX_P_RVB_MODE,
+	                         FX_P_RVB_BYP} ;
+	for (int p=0;p<7;p++) {
+		int id=ids[p] ;
+		float v=fxGet(id) ;
+		switch(id) {
+		case FX_P_RVB_PRE:  sprintf(buffer,"%4.0f ms",v) ; break ;
+		case FX_P_RVB_DEC:  sprintf(buffer,"%.2f s",v) ; break ;
+		case FX_P_RVB_MODE: sprintf(buffer,"%s",v>=0.5f?"NORMAL":"ECO") ; break ;
+		case FX_P_RVB_BYP:  sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ; break ;
+		default:            sprintf(buffer,"%.2f",v) ; break ;  // SIZ/DMP/WID
+		}
+		drawMasterFxRow(labels[p],buffer,(fxRowForId(id)==fxRow_),x,2+p,valueX) ;
+	}
 }
 
 // TREEFROG_EQ_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12): dedicated EQ menu.
