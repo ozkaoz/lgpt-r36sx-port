@@ -145,17 +145,20 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[1].assign("immediately");
 			result[2].assign("");
 			break;
-		// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4):
-		// Master-bus FX, monotonic 00-FF on the low byte (0=min, FF=max).
+		// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4) /
+		// TREEFROG_SEND_LIVE_V1 (Fase 15):
+		// DLYS/RVBS modulate the LIVE per-channel instrument send override
+		// (never the persisted base nor the per-track Mixer send).  The rest
+		// are master-bus FX, monotonic 00-FF on the low byte (0=min, FF=max).
 		case I_CMD_DLYS:
 			result[0].assign("Delay Send:--bb");
-			result[1].assign("track delay send bb");
-			result[2].assign("00-FF -> 0-100%");
+			result[1].assign("instrument delay send bb");
+			result[2].assign("00-FF -> 0-100% (live)");
 			break;
 		case I_CMD_RVBS:
 			result[0].assign("ReveRb Send:--bb");
-			result[1].assign("track reverb send bb");
-			result[2].assign("00-FF -> 0-100%");
+			result[1].assign("instrument reverb send bb");
+			result[2].assign("00-FF -> 0-100% (live)");
 			break;
 		case I_CMD_DLYT:
 			result[0].assign("Delay TiMe:--bb");

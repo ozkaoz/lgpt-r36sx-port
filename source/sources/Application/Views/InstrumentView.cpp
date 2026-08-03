@@ -258,8 +258,10 @@ void InstrumentView::fillSampleParameters() {
 
 	// ----------------------------------------------------------
 	// Block 5: EFFECT SENDS (percent bars, TREEFROG_FX_SEND_BAR_V1).
-	// DRY 0..100 (default 100).  DELAY/REVERB -1 = inherit per-track
-	// Mixer send (Fase 6/7), 0..100 = explicit instrument override.
+	// DRY 0..100 (default 100).  DELAY/REVERB 0..100 = the PERSISTED base
+	// (default 0); -1 = inherit per-track Mixer send (legacy projects only).
+	// Since Fase 15 only these edits write the persisted base; phrase/table
+	// DLYS/RVBS automation modulates the live per-channel override instead.
 	// ----------------------------------------------------------
 	position._y+=2 ;  // skip header row 21
 	v=instrument->FindVariable(SIP_DRY) ;

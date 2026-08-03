@@ -512,6 +512,22 @@ los golden WAVs de Fase 0 y la reproducción actual no cambian (confirmado por e
 - `PlayerChannel::Render`: lee `GetLiveDelaySend(index_)`/`GetLiveReverbSend(index_)` en lugar de los overrides de base; el resto (0xFF hereda, 0..100 gana, `gain = send%*DRY%/10000`) no cambia.
 - Tests actualizados (Fase 6/7, phase4 guards, phase9 docstring) al nuevo contrato y test nuevo `tests/test_fx_phase15_live_sends.py` -> `FX_LIVE_SENDS_PHASE15_OK` (defaults 100/0/0, instrumento default en silencio, hereda `-1` legacy exacto, automatización live-only sin tocar base, trigger restaura base, legato conserva live, canales independientes, cambio de instrumento aplica su base, guards de fuente).
 
+### Fase 16 — Revisión de archivos afectados (hecho y verificado)
+
+Auditoría de los archivos del listado de la spec (no se asumió que todos necesitan cambios; sin tocar DSP innecesariamente). Resultado por archivo:
+
+- `Views/PhraseView.cpp`, `Views/TableView.cpp`: sin referencias a sends; no requieren cambios (dibujan/ejecutan comandos genéricamente).
+- `Views/MixerView.h`, `Views/InstrumentView.h`: sin referencias; sin cambios.
+- `Views/MixerView.cpp`: única referencia es un comentario sobre el `InstrumentFxModal` eliminado (Fase 6.3); sin cambios.
+- `Views/ModalDialogs/InstrumentFxModal.{h,cpp}`: ya no existen (eliminados en Fase 6.3); sin cambios.
+- `Views/InstrumentView.cpp`: bloque EFFECT SENDS edita la base persistida DRY/DLY/RVB (única vía que la escribe desde Fase 15). Comentario actualizado a la semántica Fase 15. Sin cambios de código.
+- `Instruments/CommandList.{h,cpp}` y `Utils/HelpLegend.h`: textos desactualizados ("track delay/reverb send"). Actualizados a "instrument delay/reverb send (live)" con la nota Fase 15. Solo comentarios/ayuda; los FourCC `DSN`/`RSN` y su mapeo 00-FF no cambian.
+- `Instruments/SampleInstrument.{h,cpp}`: ya consistentes con Fase 15 (fase anterior); sin cambios aquí.
+- `Model/Mixer.{h,cpp}`: sends per-track siguen como capa de herencia persistida (`DELAYSEND`/`REVERBSEND`); sin cambios (compat Fase 7 intacta).
+- `Player/PlayerChannel.cpp`: ya lee la capa live (Fase 15); sin cambios.
+- `Audio/FxEngine.{h,cpp}`: DSP no se modifica (evitar cambios innecesarios en módulos DSP).
+- Verificación: suite FX (Fase 4/6/8/15) en verde; `g++ -fpermissive -fsyntax-only` de `CommandList.cpp`, `InstrumentView.cpp`, `HelpLegend.h` OK.
+
 ---
 
 ## G. Diseño de clases / APIs (FxEngine)

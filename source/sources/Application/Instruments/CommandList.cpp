@@ -28,10 +28,12 @@ static const CommandSpec _specs[] = {
 	{ I_CMD_FRES,                     "RES ",            CMD_PARAM_FORMAT_HEX16 },
 	{ I_CMD_CRSH,                     "BTS ",            CMD_PARAM_FORMAT_HEX16 },
 	{ I_CMD_PFIN,                     "PFI ",            CMD_PARAM_FORMAT_HEX16 },
-	// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4):
+	// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4) /
+	// TREEFROG_SEND_LIVE_V1 (Fase 15):
 	// Master-bus FX automation, monotonic 00-FF on the low param byte:
-	// DLYS/RVBS set the track sends, DLYT/DLYF the master delay,
-	// RVDC/RVSZ the master reverb, CMPT the master compressor threshold.
+	// DLYS/RVBS modulate the LIVE per-channel instrument send override (never
+	// the persisted base nor the per-track Mixer send), DLYT/DLYF the master
+	// delay, RVDC/RVSZ the master reverb, CMPT the master comp threshold.
 	// These commands only read (value & 0xFF), so the editor is 2-digit HEX8.
 	{ I_CMD_DLYS,                     "DSN ",            CMD_PARAM_FORMAT_HEX8 },
 	{ I_CMD_RVBS,                     "RSN ",            CMD_PARAM_FORMAT_HEX8 },
