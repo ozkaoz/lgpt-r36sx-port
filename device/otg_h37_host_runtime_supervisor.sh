@@ -34,7 +34,10 @@ midi_wanted(){ [ "$(cat "$POLICY_FILE" 2>/dev/null || true)" = "MIDI_OTG" ]; }
 # v14.1: RO-proof daemon launch. A dirty SD FAT mounted read-only would make
 # `daemon >> SD.log &` fail the redirect and the daemon would never start.
 pick_log_path(){ p="$1"; if ( : >> "$p" ) 2>/dev/null; then printf '%s' "$p"; else printf '/tmp/%s' "$(basename "$p")"; fi; }
-terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
+# v14.3: stop daemons gracefully - SIGUSR1 (drain + clean PCM close) before
+# SIGTERM/SIGKILL. Killing a live musb URB stream abruptly wedges the
+# controller on the Sampler bounce.
+terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill -USR1 "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 40 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" || { wait "$p" 2>/dev/null || true; return 0; }; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
 cleanup(){
   STOP=1
   for p in "$RUNTIME/sp404_daemon_pid" "$RUNTIME/midi_daemon_pid"; do

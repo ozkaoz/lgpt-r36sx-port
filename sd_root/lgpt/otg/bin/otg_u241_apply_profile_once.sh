@@ -87,6 +87,21 @@ H35_ROLE_PATH="/sys/devices/platform/soc/18844000.usb/musb-hdrc.0.auto/mode"
 # as a host policy), racing the musb gadget rebuild with HW_PARAMS EIO storms
 # and role flips that crashed the console. Force-stop the supervisor + daemons
 # before ANY gadget/role operation.
+# v14.3: daemons are stopped gracefully (SIGUSR1 first) so a live stream is
+# drained instead of killed mid-URB, which wedged musb on the Sampler bounce.
+stop_daemon() {
+    name="$1"
+    pidof "$name" >/dev/null 2>&1 || return 0
+    pkill -USR1 -x "$name" 2>/dev/null || pkill -USR1 "$name" 2>/dev/null || true
+    n=0
+    while pidof "$name" >/dev/null 2>&1 && [ "$n" -lt 30 ]; do
+        sleep 0.1
+        n=$((n + 1))
+    done
+    if pidof "$name" >/dev/null 2>&1; then
+        killall -9 "$name" 2>/dev/null || true
+    fi
+}
 stop_host_supervisor() {
     s="$(cat "$RUNTIME/h38_host_supervisor_pid" 2>/dev/null || true)"
     if [ -n "$s" ] && kill -0 "$s" 2>/dev/null; then
@@ -97,7 +112,7 @@ stop_host_supervisor() {
         kill -0 "$s" 2>/dev/null && kill -9 "$s" 2>/dev/null || true
     fi
     for p in r36s_sp404_host_audio_io r36s_midi_host_io; do
-        pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
+        stop_daemon "$p"
     done
 }
 switch_host_role() {
@@ -187,19 +202,42 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
             fi
             ;;
         USB_OUT)
-            [ -x "$BIN/otg_u241_shutdown.sh" ] && /bin/sh "$BIN/otg_u241_shutdown.sh"
-            for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \
-                     r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
-                pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
-            done
-            if ! load_host_usb_modules; then
-                echo "HOST_STACK_ABORT skipped_role_switch=1"
+            # v14.3 SP404_REUSE: the core keeps host-role daemons alive across
+            # a fast LOCAL switch (Local only closes the core fifo). Re-entering
+            # USB_OUT then, a cold apply tears down a HEALTHY streaming SP404
+            # daemon - and killing live musb URBs is what wedged the controller
+            # on every Local->Sampler bounce. If the supervisor, the daemon and
+            # the card are all still up and the policy is already USB_OUT, reuse
+            # the live runtime (same pattern as ANDROID v12) and skip the
+            # shutdown/module/role rebuild entirely.
+            reuse=0
+            sup="$(cat "$RUNTIME/h38_host_supervisor_pid" 2>/dev/null || true)"
+            dp="$(cat "$RUNTIME/sp404_daemon_pid" 2>/dev/null || true)"
+            pol="$(cat "$RUNTIME/audio_driver_policy" 2>/dev/null || echo NONE)"
+            card="$(cat "$RUNTIME/sp404_playback_pcm" 2>/dev/null || echo none)"
+            if [ "$pol" = "USB_OUT_OTG" ] &&
+               [ -n "$sup" ] && kill -0 "$sup" 2>/dev/null &&
+               [ -n "$dp" ] && kill -0 "$dp" 2>/dev/null &&
+               [ -n "$card" ] && [ "$card" != "none" ] && [ -e "$card" ]; then
+                reuse=1
+            fi
+            if [ "$reuse" -eq 1 ]; then
+                echo "SP404_RUNTIME_REUSED supervisor=$sup daemon=$dp card=$card fifo=$([ -p /tmp/r36sx_sp404_pcm_fifo ] && echo present || echo missing)"
             else
-                switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
-                if [ -x "$BIN/otg_h37_host_runtime_supervisor.sh" ]; then
-                    LGPT_H38_POLICY=USB_OUT_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh"
+                [ -x "$BIN/otg_u241_shutdown.sh" ] && /bin/sh "$BIN/otg_u241_shutdown.sh"
+                for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \
+                         r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
+                    pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
+                done
+                if ! load_host_usb_modules; then
+                    echo "HOST_STACK_ABORT skipped_role_switch=1"
                 else
-                    echo "ERROR_HOST_SUPERVISOR_MISSING"
+                    switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
+                    if [ -x "$BIN/otg_h37_host_runtime_supervisor.sh" ]; then
+                        LGPT_H38_POLICY=USB_OUT_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh"
+                    else
+                        echo "ERROR_HOST_SUPERVISOR_MISSING"
+                    fi
                 fi
             fi
             ;;
@@ -223,8 +261,7 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
         WINDOWS)
             stop_host_supervisor
             for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \
-                     r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35 \
-                     r36s_sp404_host_audio_io r36s_midi_host_io; do
+                     r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
                 pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
             done
             if [ -x "$BIN/otg_u241_setup_once.sh" ]; then

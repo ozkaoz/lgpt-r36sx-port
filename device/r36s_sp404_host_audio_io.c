@@ -76,6 +76,17 @@ static unsigned g_dev_cap_channels = 1;
 static unsigned g_dev_cap_rate = 48000;
 static unsigned g_dev_play_shift = 0;
 static unsigned g_dev_cap_shift = 0;
+/* v14.3: graceful daemon stop. Killing a live streaming process with a plain
+ * SIGTERM while musb URB transfers are in flight wedges the controller on this
+ * SoC (crash al volver a Sampler). SIGUSR1/SIGTERM/SIGINT all set this flag;
+ * the main loop checks it at a safe point (between ALSA calls) and closes the
+ * PCMs cleanly from its own context before exiting. */
+static volatile sig_atomic_t g_sp404_stop_requested = 0;
+
+static void sp404_stop_signal_handler(int sig) {
+    (void)sig;
+    g_sp404_stop_requested = 1;
+}
 
 static unsigned fmt_shift(int fmt) {
     switch (fmt) {
@@ -2233,6 +2244,14 @@ int main(int argc, char **argv) {
     sigemptyset(&pipe_action.sa_mask);
     sigaction(SIGPIPE, &pipe_action, 0);
 
+    struct sigaction stop_action;
+    memset(&stop_action, 0, sizeof(stop_action));
+    stop_action.sa_handler = sp404_stop_signal_handler;
+    sigemptyset(&stop_action.sa_mask);
+    sigaction(SIGUSR1, &stop_action, 0);
+    sigaction(SIGTERM, &stop_action, 0);
+    sigaction(SIGINT, &stop_action, 0);
+
     if (argc > 1 && strcmp(argv[1], "--probe-all") == 0) {
         const char *probe_play = argc > 2 ? argv[2] : "/dev/snd/pcmC0D0p";
         const char *probe_cap = argc > 3 ? argv[3] : "/dev/snd/pcmC0D0c";
@@ -2534,6 +2553,18 @@ int main(int argc, char **argv) {
     long fifo_samples_last = 0;
 
     for (;;) {
+        if (g_sp404_stop_requested) {
+            if (cap.active) stop_capture("daemon-stop");
+            if (mon_cap_pcm >= 0) { close(mon_cap_pcm); mon_cap_pcm = -1; }
+            if (pcm >= 0) { close(pcm); pcm = -1; }
+            close(in);
+            if (keep >= 0) close(keep);
+            mark_inactive();
+            write_text_file(PLAYBACK_PCM_STATUS, "stopped-graceful\n");
+            fprintf(stderr,
+                    "R36SX_SP404_AUDIO_DAEMON_STOP_REQUESTED graceful_shutdown=1\n");
+            break;
+        }
         reread_sp404_card();
         refresh_audio_direction();
         int conf = usb_configured_cached();

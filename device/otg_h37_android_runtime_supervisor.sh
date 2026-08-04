@@ -29,7 +29,7 @@ policy_android(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in ANDROID|AN
 # v14.1: RO-proof launch - a dirty SD FAT mounted read-only would make
 # `daemon >> SD.log &` fail the redirect and the daemon/receiver never start.
 pick_log_path(){ p="$1"; if ( : >> "$p" ) 2>/dev/null; then printf '%s' "$p"; else printf '/tmp/%s' "$(basename "$p")"; fi; }
-terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
+terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill -USR1 "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 40 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" || { wait "$p" 2>/dev/null || true; return 0; }; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
 cleanup(){
   STOP=1
   rp="$(cat "$RECEIVER_PID" 2>/dev/null || true)"
