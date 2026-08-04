@@ -414,9 +414,9 @@ static int marker_fresh(const char *p, int max_age_sec) {
 
 static const char *mode_name(int mode) {
     switch (mode) {
-    case U241_WINDOWS: return "Windows (USB Duplex)";
-    case U241_ANDROID: return "Android (USB IN)";
-    case U241_USB_OUT: return "Sampler (USB OUT)";
+    case U241_WINDOWS: return "Windows";
+    case U241_ANDROID: return "Android";
+    case U241_USB_OUT: return "Sampler";
     case U241_MIDI: return "MIDI";
     case U241_LOCAL_CONSOLE:
     default: return "Local Console";
@@ -482,11 +482,11 @@ static void write_active_branch_file(int mode) {
 static const char *mode_desc(int mode) {
     switch (mode) {
     case U241_WINDOWS:
-        return "OUT+IN full duplex with PC/SP404";
+        return "Duplex UAC2 gadget (PC host)";
     case U241_ANDROID:
-        return "IN only: capture from Android/device";
+        return "Duplex UAC2 gadget (phone host)";
     case U241_USB_OUT:
-        return "Sampler OUT+IN duplex (SP404/UAC2 host)";
+        return "Duplex UAC2 host (sampler)";
     case U241_MIDI:
         return "MIDI: USB piano/controller";
     case U241_LOCAL_CONSOLE:
@@ -663,11 +663,15 @@ static int detected_device(void) {
 }
 
 static int mode_has_out(int mode) {
-    return mode == U241_WINDOWS || mode == U241_USB_OUT;
+    return mode == U241_WINDOWS ||
+        mode == U241_ANDROID ||
+        mode == U241_USB_OUT;
 }
 
 static int mode_has_in(int mode) {
-    return mode == U241_WINDOWS || mode == U241_ANDROID;
+    return mode == U241_WINDOWS ||
+        mode == U241_ANDROID ||
+        mode == U241_USB_OUT;
 }
 
 static const char *device_out_fifo(int device) {

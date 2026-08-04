@@ -1483,7 +1483,7 @@ int main(int argc, char **argv) {
     }
 
     const char *fifo = argc > 1 ? argv[1] : "/tmp/r36sx_sp404_pcm_fifo";
-    char pcm_play_buf[64], pcm_cap_buf[64];
+    char pcm_play_buf[96], pcm_cap_buf[96];
     int sp404_card = 1;
     {
         int cfd = open(SP404_CARD, O_RDONLY);
@@ -1500,34 +1500,83 @@ int main(int argc, char **argv) {
     }
     snprintf(pcm_play_buf, sizeof(pcm_play_buf), "/dev/snd/pcmC%dD0p", sp404_card);
     snprintf(pcm_cap_buf, sizeof(pcm_cap_buf), "/dev/snd/pcmC%dD0c", sp404_card);
+    /* H38.5 FULL_PCM_PATHS: the detector now writes complete PCM node paths
+     * (real D index, resolved from the USB parent). Prefer them over guessing
+     * pcmC{N}D0. Command-line args still win for direct invocations. */
+    if (argc <= 2) {
+        int fd = open("/tmp/r36sx_lgpt_usb/sp404_playback_pcm", O_RDONLY);
+        if (fd >= 0) {
+            char b[128];
+            ssize_t n = read(fd, b, sizeof(b) - 1);
+            close(fd);
+            if (n > 0) {
+                b[n] = 0;
+                char *nl = strchr(b, '\n');
+                if (nl) *nl = 0;
+                if (strlen(b) > 0 && strncmp(b, "/dev/snd/pcm", 12) == 0)
+                    snprintf(pcm_play_buf, sizeof(pcm_play_buf), "%s", b);
+            }
+        }
+    }
+    if (argc <= 3) {
+        int fd = open("/tmp/r36sx_lgpt_usb/sp404_capture_pcm", O_RDONLY);
+        if (fd >= 0) {
+            char b[128];
+            ssize_t n = read(fd, b, sizeof(b) - 1);
+            close(fd);
+            if (n > 0) {
+                b[n] = 0;
+                char *nl = strchr(b, '\n');
+                if (nl) *nl = 0;
+                if (strlen(b) > 0 && strncmp(b, "/dev/snd/pcm", 12) == 0)
+                    snprintf(pcm_cap_buf, sizeof(pcm_cap_buf), "%s", b);
+            }
+        }
+    }
     const char *pcmp = argc > 2 ? argv[2] : pcm_play_buf;
     const char *pcmc = argc > 3 ? argv[3] : pcm_cap_buf;
     const int pcm_path_overridden = (argc > 2) || (argc > 3);
     static unsigned long long last_card_recheck_ms = 0;
     int reread_sp404_card(void) {
         /* Only auto-track when the pcm paths were not forced on the command
-         * line. Reread the live marker so a late/hotplug enumeration on a
+         * line. Reread the live markers so a late/hotplug enumeration on a
          * different card index is picked up without a daemon restart. */
         if (pcm_path_overridden) return sp404_card;
         unsigned long long now = monotonic_milliseconds();
         if (last_card_recheck_ms != 0 && now >= last_card_recheck_ms &&
             (now - last_card_recheck_ms) < 500ULL) return sp404_card;
         last_card_recheck_ms = now;
+        int new_card = sp404_card;
         int cfd = open(SP404_CARD, O_RDONLY);
-        if (cfd < 0) return sp404_card;
-        char cbuf[16];
-        ssize_t cn = read(cfd, cbuf, sizeof(cbuf) - 1);
-        close(cfd);
-        if (cn <= 0) return sp404_card;
-        cbuf[cn] = 0;
-        int v = atoi(cbuf);
-        if (v > 0 && v != sp404_card) {
-            sp404_card = v;
-            snprintf(pcm_play_buf, sizeof(pcm_play_buf), "/dev/snd/pcmC%dD0p", sp404_card);
-            snprintf(pcm_cap_buf, sizeof(pcm_cap_buf), "/dev/snd/pcmC%dD0c", sp404_card);
-            fprintf(stderr, "CARD_RECHECK_UPDATED card=%d pcmp=%s pcmc=%s\n",
-                    sp404_card, pcm_play_buf, pcm_cap_buf);
+        if (cfd >= 0) {
+            char vbuf[16];
+            ssize_t cn = read(cfd, vbuf, sizeof(vbuf) - 1);
+            close(cfd);
+            if (cn > 0) { vbuf[cn] = 0; int v = atoi(vbuf); if (v > 0) new_card = v; }
         }
+        if (new_card == sp404_card) return sp404_card;
+        sp404_card = new_card;
+        /* Re-read the full-path markers, which may carry a non-standard D index. */
+        {
+            char pb[128] = {0};
+            int fd = open("/tmp/r36sx_lgpt_usb/sp404_playback_pcm", O_RDONLY);
+            if (fd >= 0) {
+                ssize_t n = read(fd, pb, sizeof(pb) - 1);
+                close(fd);
+                if (n > 0) { pb[n] = 0; char *nl = strchr(pb, '\n'); if (nl) *nl = 0;
+                    if (strncmp(pb, "/dev/snd/pcm", 12) == 0) snprintf(pcm_play_buf, sizeof(pcm_play_buf), "%s", pb); }
+            }
+            pb[0] = 0;
+            fd = open("/tmp/r36sx_lgpt_usb/sp404_capture_pcm", O_RDONLY);
+            if (fd >= 0) {
+                ssize_t n = read(fd, pb, sizeof(pb) - 1);
+                close(fd);
+                if (n > 0) { pb[n] = 0; char *nl = strchr(pb, '\n'); if (nl) *nl = 0;
+                    if (strncmp(pb, "/dev/snd/pcm", 12) == 0) snprintf(pcm_cap_buf, sizeof(pcm_cap_buf), "%s", pb); }
+            }
+        }
+        fprintf(stderr, "CARD_RECHECK_UPDATED card=%d pcmp=%s pcmc=%s\n",
+                sp404_card, pcm_play_buf, pcm_cap_buf);
         return sp404_card;
     }
     int requested_channels = argc > 4 ? atoi(argv[4]) : 1;

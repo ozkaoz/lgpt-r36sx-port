@@ -91,32 +91,77 @@ h35_switch_host_role(){
 # musb controller (now in host role) can enumerate the SP404/UAC2 or a USB-MIDI
 # device as an ALSA card/rawmidi node. Idempotent; searches the SD deployment
 # dir and the built-in module tree. Without these the SP404 never appears.
+# All eight modules are mandatory for the sampler profile: a failure of
+# snd-pcm/snd-usbmidi-lib/snd-usb-audio (or any of the core stack) aborts the
+# mode with a full diagnostic instead of silently continuing to host role.
 H35_HOST_MODBASE=$BASE/modules/4.4.186-release/host_usb_audio
+H35_UAC2_MODBASE=$BASE/modules/4.4.186-release/u2_38au8_sync_uac2
 h35_loaded(){ grep -q "^$1 " /proc/modules 2>/dev/null; }
+h35_module_vermagic(){
+  f="$1"; [ -r "$f" ] || return 1
+  strings "$f" 2>/dev/null | grep -m1 '^[0-9]\+\.[0-9]\+\.[0-9]\+' || true
+}
+h35_insmod_with_diag(){
+  p="$1"
+  err="$(insmod "$p" 2>&1 || true)"
+  rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  {
+    echo "insmod FAILED rc=$rc path=$p"
+    echo "  stderr: $err"
+    echo "  vermagic=$(h35_module_vermagic "$p")"
+    echo "  uname=$(uname -r 2>/dev/null || echo unknown)"
+  } >>"$LOGROOT/H38_HOST_MODULE_LOAD.err" 2>/dev/null || true
+  return 1
+}
 h35_load_host_module(){
   filename="$1"; module="$(echo "${filename%.ko}" | tr - _)"
   h35_loaded "$module" && echo "HOST_LOAD_${filename}_ALREADY=YES" && return 0
+  # Preferred: modprobe with modules.dep when the on-disk module tree is usable.
+  if command -v modprobe >/dev/null 2>&1 && [ -d "/lib/modules/$(uname -r 2>/dev/null)" ]; then
+    if modprobe "$module" 2>>"$LOGROOT/H38_HOST_MODULE_LOAD.err"; then
+      echo "HOST_LOAD_${filename}_MODPROBE=YES"
+      return 0
+    fi
+  fi
+  # Fallback: manual insmod respecting the on-disk search order.
   for p in \
     /lib/modules/4.4.186-release/kernel/sound/core/"$filename" \
     /lib/modules/4.4.186-release/kernel/sound/usb/"$filename" \
     /lib32/modules/4.4.186-release/kernel/sound/core/"$filename" \
     /lib32/modules/4.4.186-release/kernel/sound/usb/"$filename" \
-    "$BASE"/modules/4.4.186-release/u2_38au8_sync_uac2/"$filename" \
+    "$H35_UAC2_MODBASE"/"$filename" \
     $(find "$H35_HOST_MODBASE" -type f -name "$filename" 2>/dev/null); do
     [ -f "$p" ] || continue
-    insmod "$p" 2>>"$LOGROOT/H38_HOST_MODULE_LOAD.err" && echo "HOST_LOAD_${filename}_INSMOD=YES FROM=$p" && return 0
-    echo "insmod $p -> rc=$?" >>"$LOGROOT/H38_HOST_MODULE_LOAD.err" 2>/dev/null || true
+    h35_insmod_with_diag "$p" && { echo "HOST_LOAD_${filename}_INSMOD=YES FROM=$p"; return 0; }
   done
   echo "HOST_LOAD_${filename}_FAILED=YES"
   return 1
 }
+H35_CORE_STACK="soundcore.ko snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-rawmidi.ko"
+H35_USB_STACK="snd-usbmidi-lib.ko snd-usb-audio.ko"
+H35_HOST_MODULE_ERRLOG="$LOGROOT/H38_HOST_MODULE_LOAD.err"
 h35_load_host_stack(){
-  for m in soundcore.ko snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-rawmidi.ko; do
-    h35_load_host_module "$m" || true
+  local failed=""
+  for m in $H35_CORE_STACK; do
+    h35_load_host_module "$m" || failed="$failed $m"
   done
-  for m in snd-usbmidi-lib.ko snd-usb-audio.ko; do
-    h35_load_host_module "$m" || true
+  for m in $H35_USB_STACK; do
+    h35_load_host_module "$m" || failed="$failed $m"
   done
+  if [ -n "$failed" ]; then
+    {
+      echo "H38_HOST_STACK_ABORT failed=[$failed]"
+      echo "  modules.dep=$(ls /lib/modules/$(uname -r 2>/dev/null)/modules.dep 2>/dev/null || echo missing)"
+      echo "  uname=$(uname -r 2>/dev/null || echo unknown)"
+      echo "  /proc/modules tail:"
+      grep -E '^(snd|soundcore|usbcore|usb)' /proc/modules 2>/dev/null || true
+    } >>"$H35_HOST_MODULE_ERRLOG" 2>/dev/null || true
+    echo "HOST_STACK_ABORT failed=[$failed]"
+    return 1
+  fi
+  echo "HOST_STACK_OK"
+  return 0
 }
 
 case "$MODE" in
@@ -142,12 +187,17 @@ case "$MODE" in
     log "MODE_APPLY_STARTED windows_pid=$p"
     ;;
   USB_OUT)
-    # SP404MKII / host UAC2 OUT-only mode. Switch to host role and let the
-    # host runtime supervisor own the SP404 daemon.
+    # Sampler / host UAC2 duplex mode. The ALSA host stack is MANDATORY: if the
+    # essential modules fail to load, abort with ERROR instead of switching to
+    # host role and reporting a phantom "STARTED" without a card.
     stop_windows_runtime
     stop_android_runtime
     h35_clear_transient_state
-    h35_load_host_stack
+    if ! h35_load_host_stack; then
+      atomic_write "$STATUS" "ERROR mode=USB_OUT reason=host_stack_load_failed" || true
+      log MODE_APPLY_ERROR_HOST_STACK
+      exit 38
+    fi
     h35_switch_host_role || exit $?
     [ -r "$BIN/otg_h37_host_runtime_supervisor.sh" ] || { atomic_write "$STATUS" "ERROR mode=USB_OUT missing=host_supervisor" || true; exit 33; }
     LGPT_H38_POLICY=USB_OUT_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh" >>"$LOG" 2>&1 & p=$!
@@ -155,12 +205,15 @@ case "$MODE" in
     log "MODE_APPLY_STARTED usb_out_supervisor_pid=$p"
     ;;
   MIDI)
-    # USB-MIDI piano/controller. Switch to host role and let the host runtime
-    # supervisor own the MIDI daemon.
+    # USB-MIDI piano/controller. The ALSA host stack is mandatory.
     stop_windows_runtime
     stop_android_runtime
     h35_clear_transient_state
-    h35_load_host_stack
+    if ! h35_load_host_stack; then
+      atomic_write "$STATUS" "ERROR mode=MIDI reason=host_stack_load_failed" || true
+      log MODE_APPLY_ERROR_HOST_STACK
+      exit 39
+    fi
     h35_switch_host_role || exit $?
     [ -r "$BIN/otg_h37_host_runtime_supervisor.sh" ] || { atomic_write "$STATUS" "ERROR mode=MIDI missing=host_supervisor" || true; exit 34; }
     LGPT_H38_POLICY=MIDI_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh" >>"$LOG" 2>&1 & p=$!

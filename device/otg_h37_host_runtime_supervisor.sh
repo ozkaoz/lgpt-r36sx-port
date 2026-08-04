@@ -71,10 +71,20 @@ while [ "$STOP" -eq 0 ] && policy_host; do
     if ! pid_alive "$sp_pid"; then
       [ -x "$SP404_DAEMON" ] || { log "ERROR missing_sp404_daemon=$SP404_DAEMON"; exit 31; }
       [ -p "$SP404_FIFO" ] || { rm -f "$SP404_FIFO" 2>/dev/null || true; mkfifo "$SP404_FIFO" 2>/dev/null || true; }
-      "$SP404_DAEMON" "$SP404_FIFO" >>"$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log" 2>&1 &
+      # Prefer full PCM paths written by the improved detector; fall back to
+      # the old card-index marker for backward compatibility with ABI1.
+      sp_play="$(cat "$RUNTIME/sp404_playback_pcm" 2>/dev/null || echo none)"
+      sp_cap="$(cat "$RUNTIME/sp404_capture_pcm" 2>/dev/null || echo none)"
+      case "$sp_play" in none|''|FAILED|/dev/snd/pcmC0D0p)
+        card="$(cat "$RUNTIME/sp404_card" 2>/dev/null || echo 1)"
+        sp_play="/dev/snd/pcmC${card}D0p"
+        sp_cap="/dev/snd/pcmC${card}D0c"
+        ;;
+      esac
+      "$SP404_DAEMON" "$SP404_FIFO" "$sp_play" "$sp_cap" >>"$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log" 2>&1 &
       sp_pid=$!
       atomic_write "$RUNTIME/sp404_daemon_pid" "$sp_pid" || true
-      log "SP404_DAEMON_STARTED pid=$sp_pid"
+      log "SP404_DAEMON_STARTED pid=$sp_pid play=$sp_play cap=$sp_cap"
       sleep 0.3
     fi
   else
