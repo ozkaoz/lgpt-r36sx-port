@@ -93,6 +93,15 @@ switch_host_role() {
         return 2
     }
     echo "ROLE_BEFORE $H35_ROLE_PATH=$(cat "$H35_ROLE_PATH" 2>/dev/null)"
+    # v14: if the controller is already in host role, do not re-drive it.
+    # Re-writing mode on an already-host MUSB reset the SP404 endpoint while
+    # the daemon streamed, panicking the console on the Sampler bounce.
+    case "$(cat "$H35_ROLE_PATH" 2>/dev/null)" in
+        host|b_host)
+            echo "ROLE_ALREADY_HOST skip_rewrite=1"
+            return 0
+            ;;
+    esac
     echo host > "$H35_ROLE_PATH" 2>/dev/null || echo b_host > "$H35_ROLE_PATH" 2>/dev/null || {
         echo "ERROR_HOST_ROLE_WRITE_FAILED=YES"
         return 3
@@ -143,10 +152,18 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
                          r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
                     pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
                 done
-                if [ -x "$BIN/otg_h37_android_runtime_supervisor.sh" ]; then
-                    /bin/sh "$BIN/otg_h37_android_runtime_supervisor.sh"
+                # v14: AOA is host-side too. After a WINDOWS bounce the musb
+                # is left in device/gadget role and the phone is never seen
+                # ("android waiting"). Restore host stack + role like USB_OUT.
+                if ! load_host_usb_modules; then
+                    echo "HOST_STACK_ABORT skipped_role_switch=1"
                 else
-                    echo "ERROR_ANDROID_SUPERVISOR_MISSING"
+                    switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
+                    if [ -x "$BIN/otg_h37_android_runtime_supervisor.sh" ]; then
+                        /bin/sh "$BIN/otg_h37_android_runtime_supervisor.sh"
+                    else
+                        echo "ERROR_ANDROID_SUPERVISOR_MISSING"
+                    fi
                 fi
             fi
             ;;
@@ -186,7 +203,8 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
             ;;
         WINDOWS)
             for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \
-                     r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
+                     r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35 \
+                     r36s_sp404_host_audio_io r36s_midi_host_io; do
                 pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
             done
             if [ -x "$BIN/otg_u241_setup_once.sh" ]; then

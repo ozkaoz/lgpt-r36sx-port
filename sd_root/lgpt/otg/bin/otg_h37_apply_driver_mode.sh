@@ -18,11 +18,12 @@ mkdir -p "$BASE" "$BIN" "$LOGROOT" "$RUNTIME" 2>/dev/null || true
 normalize_mode(){ case "$1" in
   ANDROID|ANDROID_OTG|ANDROID_AOA) echo ANDROID;;
   USB_IN|USB_IN_OTG) echo ANDROID;;
+  SP404_IN|SP404_IN_OTG|SP404IN|SP404IN_OTG) echo SP404_IN;;
   USB_OUT|USB_OUT_OTG|SP404|SP404_OTG) echo USB_OUT;;
   MIDI|MIDI_OTG) echo MIDI;;
   WINDOWS|WINDOWS_OTG|USB_DUPLEX|USB_DUPLEX_OTG|USB_IN_OUT|FULL_DUPLEX) echo WINDOWS;;
   *) echo LOCAL_CONSOLE;; esac; }
-policy_for_mode(){ case "$1" in ANDROID) echo USB_IN_OTG;; WINDOWS) echo USB_DUPLEX_OTG;; USB_OUT) echo USB_OUT_OTG;; MIDI) echo MIDI_OTG;; *) echo LOCAL_CONSOLE;; esac; }
+policy_for_mode(){ case "$1" in ANDROID) echo USB_IN_OTG;; WINDOWS) echo USB_DUPLEX_OTG;; SP404_IN|USB_OUT) echo USB_OUT_OTG;; MIDI) echo MIDI_OTG;; *) echo LOCAL_CONSOLE;; esac; }
 atomic_write(){ p="$1"; v="$2"; d="$(dirname "$p")"; mkdir -p "$d" 2>/dev/null || true; t="${p}.h35tmp.$$"; rm -f "$t" 2>/dev/null || true; printf '%s\n' "$v" >"$t" 2>/dev/null && mv -f "$t" "$p" 2>/dev/null; }
 log(){ printf '%s H35 mode=%s supervisor=%s %s\n' "$(date 2>/dev/null || echo no-date)" "$MODE" "${LGPT_H35_SUPERVISOR_PID:-none}" "$*" >>"$LOG" 2>/dev/null || true; }
 pid_alive(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] && kill -0 "$p" 2>/dev/null; }
@@ -171,7 +172,7 @@ h35_load_host_stack(){
 case "$MODE" in
   WINDOWS) atomic_write "$RUNTIME/audio_usb_profile" "MONO_48K" ;;
   ANDROID) atomic_write "$RUNTIME/audio_usb_profile" "STEREO_44K1_AOA_BULK";;
-  USB_OUT) atomic_write "$RUNTIME/audio_usb_profile" "MONO_48K";;
+  USB_OUT|SP404_IN) atomic_write "$RUNTIME/audio_usb_profile" "MONO_48K";;
   MIDI) atomic_write "$RUNTIME/audio_usb_profile" "MIDI_48K";;
   *) atomic_write "$RUNTIME/audio_usb_profile" "LOCAL";;
 esac
@@ -190,23 +191,25 @@ case "$MODE" in
     atomic_write "$STATUS" "STARTED mode=WINDOWS pid=$p" || true
     log "MODE_APPLY_STARTED windows_pid=$p"
     ;;
-  USB_OUT)
-    # Sampler / host UAC2 duplex mode. The ALSA host stack is MANDATORY: if the
-    # essential modules fail to load, abort with ERROR instead of switching to
-    # host role and reporting a phantom "STARTED" without a card.
+  USB_OUT|SP404_IN)
+    # Sampler / host UAC2 mode (OUT: console->SP playback only; IN: SP-404
+    # "SP404_IN" token selects the same host stack but the daemon reads the
+    # mode file and runs capture-only). The ALSA host stack is MANDATORY: if
+    # the essential modules fail to load, abort with ERROR instead of
+    # switching to host role and reporting a phantom "STARTED" without a card.
     stop_windows_runtime
     stop_android_runtime
     h35_clear_transient_state
     if ! h35_load_host_stack; then
-      atomic_write "$STATUS" "ERROR mode=USB_OUT reason=host_stack_load_failed" || true
+      atomic_write "$STATUS" "ERROR mode=$MODE reason=host_stack_load_failed" || true
       log MODE_APPLY_ERROR_HOST_STACK
       exit 38
     fi
     h35_switch_host_role || exit $?
-    [ -r "$BIN/otg_h37_host_runtime_supervisor.sh" ] || { atomic_write "$STATUS" "ERROR mode=USB_OUT missing=host_supervisor" || true; exit 33; }
+    [ -r "$BIN/otg_h37_host_runtime_supervisor.sh" ] || { atomic_write "$STATUS" "ERROR mode=$MODE missing=host_supervisor" || true; exit 33; }
     LGPT_H38_POLICY=USB_OUT_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh" >>"$LOG" 2>&1 & p=$!
-    atomic_write "$STATUS" "STARTED mode=USB_OUT supervisor_pid=$p" || true
-    log "MODE_APPLY_STARTED usb_out_supervisor_pid=$p"
+    atomic_write "$STATUS" "STARTED mode=$MODE supervisor_pid=$p" || true
+    log "MODE_APPLY_STARTED ${MODE}_supervisor_pid=$p"
     ;;
   MIDI)
     # USB-MIDI piano/controller. The ALSA host stack is mandatory.

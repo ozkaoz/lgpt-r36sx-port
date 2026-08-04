@@ -93,6 +93,15 @@ switch_host_role() {
         return 2
     }
     echo "ROLE_BEFORE $H35_ROLE_PATH=$(cat "$H35_ROLE_PATH" 2>/dev/null)"
+    # v14: if the controller is already in host role, do not re-drive it.
+    # Re-writing mode on an already-host MUSB reset the SP404 endpoint while
+    # the daemon streamed, panicking the console on the Sampler bounce.
+    case "$(cat "$H35_ROLE_PATH" 2>/dev/null)" in
+        host|b_host)
+            echo "ROLE_ALREADY_HOST skip_rewrite=1"
+            return 0
+            ;;
+    esac
     echo host > "$H35_ROLE_PATH" 2>/dev/null || echo b_host > "$H35_ROLE_PATH" 2>/dev/null || {
         echo "ERROR_HOST_ROLE_WRITE_FAILED=YES"
         return 3
@@ -194,7 +203,8 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
             ;;
         WINDOWS)
             for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \
-                     r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
+                     r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35 \
+                     r36s_sp404_host_audio_io r36s_midi_host_io; do
                 pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
             done
             if [ -x "$BIN/otg_u241_setup_once.sh" ]; then
