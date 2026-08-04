@@ -23,9 +23,9 @@ GENERATION="${LGPT_H35_GENERATION:-$(cat "$RUNTIME/h35_android_generation" 2>/de
 mkdir -p "$LOGROOT" "$RUNTIME" 2>/dev/null || exit 20
 log(){ printf '%s H35_ANDROID_SUPERVISOR %s\n' "$(date 2>/dev/null || echo no-date)" "$*" >>"$LOG" 2>/dev/null || true; }
 atomic_write(){ p="$1"; v="$2"; d="$(dirname "$p")"; mkdir -p "$d" 2>/dev/null || true; t="${p}.h35tmp.$$"; rm -f "$t" 2>/dev/null || true; printf '%s\n' "$v" >"$t" 2>/dev/null && mv -f "$t" "$p" 2>/dev/null; }
-pid_alive(){ p="$1"; [ -n "$p" ] && kill -0 "$p" 2>/dev/null; }
-policy_android(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in ANDROID|ANDROID_OTG|ANDROID_AOA) return 0;; *) return 1;; esac; }
-terminate_pid(){ p="$1"; name="$2"; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
+pid_alive(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] && kill -0 "$p" 2>/dev/null; }
+policy_android(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in ANDROID|ANDROID_OTG|ANDROID_AOA|USB_IN_OTG|USB_IN) return 0;; *) return 1;; esac; }
+terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
 cleanup(){
   STOP=1
   rp="$(cat "$RECEIVER_PID" 2>/dev/null || true)"

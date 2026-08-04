@@ -21,11 +21,11 @@ STOP=0
 mkdir -p "$LOGROOT" "$RUNTIME" 2>/dev/null || exit 20
 log(){ printf '%s H38_HOST_SUPERVISOR %s\n' "$(date 2>/dev/null || echo no-date)" "$*" >>"$LOG" 2>/dev/null || true; }
 atomic_write(){ p="$1"; v="$2"; d="$(dirname "$p")"; mkdir -p "$d" 2>/dev/null || true; t="${p}.h38tmp.$$"; rm -f "$t" 2>/dev/null || true; printf '%s\n' "$v" >"$t" 2>/dev/null && mv -f "$t" "$p" 2>/dev/null; }
-pid_alive(){ p="$1"; [ -n "$p" ] && kill -0 "$p" 2>/dev/null; }
+pid_alive(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] && kill -0 "$p" 2>/dev/null; }
 policy_host(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG|USB_DUPLEX_OTG|MIDI_OTG) return 0;; *) return 1;; esac; }
 sp404_wanted(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG|USB_DUPLEX_OTG) return 0;; *) return 1;; esac; }
 midi_wanted(){ [ "$(cat "$POLICY_FILE" 2>/dev/null || true)" = "MIDI_OTG" ]; }
-terminate_pid(){ p="$1"; name="$2"; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
+terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
 cleanup(){
   STOP=1
   for p in "$RUNTIME/sp404_daemon_pid" "$RUNTIME/midi_daemon_pid"; do
@@ -81,6 +81,12 @@ while [ "$STOP" -eq 0 ] && policy_host; do
         sp_cap="/dev/snd/pcmC${card}D0c"
         ;;
       esac
+      if [ "$sp_play" = "none" ] || [ "$sp_cap" = "none" ] || [ ! -e "$sp_play" ] || [ ! -e "$sp_cap" ]; then
+        log "SP404_NODE_MISSING play=$sp_play cap=$sp_cap usb=$(cat "$RUNTIME/sp404_usb_id" 2>/dev/null || echo none) wait=$backoff"
+        sleep "$backoff"
+        [ "$backoff" -lt 4 ] && backoff=$((backoff+1))
+        continue
+      fi
       "$SP404_DAEMON" "$SP404_FIFO" "$sp_play" "$sp_cap" >>"$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log" 2>&1 &
       sp_pid=$!
       atomic_write "$RUNTIME/sp404_daemon_pid" "$sp_pid" || true

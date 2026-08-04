@@ -25,8 +25,8 @@ normalize_mode(){ case "$1" in
 policy_for_mode(){ case "$1" in ANDROID) echo USB_IN_OTG;; WINDOWS) echo USB_DUPLEX_OTG;; USB_OUT) echo USB_OUT_OTG;; MIDI) echo MIDI_OTG;; *) echo LOCAL_CONSOLE;; esac; }
 atomic_write(){ p="$1"; v="$2"; d="$(dirname "$p")"; mkdir -p "$d" 2>/dev/null || true; t="${p}.h35tmp.$$"; rm -f "$t" 2>/dev/null || true; printf '%s\n' "$v" >"$t" 2>/dev/null && mv -f "$t" "$p" 2>/dev/null; }
 log(){ printf '%s H35 mode=%s supervisor=%s %s\n' "$(date 2>/dev/null || echo no-date)" "$MODE" "${LGPT_H35_SUPERVISOR_PID:-none}" "$*" >>"$LOG" 2>/dev/null || true; }
-pid_alive(){ p="$1"; [ -n "$p" ] && kill -0 "$p" 2>/dev/null; }
-terminate_pid(){ p="$1"; [ -n "$p" ] || return 0; pid_alive "$p" || return 0; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; }
+pid_alive(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] && kill -0 "$p" 2>/dev/null; }
+terminate_pid(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; }
 kill_name(){ name="$1"; for p in $(pidof "$name" 2>/dev/null || true); do terminate_pid "$p"; done; }
 stop_android_runtime(){
   sp="$(cat "$RUNTIME/h35_android_supervisor_pid" 2>/dev/null || true)"; terminate_pid "$sp"

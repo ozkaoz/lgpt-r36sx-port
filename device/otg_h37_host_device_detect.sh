@@ -30,6 +30,28 @@ atomic_write(){ p="$1"; v="$2"; d="$(dirname "$p")"; mkdir -p "$d" 2>/dev/null |
 card_index_of(){ p="$1"; echo "${p##*/card}" ; }
 is_audio_card(){ c="$1"; [ -e "/proc/asound/$c/pcm0c" ] || [ -e "/proc/asound/$c/pcm0p" ]; }
 sysfs_usb_id(){ d="$1"; v="$(cat "$d/idVendor" 2>/dev/null || true)"; i="$(cat "$d/idProduct" 2>/dev/null || true)"; [ -n "$v" ] && [ -n "$i" ] && echo "$v:$i"; }
+usb_tree_dump(){
+  log "--- USB BUS DUMP ---"
+  log "MUSB_MODE="$(find /sys/devices -path '*musb-hdrc.0.auto/mode' -exec cat {} \; 2>/dev/null | head -1 || true)
+  for d in /sys/bus/usb/devices/*; do
+    [ -d "$d" ] || continue
+    b="$(basename "$d")"
+    [ -r "$d/idVendor" ] && [ -r "$d/idProduct" ] || continue
+    v="$(cat "$d/idVendor" 2>/dev/null || true)"
+    p="$(cat "$d/idProduct" 2>/dev/null || true)"
+    sp="$(cat "$d/speed" 2>/dev/null || true)"
+    pr="$(cat "$d/product" 2>/dev/null || true)"
+    mk="$(cat "$d/manufacturer" 2>/dev/null || true)"
+    log "USB $b vid=$v pid=$p speed=$sp product=$pr manufacturer=$mk"
+  done
+  log "ASOUND_CARDS:"
+  cat /proc/asound/cards 2>/dev/null >>"$LOG" || true
+  log "SND_NODES:"
+  ls /dev/snd 2>/dev/null >>"$LOG" || true
+  log "DMESG_USB:"
+  dmesg 2>/dev/null | grep -iE 'musb|usb [0-9]|otg|new high|new full|vbus|config 1|audio' | tail -n 40 >>"$LOG" || true
+  log "--- USB BUS DUMP END ---"
+}
 sysfs_usb_path_of_card(){
   # Resolve /sys/class/sound/cardN/device -> real USB device node, then find
   # the bus address "1-1.2" that identifies the physical port.
@@ -157,6 +179,10 @@ detect_host(){
 
 if ! mkdir "$LOCK" 2>/dev/null; then log "DETECT_BUSY"; exit 40; fi
 trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT INT TERM
+if [ ! -e /tmp/r36sx_h38_usb_diag_done ]; then
+  usb_tree_dump
+  touch /tmp/r36sx_h38_usb_diag_done
+fi
 detect_host
 log "HOST_DETECT_DONE"
 exit 0
