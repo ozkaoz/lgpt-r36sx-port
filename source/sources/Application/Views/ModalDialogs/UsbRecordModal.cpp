@@ -1302,14 +1302,26 @@ void UsbRecordModal::DrawView() {
     DrawString(1, 4, line, props);
 
     const int level = capture_.levelPercent;
-    int bars = (level * 18 + 50) / 100;
-    if (bars < 0) bars = 0;
-    if (bars > 18) bars = 18;
-    char meter[20];
-    for (int i = 0; i < 18; ++i) meter[i] = i < bars ? '|' : ' ';
-    meter[18] = 0;
-    snprintf(line, sizeof(line), "IN [%s] %3d%%", meter, level);
-    DrawString(1, 5, line, props);
+    const int barWidth = 24;
+    int filled = (level * barWidth + 50) / 100;
+    if (filled < 0) filled = 0;
+    if (filled > barWidth) filled = barWidth;
+    SetColor(CD_NORMAL);
+    DrawString(1, 5, "IN [", props);
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < filled) {
+            SetColor(CD_NORMAL);
+            props.invert_ = true;
+        } else {
+            SetColor(CD_HILITE1);
+            props.invert_ = false;
+        }
+        DrawString(1 + 4 + i, 5, " ", props);
+    }
+    props.invert_ = false;
+    SetColor(CD_NORMAL);
+    snprintf(line, sizeof(line), "] %3d%%", level);
+    DrawString(1 + 4 + barWidth, 5, line, props);
 
     snprintf(
         line,

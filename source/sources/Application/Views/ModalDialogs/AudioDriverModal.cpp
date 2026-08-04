@@ -35,28 +35,17 @@ void AudioDriverModal::DrawView() {
     DrawString(1, 3, line, props);
 
     const int count = TreeFrogUac2Bridge_GetDriverModeCount();
-    int samplerIndex = -1;
     for (int i = 0; i < count; ++i) {
         props.invert_ = (i == selected_);
         SetColor(i == selected_ ? CD_HILITE2 : CD_NORMAL);
         const char *name = TreeFrogUac2Bridge_GetDriverModeNameByIndex(i);
-        if (strcmp(name, "Sampler") == 0) {
-            samplerIndex = i;
-            /* U2.52.5 SAMPLER_OUT_ONLY: the direction toggle is removed. */
-            snprintf(line, sizeof(line), "%c %-24.24s%s",
-                     i == selected_ ? '>' : ' ', name, "[OUT]");
-        } else {
-            snprintf(line, sizeof(line), "%c %-30.30s",
-                     i == selected_ ? '>' : ' ', name);
-        }
+        snprintf(line, sizeof(line), "%c %-30.30s",
+                 i == selected_ ? '>' : ' ', name);
         DrawString(1, 5 + i * 2, line, props);
         props.invert_ = false;
         SetColor(CD_NORMAL);
         const char *desc =
             TreeFrogUac2Bridge_GetDriverModeDescriptionByIndex(i);
-        if (i == samplerIndex) {
-            desc = "OUT: console->sampler (play)";
-        }
         DrawString(3, 6 + i * 2, desc, props);
     }
 

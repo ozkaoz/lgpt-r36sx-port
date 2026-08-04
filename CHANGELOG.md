@@ -1,5 +1,24 @@
 # Changelog
 
+## Release candidate: RC9.7 - Audio driver Sampler (SP404MKII)
+
+- **Estado**: iteración de acabado sobre RC9.6 centrada en el driver de
+  audio Sampler (SP404MKII) y el menú USB-REC. No toca el motor FX/DSP, la
+  persistencia ni el resto de modos de audio.
+- **Etiqueta del driver**: el modal de selección de audio driver ya no
+  muestra el sufijo `[OUT]`; la entrada pasa a llamarse solo `Sampler`
+  (`AudioDriverModal.cpp`), con la descripción
+  `SP404: console sound to sampler (EXT SOURCE)` procedente de
+  `TreeFrogUac2Bridge_GetDriverModeDescriptionByIndex` (`TreeFrogUac2Bridge.cpp`,
+  caso `U241_USB_OUT`).
+- **Barra de preescucha USB-REC**: sustituidas las líneas `|` por una barra
+  sólida dinámica de 24 celdas con la estética canónica del port
+  (`UIIntVarField`: relleno CD_NORMAL invertido, resto CD_HILITE1 hueco),
+  formato `IN [....]  %3d%%` (`UsbRecordModal.cpp`, DrawView).
+- **Verificación**: build del target `BUILD_U2523_OK` (sha core
+  `56851509...`, daemons SP404/MIDI idénticos a RC9.6), install y verify en
+  SD (`VERIFY_U2523_OK`, `ERRORS=0`) con estado `USB_OUT` restaurado.
+
 ## Release candidate: Bacon 1.1 - FX Dev (RC5)
 
 - **Estado**: iteración exclusivamente de layout/renderizado sobre RC4

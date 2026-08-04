@@ -503,7 +503,7 @@ static const char *mode_desc(int mode) {
     case U241_ANDROID:
         return "Duplex UAC2 gadget (phone host)";
     case U241_USB_OUT:
-        return "SP404: OUT console->sampler / IN sampler->console";
+        return "SP404: console sound to sampler (EXT SOURCE)";
     case U241_SP404_IN:
         return "SP404 IN: sampler->console, recording only";
     case U241_MIDI:
