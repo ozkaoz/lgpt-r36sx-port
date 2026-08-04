@@ -24,6 +24,9 @@ normalize_mode() {
 NORM="$(normalize_mode "$MODE")"
 
 HOST_MODBASE=$BASE/modules/4.4.186-release/host_usb_audio
+# ALSA core stack must be resident before snd-usbmidi-lib/snd-usb-audio load;
+# otherwise insmod fails with unresolved snd_*/snd_pcm_*/snd_rawmidi symbols.
+HOST_CORE_MODULES="soundcore.ko snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-rawmidi.ko"
 HOST_MODULES="snd-usbmidi-lib.ko snd-usb-audio.ko"
 
 u2414_loaded() {
@@ -44,21 +47,25 @@ load_host_usb_module() {
         }
     fi
     for p in \
+      /lib/modules/4.4.186-release/kernel/sound/core/"$filename" \
       /lib/modules/4.4.186-release/kernel/sound/usb/"$filename" \
+      /lib32/modules/4.4.186-release/kernel/sound/core/"$filename" \
       /lib32/modules/4.4.186-release/kernel/sound/usb/"$filename" \
+      "$BASE"/modules/4.4.186-release/u2_38au8_sync_uac2/"$filename" \
       $(find "$HOST_MODBASE" -type f -name "$filename" 2>/dev/null); do
         [ -f "$p" ] || continue
-        insmod "$p" 2>/dev/null && {
+        insmod "$p" 2>>"$LOGROOT/H38_HOST_MODULE_LOAD.err" && {
             echo "HOST_LOAD_${filename}_INSMOD=YES FROM=$p"
             return 0
         }
+        echo "insmod $p -> rc=$?" >>"$LOGROOT/H38_HOST_MODULE_LOAD.err" 2>/dev/null || true
     done
     echo "HOST_LOAD_${filename}_FAILED=YES"
     return 1
 }
 
 load_host_usb_modules() {
-    for m in $HOST_MODULES; do
+    for m in $HOST_CORE_MODULES $HOST_MODULES; do
         load_host_usb_module "$m" || true
     done
 }

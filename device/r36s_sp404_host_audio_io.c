@@ -1502,6 +1502,34 @@ int main(int argc, char **argv) {
     snprintf(pcm_cap_buf, sizeof(pcm_cap_buf), "/dev/snd/pcmC%dD0c", sp404_card);
     const char *pcmp = argc > 2 ? argv[2] : pcm_play_buf;
     const char *pcmc = argc > 3 ? argv[3] : pcm_cap_buf;
+    const int pcm_path_overridden = (argc > 2) || (argc > 3);
+    static unsigned long long last_card_recheck_ms = 0;
+    int reread_sp404_card(void) {
+        /* Only auto-track when the pcm paths were not forced on the command
+         * line. Reread the live marker so a late/hotplug enumeration on a
+         * different card index is picked up without a daemon restart. */
+        if (pcm_path_overridden) return sp404_card;
+        unsigned long long now = monotonic_milliseconds();
+        if (last_card_recheck_ms != 0 && now >= last_card_recheck_ms &&
+            (now - last_card_recheck_ms) < 500ULL) return sp404_card;
+        last_card_recheck_ms = now;
+        int cfd = open(SP404_CARD, O_RDONLY);
+        if (cfd < 0) return sp404_card;
+        char cbuf[16];
+        ssize_t cn = read(cfd, cbuf, sizeof(cbuf) - 1);
+        close(cfd);
+        if (cn <= 0) return sp404_card;
+        cbuf[cn] = 0;
+        int v = atoi(cbuf);
+        if (v > 0 && v != sp404_card) {
+            sp404_card = v;
+            snprintf(pcm_play_buf, sizeof(pcm_play_buf), "/dev/snd/pcmC%dD0p", sp404_card);
+            snprintf(pcm_cap_buf, sizeof(pcm_cap_buf), "/dev/snd/pcmC%dD0c", sp404_card);
+            fprintf(stderr, "CARD_RECHECK_UPDATED card=%d pcmp=%s pcmc=%s\n",
+                    sp404_card, pcm_play_buf, pcm_cap_buf);
+        }
+        return sp404_card;
+    }
     int requested_channels = argc > 4 ? atoi(argv[4]) : 1;
     if (requested_channels != 1 && requested_channels != 2)
         requested_channels = 1;
@@ -1573,6 +1601,7 @@ int main(int argc, char **argv) {
     unsigned long long starvation_since_ms = 0;
 
     for (;;) {
+        reread_sp404_card();
         int conf = usb_configured_cached();
         if (conf != last_conf) {
             fprintf(stderr,

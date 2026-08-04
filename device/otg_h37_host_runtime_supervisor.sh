@@ -47,14 +47,25 @@ fi
 atomic_write "$SUP_PID" "$$" || true
 log "START supervisor=$$"
 # Run the host-side device probe so SP404/MIDI markers are current.
-[ -r "$BIN/otg_h37_host_device_detect.sh" ] && /bin/sh "$BIN/otg_h37_host_device_detect.sh" >>"$LOG" 2>&1 || true
+detect_now(){ /bin/sh "$BIN/otg_h37_host_device_detect.sh" >>"$LOG" 2>&1 || true; }
+[ -r "$BIN/otg_h37_host_device_detect.sh" ] && detect_now
 sp_pid=0
 mi_pid=0
 backoff=1
+# Re-probe periodically: the USB host role switch and the SP404/MIDI
+# enumeration may lag the first probe, and the device can be hot-plugged after
+# the supervisor starts. The daemons read these markers live, so refreshing
+# them unblocks a late-arriving card without restarting anything.
+detect_tick=0
 while [ "$STOP" -eq 0 ] && policy_host; do
   run_sp404=0; run_midi=0
   sp404_wanted && run_sp404=1
   midi_wanted && run_midi=1
+  detect_tick=$((detect_tick + 1))
+  if [ "$detect_tick" -ge 3 ]; then
+    detect_tick=0
+    [ -r "$BIN/otg_h37_host_device_detect.sh" ] && detect_now
+  fi
 
   if [ "$run_sp404" -eq 1 ]; then
     if ! pid_alive "$sp_pid"; then
