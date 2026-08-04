@@ -102,9 +102,10 @@ detect_host(){
     [ -d "$c" ] || continue
     idx="${c##*/card}"
     case "$idx" in ''|*[!0-9]*) continue;; esac
-    # Skip the built-in console card (C0 is always the R36S internal codec).
-    [ "$idx" = "0" ] && continue
     # Must expose at least one PCM; candidates must come from a USB device.
+    # NOTE: in host role the SP404MKII registers as card C0 (the R36S console
+    # uses the proprietary SF3000 audio, NOT an ALSA card), so we must NOT skip
+    # index 0. The USB-path filter below excludes any non-USB built-in card.
     if ! ls "$c"/pcmC*D* >/dev/null 2>&1; then continue; fi
     syslink="/sys/class/sound/card$idx/device"
     [ -e "$syslink" ] || continue
@@ -168,8 +169,8 @@ detect_host(){
   for m in /dev/snd/midiC*D*; do
     [ -e "$m" ] || continue
     midi_dev="${m##*/}"
-    # Prefer a rawmidi whose card is not the internal console card.
-    case "$midi_dev" in midiC0D*) continue;; esac
+    # In host role the only rawmidi source is the USB-MIDI device. The
+    # SP-404MKII exposes midiC0D0, so do NOT skip card index 0 here.
     midi_node="$midi_dev"
     break
   done
