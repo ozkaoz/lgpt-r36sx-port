@@ -910,6 +910,12 @@ static double rs_ratio = 1.0;
 static double rs_rfill_ema = 0.0;
 static int rs_ema_init = 0;
 static long rs_write_count = 0;
+/* RC9.8 feed EMA moved to file scope so every stream (re)open can restart
+ * it at 1.0. The function-local version survived reconnects and stayed
+ * pinned at the 1.08 clamp for ~20 s after a transient feed spike, draining
+ * the ring 8% too fast (permanent starvation/buzz, the "pitido"). */
+static double rs_feed_ema = 1.0;
+static int rs_feed_windows_since_open = 0;
 
 static void rs_build_table(double fc) {
     int p, j;
@@ -936,6 +942,12 @@ static void resampler_reset(void) {
     rs_pos = (double)(RS_TAPS / 2);
     rs_ema_init = 0;
     rs_in_ch = g_audio_channels;
+    /* RC9.8: every stream restarts from the 1.0 ratio and a clean feed EMA.
+     * A resurrected EMA/ratio from a dead stream re-pinned the ring drain
+     * and reproduced the starvation buzz on the next reconnect. */
+    rs_ratio = 1.0;
+    rs_feed_ema = 1.0;
+    rs_feed_windows_since_open = 0;
 }
 
 static int ring_pop_one_sample(int16_t *s) {
@@ -2759,6 +2771,13 @@ int main(int argc, char **argv) {
             stream_primed = 0;
             starvation_since_ms = 0;
             ++reconnects;
+            /* RC9.8: anchor the fresh stream at ratio 1.0 and restart the
+             * feed measurement. The first windows after an open measure the
+             * reconnect transient (engine double-cadence burst), not the
+             * producer/device balance. */
+            rs_ratio = 1.0;
+            rs_feed_ema = 1.0;
+            rs_feed_windows_since_open = 0;
             fprintf(stderr,
                     "PCM_PLAY_OPENED reconnects=%ld period_frames=%d channels=%u start_threshold_frames=%d\n",
                     reconnects, active_period_frames, g_audio_channels,
@@ -3127,16 +3146,34 @@ int main(int argc, char **argv) {
             {
                 double feed =
                     (double)producer_rate_per_s / (double)g_audio_rate;
-                static double feed_ratio_ema = -1.0;
-                if (feed_ratio_ema < 0.0) feed_ratio_ema = feed;
-                feed_ratio_ema += (feed - feed_ratio_ema) * 0.25;
-                if (feed_ratio_ema < 0.92) feed_ratio_ema = 0.92;
-                if (feed_ratio_ema > 1.08) feed_ratio_ema = 1.08;
-                if (feed_ratio_ema > 0.0) rs_ratio = feed_ratio_ema;
+                ++rs_feed_windows_since_open;
+                if (rs_feed_windows_since_open <= 2) {
+                    /* RC9.8: ignore the reconnect-transient windows. The
+                     * burst right after an open (engine double-cadence)
+                     * measured up to ~1.85x and pinned the EMA at the 1.08
+                     * clamp, draining the ring 8% too fast (buzz). */
+                    rs_feed_ema = 1.0;
+                } else if (feed > 1.15 || feed < 0.85) {
+                    /* RC9.8 spike rejection: a one-window transient feed
+                     * must not drag the EMA. The producer is anchored at 1x
+                     * realtime, so a legitimate window is always ~1.0. */
+                } else {
+                    rs_feed_ema += (feed - rs_feed_ema) * 0.25;
+                    if (rs_feed_ema < 0.92) rs_feed_ema = 0.92;
+                    if (rs_feed_ema > 1.08) rs_feed_ema = 1.08;
+                    rs_ratio = rs_feed_ema;
+                }
+                /* RC9.8 starvation override: an empty ring can never refill
+                 * while the drain is faster than the producer (ratio > 1.0).
+                 * Fall back to 1.0 so the ring re-primes from current audio;
+                 * the ring-level integral/trims keep tracking the real
+                 * device clock as before. */
+                if (rfill < required_samples && rs_ratio > 1.0)
+                    rs_ratio = 1.0;
                 fprintf(stderr,
-                        "PLAYBACK_FEEDRATIO producer_rate=%ld feed_ratio=%.4f ratio=%.4f channels=%u\n",
-                        producer_rate_per_s, feed_ratio_ema, rs_ratio,
-                        feed_ch);
+                        "PLAYBACK_FEEDRATIO producer_rate=%ld feed_ratio=%.4f ratio=%.4f channels=%u windows=%d\n",
+                        producer_rate_per_s, rs_feed_ema, rs_ratio,
+                        feed_ch, rs_feed_windows_since_open);
             }
             fprintf(stderr,
                     "BRIDGE_PROGRESS_U2517 frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld starvation_silence=%ld starvation_events=%ld xruns=%ld dropped=%ld ring_fill=%u reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%d channels=%u prepare_failures=%ld latency_trim_events=%ld latency_trimmed_samples=%ld poll_timeouts=%ld short_writes=%ld primed=%d fifo_total=%ld fifo_rate_per_s=%ld\n",
