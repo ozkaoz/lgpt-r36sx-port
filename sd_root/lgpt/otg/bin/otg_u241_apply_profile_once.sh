@@ -26,7 +26,7 @@ NORM="$(normalize_mode "$MODE")"
 HOST_MODBASE=$BASE/modules/4.4.186-release/host_usb_audio
 # ALSA core stack must be resident before snd-usbmidi-lib/snd-usb-audio load;
 # otherwise insmod fails with unresolved snd_*/snd_pcm_*/snd_rawmidi symbols.
-HOST_CORE_MODULES="soundcore.ko snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-rawmidi.ko"
+HOST_CORE_MODULES="soundcore.ko snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-seq-device.ko snd-rawmidi.ko"
 HOST_MODULES="snd-usbmidi-lib.ko snd-usb-audio.ko"
 
 u2414_loaded() {
@@ -65,9 +65,19 @@ load_host_usb_module() {
 }
 
 load_host_usb_modules() {
+    failed=""
     for m in $HOST_CORE_MODULES $HOST_MODULES; do
-        load_host_usb_module "$m" || true
+        load_host_usb_module "$m" || failed="$failed $m"
     done
+    if [ -n "$failed" ]; then
+        {
+            echo "H38_HOST_STACK_ABORT failed=[$failed]"
+            echo "  dmesg tail:"
+            dmesg 2>/dev/null | tail -n 60
+        } >>"$LOGROOT/H38_HOST_MODULE_LOAD.err" 2>/dev/null || true
+        return 1
+    fi
+    return 0
 }
 
 H35_ROLE_PATH="/sys/devices/platform/soc/18844000.usb/musb-hdrc.0.auto/mode"
@@ -125,12 +135,15 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
                      r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
                 pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
             done
-            load_host_usb_modules
-            switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
-            if [ -x "$BIN/otg_h37_host_runtime_supervisor.sh" ]; then
-                LGPT_H38_POLICY=USB_OUT_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh"
+            if ! load_host_usb_modules; then
+                echo "HOST_STACK_ABORT skipped_role_switch=1"
             else
-                echo "ERROR_HOST_SUPERVISOR_MISSING"
+                switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
+                if [ -x "$BIN/otg_h37_host_runtime_supervisor.sh" ]; then
+                    LGPT_H38_POLICY=USB_OUT_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh"
+                else
+                    echo "ERROR_HOST_SUPERVISOR_MISSING"
+                fi
             fi
             ;;
         MIDI)
@@ -139,12 +152,15 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
                      r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
                 pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
             done
-            load_host_usb_modules
-            switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
-            if [ -x "$BIN/otg_h37_host_runtime_supervisor.sh" ]; then
-                LGPT_H38_POLICY=MIDI_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh"
+            if ! load_host_usb_modules; then
+                echo "HOST_STACK_ABORT skipped_role_switch=1"
             else
-                echo "ERROR_HOST_SUPERVISOR_MISSING"
+                switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
+                if [ -x "$BIN/otg_h37_host_runtime_supervisor.sh" ]; then
+                    LGPT_H38_POLICY=MIDI_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh"
+                else
+                    echo "ERROR_HOST_SUPERVISOR_MISSING"
+                fi
             fi
             ;;
         WINDOWS)

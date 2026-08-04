@@ -111,6 +111,8 @@ h35_insmod_with_diag(){
     echo "  stderr: $err"
     echo "  vermagic=$(h35_module_vermagic "$p")"
     echo "  uname=$(uname -r 2>/dev/null || echo unknown)"
+    echo "  dmesg tail:"
+    dmesg 2>/dev/null | tail -n 60
   } >>"$LOGROOT/H38_HOST_MODULE_LOAD.err" 2>/dev/null || true
   return 1
 }
@@ -138,7 +140,7 @@ h35_load_host_module(){
   echo "HOST_LOAD_${filename}_FAILED=YES"
   return 1
 }
-H35_CORE_STACK="soundcore.ko snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-rawmidi.ko"
+H35_CORE_STACK="soundcore.ko snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-seq-device.ko snd-rawmidi.ko"
 H35_USB_STACK="snd-usbmidi-lib.ko snd-usb-audio.ko"
 H35_HOST_MODULE_ERRLOG="$LOGROOT/H38_HOST_MODULE_LOAD.err"
 h35_load_host_stack(){
@@ -156,6 +158,8 @@ h35_load_host_stack(){
       echo "  uname=$(uname -r 2>/dev/null || echo unknown)"
       echo "  /proc/modules tail:"
       grep -E '^(snd|soundcore|usbcore|usb)' /proc/modules 2>/dev/null || true
+      echo "  dmesg tail:"
+      dmesg 2>/dev/null | tail -n 60
     } >>"$H35_HOST_MODULE_ERRLOG" 2>/dev/null || true
     echo "HOST_STACK_ABORT failed=[$failed]"
     return 1

@@ -90,6 +90,7 @@ required = {
     "CONFIG_LOCALVERSION_AUTO": "n",
     "CONFIG_SMP": "n",
     "CONFIG_PREEMPT": "y",
+    "CONFIG_DEBUG_PREEMPT": "n",
     "CONFIG_MODVERSIONS": "n",
     "CONFIG_MODULE_UNLOAD": "n",
     "CONFIG_MODULES": "y",

@@ -10,6 +10,9 @@ SP404_DAEMON="$BUILD/r36s_sp404_host_audio_io"
 MIDI_DAEMON="$BUILD/r36s_midi_host_io"
 HOST_AUDIO_MODULE="$PROJECT_ROOT/BUILD/HOST_USB_AUDIO/snd-usb-audio.ko"
 HOST_USBMIDI_MODULE="$PROJECT_ROOT/BUILD/HOST_USB_AUDIO/snd-usbmidi-lib.ko"
+# ALSA core stack modules required before snd-usbmidi-lib/snd-usb-audio load.
+HOST_CORE_MODULE_SRC="$PROJECT_ROOT/BUILD/HOST_USB_AUDIO"
+HOST_CORE_MODULES="snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-seq-device.ko snd-rawmidi.ko"
 ACTIVE_CORE="$SD/cubegm/cores/lgpt_r36sx_port_libretro.so"
 ACTIVE_DAEMON="$SD/lgpt/otg/bin/r36s_u241_usb_audio_io"
 ACTIVE_SP404_DAEMON="$SD/lgpt/otg/bin/r36s_sp404_host_audio_io"
@@ -56,6 +59,11 @@ if [[ "$HOST_MODULES" -eq 1 ]]; then
   mkdir -p "$HOST_MODULE_DIR"
   install -m 0644 "$HOST_AUDIO_MODULE" "$ACTIVE_HOST_AUDIO_MODULE"
   install -m 0644 "$HOST_USBMIDI_MODULE" "$ACTIVE_HOST_USBMIDI_MODULE"
+  for c in $HOST_CORE_MODULES; do
+    if [[ -s "$HOST_CORE_MODULE_SRC/$c" ]]; then
+      install -m 0644 "$HOST_CORE_MODULE_SRC/$c" "$HOST_MODULE_DIR/$c"
+    fi
+  done
 fi
 printf 'MONO_48K\n' > "$SD/lgpt/otg/audio_usb_profile"
 : > "$SD/lgpt/otg/enable_lgpt_uac2_bridge"
