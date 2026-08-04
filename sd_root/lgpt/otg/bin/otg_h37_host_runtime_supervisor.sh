@@ -22,8 +22,14 @@ mkdir -p "$LOGROOT" "$RUNTIME" 2>/dev/null || exit 20
 log(){ printf '%s H38_HOST_SUPERVISOR %s\n' "$(date 2>/dev/null || echo no-date)" "$*" >>"$LOG" 2>/dev/null || true; }
 atomic_write(){ p="$1"; v="$2"; d="$(dirname "$p")"; mkdir -p "$d" 2>/dev/null || true; t="${p}.h38tmp.$$"; rm -f "$t" 2>/dev/null || true; printf '%s\n' "$v" >"$t" 2>/dev/null && mv -f "$t" "$p" 2>/dev/null; }
 pid_alive(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] && kill -0 "$p" 2>/dev/null; }
-policy_host(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG|USB_DUPLEX_OTG|MIDI_OTG) return 0;; *) return 1;; esac; }
-sp404_wanted(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG|USB_DUPLEX_OTG) return 0;; *) return 1;; esac; }
+# v14.2: USB_DUPLEX_OTG (WINDOWS) is NOT a host policy. In WINDOWS the musb
+# controller is bound as a UAC2 gadget, so the host supervisor must exit and
+# never spawn the SP404/MIDI daemons there. Keeping USB_DUPLEX_OTG here let a
+# leftover supervisor respawn the SP404 daemon during a WINDOWS apply, which
+# held the host PCM and produced the HW_PARAMS EIO storms and role races seen
+# in the RC9.2 field test.
+policy_host(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG|MIDI_OTG) return 0;; *) return 1;; esac; }
+sp404_wanted(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG) return 0;; *) return 1;; esac; }
 midi_wanted(){ [ "$(cat "$POLICY_FILE" 2>/dev/null || true)" = "MIDI_OTG" ]; }
 # v14.1: RO-proof daemon launch. A dirty SD FAT mounted read-only would make
 # `daemon >> SD.log &` fail the redirect and the daemon would never start.

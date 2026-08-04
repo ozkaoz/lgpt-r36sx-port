@@ -81,6 +81,25 @@ load_host_usb_modules() {
 }
 
 H35_ROLE_PATH="/sys/devices/platform/soc/18844000.usb/musb-hdrc.0.auto/mode"
+# v14.2: a host supervisor left over from USB_OUT/SP404/MIDI keeps respawning
+# the SP404/MIDI daemons while they hold the host PCM - and, worst case, it
+# respawned them DURING a WINDOWS apply (policy USB_DUPLEX_OTG used to count
+# as a host policy), racing the musb gadget rebuild with HW_PARAMS EIO storms
+# and role flips that crashed the console. Force-stop the supervisor + daemons
+# before ANY gadget/role operation.
+stop_host_supervisor() {
+    s="$(cat "$RUNTIME/h38_host_supervisor_pid" 2>/dev/null || true)"
+    if [ -n "$s" ] && kill -0 "$s" 2>/dev/null; then
+        echo "HOST_SUPERVISOR_STOP pid=$s"
+        kill "$s" 2>/dev/null || true
+        n=0
+        while kill -0 "$s" 2>/dev/null && [ "$n" -lt 20 ]; do sleep 0.1; n=$((n+1)); done
+        kill -0 "$s" 2>/dev/null && kill -9 "$s" 2>/dev/null || true
+    fi
+    for p in r36s_sp404_host_audio_io r36s_midi_host_io; do
+        pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
+    done
+}
 switch_host_role() {
     for g in /sys/kernel/config/usb_gadget/r36sx_lgpt_* \
              /sys/kernel/config/usb_gadget/r36sx_uac2_*; do
@@ -202,6 +221,7 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
             fi
             ;;
         WINDOWS)
+            stop_host_supervisor
             for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \
                      r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35 \
                      r36s_sp404_host_audio_io r36s_midi_host_io; do
@@ -214,6 +234,7 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
             fi
             ;;
         *)
+            stop_host_supervisor
             for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \
                      r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
                 pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true

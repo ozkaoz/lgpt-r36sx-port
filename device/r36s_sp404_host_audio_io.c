@@ -32,6 +32,12 @@
 #include <unistd.h>
 #include <sound/asound.h>
 
+/* v14.2: USBDEVFS_RESET for the SP404 bus-reset self-heal. Defined here so the
+ * build does not depend on linux/usbdevice_fs.h being present in the sysroot. */
+#ifndef USBDEVFS_RESET
+#define USBDEVFS_RESET _IO('U', 20)
+#endif
+
 static const char *ACTIVE_MARKER = "/tmp/r36sx_uac2_usb_active";
 static const char *LOWLAT_SENTINEL = "/mnt/sdcard/lgpt/otg/lowlat_240";
 static const char *RUNTIME_DIR = "/tmp/r36sx_lgpt_usb";
@@ -2402,6 +2408,58 @@ int main(int argc, char **argv) {
                 card, real, g_reenum_count);
         return 0;
     }
+    /* v14.2: real USB bus reset (USBDEVFS_RESET) fallback. Some SP-404MKII
+     * firmware revisions ignore the authorized-toggle unplug/replug and only
+     * recover from an actual bus reset. Resolve the card's device node under
+     * /dev/bus/usb and reset it, then let snd-usb-audio rebind fresh. */
+    int sp404_usb_usbdevfs_reset(void) {
+        int card = rescan_card_by_name();
+        if (card <= 0) return -1;
+        char link[192];
+        snprintf(link, sizeof(link), "/sys/class/sound/card%d/device", card);
+        char real[512];
+        if (!realpath(link, real)) return -1;
+        char *base = strrchr(real, '/');
+        if (!base || !*(base + 1)) return -1;
+        char path[320];
+        snprintf(path, sizeof(path), "/sys/bus/usb/devices/%s", base + 1);
+        char buf[64];
+        int bus = -1, dev = -1;
+        int fd = open(path, O_RDONLY);
+        if (fd < 0) return -1;
+        close(fd);
+        snprintf(path, sizeof(path), "/sys/bus/usb/devices/%s/busnum", base + 1);
+        fd = open(path, O_RDONLY);
+        if (fd >= 0) {
+            ssize_t n = read(fd, buf, sizeof(buf) - 1);
+            close(fd);
+            if (n > 0) { buf[n] = 0; bus = atoi(buf); }
+        }
+        snprintf(path, sizeof(path), "/sys/bus/usb/devices/%s/devnum", base + 1);
+        fd = open(path, O_RDONLY);
+        if (fd >= 0) {
+            ssize_t n = read(fd, buf, sizeof(buf) - 1);
+            close(fd);
+            if (n > 0) { buf[n] = 0; dev = atoi(buf); }
+        }
+        if (bus <= 0 || dev <= 0) return -1;
+        snprintf(path, sizeof(path), "/dev/bus/usb/%03d/%03d", bus, dev);
+        fd = open(path, O_RDWR);
+        if (fd < 0) {
+            fprintf(stderr, "SP404_USBDEVFS_RESET_OPEN_FAILED node=%s errno=%d (%s)\n",
+                    path, errno, strerror(errno));
+            return -1;
+        }
+        int rc = ioctl(fd, USBDEVFS_RESET, 0);
+        int saved_errno = errno;
+        close(fd);
+        ++g_reenum_count;
+        g_last_reenum_ms = monotonic_milliseconds();
+        fprintf(stderr,
+                "SP404_USBDEVFS_RESET card=%d bus=%d dev=%d rc=%d errno=%d (%s)\n",
+                card, bus, dev, rc, saved_errno, strerror(saved_errno));
+        return rc;
+    }
     int requested_channels = argc > 4 ? atoi(argv[4]) : 1;
     if (requested_channels != 1 && requested_channels != 2)
         requested_channels = 1;
@@ -2585,8 +2643,14 @@ int main(int argc, char **argv) {
                     (now_ms - g_eio_storm_start_ms) >= 5000 &&
                     (g_last_reenum_ms == 0 ||
                      now_ms - g_last_reenum_ms >= 30000) &&
-                    g_reenum_count < 3) {
-                    int rc = toggle_sp404_usb_reenum();
+                    g_reenum_count < 8) {
+                    /* v14.2: alternate soft unplug/replug with a real
+                     * USBDEVFS_RESET bus reset. Some firmware revisions ignore
+                     * the authorized toggle and only recover from a bus reset.
+                     * Escalate up to 8 attempts (~4 min). */
+                    int rc = (g_reenum_count % 2 == 0)
+                                 ? toggle_sp404_usb_reenum()
+                                 : sp404_usb_usbdevfs_reset();
                     fprintf(stderr,
                             "SP404_REENUM_ATTEMPT rc=%d stalled_ms=%llu count=%d\n",
                             rc, now_ms - g_eio_storm_start_ms, g_reenum_count);
