@@ -56,6 +56,7 @@ sysfs_usb_path_of_card(){
   # Resolve /sys/class/sound/cardN/device -> real USB device node, then find
   # the bus address "1-1.2" that identifies the physical port.
   devlink="$1"
+  parent_bus=""
   target="$(readlink -f "$devlink" 2>/dev/null || true)"
   [ -n "$target" ] || return 1
   # Walk up ancestors to the deepest node that still looks like a USB device
@@ -102,14 +103,23 @@ detect_host(){
     [ -d "$c" ] || continue
     idx="${c##*/card}"
     case "$idx" in ''|*[!0-9]*) continue;; esac
-    # Must expose at least one PCM; candidates must come from a USB device.
-    # NOTE: in host role the SP404MKII registers as card C0 (the R36S console
-    # uses the proprietary SF3000 audio, NOT an ALSA card), so we must NOT skip
-    # index 0. The USB-path filter below excludes any non-USB built-in card.
-    if ! ls "$c"/pcmC*D* >/dev/null 2>&1; then continue; fi
+    # In host role the SP404MKII registers as card C0 (the R36S console uses the
+    # proprietary SF3000 audio, NOT an ALSA card), so after troubleshooting the
+    # UUIDs must NOT skip index 0. Every rejection is logged for diagnosis.
+    if ! ls "$c"/pcmC*D* >/dev/null 2>&1; then
+      log "SP404_CARD_SKIP idx=$idx reason=no_pcm_dir"
+      continue
+    fi
     syslink="/sys/class/sound/card$idx/device"
-    [ -e "$syslink" ] || continue
-    if ! readlink -f "$syslink" 2>/dev/null | grep -q '/usb\|usb[0-9]*/'; then continue; fi
+    if [ ! -e "$syslink" ]; then
+      log "SP404_CARD_SKIP idx=$idx reason=no_syslink path=$syslink"
+      continue
+    fi
+    rl="$(readlink -f "$syslink" 2>/dev/null || true)"
+    if ! printf '%s' "$rl" | grep -qE '/usb|usb[0-9]+/'; then
+      log "SP404_CARD_SKIP idx=$idx reason=not_usb_path readlink=$rl"
+      continue
+    fi
     # Resolve the USB parent for identity and reject anything that is not a
     # class-compliant audio interface (snd-usb-audio exposes usb_id in card dir).
     syspath="$(sysfs_usb_path_of_card "$syslink")"
@@ -153,6 +163,33 @@ detect_host(){
     log "SP404_FOUND card=$idx pcm=$pdev usb=$usbid syspath=$syspath caps=$caps"
     break
   done
+
+  # ---- Fallback ----------------------------------------------------------
+  # If no USB-backed card matched the strict path filter (the musb sysfs link
+  # layout can differ), adopt the single PCM card that exposes a matched PLAY
+  # + CAPTURE pair on the same D index. In host role the only ALSA audio card
+  # is the connected USB device, so a sole duplex card IS the SP404.
+  if [ "$sp404_card" = "none" ]; then
+    for p in /dev/snd/pcmC*D*p; do
+      [ -e "$p" ] || continue
+      dev="${p##*/}"
+      if [ -e "/dev/snd/${dev%p}c" ]; then
+        idx="$(echo "$dev" | sed -n 's/^pcmC\([0-9]*\)D.*/\1/p')"
+        pdev="$(echo "$dev" | sed -n 's/^pcm\(C[0-9]*D[0-9]*\)p/\1/p')"
+        [ -n "$idx" ] && [ -n "$pdev" ] || continue
+        sp404_card="$idx"
+        sp404_pcm="$pdev"
+        sp404_play="/dev/snd/${dev%p}p"
+        sp404_cap="/dev/snd/${dev%p}c"
+        sp404_usbid="auto:$pdev"
+        sp404_syspath="$dev"
+        sp404_caps="none"
+        log "SP404_FALLBACK_FOUND dev=$dev idx=$idx play=$sp404_play cap=$sp404_cap"
+        break
+      fi
+    done
+  fi
+  [ "$sp404_card" = "none" ] && log "SP404_NONE card_not_matched"
 
   # ---- Persist markers ------------------------------------------------
   atomic_write "$RUNTIME/sp404_card" "$sp404_card" || true
