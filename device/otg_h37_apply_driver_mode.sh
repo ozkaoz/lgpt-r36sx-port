@@ -87,6 +87,38 @@ h35_switch_host_role(){
   echo "$role" | grep -q host
 }
 
+# Load the ALSA core stack plus the host-side USB audio/MIDI modules so the
+# musb controller (now in host role) can enumerate the SP404/UAC2 or a USB-MIDI
+# device as an ALSA card/rawmidi node. Idempotent; searches the SD deployment
+# dir and the built-in module tree. Without these the SP404 never appears.
+H35_HOST_MODBASE=$BASE/modules/4.4.186-release/host_usb_audio
+h35_loaded(){ grep -q "^$1 " /proc/modules 2>/dev/null; }
+h35_load_host_module(){
+  filename="$1"; module="$(echo "${filename%.ko}" | tr - _)"
+  h35_loaded "$module" && echo "HOST_LOAD_${filename}_ALREADY=YES" && return 0
+  for p in \
+    /lib/modules/4.4.186-release/kernel/sound/core/"$filename" \
+    /lib/modules/4.4.186-release/kernel/sound/usb/"$filename" \
+    /lib32/modules/4.4.186-release/kernel/sound/core/"$filename" \
+    /lib32/modules/4.4.186-release/kernel/sound/usb/"$filename" \
+    "$BASE"/modules/4.4.186-release/u2_38au8_sync_uac2/"$filename" \
+    $(find "$H35_HOST_MODBASE" -type f -name "$filename" 2>/dev/null); do
+    [ -f "$p" ] || continue
+    insmod "$p" 2>>"$LOGROOT/H38_HOST_MODULE_LOAD.err" && echo "HOST_LOAD_${filename}_INSMOD=YES FROM=$p" && return 0
+    echo "insmod $p -> rc=$?" >>"$LOGROOT/H38_HOST_MODULE_LOAD.err" 2>/dev/null || true
+  done
+  echo "HOST_LOAD_${filename}_FAILED=YES"
+  return 1
+}
+h35_load_host_stack(){
+  for m in soundcore.ko snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-rawmidi.ko; do
+    h35_load_host_module "$m" || true
+  done
+  for m in snd-usbmidi-lib.ko snd-usb-audio.ko; do
+    h35_load_host_module "$m" || true
+  done
+}
+
 case "$MODE" in
   WINDOWS) atomic_write "$RUNTIME/audio_usb_profile" "MONO_48K" ;;
   ANDROID) atomic_write "$RUNTIME/audio_usb_profile" "STEREO_44K1_AOA_BULK";;
@@ -115,6 +147,7 @@ case "$MODE" in
     stop_windows_runtime
     stop_android_runtime
     h35_clear_transient_state
+    h35_load_host_stack
     h35_switch_host_role || exit $?
     [ -r "$BIN/otg_h37_host_runtime_supervisor.sh" ] || { atomic_write "$STATUS" "ERROR mode=USB_OUT missing=host_supervisor" || true; exit 33; }
     LGPT_H38_POLICY=USB_OUT_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh" >>"$LOG" 2>&1 & p=$!
@@ -127,6 +160,7 @@ case "$MODE" in
     stop_windows_runtime
     stop_android_runtime
     h35_clear_transient_state
+    h35_load_host_stack
     h35_switch_host_role || exit $?
     [ -r "$BIN/otg_h37_host_runtime_supervisor.sh" ] || { atomic_write "$STATUS" "ERROR mode=MIDI missing=host_supervisor" || true; exit 34; }
     LGPT_H38_POLICY=MIDI_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh" >>"$LOG" 2>&1 & p=$!

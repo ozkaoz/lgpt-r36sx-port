@@ -414,12 +414,12 @@ static int marker_fresh(const char *p, int max_age_sec) {
 
 static const char *mode_name(int mode) {
     switch (mode) {
-    case U241_WINDOWS: return "USB duplex";
-    case U241_ANDROID: return "USB in";
-    case U241_USB_OUT: return "USB out";
+    case U241_WINDOWS: return "Windows (USB Duplex)";
+    case U241_ANDROID: return "Android (USB IN)";
+    case U241_USB_OUT: return "Sampler (USB OUT)";
     case U241_MIDI: return "MIDI";
     case U241_LOCAL_CONSOLE:
-    default: return "Local console";
+    default: return "Local Console";
     }
 }
 
@@ -486,7 +486,7 @@ static const char *mode_desc(int mode) {
     case U241_ANDROID:
         return "IN only: capture from Android/device";
     case U241_USB_OUT:
-        return "OUT only: send mix to USB device";
+        return "Sampler OUT+IN duplex (SP404/UAC2 host)";
     case U241_MIDI:
         return "MIDI: USB piano/controller";
     case U241_LOCAL_CONSOLE:
@@ -1873,13 +1873,25 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
      * If the gadget, daemon and FIFO are already present, changing LOCAL/USB
      * is a core routing decision.  Do not fork the profile script.
      */
-    if (runtime_ready_fast()) {
+    if (g_driver_mode == U241_ANDROID ||
+        g_driver_mode == U241_USB_OUT ||
+        g_driver_mode == U241_MIDI) {
+        /*
+         * U2.52 HOST_ROLE_MODE_ALWAYS_APPLY:
+         * Host-role modes (Android AOA, SP404 sampler OUT, MIDI) load ALSA
+         * host modules, switch the musb controller to host role and start the
+         * host supervisor.  A live Windows gadget/daemon contract says nothing
+         * about the host-role runtime, so routing the change as a fast in-core
+         * switch silently leaves snd-usb-audio unloaded and the device never
+         * enumerates (SP404_CARD=none).  Always fork the profile + supervisor
+         * for host-role modes.
+         */
+        close_fifo_if_open("fifo closed host-role apply");
+        launch_apply_profile_once(g_driver_mode);
+        log_msg("driver mode host-role apply requested");
+    } else if (runtime_ready_fast()) {
         if (g_driver_mode == U241_LOCAL_CONSOLE)
             close_fifo_if_open("fifo closed fast local-console switch");
-        if (g_driver_mode == U241_ANDROID ||
-            g_driver_mode == U241_USB_OUT ||
-            g_driver_mode == U241_MIDI)
-            close_fifo_if_open("fifo closed fast host-role switch");
         log_msg("driver mode fast apply runtime-ready");
     } else {
         launch_apply_profile_once(g_driver_mode);
