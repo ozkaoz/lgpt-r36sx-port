@@ -1624,7 +1624,13 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
     if ((g_submit_count % 30) == 0) refresh_mode_from_file(0);
     ensure_setup_started();
     refresh_usb_state();
-    if ((g_submit_count % 30) == 0) refresh_runtime_audio_profile();
+    /* RC9.6: refresh the audio profile on EVERY submit instead of every 30.
+     * The SP404 daemon writes audio_channels=2 at start; a lazy refresh left
+     * the first ~0.5 s of playback streaming MONO into the stereo daemon,
+     * which drained the ring at 2x and buzzed until the switch. Applying the
+     * profile at the first playback callback keeps the fifo layout in lockstep
+     * with the daemon from sample one. */
+    refresh_runtime_audio_profile();
     if ((g_submit_count % 12) == 0) refresh_passive_physical_volume_file();
     if ((g_submit_count % 60) == 0) refresh_capture_status();
 

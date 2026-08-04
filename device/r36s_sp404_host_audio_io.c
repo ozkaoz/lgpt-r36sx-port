@@ -684,20 +684,16 @@ static unsigned convert_s16_to_device(
         int32_t right = (in_channels == 2) ? in[(size_t)f * in_channels + 1] : left;
         for (c = 0; c < (int)out_channels; ++c) {
             /*
-             * SP404 4CH CHANNEL MAPPING (RC9.5, audible pair):
-             * Empirical result from this build: the MK2's ch3/4 playback pair
-             * is the pair that reaches the main output (RC7.9 era was audible
-             * even with EXT SOURCE off), while ch1/2 stayed silent even with
-             * EXT SOURCE lit (RC8.0-v11 silence with zeroes on the fifo).
-             * Send L/R on ch3/4 so the console stream always arrives; on a
-             * plain 2ch device fall back to ch1/2.
+             * SP404 4CH CHANNEL MAPPING (RC9.6, EXT SOURCE gate):
+             * Route L/R to ch1/2. The MK2 feeds ch1/2 through the EXT IN /
+             * INPUT FX bus, which is only audible while [EXT SOURCE] is
+             * engaged; ch3/4 stay silent so the console never sounds without
+             * the pad. This restores the RC8.0-v11 behavior the user reports
+             * as the stable one ("la SP solo suena con EXT SOURCE"). RC9.5
+             * routed ch3/4, which is audible unconditionally, and is reverted
+             * here. Works for both 2ch and 4ch devices.
              */
-            int32_t v;
-            if (out_channels >= 4) {
-                v = (c == 2) ? left : ((c == 3) ? right : 0);
-            } else {
-                v = (c == 0) ? left : ((c == 1) ? right : 0);
-            }
+            int32_t v = (c == 0) ? left : ((c == 1) ? right : 0);
             v <<= (int)out_shift;
             unsigned char *dst = out + ((size_t)f * out_channels + (size_t)c) * out_bytes;
             unsigned b;
@@ -3110,16 +3106,27 @@ int main(int argc, char **argv) {
         if ((period_writes % 200) == 0) {
             long fifo_delta = rs_fifo_total - fifo_samples_last;
             fifo_samples_last = rs_fifo_total;
-            long fifo_rate_per_s = fifo_delta / 2;
-            /* v12 feedforward: fifo_rate_per_s = producer_rate *
-             * (48000 / device_rate), so fifo_rate_per_s / g_audio_rate is
-             * exactly the ring-balancing resampler ratio (producer /
-             * device). EMA over ~4 windows (~8 s) to smooth the fifo burst
-             * noise; this replaces the ring-level integral as the ratio
-             * baseline and cannot limit-cycle. */
+            /* RC9.6 feedforward fix: the fifo carries interleaved samples, so
+             * convert the ~2 s delta to FRAMES (divide by the stream channels)
+             * before halving for the per-second rate. The old formula
+             * fifo_rate_per_s = fifo_delta / 2 assumed mono: a stereo producer
+             * (192000 samples per 2 s) computed feed = 96000/48000 = 2.0,
+             * pinned the ratio at the 1.08 clamp, drained the ring 8% too
+             * fast and produced the permanent starvation/buzz. With frames,
+             * mono and stereo both converge to producer_rate / device_rate
+             * (~1.0), so the ring stays balanced, latency trims stay off and
+             * the stream neither cuts nor changes speed. */
+            unsigned feed_ch = g_audio_channels ? g_audio_channels : 1u;
+            long producer_rate_per_s =
+                (fifo_delta / (long)feed_ch) / 2;
+            /* v12 feedforward: producer_rate_per_s / g_audio_rate is exactly
+             * the ring-balancing resampler ratio (producer / device). EMA over
+             * ~4 windows (~8 s) to smooth the fifo burst noise; this replaces
+             * the ring-level integral as the ratio baseline and cannot
+             * limit-cycle. */
             {
                 double feed =
-                    (double)fifo_rate_per_s / (double)g_audio_rate;
+                    (double)producer_rate_per_s / (double)g_audio_rate;
                 static double feed_ratio_ema = -1.0;
                 if (feed_ratio_ema < 0.0) feed_ratio_ema = feed;
                 feed_ratio_ema += (feed - feed_ratio_ema) * 0.25;
@@ -3127,8 +3134,9 @@ int main(int argc, char **argv) {
                 if (feed_ratio_ema > 1.08) feed_ratio_ema = 1.08;
                 if (feed_ratio_ema > 0.0) rs_ratio = feed_ratio_ema;
                 fprintf(stderr,
-                        "PLAYBACK_FEEDRATIO window_rate=%ld feed_ratio=%.4f ratio=%.4f\n",
-                        fifo_rate_per_s, feed_ratio_ema, rs_ratio);
+                        "PLAYBACK_FEEDRATIO producer_rate=%ld feed_ratio=%.4f ratio=%.4f channels=%u\n",
+                        producer_rate_per_s, feed_ratio_ema, rs_ratio,
+                        feed_ch);
             }
             fprintf(stderr,
                     "BRIDGE_PROGRESS_U2517 frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld starvation_silence=%ld starvation_events=%ld xruns=%ld dropped=%ld ring_fill=%u reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%d channels=%u prepare_failures=%ld latency_trim_events=%ld latency_trimmed_samples=%ld poll_timeouts=%ld short_writes=%ld primed=%d fifo_total=%ld fifo_rate_per_s=%ld\n",
@@ -3143,7 +3151,7 @@ int main(int argc, char **argv) {
                     playback_prepare_failures, latency_trim_events,
                     latency_trimmed_samples, poll_timeouts,
                     short_write_events, stream_primed,
-                    rs_fifo_total, fifo_rate_per_s);
+                    rs_fifo_total, producer_rate_per_s);
             play_peak = 0;
         }
     }
