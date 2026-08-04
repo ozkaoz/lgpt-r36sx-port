@@ -2057,7 +2057,6 @@ int TreeFrogUac2Bridge_StartUsbCapture(
     if (!wav_path || !wav_path[0]) return 0;
 
     if (g_driver_mode == U241_LOCAL_CONSOLE ||
-        g_driver_mode == U241_USB_OUT ||
         g_driver_mode == U241_MIDI) {
         snprintf(
             g_capture_status,
@@ -2068,6 +2067,28 @@ int TreeFrogUac2Bridge_StartUsbCapture(
             g_capture_error,
             sizeof(g_capture_error),
             "select external audio driver");
+        return 0;
+    }
+
+    /*
+     * H38 SP404 RECORD ENABLE:
+     * The SP404MKII is a UAC2 audio interface with a real capture endpoint
+     * (SP main out -> console). Its daemon prepares and streams that capture
+     * through the same START/STOP command mailbox. The generic USB_OUT mode
+     * (plain gadget sampler) still has no host-side capture PCM, so it keeps
+     * the block; only the SP404 host-role device is allowed.
+     */
+    if (g_driver_mode == U241_USB_OUT &&
+        detected_device() != U241_DEVICE_SP404) {
+        snprintf(
+            g_capture_status,
+            sizeof(g_capture_status),
+            "USB OUT without SP404 has no capture path");
+        g_capture_state = TREEFROG_USB_CAPTURE_ERROR;
+        snprintf(
+            g_capture_error,
+            sizeof(g_capture_error),
+            "SP404 capture unavailable");
         return 0;
     }
 

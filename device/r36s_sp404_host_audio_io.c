@@ -642,7 +642,17 @@ static unsigned convert_s16_to_device(
         int32_t left = in[(size_t)f * in_channels];
         int32_t right = (in_channels == 2) ? in[(size_t)f * in_channels + 1] : left;
         for (c = 0; c < (int)out_channels; ++c) {
-            int32_t v = (c == 0) ? left : right;
+            /*
+             * RC8.0 SP404 4CH CHANNEL MAPPING:
+             * The SP404MKII exposes 4 playback channels over UAC2. Per the
+             * mk2 audio diagram, ch1/2 feed the EXT IN / INPUT FX path (only
+             * audible while [EXT SOURCE] is engaged) and ch3/4 mix straight
+             * to the main output. Writing all four duplicated the console
+             * stream: audible without EXT SOURCE and doubled with it. Send
+             * L/R only on ch1/2 and keep ch3/4 silent so the SP renders the
+             * console audio solely through its ext-source processing path.
+             */
+            int32_t v = (c == 0) ? left : ((c == 1) ? right : 0);
             v <<= (int)out_shift;
             unsigned char *dst = out + ((size_t)f * out_channels + (size_t)c) * out_bytes;
             unsigned b;
