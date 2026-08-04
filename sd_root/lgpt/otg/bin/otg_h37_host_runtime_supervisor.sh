@@ -103,7 +103,9 @@ while [ "$STOP" -eq 0 ] && policy_host; do
       # ~20-30 s of 1 kHz square waves on the SP404 ("pitido inicial"). The
       # daemon configures the PCM itself (constraint picking), so the probe is
       # no longer needed; start streaming directly.
-      "$SP404_DAEMON" "$SP404_FIFO" "$sp_play" "$sp_cap" >>"$(pick_log_path "$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log")" 2>&1 &
+      # RC9.5: stereo producer (4th arg). The core mirrors /tmp/.../audio_channels
+      # and streams interleaved L/R; the daemon's resampler runs 2ch.
+      "$SP404_DAEMON" "$SP404_FIFO" "$sp_play" "$sp_cap" 2 >>"$(pick_log_path "$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log")" 2>&1 &
       sp_pid=$!
       atomic_write "$RUNTIME/sp404_daemon_pid" "$sp_pid" || true
       atomic_write "$RUNTIME/daemon_pid" "$sp_pid" || true

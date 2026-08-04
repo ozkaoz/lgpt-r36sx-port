@@ -684,16 +684,20 @@ static unsigned convert_s16_to_device(
         int32_t right = (in_channels == 2) ? in[(size_t)f * in_channels + 1] : left;
         for (c = 0; c < (int)out_channels; ++c) {
             /*
-             * SP404 4CH CHANNEL MAPPING (v11, EXT SOURCE gate):
-             * The SP404MKII exposes 4 playback channels over UAC2. Per the
-             * mk2 audio diagram, ch1/2 feed the EXT IN / INPUT FX path, which
-             * is only audible while [EXT SOURCE] is engaged on the SP, and
-             * ch3/4 mix straight to the main output. v9 sent L/R on ch3/4 so
-             * the console stream reached the main mix even with EXT SOURCE
-             * off, which the user reports as a fault. v11 routes L/R to ch1/2
-             * (the SP hardware gates it by EXT SOURCE) and keeps ch3/4 silent.
+             * SP404 4CH CHANNEL MAPPING (RC9.5, audible pair):
+             * Empirical result from this build: the MK2's ch3/4 playback pair
+             * is the pair that reaches the main output (RC7.9 era was audible
+             * even with EXT SOURCE off), while ch1/2 stayed silent even with
+             * EXT SOURCE lit (RC8.0-v11 silence with zeroes on the fifo).
+             * Send L/R on ch3/4 so the console stream always arrives; on a
+             * plain 2ch device fall back to ch1/2.
              */
-            int32_t v = (c == 2 || c == 3) ? 0 : ((c == 0) ? left : right);
+            int32_t v;
+            if (out_channels >= 4) {
+                v = (c == 2) ? left : ((c == 3) ? right : 0);
+            } else {
+                v = (c == 0) ? left : ((c == 1) ? right : 0);
+            }
             v <<= (int)out_shift;
             unsigned char *dst = out + ((size_t)f * out_channels + (size_t)c) * out_bytes;
             unsigned b;
@@ -901,7 +905,9 @@ static float rs_table[RS_PHASES * RS_TAPS];
 static int rs_table_ready = 0;
 static double rs_fc = 0.0;
 static float rs_h[RS_TAPS];
+static float rs_hr[RS_TAPS];
 static int rs_n = 0;
+static unsigned rs_in_ch = 1;
 static long rs_base = 0;
 static double rs_pos = 0.0;
 static double rs_ratio = 1.0;
@@ -933,6 +939,7 @@ static void resampler_reset(void) {
     rs_base = 0;
     rs_pos = (double)(RS_TAPS / 2);
     rs_ema_init = 0;
+    rs_in_ch = g_audio_channels;
 }
 
 static int ring_pop_one_sample(int16_t *s) {
@@ -940,6 +947,14 @@ static int ring_pop_one_sample(int16_t *s) {
     *s = ring[rpos];
     rpos = (rpos + 1) % RING_SAMPLES;
     --rfill;
+    return 0;
+}
+static int ring_pop_frame(unsigned ch, int16_t *frm) {
+    unsigned c;
+    if (rfill < ch) return -1;
+    for (c = 0; c < ch; ++c) {
+        if (ring_pop_one_sample(&frm[c]) != 0) return -1;
+    }
     return 0;
 }
 
@@ -2909,20 +2924,28 @@ int main(int argc, char **argv) {
 
             unsigned produced = 0;
             int hard_starve = 0;
+            int16_t frm[2];
             while (produced < required_samples) {
                 while ((int)rs_pos + RS_TAPS / 2 >
                        rs_base + rs_n - 1) {
-                    int16_t s;
-                    if (ring_pop_one_sample(&s) != 0) {
+                    if (ring_pop_frame(rs_in_ch, frm) != 0) {
                         hard_starve = 1;
                         break;
                     }
                     if (rs_n < RS_TAPS) {
-                        rs_h[rs_n++] = (float)s;
+                        rs_h[rs_n] = (float)frm[0];
+                        if (rs_in_ch == 2)
+                            rs_hr[rs_n] = (float)frm[1];
+                        ++rs_n;
                     } else {
                         memmove(&rs_h[0], &rs_h[1],
                                 (RS_TAPS - 1) * sizeof(float));
-                        rs_h[RS_TAPS - 1] = (float)s;
+                        if (rs_in_ch == 2)
+                            memmove(&rs_hr[0], &rs_hr[1],
+                                    (RS_TAPS - 1) * sizeof(float));
+                        rs_h[RS_TAPS - 1] = (float)frm[0];
+                        if (rs_in_ch == 2)
+                            rs_hr[RS_TAPS - 1] = (float)frm[1];
                         ++rs_base;
                     }
                 }
@@ -2937,15 +2960,34 @@ int main(int argc, char **argv) {
                 if (idx_base < 0) idx_base = 0;
                 if (idx_base > RS_TAPS - 1) idx_base = RS_TAPS - 1;
                 float acc = 0.0f;
+                float accr = 0.0f;
                 int j;
-                for (j = 0; j < RS_TAPS; ++j)
-                    acc += rs_h[idx_base + j] *
-                           rs_table[pidx * RS_TAPS + j];
-                float scaled = acc * PLAYBACK_GAIN;
-                int32_t samp = (int32_t)scaled;
-                if (samp > 32767) samp = 32767;
-                if (samp < -32768) samp = -32768;
-                out[produced++] = (int16_t)samp;
+                if (rs_in_ch == 2) {
+                    for (j = 0; j < RS_TAPS; ++j) {
+                        float w = rs_table[pidx * RS_TAPS + j];
+                        acc += rs_h[idx_base + j] * w;
+                        accr += rs_hr[idx_base + j] * w;
+                    }
+                    float scaled = acc * PLAYBACK_GAIN;
+                    int32_t samp = (int32_t)scaled;
+                    if (samp > 32767) samp = 32767;
+                    if (samp < -32768) samp = -32768;
+                    out[produced++] = (int16_t)samp;
+                    float scaledr = accr * PLAYBACK_GAIN;
+                    int32_t sampr = (int32_t)scaledr;
+                    if (sampr > 32767) sampr = 32767;
+                    if (sampr < -32768) sampr = -32768;
+                    out[produced++] = (int16_t)sampr;
+                } else {
+                    for (j = 0; j < RS_TAPS; ++j)
+                        acc += rs_h[idx_base + j] *
+                               rs_table[pidx * RS_TAPS + j];
+                    float scaled = acc * PLAYBACK_GAIN;
+                    int32_t samp = (int32_t)scaled;
+                    if (samp > 32767) samp = 32767;
+                    if (samp < -32768) samp = -32768;
+                    out[produced++] = (int16_t)samp;
+                }
                 rs_pos += rs_ratio;
             }
             if (hard_starve) {
