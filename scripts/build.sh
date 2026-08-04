@@ -38,10 +38,10 @@ grep -aFq 'R36SX_USB_AUDIO_DAEMON_ABI=7' "$DAEMON" || fail "Missing daemon ABI7 
 # Unified driver host-side backends: SP404MKII (host UAC2) and USB-MIDI.
 "${CROSS}gcc" -mips32r2 -march=mips32r2 -mtune=74kc -mdspr2 -mfp32 -mhard-float -EL \
   --sysroot="$SYSROOT" -std=gnu99 -O2 -static -Wall -Wextra \
-  -o "$OUT_DIR/r36s_sp404_host_audio_io" "$ROOT/device/r36s_sp404_host_audio_io.c"
+  -o "$OUT_DIR/r36s_sp404_host_audio_io" "$ROOT/device/r36s_sp404_host_audio_io.c" -lm
 "${CROSS}gcc" -mips32r2 -march=mips32r2 -mtune=74kc -mdspr2 -mfp32 -mhard-float -EL \
   --sysroot="$SYSROOT" -std=gnu99 -O2 -static -Wall -Wextra \
-  -o "$OUT_DIR/r36s_midi_host_io" "$ROOT/device/r36s_midi_host_io.c"
+  -o "$OUT_DIR/r36s_midi_host_io" "$ROOT/device/r36s_midi_host_io.c" -lm
 chmod 0755 "$OUT_DIR/r36s_sp404_host_audio_io" "$OUT_DIR/r36s_midi_host_io"
 grep -aFq 'R36SX_SP404_AUDIO_DAEMON_ABI=1' "$OUT_DIR/r36s_sp404_host_audio_io" || fail "Missing SP404 ABI1 marker"
 grep -aFq 'R36SX_MIDI_DAEMON_ABI=1' "$OUT_DIR/r36s_midi_host_io" || fail "Missing MIDI ABI1 marker"

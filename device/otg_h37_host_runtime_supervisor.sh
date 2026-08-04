@@ -25,6 +25,9 @@ pid_alive(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] && kill -0 "$p" 2>/dev/null;
 policy_host(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG|USB_DUPLEX_OTG|MIDI_OTG) return 0;; *) return 1;; esac; }
 sp404_wanted(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in SP404_OTG|USB_OUT_OTG|USB_DUPLEX_OTG) return 0;; *) return 1;; esac; }
 midi_wanted(){ [ "$(cat "$POLICY_FILE" 2>/dev/null || true)" = "MIDI_OTG" ]; }
+# v14.1: RO-proof daemon launch. A dirty SD FAT mounted read-only would make
+# `daemon >> SD.log &` fail the redirect and the daemon would never start.
+pick_log_path(){ p="$1"; if ( : >> "$p" ) 2>/dev/null; then printf '%s' "$p"; else printf '/tmp/%s' "$(basename "$p")"; fi; }
 terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
 cleanup(){
   STOP=1
@@ -91,7 +94,7 @@ while [ "$STOP" -eq 0 ] && policy_host; do
       # ~20-30 s of 1 kHz square waves on the SP404 ("pitido inicial"). The
       # daemon configures the PCM itself (constraint picking), so the probe is
       # no longer needed; start streaming directly.
-      "$SP404_DAEMON" "$SP404_FIFO" "$sp_play" "$sp_cap" >>"$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log" 2>&1 &
+      "$SP404_DAEMON" "$SP404_FIFO" "$sp_play" "$sp_cap" >>"$(pick_log_path "$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log")" 2>&1 &
       sp_pid=$!
       atomic_write "$RUNTIME/sp404_daemon_pid" "$sp_pid" || true
       atomic_write "$RUNTIME/daemon_pid" "$sp_pid" || true
@@ -108,7 +111,7 @@ while [ "$STOP" -eq 0 ] && policy_host; do
       midi_node="$(cat "$RUNTIME/midi_rawmidi" 2>/dev/null || echo none)"
       case "$midi_node" in none|''|FAILED) log "MIDI_DEVICE_NONE wait=$backoff"; sleep "$backoff"; [ "$backoff" -lt 4 ] && backoff=$((backoff+1)); continue;; esac
       [ -p "$MIDI_FIFO" ] || { rm -f "$MIDI_FIFO" 2>/dev/null || true; mkfifo "$MIDI_FIFO" 2>/dev/null || true; }
-      "$MIDI_DAEMON" "/dev/snd/$midi_node" "$MIDI_FIFO" >>"$LOGROOT/H38_MIDI_HOST_DAEMON.log" 2>&1 &
+      "$MIDI_DAEMON" "/dev/snd/$midi_node" "$MIDI_FIFO" >>"$(pick_log_path "$LOGROOT/H38_MIDI_HOST_DAEMON.log")" 2>&1 &
       mi_pid=$!
       atomic_write "$RUNTIME/midi_daemon_pid" "$mi_pid" || true
       atomic_write "$RUNTIME/daemon_pid" "$mi_pid" || true

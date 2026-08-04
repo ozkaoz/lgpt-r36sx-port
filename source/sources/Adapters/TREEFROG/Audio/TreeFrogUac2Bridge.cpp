@@ -152,6 +152,10 @@ enum { U2415_MONITOR_PREBUFFER_SAMPLES = 960 };
 
 static const char *kEnable = "/mnt/sdcard/lgpt/otg/enable_lgpt_uac2_bridge";
 static const char *kMode = "/mnt/sdcard/lgpt/otg/audio_driver_mode";
+/* v14.1: in-session source of truth. /tmp is always writable even when the
+ * SD FAT is mounted read-only (dirty bit from a bad unplug), so the driver
+ * mode can change and never flips back to Local Console on refresh. */
+static const char *kRuntimeMode = "/tmp/r36sx_lgpt_usb/audio_driver_mode";
 static const char *kNoMute = "/mnt/sdcard/lgpt/otg/disable_mute_local";
 static const char *kU2430BuildMarker =
     "R36SX U2.51.7 MONITOR FIFO HANDSHAKE FILENAME EDITOR CORE";
@@ -849,9 +853,17 @@ static int runtime_ready_fast(void) {
 
 static void write_mode_file(int mode) {
     mkdir(kRuntimeDir, 0777);
+    const char *m = mode_token(mode);
+    /* v14.1: write the runtime copy first (always writable); the SD copy is
+     * a best-effort persistence for the next boot. */
+    int rt = open(kRuntimeMode, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (rt >= 0) {
+        write(rt, m, strlen(m));
+        write(rt, "\n", 1);
+        close(rt);
+    }
     int fd = open(kMode, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) {
-        const char *m = mode_token(mode);
         write(fd, m, strlen(m));
         write(fd, "\n", 1);
         /*
@@ -865,19 +877,22 @@ static void write_mode_file(int mode) {
     write_runtime_file_atomic(kPolicy, policy_token(mode));
     write_active_branch_file(mode);
     struct stat st;
-    if (stat(kMode, &st) == 0) g_mode_mtime = st.st_mtime;
+    if (stat(kRuntimeMode, &st) == 0) g_mode_mtime = st.st_mtime;
 }
 
 static void refresh_mode_from_file(int force) {
     struct stat st;
-    if (stat(kMode, &st) != 0) {
+    const char *src = kMode;
+    if (stat(kRuntimeMode, &st) == 0) {
+        src = kRuntimeMode;
+    } else if (stat(kMode, &st) != 0) {
         if (force) write_mode_file(g_driver_mode);
         return;
     }
     if (!force && st.st_mtime == g_mode_mtime) return;
     g_mode_mtime = st.st_mtime;
     char buf[96];
-    int fd = open(kMode, O_RDONLY);
+    int fd = open(src, O_RDONLY);
     if (fd < 0) return;
     ssize_t n = read(fd, buf, sizeof(buf)-1);
     close(fd);

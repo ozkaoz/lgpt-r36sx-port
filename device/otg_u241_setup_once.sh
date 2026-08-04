@@ -26,7 +26,14 @@ trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT INT TERM
 if [ -f "$LOG" ] && [ "$(wc -c < "$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
     mv -f "$LOG" "$LOG.previous" 2>/dev/null || true
 fi
-exec >> "$LOG" 2>&1
+# v14.1: RO-proof logging - if the SD FAT is mounted read-only (dirty bit
+# from a bad unplug) the exec redirect would abort the whole setup. Fall back
+# to /tmp so the Windows gadget can still be configured and its daemon start.
+if ! ( : >> "$LOG" ) 2>/dev/null; then
+    exec >> /tmp/u2517_audio_driver_setup.log 2>&1
+else
+    exec >> "$LOG" 2>&1
+fi
 
 echo "R36SX LGPT U2.51.7 ABI7 MONITOR-FIFO HANDSHAKE OTG SETUP"
 date
@@ -121,9 +128,16 @@ start_daemon_only() {
     if [ -f "$DLOG" ] && [ "$(wc -c < "$DLOG" 2>/dev/null || echo 0)" -gt 8388608 ]; then
         mv -f "$DLOG" "$DLOG.previous" 2>/dev/null || true
     fi
+    # v14.1: RO-proof launch (dirty SD FAT mounted read-only would fail the
+    # redirect and the Windows daemon would never start).
+    if ( : >> "$DLOG" ) 2>/dev/null; then
+        DLOG_TARGET="$DLOG"
+    else
+        DLOG_TARGET=/tmp/u2517_usb_audio_daemon.log
+    fi
 
     "$DAEMON" "$FIFO" /dev/snd/pcmC0D0p /dev/snd/pcmC0D0c "$EXPECTED_CHANNELS" \
-        >> "$DLOG" 2>&1 &
+        >> "$DLOG_TARGET" 2>&1 &
     daemon_pid=$!
     printf '%s\n' "$daemon_pid" > "$RUNTIME/daemon_pid"
     echo "DAEMON_PID=$daemon_pid RECOVERY_KIND=$recovery_kind"

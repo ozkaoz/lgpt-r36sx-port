@@ -220,7 +220,16 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
             done
             [ -x "$BIN/otg_u241_shutdown.sh" ] && /bin/sh "$BIN/otg_u241_shutdown.sh"
             ;;
-    esac
-} >> "$LOGROOT/H38_2_APPLY_MODE.log" 2>&1 &
+            esac
+        # v14.1: RO-proof SD logging. If the SD FAT is mounted read-only
+        # (dirty bit from a bad unplug) the old `{ ... } >> SD.log` redirect
+        # aborted the whole apply, so no mode ever changed. The block logs to
+        # /tmp (always writable) and mirrors to the SD log best-effort.
+        if ( : >> "$LOGROOT/H38_2_APPLY_MODE.log" ) 2>/dev/null; then
+            cat /tmp/h38_2_apply_mode.log >> "$LOGROOT/H38_2_APPLY_MODE.log" 2>/dev/null || true
+        else
+            cat /tmp/h38_2_apply_mode.log >> /tmp/h38_2_apply_mode.sd_mirror.log 2>/dev/null || true
+        fi
+} > /tmp/h38_2_apply_mode.log 2>&1 &
 
 exit 0

@@ -2,7 +2,14 @@
 BASE=/mnt/sdcard/lgpt/otg
 LOGROOT=/mnt/sdcard/LGPT_OTG_LOGS
 mkdir -p "$LOGROOT" 2>/dev/null || true
-exec >> "$LOGROOT/U2517_SHUTDOWN.log" 2>&1
+# v14.1: RO-proof logging - if the SD log cannot be opened (dirty FAT
+# mounted read-only) fall back to /tmp so the shutdown always runs before
+# role operations.
+if ! ( : >> "$LOGROOT/U2517_SHUTDOWN.log" ) 2>/dev/null; then
+    exec >> /tmp/u2517_shutdown.log 2>&1
+else
+    exec >> "$LOGROOT/U2517_SHUTDOWN.log" 2>&1
+fi
 
 date
 # v14: stop every USB audio daemon (Windows UAC2, SP404 host, USB-MIDI)

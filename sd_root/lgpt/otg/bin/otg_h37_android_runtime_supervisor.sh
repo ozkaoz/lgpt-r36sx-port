@@ -26,6 +26,9 @@ log(){ printf '%s H35_ANDROID_SUPERVISOR %s\n' "$(date 2>/dev/null || echo no-da
 atomic_write(){ p="$1"; v="$2"; d="$(dirname "$p")"; mkdir -p "$d" 2>/dev/null || true; t="${p}.h35tmp.$$"; rm -f "$t" 2>/dev/null || true; printf '%s\n' "$v" >"$t" 2>/dev/null && mv -f "$t" "$p" 2>/dev/null; }
 pid_alive(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] && kill -0 "$p" 2>/dev/null; }
 policy_android(){ case "$(cat "$POLICY_FILE" 2>/dev/null || true)" in ANDROID|ANDROID_OTG|ANDROID_AOA|USB_IN_OTG|USB_IN) return 0;; *) return 1;; esac; }
+# v14.1: RO-proof launch - a dirty SD FAT mounted read-only would make
+# `daemon >> SD.log &` fail the redirect and the daemon/receiver never start.
+pick_log_path(){ p="$1"; if ( : >> "$p" ) 2>/dev/null; then printf '%s' "$p"; else printf '/tmp/%s' "$(basename "$p")"; fi; }
 terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
 cleanup(){
   STOP=1
@@ -59,7 +62,7 @@ rm -f "$RUNTIME/aoa_host_configured" "$RUNTIME/aoa_bulk_accessory_present" \
 # with ENOENT ("fifo open pending", recording blocked) until the AOA daemon
 # happened to recreate it on its own schedule.
 [ -p "$PCM_FIFO" ] || { rm -f "$PCM_FIFO" 2>/dev/null || true; mkfifo "$PCM_FIFO" 2>/dev/null || true; }
-"$DAEMON" "$PROJECT_FIFO" - "$PCM_FIFO" 2 48000 >>"$LOGROOT/H35_AOA_BULK_AUDIO_DAEMON.log" 2>&1 &
+"$DAEMON" "$PROJECT_FIFO" - "$PCM_FIFO" 2 48000 >>"$(pick_log_path "$LOGROOT/H35_AOA_BULK_AUDIO_DAEMON.log")" 2>&1 &
 dp=$!
 atomic_write "$DAEMON_PID" "$dp" || true
 sleep 0.15
@@ -76,7 +79,7 @@ while [ "$STOP" -eq 0 ] && policy_android; do
           "$RUNTIME/daemon_version" "$RUNTIME/capture_abi" 2>/dev/null || true
     log "DAEMON_EXITED pid=$dp restarts=$daemon_restarts restarting"
     [ -p "$PCM_FIFO" ] || { rm -f "$PCM_FIFO" 2>/dev/null || true; mkfifo "$PCM_FIFO" 2>/dev/null || true; }
-    "$DAEMON" "$PROJECT_FIFO" - "$PCM_FIFO" 2 48000 >>"$LOGROOT/H35_AOA_BULK_AUDIO_DAEMON.log" 2>&1 &
+"$DAEMON" "$PROJECT_FIFO" - "$PCM_FIFO" 2 48000 >>"$(pick_log_path "$LOGROOT/H35_AOA_BULK_AUDIO_DAEMON.log")" 2>&1 &
     dp=$!
     atomic_write "$DAEMON_PID" "$dp" || true
     sleep 0.25
@@ -91,7 +94,7 @@ while [ "$STOP" -eq 0 ] && policy_android; do
     terminate_pid "$rp" receiver
     continue
   fi
-  "$RECEIVER" >>"$LOGROOT/H35_AOA_BULK_RECEIVER_WRAPPER.log" 2>&1 &
+  "$RECEIVER" >>"$(pick_log_path "$LOGROOT/H35_AOA_BULK_RECEIVER_WRAPPER.log")" 2>&1 &
   rp=$!
   atomic_write "$RECEIVER_PID" "$rp" || true
   log "RECEIVER_STARTED pid=$rp backoff=$backoff"
