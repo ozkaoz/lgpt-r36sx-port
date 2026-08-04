@@ -70,7 +70,8 @@ extern "C" const char *TreeFrogU2517RecordRuntimeMarker(void) {
         "U2515_RECORD_SESSION_STATE_MACHINE U2517_MONITOR_FIFO_HANDSHAKE_CONTROL "
         "U2515_CAPTURE_SNAPSHOT_CACHE U2517_FILENAME_EDITOR_FAST_CASE_DUPLICATE_GUARD "
         "U2517_RUNTIME_ABI7_DAEMON_ONLY_RECOVERY "
-        "H38_6_THREE_MODE_ABI7_LOCAL_WINDOWS_ANDROID";
+        "H38_6_THREE_MODE_ABI7_LOCAL_WINDOWS_ANDROID "
+        "U2517_AUDIO_DIRECTION_SP404_OUT_IN";
 }
 enum {
     U241_LOCAL_CONSOLE = 0,
@@ -78,6 +79,10 @@ enum {
     U241_ANDROID = 2,
     U241_USB_OUT = 3,
     U241_MIDI = 4,
+    /* U2.51.10: SP404 simplex IN direction (SP -> console, recording only).
+     * Kept as a distinct mode so U241_ANDROID ("Android" phone gadget) is
+     * untouched. */
+    U241_SP404_IN = 5,
     /* Backward-compatible aliases retained for older call sites and logs. */
     U241_USB_DUPLEX = U241_WINDOWS,
     U241_USB_IN = U241_ANDROID
@@ -99,7 +104,11 @@ static pid_t g_setup_child_pid = -1;
 static int g_setup_child_status = 0;
 static int g_last_runtime_contract_code = -1;
 static unsigned long g_submit_count = 0;
+static long long g_android_fifo_miss_start_ms = 0;
+static long long g_android_last_heal_ms = 0;
+static int g_android_heal_attempts = 0;
 static int g_driver_mode = U241_LOCAL_CONSOLE;
+static int g_sampler_direction_in = 0;
 static time_t g_mode_mtime = 0;
 static int g_usb_raw = 0;
 static int g_usb_out_allowed = 0;
@@ -417,6 +426,7 @@ static const char *mode_name(int mode) {
     case U241_WINDOWS: return "Windows";
     case U241_ANDROID: return "Android";
     case U241_USB_OUT: return "Sampler";
+    case U241_SP404_IN: return "Sampler";
     case U241_MIDI: return "MIDI";
     case U241_LOCAL_CONSOLE:
     default: return "Local Console";
@@ -428,6 +438,7 @@ static const char *mode_token(int mode) {
     case U241_WINDOWS: return "USB_DUPLEX";
     case U241_ANDROID: return "USB_IN";
     case U241_USB_OUT: return "USB_OUT";
+    case U241_SP404_IN: return "SP404_IN";
     case U241_MIDI: return "MIDI";
     case U241_LOCAL_CONSOLE:
     default: return "LOCAL_CONSOLE";
@@ -439,6 +450,7 @@ static const char *policy_token(int mode) {
     case U241_WINDOWS: return "USB_DUPLEX_OTG";
     case U241_ANDROID: return "USB_IN_OTG";
     case U241_USB_OUT: return "USB_OUT_OTG";
+    case U241_SP404_IN: return "USB_OUT_OTG";
     case U241_MIDI: return "MIDI_OTG";
     case U241_LOCAL_CONSOLE:
     default: return "LOCAL_CONSOLE";
@@ -450,6 +462,7 @@ static const char *branch_name_for_mode(int mode) {
     case U241_WINDOWS: return "audio_driver_usb_duplex";
     case U241_ANDROID: return "audio_driver_usb_in";
     case U241_USB_OUT: return "audio_driver_usb_out";
+    case U241_SP404_IN: return "audio_driver_sp404_in";
     case U241_MIDI: return "audio_driver_midi";
     case U241_LOCAL_CONSOLE:
     default: return "audio_driver_local_console";
@@ -486,7 +499,9 @@ static const char *mode_desc(int mode) {
     case U241_ANDROID:
         return "Duplex UAC2 gadget (phone host)";
     case U241_USB_OUT:
-        return "Duplex UAC2 host (sampler)";
+        return "SP404: OUT console->sampler / IN sampler->console";
+    case U241_SP404_IN:
+        return "SP404 IN: sampler->console, recording only";
     case U241_MIDI:
         return "MIDI: USB piano/controller";
     case U241_LOCAL_CONSOLE:
@@ -505,6 +520,8 @@ static int selectable_mode(int mode) {
 
 static int mode_from_text(const char *s) {
     if (!s) return U241_LOCAL_CONSOLE;
+    if (strstr(s, "SP404_IN") || strstr(s, "SP404IN"))
+        return U241_SP404_IN;
     if (strstr(s, "ANDROID") || strstr(s, "AOA") ||
         strstr(s, "USB_IN"))
         return U241_ANDROID;
@@ -606,16 +623,24 @@ static int udc_configured_raw(void) {
 }
 
 static int daemon_pid_alive(void) {
-    char buf[32];
-    int fd = open(kDaemonPid, O_RDONLY);
-    if (fd < 0) return 0;
-    ssize_t n = read(fd, buf, sizeof(buf) - 1);
-    close(fd);
-    if (n <= 0) return 0;
-    buf[n] = 0;
-    long pid = strtol(buf, 0, 10);
-    if (pid <= 1) return 0;
-    return kill((pid_t)pid, 0) == 0 || errno == EPERM;
+    static const char *candidates[] = {
+        kDaemonPid,
+        "/tmp/r36sx_lgpt_usb/sp404_daemon_pid",
+        "/tmp/r36sx_lgpt_usb/midi_daemon_pid"
+    };
+    for (unsigned i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
+        char buf[32];
+        int fd = open(candidates[i], O_RDONLY);
+        if (fd < 0) continue;
+        ssize_t n = read(fd, buf, sizeof(buf) - 1);
+        close(fd);
+        if (n <= 0) continue;
+        buf[n] = 0;
+        long pid = strtol(buf, 0, 10);
+        if (pid <= 1) continue;
+        if (kill((pid_t)pid, 0) == 0 || errno == EPERM) return 1;
+    }
+    return 0;
 }
 
 static int requested_audio_channels(void) {
@@ -662,16 +687,23 @@ static int detected_device(void) {
     return U241_DEVICE_NONE;
 }
 
+/*
+ * U2.52.5 SAMPLER OUT_ONLY + Android input-only:
+ *   USB_OUT  (Sampler): console -> SP playback only (direction toggle removed).
+ *   Android AOA: input-only (receiver/daemon have no playback path), so it has
+ *   no OUT and never mutes the console.
+ * Windows gadget mode keeps its existing out+in semantics.
+ */
 static int mode_has_out(int mode) {
-    return mode == U241_WINDOWS ||
-        mode == U241_ANDROID ||
-        mode == U241_USB_OUT;
+    if (mode == U241_USB_OUT) return !g_sampler_direction_in;
+    return mode == U241_WINDOWS;
 }
 
 static int mode_has_in(int mode) {
+    if (mode == U241_USB_OUT) return g_sampler_direction_in;
     return mode == U241_WINDOWS ||
         mode == U241_ANDROID ||
-        mode == U241_USB_OUT;
+        mode == U241_SP404_IN;
 }
 
 static const char *device_out_fifo(int device) {
@@ -852,6 +884,14 @@ static void refresh_mode_from_file(int force) {
     if (n <= 0) return;
     buf[n] = 0;
     int new_mode = mode_from_text(buf);
+    if (new_mode == U241_SP404_IN) {
+        /* U2.52.5 SAMPLER_OUT_ONLY: a persisted SP404_IN token behaves as
+         * Sampler OUT; the port no longer captures. */
+        new_mode = U241_USB_OUT;
+        g_sampler_direction_in = 0;
+    } else if (new_mode == U241_USB_OUT) {
+        g_sampler_direction_in = 0;
+    }
     if (!selectable_mode(new_mode)) new_mode = U241_LOCAL_CONSOLE;
     if (new_mode != g_driver_mode) {
         g_driver_mode = new_mode;
@@ -969,6 +1009,13 @@ static int should_mute_now(void) {
      *
      * disable_mute_local is retained only as an explicit diagnostic override.
      */
+    /*
+     * U2.52.5 ANDROID_NO_MUTE:
+     * Android AOA is input-only (there is no console->phone playback path),
+     * so routing audio to USB must not silence the console: the user hears
+     * the project locally while the phone capture feeds the Record modal.
+     */
+    if (g_driver_mode == U241_ANDROID) return 0;
     return mode_has_out(g_driver_mode) &&
            !nomute_file_present() &&
            g_usb_raw;
@@ -1131,8 +1178,28 @@ static void ensure_fifo_open_nonblocking(void) {
     g_fifo_fd = open(out_fifo, O_WRONLY | O_NONBLOCK);
     if (g_fifo_fd < 0) {
         if ((g_submit_count % 240) == 0) log_msg("fifo open pending");
+        /* v12 self-heal: in Android mode a persistently missing AOA PCM fifo
+         * means the AOA runtime died; re-request the host-role apply (which
+         * reuses a healthy runtime or restarts the supervisor watchdog) at
+         * most once per 30 s, up to 5 attempts. */
+        if (detected_device() == U241_DEVICE_ANDROID) {
+            const long long now_ms = monotonic_milliseconds();
+            if (g_android_fifo_miss_start_ms == 0)
+                g_android_fifo_miss_start_ms = now_ms;
+            if (g_android_heal_attempts < 5 &&
+                now_ms > 0 &&
+                now_ms - g_android_fifo_miss_start_ms >= 30000 &&
+                now_ms - g_android_last_heal_ms >= 30000) {
+                g_android_last_heal_ms = now_ms;
+                g_android_fifo_miss_start_ms = now_ms;
+                ++g_android_heal_attempts;
+                log_msg("android fifo missing - re-applying host-role runtime");
+                launch_apply_profile_once(U241_ANDROID);
+            }
+        }
         return;
     }
+    g_android_fifo_miss_start_ms = 0;
     log_msg("fifo opened");
 }
 
@@ -1856,7 +1923,13 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
 #if TREEFROG_UAC2_BRIDGE
     if (!selectable_mode(mode)) return mode_name(mode);
 
+    const int effective =
+        (mode == U241_USB_OUT && g_sampler_direction_in)
+            ? U241_SP404_IN
+            : mode;
+
     if (g_driver_mode == mode) {
+        if (effective != mode) write_mode_file(effective);
         return mode_name(g_driver_mode);
     }
 
@@ -1870,7 +1943,7 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
     g_driver_mode = mode;
     g_pending_driver_mode = mode;
     log_msg("driver mode changed");
-    write_mode_file(g_driver_mode);
+    write_mode_file(effective);
 
     /*
      * U2.41.5.2 FAST_DEVICE_SWITCH:
@@ -1879,10 +1952,11 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
      */
     if (g_driver_mode == U241_ANDROID ||
         g_driver_mode == U241_USB_OUT ||
+        g_driver_mode == U241_SP404_IN ||
         g_driver_mode == U241_MIDI) {
         /*
          * U2.52 HOST_ROLE_MODE_ALWAYS_APPLY:
-         * Host-role modes (Android AOA, SP404 sampler OUT, MIDI) load ALSA
+         * Host-role modes (Android AOA, SP404 sampler OUT/IN, MIDI) load ALSA
          * host modules, switch the musb controller to host role and start the
          * host supervisor.  A live Windows gadget/daemon contract says nothing
          * about the host-role runtime, so routing the change as a fast in-core
@@ -1891,14 +1965,14 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
          * for host-role modes.
          */
         close_fifo_if_open("fifo closed host-role apply");
-        launch_apply_profile_once(g_driver_mode);
+        launch_apply_profile_once(effective);
         log_msg("driver mode host-role apply requested");
     } else if (runtime_ready_fast()) {
         if (g_driver_mode == U241_LOCAL_CONSOLE)
             close_fifo_if_open("fifo closed fast local-console switch");
         log_msg("driver mode fast apply runtime-ready");
     } else {
-        launch_apply_profile_once(g_driver_mode);
+        launch_apply_profile_once(effective);
         log_msg("driver mode setup apply requested");
     }
 
@@ -1911,7 +1985,8 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
 
 const char *TreeFrogUac2Bridge_CycleDriverMode(void) {
 #if TREEFROG_UAC2_BRIDGE
-    int next = (g_driver_mode + 1) % 5;
+    int next = (g_driver_mode + 1) %
+        TreeFrogUac2Bridge_GetDriverModeCount();
     return TreeFrogUac2Bridge_SetDriverMode(next);
 #else
     return "DISABLED";
@@ -1919,6 +1994,24 @@ const char *TreeFrogUac2Bridge_CycleDriverMode(void) {
 }
 
 int TreeFrogUac2Bridge_GetDriverModeCount(void) { return 5; }
+
+int TreeFrogUac2Bridge_GetSamplerDirectionIn(void) {
+#if TREEFROG_UAC2_BRIDGE
+    return g_sampler_direction_in;
+#else
+    return 0;
+#endif
+}
+
+void TreeFrogUac2Bridge_SetSamplerDirectionIn(int in) {
+#if TREEFROG_UAC2_BRIDGE
+    /* U2.52.5 SAMPLER_OUT_ONLY: the OUT/IN direction toggle is removed;
+     * Sampler always plays console -> SP404. */
+    (void)in;
+#else
+    (void)in;
+#endif
+}
 
 const char *TreeFrogUac2Bridge_GetDriverModeNameByIndex(int mode) {
 #if TREEFROG_UAC2_BRIDGE
@@ -2078,6 +2171,21 @@ int TreeFrogUac2Bridge_StartUsbCapture(
      * (plain gadget sampler) still has no host-side capture PCM, so it keeps
      * the block; only the SP404 host-role device is allowed.
      */
+    if ((g_driver_mode == U241_USB_OUT ||
+         g_driver_mode == U241_SP404_IN) &&
+        !g_sampler_direction_in) {
+        snprintf(
+            g_capture_status,
+            sizeof(g_capture_status),
+            "Sampler is OUT; switch to IN (L/R in Audio Driver)");
+        g_capture_state = TREEFROG_USB_CAPTURE_ERROR;
+        snprintf(
+            g_capture_error,
+            sizeof(g_capture_error),
+            "sampler direction is OUT");
+        return 0;
+    }
+
     if (g_driver_mode == U241_USB_OUT &&
         detected_device() != U241_DEVICE_SP404) {
         snprintf(
@@ -2328,7 +2436,9 @@ int TreeFrogUac2Bridge_IsRecordingDaemonReady(void) {
             return 0;
         return exists_file(kMidiFifo) && midi_device_present_raw();
     }
-    if (g_driver_mode == U241_USB_OUT &&
+    if ((g_driver_mode == U241_USB_OUT ||
+         g_driver_mode == U241_SP404_IN) &&
+        g_sampler_direction_in &&
         detected_device() == U241_DEVICE_SP404) {
         if (strcmp(g_capture_abi, "R36SX_SP404_CAPTURE_ABI=1") != 0)
             return 0;

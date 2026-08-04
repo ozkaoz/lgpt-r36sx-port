@@ -18,6 +18,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdint.h>
@@ -54,6 +55,9 @@ static const char *AUDIO_PROFILE = "/tmp/r36sx_lgpt_usb/audio_profile";
 static const char *AUDIO_CHANNELS = "/tmp/r36sx_lgpt_usb/audio_channels";
 static const char *AUDIO_RATE = "/tmp/r36sx_lgpt_usb/audio_rate";
 static const char *PLAYBACK_PCM_STATUS = "/tmp/r36sx_lgpt_usb/playback_pcm_status";
+static const char *AUDIO_MODE_FILE = "/mnt/sdcard/lgpt/otg/audio_driver_mode";
+static int g_dir_out = 1;
+static unsigned long long g_dir_check_ms = 0;
 static unsigned g_audio_channels = 1;
 static unsigned g_audio_rate = 48000;
 static int g_dev_play_format = SNDRV_PCM_FORMAT_S16_LE;
@@ -628,6 +632,26 @@ static int wait_playback_writable(int pcm, int timeout_ms) {
     return (pfd.revents & POLLOUT) ? 1 : 0;
 }
 
+/* v12 EXT SOURCE backoff: when the SP-404MKII stalls (Ext Source pressed),
+ * ALSA polls EIO and the device keeps returning EIO for every reopen. v11
+ * reopened every ~100 ms, which made the ring refill, overflow, and beep
+ * (the static burst). Escalate the retry delay up to 2 s so a stalled
+ * device produces at most a few sparse clicks instead of a static storm;
+ * reset the delay once the stream has written cleanly for 8 periods. */
+static int g_eio_backoff_ms = 250;
+static void eio_backoff_sleep(void) {
+    sleep_ms(g_eio_backoff_ms);
+    if (g_eio_backoff_ms < 2000) g_eio_backoff_ms *= 2;
+}
+/* v12.1 USB re-enumeration after a persistent EIO stall: the SP-404MKII
+ * stops consuming its USB stream while EXT SOURCE is held and some firmware
+ * revisions do not resume until the device re-enumerates. The daemon then
+ * toggles the port's authorized flag (software unplug/replug) so the user no
+ * longer has to pull the cable. */
+static unsigned long long g_eio_storm_start_ms = 0;
+static unsigned long long g_last_reenum_ms = 0;
+static int g_reenum_count = 0;
+
 static unsigned convert_s16_to_device(
     const int16_t *in,
     int frames,
@@ -643,16 +667,16 @@ static unsigned convert_s16_to_device(
         int32_t right = (in_channels == 2) ? in[(size_t)f * in_channels + 1] : left;
         for (c = 0; c < (int)out_channels; ++c) {
             /*
-             * RC8.0 SP404 4CH CHANNEL MAPPING:
+             * SP404 4CH CHANNEL MAPPING (v11, EXT SOURCE gate):
              * The SP404MKII exposes 4 playback channels over UAC2. Per the
-             * mk2 audio diagram, ch1/2 feed the EXT IN / INPUT FX path (only
-             * audible while [EXT SOURCE] is engaged) and ch3/4 mix straight
-             * to the main output. Writing all four duplicated the console
-             * stream: audible without EXT SOURCE and doubled with it. Send
-             * L/R only on ch1/2 and keep ch3/4 silent so the SP renders the
-             * console audio solely through its ext-source processing path.
+             * mk2 audio diagram, ch1/2 feed the EXT IN / INPUT FX path, which
+             * is only audible while [EXT SOURCE] is engaged on the SP, and
+             * ch3/4 mix straight to the main output. v9 sent L/R on ch3/4 so
+             * the console stream reached the main mix even with EXT SOURCE
+             * off, which the user reports as a fault. v11 routes L/R to ch1/2
+             * (the SP hardware gates it by EXT SOURCE) and keeps ch3/4 silent.
              */
-            int32_t v = (c == 0) ? left : ((c == 1) ? right : 0);
+            int32_t v = (c == 2 || c == 3) ? 0 : ((c == 0) ? left : right);
             v <<= (int)out_shift;
             unsigned char *dst = out + ((size_t)f * out_channels + (size_t)c) * out_bytes;
             unsigned b;
@@ -740,6 +764,44 @@ static int write_frames_exact(
     return completed;
 }
 
+static void dump_file(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    char line[512];
+    while (fgets(line, sizeof(line), f)) {
+        size_t len = strlen(line);
+        if (len > 0 && line[len - 1] == '\n') line[len - 1] = 0;
+        fprintf(stderr, "  %s\n", line);
+    }
+    fclose(f);
+}
+
+static void dump_asound_state(const char *tag) {
+    static unsigned long long last_dump_ms = 0;
+    const unsigned long long now = monotonic_milliseconds();
+    if (last_dump_ms != 0 && (now - last_dump_ms) < 4000ULL) return;
+    last_dump_ms = now;
+    fprintf(stderr, "=== ASOUND_DUMP tag=%s ===\n", tag ? tag : "");
+    dump_file("/proc/asound/cards");
+    dump_file("/proc/asound/card0/stream0");
+    dump_file("/proc/asound/card0/pcm0p/sub0/status");
+    dump_file("/proc/asound/card0/pcm0p/sub0/hw_params");
+    dump_file("/proc/asound/card0/pcm0c/sub0/status");
+    dump_file("/proc/asound/card0/pcm0c/sub0/hw_params");
+    dump_file("/proc/asound/card0/pcm0c/sub0/prealloc");
+    dump_file("/proc/asound/card0/pcm1c/sub0/status");
+    dump_file("/proc/asound/card0/pcm1c/sub0/hw_params");
+    dump_file("/proc/asound/card0/pcm1p/sub0/status");
+    dump_file("/proc/asound/card0/pcm1p/sub0/hw_params");
+}
+
+static void capture_start_diag(int pcm) {
+    int rc = ioctl(pcm, SNDRV_PCM_IOCTL_START);
+    fprintf(stderr, "CAPTURE_IOCTL_START rc=%d errno=%d (%s)\n",
+            rc, rc < 0 ? errno : 0, rc < 0 ? strerror(errno) : "ok");
+    dump_asound_state("capture-start");
+}
+
 static int read_frames(int pcm, unsigned char *buf, int frames, unsigned dev_channels, unsigned dev_bytes) {
     (void)dev_channels;
     (void)dev_bytes;
@@ -764,14 +826,105 @@ static int16_t ring[RING_SAMPLES];
 static unsigned rpos = 0, wpos = 0, rfill = 0;
 static void ring_reset(void) { rpos = wpos = rfill = 0; }
 static unsigned ring_push_samples(const int16_t *s, unsigned n) { unsigned pushed = 0; while (pushed < n && rfill < RING_SAMPLES) { ring[wpos] = s[pushed++]; wpos = (wpos + 1) % RING_SAMPLES; rfill++; } return pushed; }
-static unsigned ring_pop_samples(int16_t *d, unsigned n) { unsigned popped = 0; while (popped < n && rfill > 0) { d[popped++] = ring[rpos]; rpos = (rpos + 1) % RING_SAMPLES; rfill--; } return popped; }
 static unsigned ring_drop_oldest_samples(unsigned n) {
     unsigned dropped = n < rfill ? n : rfill;
     rpos = (rpos + dropped) % RING_SAMPLES;
     rfill -= dropped;
     return dropped;
 }
-static void drain_fifo(int in, long *dropped) { int16_t inbuf[4096]; for (;;) { ssize_t r = read(in, inbuf, sizeof(inbuf)); if (r > 0) { unsigned samples = (unsigned)(r / 2); unsigned pushed = ring_push_samples(inbuf, samples); if (pushed < samples && dropped) *dropped += (long)(samples - pushed); continue; } if (r == 0) break; if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) break; loge("read fifo"); break; } }
+static long rs_fifo_total = 0;
+/* v12.1: discard stale producer data so a freshly opened stream starts with
+ * current audio. Without this, the core's project audio accumulated while
+ * the SP-404MKII enumerated gets dumped into the ring and trimmed at once,
+ * which is the initial static burst ("pitido de conexión"). */
+static void flush_input_fifo(int in) {
+    if (in < 0) return;
+    int16_t junk[2048];
+    long discarded = 0;
+    for (;;) {
+        ssize_t r = read(in, junk, sizeof(junk));
+        if (r > 0) {
+            discarded += (long)(r / 2);
+            continue;
+        }
+        break;
+    }
+    if (discarded > 0)
+        fprintf(stderr, "PCM_FIFO_FLUSH discarded_samples=%ld\n", discarded);
+}
+static void drain_fifo(int in, long *dropped) { int16_t inbuf[4096]; for (;;) { ssize_t r = read(in, inbuf, sizeof(inbuf)); if (r > 0) { unsigned samples = (unsigned)(r / 2); rs_fifo_total += (long)samples; unsigned pushed = ring_push_samples(inbuf, samples); if (pushed < samples && dropped) *dropped += (long)(samples - pushed); continue; } if (r == 0) break; if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) break; loge("read fifo"); break; } }
+
+/*
+ * U2.51.8 ADAPTIVE_RATE_RESAMPLER (polyphase windowed-sinc)
+ *
+ * The libretro/picoarch producer delivers at the panel cadence, which is a
+ * few percent slower than the device's 48 kHz adaptive clock, so a fixed
+ * ring either starves (cutouts) or overflows (drops) depending on config.
+ *
+ * v6 fixes the v5 artifacts that read as "low quality":
+ *  - linear interpolation is replaced by a 16-tap Blackman windowed-sinc
+ *    with a 256-phase polyphase table, so high-frequency content is neither
+ *    dulled nor aliased;
+ *  - the rate feedback runs on a 0.5 s EMA of the ring level instead of the
+ *    instantaneous level, removing the 0.90-0.99 limit-cycle wobble that
+ *    modulated pitch;
+ *  - the learned ratio survives ring/PCM resets, so after a capture session
+ *    playback resumes at the already-matched rate.
+ *
+ * The ratio is locked to the producer rate by the ring level (target =
+ * hardware buffer); the ring then stays near target and neither starves nor
+ * trims. A constant PLAYBACK_GAIN keeps headroom so the SP-404MKII's USB
+ * input stage (~+9 dB) does not saturate during USB-REC.
+ */
+#define RS_TAPS 16
+#define RS_PHASES 256
+#define PLAYBACK_GAIN 0.65f
+#define CAPTURE_GAIN 0.85f
+static float rs_table[RS_PHASES * RS_TAPS];
+static int rs_table_ready = 0;
+static double rs_fc = 0.0;
+static float rs_h[RS_TAPS];
+static int rs_n = 0;
+static long rs_base = 0;
+static double rs_pos = 0.0;
+static double rs_ratio = 1.0;
+static double rs_rfill_ema = 0.0;
+static int rs_ema_init = 0;
+static long rs_write_count = 0;
+
+static void rs_build_table(double fc) {
+    int p, j;
+    for (p = 0; p < RS_PHASES; ++p) {
+        double f = (double)p / (double)RS_PHASES;
+        for (j = 0; j < RS_TAPS; ++j) {
+            double t = (double)(RS_TAPS / 2 - 1 - j) + f;
+            double arg = M_PI * t * fc;
+            double s = fabs(arg) < 1e-9 ? 1.0 : sin(arg) / arg;
+            double w = 0.42 - 0.5 * cos(2.0 * M_PI * (j + 0.5) /
+                                        (double)RS_TAPS) +
+                       0.08 * cos(4.0 * M_PI * (j + 0.5) /
+                                  (double)RS_TAPS);
+            rs_table[p * RS_TAPS + j] = (float)(s * w);
+        }
+    }
+    rs_table_ready = 1;
+    rs_fc = fc;
+}
+
+static void resampler_reset(void) {
+    rs_n = 0;
+    rs_base = 0;
+    rs_pos = (double)(RS_TAPS / 2);
+    rs_ema_init = 0;
+}
+
+static int ring_pop_one_sample(int16_t *s) {
+    if (rfill == 0) return -1;
+    *s = ring[rpos];
+    rpos = (rpos + 1) % RING_SAMPLES;
+    --rfill;
+    return 0;
+}
 
 static void write_wav_header(int fd, uint32_t data_bytes, uint32_t rate, uint16_t channels) {
     uint8_t h[44]; memset(h, 0, sizeof(h));
@@ -876,6 +1029,7 @@ typedef struct CaptureState {
     char name[96];
     char token[96];
     char error[128];
+    char pcm_path[64];
     unsigned long long start_ms;
     unsigned long long last_data_ms;
     int max_seconds;
@@ -899,6 +1053,7 @@ static CaptureState cap = {
 static char last_record_command_token[96] = "";
 static int mon_cap_pcm = -1;
 static int force_playback_reopen = 0;
+static int playback_parked = 0;
 static int last_level_percent = -1;
 static int last_level_l_percent = -1;
 static int last_level_r_percent = -1;
@@ -1270,6 +1425,7 @@ static void start_capture(
     cap.start_ms = monotonic_milliseconds();
     cap.last_data_ms = cap.start_ms;
     cap.last_meta_second = -1;
+    snprintf(cap.pcm_path, sizeof(cap.pcm_path), "%s", pcmc);
 
     snprintf(
         cap.name,
@@ -1332,6 +1488,8 @@ static void start_capture(
             detail);
         return;
     }
+
+    capture_start_diag(cap.pcm);
 
     /*
      * Open the WAV only after PCM ownership is secured. A failed ALSA
@@ -1546,6 +1704,17 @@ static void poll_capture_command(const char *pcmc) {
     }
 
     if (strstr(command, "START")) {
+        if (g_dir_out) {
+            fprintf(stderr, "U2517_CAPTURE_REJECTED_MODE_OUT token=%s\n",
+                    token);
+            set_capture_state(
+                CAP_STATE_ERROR,
+                "USB capture error: driver is Sampler OUT",
+                "switch to Sampler IN to record");
+            write_capture_meta();
+            return;
+        }
+
         char path[256] = "";
         char name[96] = "";
         char seconds_text[32] = "";
@@ -1572,11 +1741,15 @@ static void poll_capture_command(const char *pcmc) {
 
 static void passive_monitor_tick(const char *pcmc, int configured) {
     monitor_refresh_flag();
-    if (!configured || !mon_enabled || cap.active) {
+    if (!configured || !mon_enabled || cap.active || g_dir_out) {
         if (mon_cap_pcm >= 0) { close(mon_cap_pcm); mon_cap_pcm = -1; }
         return;
     }
     if (mon_cap_pcm < 0) {
+        static unsigned long long mon_last_retry_ms = 0;
+        unsigned long long mon_now_ms = monotonic_milliseconds();
+        if (mon_now_ms - mon_last_retry_ms < 250) return;
+        mon_last_retry_ms = mon_now_ms;
         mon_cap_pcm = open(pcmc, O_RDONLY | O_NONBLOCK);
         if (mon_cap_pcm < 0) { if (errno != ENOENT) loge("passive monitor capture open"); return; }
         if (pcm_prepare_capture_safe(
@@ -1591,6 +1764,7 @@ static void passive_monitor_tick(const char *pcmc, int configured) {
             return;
         }
         fprintf(stderr, "CAPTURE_PASSIVE_MONITOR_OPEN pcm=%s rate=%u channels=%u\n", pcmc, g_audio_rate, g_audio_channels);
+        capture_start_diag(mon_cap_pcm);
     }
     static unsigned char raw[480 * 2 * 4];
     static int16_t conv[480 * 2];
@@ -1638,6 +1812,20 @@ static void capture_tick(void) {
             &right);
         int level = left > right ? left : right;
         set_lr_level_percent(left, right);
+
+        /*
+         * U2.51.10 CAPTURE_GAIN: leave headroom so the SP-404MKII output
+         * (hot by design) never saturates the 16-bit capture path.
+         */
+        {
+            unsigned i;
+            for (i = 0; i < (unsigned)(frames * cap.channels); ++i) {
+                int32_t v = (int32_t)((float)buffer[i] * CAPTURE_GAIN);
+                if (v > 32767) v = 32767;
+                if (v < -32768) v = -32768;
+                buffer[i] = (int16_t)v;
+            }
+        }
 
         size_t byte_count =
             (size_t)frames *
@@ -1696,6 +1884,9 @@ static void capture_tick(void) {
         now > cap.start_ms &&
         (now - cap.start_ms) >= 5000ULL &&
         cap.frames == 0) {
+        fprintf(stderr, "CAPTURE_NO_DATA diag start_elapsed=%llu\n",
+                (unsigned long long)(now - cap.start_ms));
+        dump_asound_state("capture-no-data");
         snprintf(
             cap.error,
             sizeof(cap.error),
@@ -1705,6 +1896,57 @@ static void capture_tick(void) {
     }
 
     if (frames < 0) {
+        if (frames == -ENODEV || frames == -EIO ||
+            frames == -ESHUTDOWN) {
+            /* U2.51.9 CAPTURE_DEVICE_RECOVERY: the SP-404 re-enumerates
+             * when USB-REC engages. Retry reopening for ~8s and keep the
+             * take (with a silence gap) instead of failing it. */
+            unsigned long long gap_start = monotonic_milliseconds();
+            fprintf(stderr,
+                    "CAPTURE_DEVICE_LOST rc=%d frames=%ld trying_reopen\n",
+                    frames, cap.frames);
+            if (cap.pcm >= 0) {
+                close(cap.pcm);
+                cap.pcm = -1;
+            }
+            int reopened = 0;
+            for (int attempt = 0; attempt < 32; ++attempt) {
+                int fd = open(cap.pcm_path, O_RDONLY | O_NONBLOCK);
+                if (fd >= 0) {
+                    if (pcm_prepare_capture_safe(
+                            fd, g_audio_rate, g_audio_channels,
+                            480, 4) == 0) {
+                        cap.pcm = fd;
+                        reopened = 1;
+                        break;
+                    }
+                    close(fd);
+                }
+                sleep_ms(250);
+            }
+            if (reopened) {
+                unsigned long long gap_ms =
+                    monotonic_milliseconds() - gap_start;
+                unsigned gap_frames = (unsigned)((gap_ms * g_audio_rate) /
+                                                 1000ULL);
+                if (gap_frames > 48000) gap_frames = 48000;
+                size_t gap_bytes =
+                    (size_t)gap_frames * cap.channels *
+                    sizeof(int16_t);
+                static int16_t gap_zero[48000 * 2];
+                memset(gap_zero, 0, gap_bytes);
+                if (gap_bytes > 0 &&
+                    write_all_bytes(cap.wav, gap_zero, gap_bytes) >= 0) {
+                    cap.data_bytes += (uint32_t)gap_bytes;
+                    cap.frames += (long)gap_frames;
+                }
+                fprintf(stderr,
+                        "CAPTURE_DEVICE_RECOVERED gap_ms=%llu gap_frames=%u total_frames=%ld\n",
+                        (unsigned long long)gap_ms, gap_frames,
+                        cap.frames);
+                return;
+            }
+        }
         char error_text[128];
         snprintf(
             error_text,
@@ -1720,12 +1962,276 @@ static void capture_tick(void) {
     }
 }
 
+static void probe_fill_tone(int16_t *buf, int frames, unsigned channels, unsigned long long *phase) {
+    int f, c;
+    for (f = 0; f < frames; ++f) {
+        int32_t v = (((*phase) / 24) & 1) ? 8000 : -8000;
+        (*phase)++;
+        for (c = 0; c < (int)channels; ++c)
+            buf[(size_t)f * channels + c] = (c <= 1) ? (int16_t)v : 0;
+    }
+}
+
+static int probe_play_once(const char *pcmp, unsigned ch, unsigned rate,
+                           unsigned period, unsigned periods, unsigned dur_ms) {
+    int fd = open(pcmp, O_WRONLY);
+    if (fd < 0) {
+        fprintf(stderr, "PROBE_PLAY ch=%u rate=%u p=%u n=%u OPEN_FAIL errno=%d (%s)\n",
+                ch, rate, period, periods, errno, strerror(errno));
+        return -1;
+    }
+    int rc = pcm_prepare_common(fd, 0, rate, ch, period, periods);
+    if (rc < 0) {
+        fprintf(stderr, "PROBE_PLAY ch=%u rate=%u p=%u n=%u PREPARE_FAIL rc=%d\n",
+                ch, rate, period, periods, rc);
+        close(fd);
+        return -1;
+    }
+    unsigned dev_ch = g_dev_play_channels;
+    unsigned dev_bytes = g_dev_play_bytes;
+    unsigned long long phase = 0;
+    static int16_t tone[2048 * 4];
+    static unsigned char devbuf[2048 * 2 * 4];
+    unsigned long long start = monotonic_milliseconds();
+    long writes = 0, poll_errs = 0, epipes = 0, timeouts = 0, short_writes = 0;
+    int first = 1;
+    while (monotonic_milliseconds() - start < dur_ms) {
+        int w = wait_playback_writable(fd, 25);
+        if (w < 0) {
+            ++poll_errs;
+            if (first) {
+                first = 0;
+                fprintf(stderr, "PROBE_PLAY ch=%u rate=%u FIRST_POLL_ERR rc=%d errno=%d (%s) dev_ch=%u\n",
+                        ch, rate, w, -w, strerror(-w), dev_ch);
+            }
+            break;
+        }
+        if (w == 0) { ++timeouts; continue; }
+        probe_fill_tone(tone, (int)period, dev_ch, &phase);
+        convert_s16_to_device(tone, (int)period, dev_ch, devbuf, dev_ch, dev_bytes, g_dev_play_shift);
+        int wr = write_frames_exact(fd, devbuf, (int)period, dev_ch, dev_bytes);
+        if (wr < 0) { ++epipes; break; }
+        if (wr != (int)period) ++short_writes;
+        ++writes;
+    }
+    fprintf(stderr, "PROBE_PLAY_RESULT ch=%u rate=%u p=%u n=%u dur=%u writes=%ld poll_errs=%ld timeouts=%ld epipes=%ld short_writes=%ld dev_ch=%u\n",
+            ch, rate, period, periods, dur_ms, writes, poll_errs, timeouts, epipes, short_writes, dev_ch);
+    close(fd);
+    return 0;
+}
+
+static int probe_cap_once(const char *pcmc, unsigned ch, unsigned rate,
+                          unsigned period, unsigned periods, unsigned dur_ms) {
+    int fd = open(pcmc, O_RDONLY);
+    if (fd < 0) {
+        fprintf(stderr, "PROBE_CAP ch=%u rate=%u p=%u n=%u OPEN_FAIL errno=%d (%s)\n",
+                ch, rate, period, periods, errno, strerror(errno));
+        return -1;
+    }
+    int rc = pcm_prepare_common(fd, 1, rate, ch, period, periods);
+    if (rc < 0) {
+        fprintf(stderr, "PROBE_CAP ch=%u rate=%u p=%u n=%u PREPARE_FAIL rc=%d\n",
+                ch, rate, period, periods, rc);
+        close(fd);
+        return -1;
+    }
+    unsigned dev_ch = g_dev_cap_channels;
+    unsigned dev_bytes = g_dev_cap_bytes;
+    if (ioctl(fd, SNDRV_PCM_IOCTL_START) < 0) {
+        fprintf(stderr, "PROBE_CAP ch=%u rate=%u START_FAIL errno=%d (%s)\n",
+                ch, rate, errno, strerror(errno));
+        close(fd);
+        return -1;
+    }
+    static unsigned char raw[2048 * 2 * 4];
+    unsigned long long start = monotonic_milliseconds();
+    long frames_total = 0, poll_errs = 0, reads = 0;
+    int first = 1;
+    while (monotonic_milliseconds() - start < dur_ms) {
+        struct pollfd pfd;
+        memset(&pfd, 0, sizeof(pfd));
+        pfd.fd = fd;
+        pfd.events = POLLIN | POLLERR | POLLHUP;
+        int pr = poll(&pfd, 1, 25);
+        if (pr < 0) { if (errno == EINTR) continue; break; }
+        if (pr == 0) continue;
+        if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            ++poll_errs;
+            if (first) {
+                first = 0;
+                fprintf(stderr, "PROBE_CAP ch=%u rate=%u FIRST_POLL_ERR revents=0x%x\n",
+                        ch, rate, pfd.revents);
+            }
+            break;
+        }
+        if (!(pfd.revents & POLLIN)) continue;
+        int n = read_frames(fd, raw, (int)period, dev_ch, dev_bytes);
+        if (n > 0) { frames_total += n; ++reads; }
+        else if (n < 0) {
+            fprintf(stderr, "PROBE_CAP ch=%u rate=%u READ_FAIL rc=%d\n", ch, rate, n);
+            break;
+        }
+    }
+    fprintf(stderr, "PROBE_CAP_RESULT ch=%u rate=%u p=%u n=%u dur=%u frames=%ld (%.2fs) reads=%ld poll_errs=%ld dev_ch=%u\n",
+            ch, rate, period, periods, dur_ms, frames_total,
+            (double)frames_total / (double)rate, reads, poll_errs, dev_ch);
+    close(fd);
+    return 0;
+}
+
+static int probe_combo2(const char *pcmp, const char *pcmc, const char *tag,
+                        unsigned pch_w, unsigned prate_w, unsigned pperiod_w, unsigned pperiods_w,
+                        unsigned cch_w, unsigned crate_w, unsigned cperiod_w, unsigned cperiods_w,
+                        unsigned cap_delay_ms, unsigned play_stop_ms, unsigned dur_ms) {
+    int pf = open(pcmp, O_WRONLY);
+    int cf = open(pcmc, O_RDONLY);
+    if (pf < 0 || cf < 0) {
+        fprintf(stderr, "PROBE_COMBO2[%s] OPEN_FAIL play=%d cap=%d\n", tag, pf, cf);
+        if (pf >= 0) close(pf);
+        if (cf >= 0) close(cf);
+        return -1;
+    }
+    int prc = pcm_prepare_common(pf, 0, prate_w, pch_w, pperiod_w, pperiods_w);
+    int crc = pcm_prepare_common(cf, 1, crate_w, cch_w, cperiod_w, cperiods_w);
+    if (prc < 0 || crc < 0) {
+        fprintf(stderr, "PROBE_COMBO2[%s] PREPARE_FAIL play=%d cap=%d\n", tag, prc, crc);
+        close(pf);
+        close(cf);
+        return -1;
+    }
+    unsigned pch = g_dev_play_channels, pbytes = g_dev_play_bytes;
+    unsigned cch = g_dev_cap_channels, cbytes = g_dev_cap_bytes;
+    int cap_running = 0;
+    if (cap_delay_ms == 0) {
+        if (ioctl(cf, SNDRV_PCM_IOCTL_START) < 0) {
+            fprintf(stderr, "PROBE_COMBO2[%s] CAP_START_FAIL errno=%d (%s)\n", tag, errno, strerror(errno));
+            close(pf);
+            close(cf);
+            return -1;
+        }
+        cap_running = 1;
+    }
+    unsigned long long phase = 0;
+    static int16_t tone[2048 * 4];
+    static unsigned char devbuf[2048 * 2 * 4];
+    static unsigned char raw[2048 * 2 * 4];
+    unsigned long long start = monotonic_milliseconds();
+    long writes = 0, cap_frames = 0, poll_errs = 0;
+    int first = 1;
+    while (monotonic_milliseconds() - start < dur_ms) {
+        if (!cap_running && monotonic_milliseconds() - start >= cap_delay_ms) {
+            if (ioctl(cf, SNDRV_PCM_IOCTL_START) < 0) {
+                fprintf(stderr, "PROBE_COMBO2[%s] CAP_START_FAIL errno=%d (%s)\n", tag, errno, strerror(errno));
+                break;
+            }
+            cap_running = 1;
+        }
+        if (pf >= 0 && play_stop_ms > 0 &&
+            monotonic_milliseconds() - start >= play_stop_ms) {
+            close(pf);
+            pf = -1;
+            fprintf(stderr, "PROBE_COMBO2[%s] PLAY_CLOSED_AT_%u\n", tag, play_stop_ms);
+        }
+        if (pf >= 0) {
+        int w = wait_playback_writable(pf, 5);
+        if (w < 0) { ++poll_errs; break; }
+        if (w > 0) {
+            probe_fill_tone(tone, pperiod_w, pch, &phase);
+            convert_s16_to_device(tone, pperiod_w, pch, devbuf, pch, pbytes, g_dev_play_shift);
+            int wr = write_frames_exact(pf, devbuf, pperiod_w, pch, pbytes);
+            if (wr < 0) {
+                if (first) {
+                    first = 0;
+                    fprintf(stderr, "PROBE_COMBO2[%s] PLAY_FAIL rc=%d\n", tag, wr);
+                }
+                break;
+            }
+            ++writes;
+        }
+        }
+        if (cap_running) {
+            struct pollfd pfd;
+            memset(&pfd, 0, sizeof(pfd));
+            pfd.fd = cf;
+            pfd.events = POLLIN | POLLERR | POLLHUP;
+            int pr = poll(&pfd, 1, 0);
+            if (pr > 0 && (pfd.revents & POLLIN)) {
+                int n = read_frames(cf, raw, cperiod_w, cch, cbytes);
+                if (n > 0) cap_frames += n;
+            }
+        }
+    }
+    fprintf(stderr, "PROBE_COMBO2_RESULT tag=%s dur=%u writes=%ld cap_frames=%ld poll_errs=%ld dev_pch=%u dev_cch=%u cap_delay=%u\n",
+            tag, dur_ms, writes, cap_frames, poll_errs, pch, cch, cap_delay_ms);
+    close(pf);
+    close(cf);
+    return 0;
+}
+
+static int run_probe_all(const char *pcmp, const char *pcmc) {
+    fprintf(stderr, "SP404_PROBE_START play=%s cap=%s\n", pcmp, pcmc);
+    dump_asound_state("probe-start");
+    probe_play_once(pcmp, 4, 48000, 480, 4, 2500);
+    probe_play_once(pcmp, 4, 48000, 480, 8, 2500);
+    probe_play_once(pcmp, 2, 48000, 480, 4, 2500);
+    probe_play_once(pcmp, 4, 44100, 480, 4, 2500);
+    probe_cap_once(pcmc, 2, 48000, 480, 4, 2500);
+    probe_cap_once(pcmc, 2, 48000, 1024, 4, 2500);
+    probe_cap_once(pcmc, 1, 48000, 480, 4, 2500);
+    probe_combo2(pcmp, pcmc, "a_play_p8cap", 4, 48000, 480, 8, 2, 48000, 480, 4, 0, 0, 3000);
+    probe_combo2(pcmp, pcmc, "b_lowlat", 4, 48000, 240, 4, 2, 48000, 480, 4, 0, 0, 3000);
+    probe_combo2(pcmp, pcmc, "c_cap_after_play", 4, 48000, 480, 4, 2, 48000, 480, 4, 1500, 0, 4000);
+    probe_combo2(pcmp, pcmc, "d_play_stop_then_cap", 4, 48000, 480, 4, 2, 48000, 480, 4, 2000, 1500, 4500);
+    probe_cap_once(pcmc, 2, 48000, 480, 4, 2000);
+    fprintf(stderr, "SP404_PROBE_DONE\n");
+    return 0;
+}
+
+/*
+ * U2.52.5 SAMPLER OUT_ONLY (duplex and console input abandoned)
+ *
+ * The SP-404MKII USB function is simplex (proven by --probe-all); the port
+ * is now playback-only: console -> SP. A persisted "SP404_IN" token from an
+ * older build is ignored (logged once); the daemon never switches to capture,
+ * so the "Sampler IN" path is fully removed from the runtime.
+ */
+static int g_sampler_in_seen = 0;
+static void refresh_audio_direction(void) {
+    unsigned long long now = monotonic_milliseconds();
+    if (now - g_dir_check_ms < 500) return;
+    g_dir_check_ms = now;
+
+    int fd = open(AUDIO_MODE_FILE, O_RDONLY);
+    if (fd < 0) return;
+
+    char b[96];
+    ssize_t n = read(fd, b, sizeof(b) - 1);
+    close(fd);
+    if (n <= 0) return;
+    b[n] = 0;
+
+    if ((strstr(b, "SP404_IN") || strstr(b, "SP404IN")) &&
+        !g_sampler_in_seen) {
+        g_sampler_in_seen = 1;
+        fprintf(stderr,
+                "U2517_AUDIO_DIRECTION_CHANGE OUT reason=sampler-in-abandoned mode_file=%s\n",
+                b);
+        write_text_file(PLAYBACK_PCM_STATUS, "mode-out\n");
+    }
+}
+
 int main(int argc, char **argv) {
     struct sigaction pipe_action;
     memset(&pipe_action, 0, sizeof(pipe_action));
     pipe_action.sa_handler = SIG_IGN;
     sigemptyset(&pipe_action.sa_mask);
     sigaction(SIGPIPE, &pipe_action, 0);
+
+    if (argc > 1 && strcmp(argv[1], "--probe-all") == 0) {
+        const char *probe_play = argc > 2 ? argv[2] : "/dev/snd/pcmC0D0p";
+        const char *probe_cap = argc > 3 ? argv[3] : "/dev/snd/pcmC0D0c";
+        return run_probe_all(probe_play, probe_cap);
+    }
 
     if (!ensure_monitor_fifo_node()) {
         fprintf(stderr, "U2517_MONITOR_FIFO_STARTUP_CREATE_FAILED path=%s\n", CAPTURE_MONITOR_FIFO);
@@ -1830,6 +2336,72 @@ int main(int argc, char **argv) {
                 sp404_card, pcm_play_buf, pcm_cap_buf);
         return sp404_card;
     }
+    /* v12.1: find the SP-404MKII ALSA card by name and republish the live
+     * markers (the SD detector may not have noticed a re-enumeration yet). */
+    int rescan_card_by_name(void) {
+        FILE *f = fopen("/proc/asound/cards", "r");
+        if (!f) return -1;
+        char line[256];
+        int found = -1;
+        while (fgets(line, sizeof(line), f)) {
+            int id = -1;
+            char nm[96];
+            if (sscanf(line, " %d [%95[^]]", &id, nm) == 2) {
+                if (strstr(nm, "SP-404") || strstr(nm, "SP404") ||
+                    strstr(nm, "404MKII")) {
+                    found = id;
+                    break;
+                }
+            }
+        }
+        fclose(f);
+        if (found > 0) {
+            char b[16];
+            snprintf(b, sizeof(b), "%d\n", found);
+            write_text_file(SP404_CARD, b);
+            sp404_card = found;
+            snprintf(pcm_play_buf, sizeof(pcm_play_buf),
+                     "/dev/snd/pcmC%dD0p", found);
+            snprintf(pcm_cap_buf, sizeof(pcm_cap_buf),
+                     "/dev/snd/pcmC%dD0c", found);
+            write_text_file("/tmp/r36sx_lgpt_usb/sp404_playback_pcm",
+                            pcm_play_buf);
+            write_text_file("/tmp/r36sx_lgpt_usb/sp404_capture_pcm",
+                            pcm_cap_buf);
+            fprintf(stderr,
+                    "CARD_RESCAN_FOUND card=%d pcmp=%s pcmc=%s\n",
+                    found, pcm_play_buf, pcm_cap_buf);
+        }
+        return found;
+    }
+    /* v12.1: software unplug/replug of the SP-404MKII USB port. */
+    int toggle_sp404_usb_reenum(void) {
+        int card = rescan_card_by_name();
+        if (card <= 0) return -1;
+        char link[192];
+        snprintf(link, sizeof(link), "/sys/class/sound/card%d/device", card);
+        char real[512];
+        if (!realpath(link, real)) return -1;
+        char *base = strrchr(real, '/');
+        if (base && strchr(base + 1, ':')) *base = 0;
+        char auth[288];
+        snprintf(auth, sizeof(auth), "%s/authorized", real);
+        int af = open(auth, O_WRONLY);
+        if (af < 0) return -1;
+        if (write(af, "0\n", 2) < 0) { close(af); return -1; }
+        close(af);
+        usleep(150000);
+        af = open(auth, O_WRONLY);
+        if (af < 0) return -1;
+        write(af, "1\n", 2);
+        close(af);
+        ++g_reenum_count;
+        g_last_reenum_ms = monotonic_milliseconds();
+        fprintf(stderr,
+                "SP404_USB_REENUM_TOGGLED card=%d dev=%s count=%d\n",
+                card, real, g_reenum_count);
+        return 0;
+    }
     int requested_channels = argc > 4 ? atoi(argv[4]) : 1;
     if (requested_channels != 1 && requested_channels != 2)
         requested_channels = 1;
@@ -1837,7 +2409,7 @@ int main(int argc, char **argv) {
     g_audio_rate = 48000;
     const int lowlat = path_exists(LOWLAT_SENTINEL);
     const int period_frames = lowlat ? 240 : 480;
-    const int periods = 4;
+    const int periods = lowlat ? 4 : 8;
     const unsigned producer_burst_frames = 800U;
     const int starvation_grace_ms = 24;
 
@@ -1850,6 +2422,7 @@ int main(int argc, char **argv) {
         "rate=%u channels=%u runtime=%s starvation_grace_ms=%d\n",
         fifo, pcmp, pcmc, sp404_card, period_frames, periods, lowlat,
         g_audio_rate, g_audio_channels, RUNTIME_DIR, starvation_grace_ms);
+    dump_asound_state("boot");
     write_text_file(
         DAEMON_VERSION,
         "R36SX_SP404_AUDIO_DAEMON_ABI=1\n");
@@ -1894,14 +2467,17 @@ int main(int argc, char **argv) {
     long latency_trimmed_samples = 0;
     long latency_trim_events = 0;
     long short_write_events = 0;
+    long consec_xrun_in_place = 0;
     int good_write_streak = 0;
     int last_conf = -1;
     int play_peak = 0;
     int stream_primed = 0;
     unsigned long long starvation_since_ms = 0;
+    long fifo_samples_last = 0;
 
     for (;;) {
         reread_sp404_card();
+        refresh_audio_direction();
         int conf = usb_configured_cached();
         if (conf != last_conf) {
             fprintf(stderr,
@@ -1916,6 +2492,35 @@ int main(int argc, char **argv) {
         capture_tick();
         passive_monitor_tick(pcmc, conf);
 
+        /*
+         * U2.51.5 PLAYBACK_PARK_FOR_CAPTURE
+         *
+         * The SP-404MKII USB audio interface is simplex at full speed:
+         * the probe proved capture delivers zero frames whenever the
+         * host playback PCM is open, even if not streaming. Park (close)
+         * the playback stream while a capture session is active and
+         * reopen it once the session ends.
+         */
+        if (cap.active && pcm >= 0) {
+            close(pcm);
+            pcm = -1;
+            playback_parked = 1;
+            ring_reset();
+            resampler_reset();
+            stream_primed = 0;
+            starvation_since_ms = 0;
+            good_write_streak = 0;
+            mark_inactive();
+            write_text_file(PLAYBACK_PCM_STATUS, "parked-for-capture\n");
+            fprintf(stderr, "U2517_PCM_PLAY_PARKED_FOR_CAPTURE\n");
+            sleep_ms(30);
+        }
+        if (!cap.active && playback_parked) {
+            playback_parked = 0;
+            force_playback_reopen = 1;
+            fprintf(stderr, "U2517_PCM_PLAY_UNPARK_AFTER_CAPTURE\n");
+        }
+
         if (force_playback_reopen) {
             force_playback_reopen = 0;
             if (pcm >= 0) {
@@ -1925,6 +2530,7 @@ int main(int argc, char **argv) {
                         "U2517_PCM_PLAY_FORCE_REOPEN_AFTER_USB_REC_EXIT\n");
             }
             ring_reset();
+            resampler_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             good_write_streak = 0;
@@ -1943,13 +2549,51 @@ int main(int argc, char **argv) {
             write_text_file(PLAYBACK_PCM_STATUS, "waiting-for-usb\n");
             mark_inactive();
             ring_reset();
+            resampler_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             sleep_ms(20);
             continue;
         }
 
+        if (cap.active) {
+            sleep_ms(5);
+            continue;
+        }
+
+        /*
+         * U2.51.10 DIRECTION_IN: host playback stays closed. The SP-404MKII
+         * USB function is simplex; in IN mode the SP output is captured only
+         * (direction from /mnt/sdcard/lgpt/otg/audio_driver_mode, see
+         * refresh_audio_direction). The FIFO is drained above so the console
+         * audio engine never blocks.
+         */
+        if (!g_dir_out) {
+            sleep_ms(10);
+            continue;
+        }
+
         if (pcm < 0) {
+            /* v12.1: if the stream has been stalled for 5 s and the device is
+             * still present, force a software USB re-enumeration (unplug/
+             * replug equivalent) instead of retrying the dead stream until
+             * the user physically reconnects. */
+            {
+                unsigned long long now_ms = monotonic_milliseconds();
+                if (g_eio_storm_start_ms != 0 && now_ms > 0 &&
+                    now_ms >= g_eio_storm_start_ms &&
+                    (now_ms - g_eio_storm_start_ms) >= 5000 &&
+                    (g_last_reenum_ms == 0 ||
+                     now_ms - g_last_reenum_ms >= 30000) &&
+                    g_reenum_count < 3) {
+                    int rc = toggle_sp404_usb_reenum();
+                    fprintf(stderr,
+                            "SP404_REENUM_ATTEMPT rc=%d stalled_ms=%llu count=%d\n",
+                            rc, now_ms - g_eio_storm_start_ms, g_reenum_count);
+                    sleep_ms(1200);
+                    continue;
+                }
+            }
             pcm = open(pcmp, O_WRONLY);
             if (pcm < 0) {
                 good_write_streak = 0;
@@ -2013,6 +2657,16 @@ int main(int argc, char **argv) {
                     "PCM_PLAY_OPENED reconnects=%ld period_frames=%d channels=%u start_threshold_frames=%d\n",
                     reconnects, active_period_frames, g_audio_channels,
                     active_period_frames * periods);
+            if ((reconnects % 5) == 0)
+                dump_asound_state("play-reopen");
+            /* v12.1: start the freshly opened stream from current audio; the
+             * core's stale backlog is the initial static burst. */
+            flush_input_fifo(in);
+            /* v14: do NOT reset the storm timer here. A stalled device
+             * (e.g. SP404 in standalone mode with ext source unlatched)
+             * still succeeds open(), so resetting on reopen kept the 5 s
+             * EIO re-enumeration window from ever firing. The timer is only
+             * cleared by 8 consecutive good writes below. */
         }
 
         const unsigned required_samples =
@@ -2027,10 +2681,11 @@ int main(int argc, char **argv) {
          * burst here only adds latency and is not required for continuity. */
         const unsigned prime_target = hardware_buffer_samples;
         const unsigned latency_limit =
-            prime_target + (producer_burst_samples * 2U);
+            prime_target + (producer_burst_samples * 3U);
 
         if (rfill > latency_limit) {
-            unsigned trim = rfill - prime_target;
+            unsigned trim = rfill - (prime_target +
+                                     producer_burst_samples);
             trim -= trim % g_audio_channels;
             latency_trimmed_samples +=
                 (long)ring_drop_oldest_samples(trim);
@@ -2066,14 +2721,21 @@ int main(int argc, char **argv) {
             wait_playback_writable(pcm, playback_poll_timeout_ms);
         if (writable < 0) {
             ++xruns;
+            if (xruns <= 8 || (xruns % 25) == 0)
+                fprintf(stderr,
+                        "PLAY_WAIT_WRITABLE_ERR rc=%d errno=%d (%s) ring_fill=%u reconnects=%ld\n",
+                        writable, -writable, strerror(-writable), rfill, reconnects);
+            if (g_eio_storm_start_ms == 0)
+                g_eio_storm_start_ms = monotonic_milliseconds();
             close(pcm);
             pcm = -1;
             ring_reset();
+            resampler_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             good_write_streak = 0;
             mark_inactive();
-            sleep_ms(100);
+            eio_backoff_sleep();
             continue;
         }
         if (writable == 0) {
@@ -2085,17 +2747,7 @@ int main(int argc, char **argv) {
         drain_fifo(in, &dropped);
 
         int used_starvation_silence = 0;
-        if (rfill >= required_samples) {
-            unsigned got = ring_pop_samples(out, required_samples);
-            if (got != required_samples) {
-                fprintf(stderr,
-                        "INTERNAL_RING_SHORT_READ got=%u required=%u\n",
-                        got, required_samples);
-                stream_primed = 0;
-                continue;
-            }
-            starvation_since_ms = 0;
-        } else {
+        if (rfill == 0) {
             unsigned long long now_ms = monotonic_milliseconds();
             if (starvation_since_ms == 0)
                 starvation_since_ms = now_ms;
@@ -2105,18 +2757,127 @@ int main(int argc, char **argv) {
                 sleep_ms(1);
                 continue;
             }
-
             memset(out, 0, required_samples * sizeof(int16_t));
             used_starvation_silence = 1;
+            /* U2.52.5: do not resampler_reset() here. Keeping the polyphase
+             * state (rs_pos / history) makes the stream resume at a
+             * continuous phase; a reset jumped the phase and clicked. */
             ++starvation_events;
             ++starvation_silence_periods;
             starvation_since_ms = 0;
             if (starvation_events <= 4 ||
                 (starvation_events % 100) == 0) {
                 fprintf(stderr,
-                        "PLAYBACK_SOURCE_STARVATION event=%ld ring_fill=%u required=%u grace_ms=%d action=full-silence-period-no-reset\n",
+                        "PLAYBACK_SOURCE_STARVATION event=%ld ring_fill=%u required=%u grace_ms=%d action=resampler-silence\n",
                         starvation_events, rfill,
                         required_samples, starvation_grace_ms);
+            }
+        } else {
+            if (!rs_ema_init) {
+                rs_rfill_ema = (double)rfill;
+                rs_ema_init = 1;
+            }
+            rs_rfill_ema += ((double)rfill - rs_rfill_ema) * 0.005;
+
+            /* Restored control (v9): ring-fill EMA with a slow, deadbanded
+             * integral trim only. The 8s feedforward window (U2.51.9) and the
+             * ratio persistence file are removed so the ratio starts at 1.0
+             * each boot and converges via ring level alone, which is the
+             * behavior of the stable-era driver. The deadband keeps the
+             * ring's burst noise from moving the ratio, preventing the v6
+             * limit cycle between clamps. */
+
+            /* v12 ratio control: the producer is anchored at 1x realtime, so
+             * the ring-balancing ratio equals producer_rate / device_rate.
+             * feed_ratio_ema measures that directly from the playback fifo
+             * (see the BRIDGE_PROGRESS block, refreshed every ~2 s) and is
+             * the baseline; the integral below is only a short-term residual
+             * corrector with a deadband well above the producer burst noise
+             * (8% of target), so it can never re-enter the v11 limit cycle
+             * that wobbled pitch (ratio swinging 0.95..1.05, ring 565..6054,
+             * constant latency trims). Clamp widened to [0.92, 1.08] so a
+             * real clock mismatch is absorbed by the feed instead of pinning
+             * the ratio and trimming audio. */
+            double ring_error =
+                (rs_rfill_ema - (double)prime_target) /
+                (double)prime_target;
+            if (fabs(ring_error) > 0.08) {
+                double adj = ring_error > 0 ? 0.00002 : -0.00002;
+                rs_ratio += adj;
+            }
+            if (rs_ratio < 0.92) rs_ratio = 0.92;
+            if (rs_ratio > 1.08) rs_ratio = 1.08;
+            double fc = 0.45;
+            if (rs_ratio > 1.0) fc = 0.45 / rs_ratio;
+            if (!rs_table_ready || fabs(fc - rs_fc) > 0.005)
+                rs_build_table(fc);
+
+            unsigned produced = 0;
+            int hard_starve = 0;
+            while (produced < required_samples) {
+                while ((int)rs_pos + RS_TAPS / 2 >
+                       rs_base + rs_n - 1) {
+                    int16_t s;
+                    if (ring_pop_one_sample(&s) != 0) {
+                        hard_starve = 1;
+                        break;
+                    }
+                    if (rs_n < RS_TAPS) {
+                        rs_h[rs_n++] = (float)s;
+                    } else {
+                        memmove(&rs_h[0], &rs_h[1],
+                                (RS_TAPS - 1) * sizeof(float));
+                        rs_h[RS_TAPS - 1] = (float)s;
+                        ++rs_base;
+                    }
+                }
+                if (hard_starve) break;
+                if (rs_n < RS_TAPS)
+                    break;
+                double ip = floor(rs_pos);
+                double fr = rs_pos - ip;
+                int pidx = (int)(fr * RS_PHASES);
+                if (pidx >= RS_PHASES) pidx = RS_PHASES - 1;
+                int idx_base = (int)ip - RS_TAPS / 2 - (int)rs_base;
+                if (idx_base < 0) idx_base = 0;
+                if (idx_base > RS_TAPS - 1) idx_base = RS_TAPS - 1;
+                float acc = 0.0f;
+                int j;
+                for (j = 0; j < RS_TAPS; ++j)
+                    acc += rs_h[idx_base + j] *
+                           rs_table[pidx * RS_TAPS + j];
+                float scaled = acc * PLAYBACK_GAIN;
+                int32_t samp = (int32_t)scaled;
+                if (samp > 32767) samp = 32767;
+                if (samp < -32768) samp = -32768;
+                out[produced++] = (int16_t)samp;
+                rs_pos += rs_ratio;
+            }
+            if (hard_starve) {
+                for (; produced < required_samples; ++produced)
+                    out[produced] = 0;
+                used_starvation_silence = 1;
+                /* U2.52.5: keep resampler state for phase continuity (see
+                 * the soft-starvation path above). */
+                ++starvation_events;
+                ++starvation_silence_periods;
+                starvation_since_ms = 0;
+                if (starvation_events <= 4 ||
+                    (starvation_events % 100) == 0) {
+                    fprintf(stderr,
+                            "PLAYBACK_SOURCE_STARVATION event=%ld ring_fill=%u required=%u grace_ms=%d action=resampler-partial\n",
+                            starvation_events, rfill,
+                            required_samples, starvation_grace_ms);
+                }
+            } else {
+                starvation_since_ms = 0;
+            }
+            ++rs_write_count;
+            if (rs_write_count == 1 || (rs_write_count % 600) == 0) {
+                fprintf(stderr,
+                        "PLAYBACK_RESAMPLER ratio=%.4f ring_fill=%u target=%u ema=%.0f fc=%.3f gain=%.2f\n",
+                        rs_ratio, rfill, prime_target, rs_rfill_ema,
+                        rs_fc, (double)PLAYBACK_GAIN);
             }
         }
 
@@ -2153,11 +2914,40 @@ int main(int argc, char **argv) {
             mark_inactive();
             stream_primed = 0;
             starvation_since_ms = 0;
-            if (wr == -EIO || wr == -ENODEV || wr == -ESHUTDOWN ||
-                wr == -EPIPE || wr == -ESTRPIPE) {
+            if (xruns <= 4 || (xruns % 10) == 0) {
+                fprintf(stderr,
+                        "PLAY_XRUN_DETAIL rc=%d errno=%d (%s) ring_fill=%u reconnects=%ld\n",
+                        wr, -wr, strerror(-wr), rfill, reconnects);
+                dump_asound_state("play-xrun");
+            }
+            if (wr == -EIO || wr == -ENODEV || wr == -ESHUTDOWN) {
+                if (xruns <= 4 || (xruns % 10) == 0)
+                    fprintf(stderr,
+                            "PLAY_PCM_CLOSE_FATAL rc=%d errno=%d (%s)\n",
+                            wr, -wr, strerror(-wr));
                 close(pcm);
                 pcm = -1;
-                sleep_ms(100);
+                resampler_reset();
+                eio_backoff_sleep();
+                continue;
+            }
+            if (wr == -EPIPE || wr == -ESTRPIPE) {
+                ++consec_xrun_in_place;
+                if (consec_xrun_in_place >= 4) {
+                    consec_xrun_in_place = 0;
+                    fprintf(stderr,
+                            "PLAY_PCM_CLOSE_AFTER_EPIPE_STORM reconnects=%ld\n",
+                            reconnects);
+                    close(pcm);
+                    pcm = -1;
+                    resampler_reset();
+                    eio_backoff_sleep();
+                    continue;
+                }
+                if (xruns <= 8 || (xruns % 50) == 0)
+                    fprintf(stderr,
+                            "PLAY_EPIPE_RESUME_IN_PLACE xruns=%ld ring_fill=%u\n",
+                            xruns, rfill);
                 continue;
             }
         } else if (wr != active_period_frames) {
@@ -2170,14 +2960,41 @@ int main(int argc, char **argv) {
                     short_write_events, wr, active_period_frames);
         } else {
             if (good_write_streak < 1000) ++good_write_streak;
-            if (good_write_streak >= 8) mark_active();
+            if (consec_xrun_in_place != 0) consec_xrun_in_place = 0;
+            if (good_write_streak >= 8) {
+                mark_active();
+                if (g_eio_backoff_ms != 250) g_eio_backoff_ms = 250;
+                g_eio_storm_start_ms = 0;
+            }
         }
 
         total_frames += active_period_frames;
         ++period_writes;
         if ((period_writes % 200) == 0) {
+            long fifo_delta = rs_fifo_total - fifo_samples_last;
+            fifo_samples_last = rs_fifo_total;
+            long fifo_rate_per_s = fifo_delta / 2;
+            /* v12 feedforward: fifo_rate_per_s = producer_rate *
+             * (48000 / device_rate), so fifo_rate_per_s / g_audio_rate is
+             * exactly the ring-balancing resampler ratio (producer /
+             * device). EMA over ~4 windows (~8 s) to smooth the fifo burst
+             * noise; this replaces the ring-level integral as the ratio
+             * baseline and cannot limit-cycle. */
+            {
+                double feed =
+                    (double)fifo_rate_per_s / (double)g_audio_rate;
+                static double feed_ratio_ema = -1.0;
+                if (feed_ratio_ema < 0.0) feed_ratio_ema = feed;
+                feed_ratio_ema += (feed - feed_ratio_ema) * 0.25;
+                if (feed_ratio_ema < 0.92) feed_ratio_ema = 0.92;
+                if (feed_ratio_ema > 1.08) feed_ratio_ema = 1.08;
+                if (feed_ratio_ema > 0.0) rs_ratio = feed_ratio_ema;
+                fprintf(stderr,
+                        "PLAYBACK_FEEDRATIO window_rate=%ld feed_ratio=%.4f ratio=%.4f\n",
+                        fifo_rate_per_s, feed_ratio_ema, rs_ratio);
+            }
             fprintf(stderr,
-                    "BRIDGE_PROGRESS_U2517 frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld starvation_silence=%ld starvation_events=%ld xruns=%ld dropped=%ld ring_fill=%u reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%d channels=%u prepare_failures=%ld latency_trim_events=%ld latency_trimmed_samples=%ld poll_timeouts=%ld short_writes=%ld primed=%d\n",
+                    "BRIDGE_PROGRESS_U2517 frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld starvation_silence=%ld starvation_events=%ld xruns=%ld dropped=%ld ring_fill=%u reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%d channels=%u prepare_failures=%ld latency_trim_events=%ld latency_trimmed_samples=%ld poll_timeouts=%ld short_writes=%ld primed=%d fifo_total=%ld fifo_rate_per_s=%ld\n",
                     total_frames, (double)total_frames / 48000.0,
                     period_writes, signal_periods,
                     source_silence_periods, starvation_silence_periods,
@@ -2188,7 +3005,8 @@ int main(int argc, char **argv) {
                     active_period_frames, g_audio_channels,
                     playback_prepare_failures, latency_trim_events,
                     latency_trimmed_samples, poll_timeouts,
-                    short_write_events, stream_primed);
+                    short_write_events, stream_primed,
+                    rs_fifo_total, fifo_rate_per_s);
             play_peak = 0;
         }
     }

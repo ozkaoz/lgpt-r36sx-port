@@ -103,6 +103,14 @@ if command -v file >/dev/null 2>&1; then
     file "$CORE" >>"$LOG" 2>&1 || true
 fi
 
+# U2.52.5 ALWAYS_START_LOCAL_CONSOLE:
+# The audio driver must always boot in Local Console, regardless of the mode
+# persisted by a previous session (the Audio Driver modal can still switch
+# modes in-session; the next boot returns to Local Console).
+printf 'LOCAL_CONSOLE\n' >"$DATA/otg/audio_driver_mode" 2>>"$LOG" || true
+printf 'LOCAL_CONSOLE\n' >"$DATA/otg/audio_driver_policy" 2>>"$LOG" || true
+log "AUDIO_DRIVER_MODE_FORCED=LOCAL_CONSOLE"
+
 # OTG setup remains nonblocking; USB failure must never block local console use.
 if [ -x "$DATA/otg/bin/otg_u241_setup_once.sh" ]; then
     "$DATA/otg/bin/otg_u241_setup_once.sh" >>"$LOG" 2>&1 &

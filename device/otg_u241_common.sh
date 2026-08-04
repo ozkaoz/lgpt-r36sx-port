@@ -96,13 +96,26 @@ u2414_unload_uac2() {
     fi
 
     echo "UNLOAD_usb_f_uac2_RC=$rc ERR=$(cat /tmp/u2414_rmmod.err 2>/dev/null)"
-    [ "$rc" -eq 0 ] || return "$rc"
-
-    if u2414_loaded usb_f_uac2; then
-        echo "ERROR_usb_f_uac2_STILL_LOADED=YES"
-        return 3
+    if [ "$rc" -eq 0 ]; then
+        if u2414_loaded usb_f_uac2; then
+            echo "ERROR_usb_f_uac2_STILL_LOADED=YES"
+            return 3
+        fi
+        return 0
     fi
-    return 0
+
+    # U2.53 CONFIG_MODULE_UNLOAD=n kernels: rmmod/modprobe -r fail with
+    # "Function not implemented" (EOPNOTSUPP) and the module stays loaded.
+    # u2414_cleanup_gadgets already destroyed every gadget that referenced
+    # it, so a still-loaded module is reusable; u2414_load_stack tolerates
+    # the resulting "File exists" from insmod. Without this, every runtime
+    # rebuild exited 4 and the Windows gadget was never created.
+    if u2414_loaded usb_f_uac2 && \
+       grep -qi 'not implemented\|not supported' /tmp/u2414_rmmod.err 2>/dev/null; then
+        echo "UNLOAD_usb_f_uac2_NOT_SUPPORTED=YES (module unload disabled in kernel; module stays loaded)"
+        return 0
+    fi
+    return "$rc"
 }
 
 u2414_load_stack() {
@@ -122,7 +135,17 @@ u2414_load_stack() {
     insmod "$AU8MODULE" 2>/tmp/u2414_uac2_insmod.err
     load_rc=$?
     echo "LOAD_AU8_SYNC_UAC2_RC=$load_rc FROM=$AU8MODULE ERR=$(cat /tmp/u2414_uac2_insmod.err 2>/dev/null)"
-    [ "$load_rc" -eq 0 ] || return "$load_rc"
+    if [ "$load_rc" -ne 0 ]; then
+        # U2.53 CONFIG_MODULE_UNLOAD=n: after a tolerated "unload", the
+        # module is already loaded and insmod reports "File exists". The
+        # loaded module is usable, so keep going.
+        if u2414_loaded usb_f_uac2 && \
+           grep -qi 'file exists\|already' /tmp/u2414_uac2_insmod.err 2>/dev/null; then
+            echo "LOAD_AU8_SYNC_UAC2_ALREADY_LOADED=YES"
+        else
+            return "$load_rc"
+        fi
+    fi
 
     u2414_loaded usb_f_uac2 || {
         echo "ERROR_AU8_SYNC_UAC2_NOT_LOADED=YES"

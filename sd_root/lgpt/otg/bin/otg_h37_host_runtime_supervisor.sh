@@ -32,7 +32,7 @@ cleanup(){
     dp="$(cat "$p" 2>/dev/null || true)"
     terminate_pid "$dp" "$(basename "$p")"
   done
-  rm -f "$SUP_PID" "$RUNTIME/sp404_daemon_pid" "$RUNTIME/midi_daemon_pid" 2>/dev/null || true
+  rm -f "$SUP_PID" "$RUNTIME/sp404_daemon_pid" "$RUNTIME/midi_daemon_pid" "$RUNTIME/daemon_pid" 2>/dev/null || true
   rm -rf "$LOCK" 2>/dev/null || true
   log "EXIT supervisor=$$"
 }
@@ -87,9 +87,14 @@ while [ "$STOP" -eq 0 ] && policy_host; do
         [ "$backoff" -lt 4 ] && backoff=$((backoff+1))
         continue
       fi
+      # U2.52.5 NO_PROBE_ALL: the first-start --probe-all sequence played
+      # ~20-30 s of 1 kHz square waves on the SP404 ("pitido inicial"). The
+      # daemon configures the PCM itself (constraint picking), so the probe is
+      # no longer needed; start streaming directly.
       "$SP404_DAEMON" "$SP404_FIFO" "$sp_play" "$sp_cap" >>"$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log" 2>&1 &
       sp_pid=$!
       atomic_write "$RUNTIME/sp404_daemon_pid" "$sp_pid" || true
+      atomic_write "$RUNTIME/daemon_pid" "$sp_pid" || true
       log "SP404_DAEMON_STARTED pid=$sp_pid play=$sp_play cap=$sp_cap"
       sleep 0.3
     fi
@@ -106,6 +111,7 @@ while [ "$STOP" -eq 0 ] && policy_host; do
       "$MIDI_DAEMON" "/dev/snd/$midi_node" "$MIDI_FIFO" >>"$LOGROOT/H38_MIDI_HOST_DAEMON.log" 2>&1 &
       mi_pid=$!
       atomic_write "$RUNTIME/midi_daemon_pid" "$mi_pid" || true
+      atomic_write "$RUNTIME/daemon_pid" "$mi_pid" || true
       log "MIDI_DAEMON_STARTED pid=$mi_pid node=$midi_node"
       sleep 0.3
     fi

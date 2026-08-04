@@ -3,9 +3,9 @@
 #include "System/Console/Trace.h"
 
 SoundFontPreset::SoundFontPreset(int sfID,int presetID):
+	vect_(0),
 	sfID_(sfID),
 	presetID_(presetID),
-	vect_(0),
 	lastNote_(-1)
 {
 	navigator_.SetHydraFont(GetHydraPtr(sfID));   // would be bank select

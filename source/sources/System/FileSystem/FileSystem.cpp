@@ -7,17 +7,17 @@ T_SimpleList<Path::Alias> Path::aliases_(true) ;
 
 using namespace std ;
 
-Path::Path():type_(FT_UNKNOWN),gotType_(false) {
+Path::Path():gotType_(false),type_(FT_UNKNOWN) {
 	path_=(char *)malloc(1) ;
 	strcpy(path_,"") ;
 } ;
 
-Path::Path(const char *path):type_(FT_UNKNOWN),gotType_(false) {
+Path::Path(const char *path):gotType_(false),type_(FT_UNKNOWN) {
 	path_=(char *)malloc((int)strlen(path)+1) ;
 	strcpy(path_,path) ;
 } ;
 
-Path::Path(const std::string &path):type_(FT_UNKNOWN),gotType_(false) {
+Path::Path(const std::string &path):gotType_(false),type_(FT_UNKNOWN) {
 	path_=(char *)malloc(path.size()+1) ;
 	strcpy(path_,path.c_str()) ;
 } ;

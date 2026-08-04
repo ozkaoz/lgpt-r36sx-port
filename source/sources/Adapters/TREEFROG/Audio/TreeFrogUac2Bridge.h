@@ -27,6 +27,12 @@ const char *TreeFrogUac2Bridge_GetDriverModeDescriptionByIndex(int mode);
 int TreeFrogUac2Bridge_IsDriverModeSelectable(int mode);
 const char *TreeFrogUac2Bridge_GetUsbStateText(void);
 
+/* Sampler direction (single "Sampler" UI slot): 1 = IN (sampler->console,
+ * recording), 0 = OUT (console->sampler, playback). Switching writes the
+ * audio_driver_mode token; the host daemon follows it live. */
+int TreeFrogUac2Bridge_GetSamplerDirectionIn(void);
+void TreeFrogUac2Bridge_SetSamplerDirectionIn(int in);
+
 /* Unified device detection. Returns a human-readable name for the currently
  * detected USB endpoint (Windows/Android/SP404/MIDI) or "None". */
 const char *TreeFrogUac2Bridge_GetUsbDeviceText(void);

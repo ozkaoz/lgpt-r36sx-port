@@ -118,15 +118,44 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
     echo "MODE_APPLY=$MODE normalized=$NORM DATE=$(date)"
     case "$NORM" in
         ANDROID)
-            [ -x "$BIN/otg_u241_shutdown.sh" ] && /bin/sh "$BIN/otg_u241_shutdown.sh"
-            for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \
-                     r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
-                pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
-            done
-            if [ -x "$BIN/otg_h37_android_runtime_supervisor.sh" ]; then
-                /bin/sh "$BIN/otg_h37_android_runtime_supervisor.sh"
+            # v12: reuse a healthy Android runtime instead of destroying it.
+            # v11 tore the AOA daemon down on every mode entry (and on
+            # MIDI/USB_OUT bounces), which dropped the phone accessory
+            # session; the recreated daemon left /tmp/r36sx_aoa_bulk_pcm_fifo
+            # missing until the phone reconnected, so recording failed with
+            # "runtime is not ready" and the core logged "fifo open pending".
+            # v12.1: the PCM fifo is no longer required for reuse - the
+            # supervisor pre-creates it, and a missing fifo is normal while
+            # the phone accessory is still (re)connecting.
+            reuse=0
+            sup="$(cat "$RUNTIME/h35_android_supervisor_pid" 2>/dev/null || true)"
+            dp="$(cat "$RUNTIME/daemon_pid" 2>/dev/null || true)"
+            if [ -n "$sup" ] && kill -0 "$sup" 2>/dev/null; then
+                if [ -n "$dp" ] && kill -0 "$dp" 2>/dev/null; then
+                    reuse=1
+                fi
+            fi
+            if [ "$reuse" -eq 1 ]; then
+                echo "ANDROID_RUNTIME_REUSED supervisor=$sup daemon=$dp fifo=$([ -p /tmp/r36sx_aoa_bulk_pcm_fifo ] && echo present || echo missing)"
             else
-                echo "ERROR_ANDROID_SUPERVISOR_MISSING"
+                [ -x "$BIN/otg_u241_shutdown.sh" ] && /bin/sh "$BIN/otg_u241_shutdown.sh"
+                for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \
+                         r36s_aoa_bulk_audio_io_h35 r36s_aoa_bulk_receiver_h35; do
+                    pidof "$p" >/dev/null 2>&1 && killall "$p" 2>/dev/null || true
+                done
+                # v14: AOA is host-side too. After a WINDOWS bounce the musb
+                # is left in device/gadget role and the phone is never seen
+                # ("android waiting"). Restore host stack + role like USB_OUT.
+                if ! load_host_usb_modules; then
+                    echo "HOST_STACK_ABORT skipped_role_switch=1"
+                else
+                    switch_host_role || echo "HOST_ROLE_SWITCH_FAILED rc=$?"
+                    if [ -x "$BIN/otg_h37_android_runtime_supervisor.sh" ]; then
+                        /bin/sh "$BIN/otg_h37_android_runtime_supervisor.sh"
+                    else
+                        echo "ERROR_ANDROID_SUPERVISOR_MISSING"
+                    fi
+                fi
             fi
             ;;
         USB_OUT)

@@ -16,11 +16,11 @@ int View::altRowNumber_ = 4;
 
 View::View(GUIWindow &w,ViewData *viewData):
 	w_(w),
+	hasFocus_(false),
 	modalView_(0),
 	modalViewCallback_(0),
 	suspendedModal_(0),
-	suspendedModalCallback_(0),
-	hasFocus_(false)
+	suspendedModalCallback_(0)
 {
   if (!initPrivate_) 
   {

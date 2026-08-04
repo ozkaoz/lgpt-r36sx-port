@@ -90,6 +90,7 @@ static uint16_t video_right_probe_buffer[240 * 240];
 static int16_t audio_buffer[2048 * 2];
 static bool app_ready = false;
 static double audio_accum = 0.0;
+static unsigned long audio_budget_last_ms = 0;
 static uint32_t last_phys_for_taps = 0;
 static uint32_t last_phys_for_combo = 0;
 
@@ -863,6 +864,7 @@ static void stop_audio_and_clear(void) {
     if (drv) drv->ResetPlaybackState();
     memset(audio_buffer, 0, sizeof(audio_buffer));
     audio_accum = 0.0;
+    audio_budget_last_ms = 0;
 }
 
 static void reset_runtime_state(bool send_releases) {
@@ -1198,6 +1200,7 @@ void retro_run(void) {
             uint16_t *vf = make_video_output(framebuffer, &vw, &vh, &vp);
             video_cb(vf, vw, vh, vp);
         }
+        audio_budget_last_ms = System::GetInstance()->GetClock();
         return;
     }
 
@@ -1211,7 +1214,25 @@ void retro_run(void) {
     GUIWindow *w = Application::GetInstance()->GetWindow();
     if (w) w->Update();
 
-    audio_accum += 48000.0 / 60.0;
+    /*
+     * U2.51.11 WALL_CLOCK_AUDIO_BUDGET:
+     *
+     * The audio budget is derived from the wall clock instead of a fixed
+     * 48000/60 = 800 frames per retro_run. Some frontend states call
+     * retro_run at ~120 Hz (2x the reported 60 Hz), which with the fixed
+     * budget advanced the engine at 2x realtime: the FIFO/ring producer then
+     * ran at ~96k samples/s and the SP-404MKII played 1.25x (aceleraciones).
+     * With a wall-clock budget the engine always advances in real time
+     * regardless of the frontend cadence, and the producer stays at 48k/s.
+     */
+    {
+        unsigned long now_ms = System::GetInstance()->GetClock();
+        if (audio_budget_last_ms == 0)
+            audio_budget_last_ms = now_ms;
+        unsigned long elapsed_ms = now_ms - audio_budget_last_ms;
+        audio_budget_last_ms = now_ms;
+        audio_accum += 48000.0 * (double)elapsed_ms / 1000.0;
+    }
     int frames = (int)audio_accum;
     audio_accum -= frames;
     if (frames < 0) frames = 0;
