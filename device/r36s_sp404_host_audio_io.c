@@ -56,6 +56,28 @@ static const char *AUDIO_RATE = "/tmp/r36sx_lgpt_usb/audio_rate";
 static const char *PLAYBACK_PCM_STATUS = "/tmp/r36sx_lgpt_usb/playback_pcm_status";
 static unsigned g_audio_channels = 1;
 static unsigned g_audio_rate = 48000;
+static int g_dev_play_format = SNDRV_PCM_FORMAT_S16_LE;
+static unsigned g_dev_play_bytes = 2;
+static unsigned g_dev_play_channels = 1;
+static unsigned g_dev_play_rate = 48000;
+static int g_dev_cap_format = SNDRV_PCM_FORMAT_S16_LE;
+static unsigned g_dev_cap_bytes = 2;
+static unsigned g_dev_cap_channels = 1;
+static unsigned g_dev_cap_rate = 48000;
+static unsigned g_dev_play_shift = 0;
+static unsigned g_dev_cap_shift = 0;
+
+static unsigned fmt_shift(int fmt) {
+    switch (fmt) {
+    case SNDRV_PCM_FORMAT_S16_LE:
+    case SNDRV_PCM_FORMAT_S16_BE: return 0;
+    case SNDRV_PCM_FORMAT_S24_LE:
+    case SNDRV_PCM_FORMAT_S24_3LE: return 8;
+    case SNDRV_PCM_FORMAT_S32_LE:
+    case SNDRV_PCM_FORMAT_S32_BE: return 16;
+    default: return 8;
+    }
+}
 
 static void loge(const char *msg) { fprintf(stderr, "%s errno=%d (%s)\n", msg, errno, strerror(errno)); }
 static void die_errno(const char *msg) { loge(msg); exit(2); }
@@ -67,8 +89,104 @@ static void param_set_mask(struct snd_pcm_hw_params *p, int n, unsigned int bit)
 static void interval_any(struct snd_interval *i) { memset(i, 0, sizeof(*i)); i->min = 0; i->max = 0xffffffffU; }
 static void interval_set(struct snd_pcm_hw_params *p, int n, unsigned int val) { struct snd_interval *i = param_to_interval(p, n); memset(i, 0, sizeof(*i)); i->min = val; i->max = val; i->integer = 1; }
 static void init_hw_params(struct snd_pcm_hw_params *p) { int n; memset(p, 0, sizeof(*p)); for (n = SNDRV_PCM_HW_PARAM_FIRST_MASK; n <= SNDRV_PCM_HW_PARAM_LAST_MASK; n++) mask_any(param_to_mask(p, n)); for (n = SNDRV_PCM_HW_PARAM_FIRST_INTERVAL; n <= SNDRV_PCM_HW_PARAM_LAST_INTERVAL; n++) interval_any(param_to_interval(p, n)); p->rmask = ~0U; }
+static int param_mask_supports(struct snd_pcm_hw_params *p, int n, unsigned int bit) { struct snd_mask *m = param_to_mask(p, n); return (m->bits[bit >> 5] & (1U << (bit & 31))) != 0; }
+static void interval_minmax(struct snd_pcm_hw_params *p, int n, unsigned int *mn, unsigned int *mx) { struct snd_interval *i = param_to_interval(p, n); *mn = i->min; *mx = i->max; }
 static int path_exists(const char *p) { struct stat st; return p && stat(p, &st) == 0; }
 static void sleep_ms(int ms) { usleep((useconds_t)ms * 1000U); }
+static int mask_first_bit(const struct snd_mask *m, int lo, int hi) { int b; for (b = lo; b <= hi; ++b) if (m->bits[b >> 5] & (1U << (b & 31))) return b; return -1; }
+
+static int pcm_pick_device_config(
+    int fd,
+    unsigned want_rate,
+    unsigned want_channels,
+    unsigned want_period_frames,
+    unsigned want_periods,
+    int *out_format,
+    unsigned *out_bytes,
+    unsigned *out_channels,
+    unsigned *out_rate,
+    unsigned *out_period_frames,
+    unsigned *out_periods) {
+    struct snd_pcm_hw_params hw;
+    init_hw_params(&hw);
+    param_set_mask(&hw, SNDRV_PCM_HW_PARAM_ACCESS, SNDRV_PCM_ACCESS_RW_INTERLEAVED);
+    param_set_mask(&hw, SNDRV_PCM_HW_PARAM_SUBFORMAT, SNDRV_PCM_SUBFORMAT_STD);
+    if (ioctl(fd, SNDRV_PCM_IOCTL_HW_REFINE, &hw) < 0) {
+        fprintf(stderr, "CONSTRAINT_REFINE_FAIL errno=%d (%s)\n",
+                errno, strerror(errno));
+        return -errno;
+    }
+
+    static const int fmt_pref[] = {
+        SNDRV_PCM_FORMAT_S16_LE,
+        SNDRV_PCM_FORMAT_S24_LE,
+        SNDRV_PCM_FORMAT_S24_3LE,
+        SNDRV_PCM_FORMAT_S32_LE,
+        SNDRV_PCM_FORMAT_S16_BE,
+        SNDRV_PCM_FORMAT_S32_BE
+    };
+    static const unsigned fmt_bytes[] = { 2, 4, 3, 4, 2, 4 };
+    int fmt = -1, fi;
+    unsigned bytes = 2;
+    for (fi = 0; fi < (int)(sizeof(fmt_pref) / sizeof(fmt_pref[0])); ++fi) {
+        if (param_mask_supports(&hw, SNDRV_PCM_HW_PARAM_FORMAT, fmt_pref[fi])) {
+            fmt = fmt_pref[fi];
+            bytes = fmt_bytes[fi];
+            break;
+        }
+    }
+    if (fmt < 0) {
+        int raw = mask_first_bit(
+            param_to_mask(&hw, SNDRV_PCM_HW_PARAM_FORMAT),
+            0, 63);
+        if (raw < 0) { fprintf(stderr, "CONSTRAINT_FORMAT_UNSUPPORTED\n"); return -EINVAL; }
+        fmt = raw;
+        bytes = (fmt == SNDRV_PCM_FORMAT_S16_LE ||
+                 fmt == SNDRV_PCM_FORMAT_S16_BE) ? 2 : 4;
+    }
+
+    unsigned int ch_min, ch_max;
+    interval_minmax(&hw, SNDRV_PCM_HW_PARAM_CHANNELS, &ch_min, &ch_max);
+    if (ch_min < 1) ch_min = 1;
+    unsigned int channels = want_channels;
+    if (channels < ch_min) channels = ch_min;
+    if (channels > ch_max) channels = ch_max;
+
+    unsigned int rate_min, rate_max;
+    interval_minmax(&hw, SNDRV_PCM_HW_PARAM_RATE, &rate_min, &rate_max);
+    unsigned int rate = want_rate;
+    if (rate < rate_min) rate = rate_min;
+    if (rate > rate_max) rate = rate_max;
+
+    unsigned int per_min, per_max;
+    interval_minmax(&hw, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, &per_min, &per_max);
+    unsigned int period_frames = want_period_frames;
+    if (period_frames < per_min) period_frames = per_min;
+    if (period_frames > per_max) period_frames = per_max;
+    if (period_frames < 1) period_frames = 1;
+
+    unsigned int pds_min, pds_max;
+    interval_minmax(&hw, SNDRV_PCM_HW_PARAM_PERIODS, &pds_min, &pds_max);
+    unsigned int periods = want_periods;
+    if (periods < pds_min) periods = pds_min;
+    if (periods > pds_max) periods = pds_max;
+    if (periods < 1) periods = 1;
+
+    unsigned int buf_min, buf_max;
+    interval_minmax(&hw, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, &buf_min, &buf_max);
+    unsigned int buffer_frames = period_frames * periods;
+    if (buffer_frames < buf_min) buffer_frames = buf_min;
+    if (buffer_frames > buf_max) buffer_frames = buf_max;
+
+    fprintf(stderr,
+            "CONSTRAINT_PICKED fmt=%d bytes=%u channels=%u rate=%u period=%u periods=%u buffer=%u (wanted rate=%u ch=%u)\n",
+            fmt, bytes, channels, rate, period_frames, periods, buffer_frames,
+            want_rate, want_channels);
+
+    *out_format = fmt; *out_bytes = bytes; *out_channels = channels;
+    *out_rate = rate; *out_period_frames = period_frames; *out_periods = periods;
+    return 0;
+}
 
 static unsigned long long monotonic_milliseconds(void) {
     struct timespec ts;
@@ -242,6 +360,39 @@ static int pcm_prepare_common(
         info.name,
         info.subname);
 
+    int dev_fmt = SNDRV_PCM_FORMAT_S16_LE;
+    unsigned dev_bytes = 2;
+    unsigned dev_channels = channels;
+    unsigned dev_rate = rate;
+    unsigned dev_period_frames = period_frames;
+    unsigned dev_periods = periods;
+    if (pcm_pick_device_config(
+            fd, rate, channels, period_frames, periods,
+            &dev_fmt, &dev_bytes, &dev_channels, &dev_rate,
+            &dev_period_frames, &dev_periods) == 0) {
+        if (is_capture) {
+            g_dev_cap_format = dev_fmt;
+            g_dev_cap_bytes = dev_bytes;
+            g_dev_cap_channels = dev_channels;
+            g_dev_cap_rate = dev_rate;
+            g_dev_cap_shift = fmt_shift(dev_fmt);
+        } else {
+            g_dev_play_format = dev_fmt;
+            g_dev_play_bytes = dev_bytes;
+            g_dev_play_channels = dev_channels;
+            g_dev_play_rate = dev_rate;
+            g_dev_play_shift = fmt_shift(dev_fmt);
+        }
+        rate = dev_rate;
+        channels = dev_channels;
+        period_frames = dev_period_frames;
+        periods = dev_periods;
+        fprintf(stderr,
+                "%s_PCM_DEVICE_CONFIG fmt=%d bytes=%u channels=%u rate=%u period=%u periods=%u\n",
+                direction, dev_fmt, dev_bytes, dev_channels, dev_rate,
+                dev_period_frames, dev_periods);
+    }
+
     init_hw_params(&hw);
     param_set_mask(
         &hw,
@@ -250,7 +401,7 @@ static int pcm_prepare_common(
     param_set_mask(
         &hw,
         SNDRV_PCM_HW_PARAM_FORMAT,
-        SNDRV_PCM_FORMAT_S16_LE);
+        dev_fmt);
     param_set_mask(
         &hw,
         SNDRV_PCM_HW_PARAM_SUBFORMAT,
@@ -258,11 +409,11 @@ static int pcm_prepare_common(
     interval_set(
         &hw,
         SNDRV_PCM_HW_PARAM_SAMPLE_BITS,
-        16);
+        dev_bytes * 8);
     interval_set(
         &hw,
         SNDRV_PCM_HW_PARAM_FRAME_BITS,
-        16 * channels);
+        dev_bytes * 8 * channels);
     interval_set(
         &hw,
         SNDRV_PCM_HW_PARAM_CHANNELS,
@@ -286,11 +437,11 @@ static int pcm_prepare_common(
     interval_set(
         &hw,
         SNDRV_PCM_HW_PARAM_PERIOD_BYTES,
-        period_frames * channels * 2);
+        period_frames * channels * dev_bytes);
     interval_set(
         &hw,
         SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
-        period_frames * periods * channels * 2);
+        period_frames * periods * channels * dev_bytes);
 #ifdef SNDRV_PCM_HW_PARAM_TICK_TIME
     interval_set(
         &hw,
@@ -363,20 +514,45 @@ static int pcm_prepare_capture_safe(
         return -errno;
     }
 
+    int dev_fmt = SNDRV_PCM_FORMAT_S16_LE;
+    unsigned dev_bytes = 2;
+    unsigned dev_channels = channels;
+    unsigned dev_rate = rate;
+    unsigned dev_period_frames = period_frames;
+    unsigned dev_periods = periods;
+    if (pcm_pick_device_config(
+            fd, rate, channels, period_frames, periods,
+            &dev_fmt, &dev_bytes, &dev_channels, &dev_rate,
+            &dev_period_frames, &dev_periods) == 0) {
+        g_dev_cap_format = dev_fmt;
+        g_dev_cap_bytes = dev_bytes;
+        g_dev_cap_channels = dev_channels;
+        g_dev_cap_rate = dev_rate;
+        g_dev_cap_shift = fmt_shift(g_dev_cap_format);
+        rate = dev_rate;
+        channels = dev_channels;
+        period_frames = dev_period_frames;
+        periods = dev_periods;
+        fprintf(stderr,
+                "CAP_PCM_DEVICE_CONFIG fmt=%d bytes=%u channels=%u rate=%u period=%u periods=%u\n",
+                dev_fmt, dev_bytes, dev_channels, dev_rate,
+                dev_period_frames, dev_periods);
+    }
+
     struct snd_pcm_hw_params hw;
     init_hw_params(&hw);
     param_set_mask(&hw, SNDRV_PCM_HW_PARAM_ACCESS, SNDRV_PCM_ACCESS_RW_INTERLEAVED);
-    param_set_mask(&hw, SNDRV_PCM_HW_PARAM_FORMAT, SNDRV_PCM_FORMAT_S16_LE);
+    param_set_mask(&hw, SNDRV_PCM_HW_PARAM_FORMAT, dev_fmt);
     param_set_mask(&hw, SNDRV_PCM_HW_PARAM_SUBFORMAT, SNDRV_PCM_SUBFORMAT_STD);
-    interval_set(&hw, SNDRV_PCM_HW_PARAM_SAMPLE_BITS, 16);
-    interval_set(&hw, SNDRV_PCM_HW_PARAM_FRAME_BITS, 16 * channels);
+    interval_set(&hw, SNDRV_PCM_HW_PARAM_SAMPLE_BITS, dev_bytes * 8);
+    interval_set(&hw, SNDRV_PCM_HW_PARAM_FRAME_BITS, dev_bytes * 8 * channels);
     interval_set(&hw, SNDRV_PCM_HW_PARAM_CHANNELS, channels);
     interval_set(&hw, SNDRV_PCM_HW_PARAM_RATE, rate);
     interval_set(&hw, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, period_frames);
     interval_set(&hw, SNDRV_PCM_HW_PARAM_PERIODS, periods);
     interval_set(&hw, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, period_frames * periods);
-    interval_set(&hw, SNDRV_PCM_HW_PARAM_PERIOD_BYTES, period_frames * channels * 2);
-    interval_set(&hw, SNDRV_PCM_HW_PARAM_BUFFER_BYTES, period_frames * periods * channels * 2);
+    interval_set(&hw, SNDRV_PCM_HW_PARAM_PERIOD_BYTES, period_frames * channels * dev_bytes);
+    interval_set(&hw, SNDRV_PCM_HW_PARAM_BUFFER_BYTES, period_frames * periods * channels * dev_bytes);
 #ifdef SNDRV_PCM_HW_PARAM_TICK_TIME
     interval_set(&hw, SNDRV_PCM_HW_PARAM_TICK_TIME, 0);
 #endif
@@ -452,17 +628,76 @@ static int wait_playback_writable(int pcm, int timeout_ms) {
     return (pfd.revents & POLLOUT) ? 1 : 0;
 }
 
+static unsigned convert_s16_to_device(
+    const int16_t *in,
+    int frames,
+    unsigned in_channels,
+    unsigned char *out,
+    unsigned out_channels,
+    unsigned out_bytes,
+    unsigned out_shift) {
+    int f, c;
+    if (out_channels < 1) out_channels = 1;
+    for (f = 0; f < frames; ++f) {
+        int32_t left = in[(size_t)f * in_channels];
+        int32_t right = (in_channels == 2) ? in[(size_t)f * in_channels + 1] : left;
+        for (c = 0; c < (int)out_channels; ++c) {
+            int32_t v = (c == 0) ? left : right;
+            v <<= (int)out_shift;
+            unsigned char *dst = out + ((size_t)f * out_channels + (size_t)c) * out_bytes;
+            unsigned b;
+            for (b = 0; b < out_bytes; ++b) dst[b] = (unsigned char)((uint32_t)v >> (8 * b));
+        }
+    }
+    return (unsigned)frames;
+}
+
+static unsigned convert_device_to_s16(
+    const unsigned char *in,
+    int frames,
+    unsigned in_channels,
+    unsigned in_bytes,
+    unsigned in_shift,
+    int16_t *out,
+    unsigned out_channels) {
+    int f, c;
+    if (out_channels < 1) out_channels = 1;
+    for (f = 0; f < frames; ++f) {
+        int32_t ch[2];
+        ch[0] = 0; ch[1] = 0;
+        for (c = 0; c < (int)in_channels && c < 2; ++c) {
+            uint32_t raw = 0;
+            const unsigned char *src = in + ((size_t)f * in_channels + (size_t)c) * in_bytes;
+            unsigned b;
+            for (b = 0; b < in_bytes; ++b) raw |= ((uint32_t)src[b]) << (8 * b);
+            ch[c] = (int32_t)raw >> (int)in_shift;
+        }
+        int32_t left = ch[0];
+        int32_t right = (in_channels == 2) ? ch[1] : left;
+        if (out_channels == 2) {
+            out[(size_t)f * 2] = (int16_t)left;
+            out[(size_t)f * 2 + 1] = (int16_t)right;
+        } else {
+            int32_t mono = (left + right) / 2;
+            out[f] = (int16_t)mono;
+        }
+    }
+    return (unsigned)frames;
+}
+
 static int write_frames_exact(
     int pcm,
-    int16_t *buf,
+    unsigned char *buf,
     int frames,
-    unsigned channels) {
+    unsigned dev_channels,
+    unsigned dev_bytes) {
+    const size_t frame_bytes = (size_t)dev_channels * dev_bytes;
     int completed = 0;
     int idle_retries = 0;
     while (completed < frames) {
         struct snd_xferi x;
         memset(&x, 0, sizeof(x));
-        x.buf = buf + ((size_t)completed * channels);
+        x.buf = buf + ((size_t)completed * frame_bytes);
         x.frames = frames - completed;
         if (ioctl(pcm, SNDRV_PCM_IOCTL_WRITEI_FRAMES, &x) < 0) {
             int e = errno;
@@ -495,7 +730,9 @@ static int write_frames_exact(
     return completed;
 }
 
-static int read_frames(int pcm, int16_t *buf, int frames) {
+static int read_frames(int pcm, unsigned char *buf, int frames, unsigned dev_channels, unsigned dev_bytes) {
+    (void)dev_channels;
+    (void)dev_bytes;
     struct snd_xferi x;
     memset(&x, 0, sizeof(x));
     x.buf = buf;
@@ -1345,11 +1582,14 @@ static void passive_monitor_tick(const char *pcmc, int configured) {
         }
         fprintf(stderr, "CAPTURE_PASSIVE_MONITOR_OPEN pcm=%s rate=%u channels=%u\n", pcmc, g_audio_rate, g_audio_channels);
     }
-    int16_t buf[480 * 2]; int r = read_frames(mon_cap_pcm, buf, 480);
+    static unsigned char raw[480 * 2 * 4];
+    static int16_t conv[480 * 2];
+    int r = read_frames(mon_cap_pcm, raw, 480, g_dev_cap_channels, g_dev_cap_bytes);
     if (r > 0) {
-        int ll = 0, rr = 0; peak_percent_lr_s16(buf, r, g_audio_channels, &ll, &rr); int level = (ll > rr) ? ll : rr;
+        convert_device_to_s16(raw, r, g_dev_cap_channels, g_dev_cap_bytes, g_dev_cap_shift, conv, g_audio_channels);
+        int ll = 0, rr = 0; peak_percent_lr_s16(conv, r, g_audio_channels, &ll, &rr); int level = (ll > rr) ? ll : rr;
         set_lr_level_percent(ll, rr);
-        monitor_write_samples(buf, r);
+        monitor_write_samples(conv, r);
         static long mon_frames = 0; mon_frames += r;
         if ((mon_frames % 48000) == 0) fprintf(stderr, "CAPTURE_PASSIVE_LEVEL percent=%d frames=%ld\n", level, mon_frames);
     } else if (r < 0 && (r == -EIO || r == -ENODEV || r == -ESHUTDOWN)) { close(mon_cap_pcm); mon_cap_pcm = -1; }
@@ -1373,10 +1613,11 @@ static void capture_tick(void) {
         return;
     }
 
-    int16_t buffer[480 * 2];
-    int frames = read_frames(cap.pcm, buffer, 480);
-
+    static unsigned char raw[480 * 2 * 4];
+    static int16_t buffer[480 * 2];
+    int frames = read_frames(cap.pcm, raw, 480, g_dev_cap_channels, g_dev_cap_bytes);
     if (frames > 0) {
+        convert_device_to_s16(raw, frames, g_dev_cap_channels, g_dev_cap_bytes, g_dev_cap_shift, buffer, cap.channels);
         int left = 0;
         int right = 0;
         peak_percent_lr_s16(
@@ -1628,7 +1869,7 @@ int main(int argc, char **argv) {
 
     int pcm = -1;
     int active_period_frames = period_frames;
-    int16_t out[480 * 2];
+    int16_t out[2048];
     long total_frames = 0;
     long period_writes = 0;
     long signal_periods = 0;
@@ -1884,8 +2125,18 @@ int main(int argc, char **argv) {
                 ++signal_periods;
         }
 
+        static unsigned char devbuf[2048 * 2 * 4];
+        convert_s16_to_device(
+            out,
+            active_period_frames,
+            g_audio_channels,
+            devbuf,
+            g_dev_play_channels,
+            g_dev_play_bytes,
+            g_dev_play_shift);
         int wr = write_frames_exact(
-            pcm, out, active_period_frames, g_audio_channels);
+            pcm, devbuf, active_period_frames,
+            g_dev_play_channels, g_dev_play_bytes);
         if (wr < 0) {
             ++xruns;
             good_write_streak = 0;
