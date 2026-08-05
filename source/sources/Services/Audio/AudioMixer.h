@@ -21,6 +21,11 @@ public:
 	void SetFileRenderer(const char *path) ;
 	void EnableRendering(bool enable) ;
 	void SetVolume(fixed volume) ;
+    // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): channel/stream buses run
+    // with the clip bypassed so the master sum (and its pre-clip meter) sees
+    // the TRUE unclipped level of each channel.  The master bus and the audio
+    // out keep their clip: that is what guards the int16 conversion.
+    void SetClipBypass(bool bypass) ;
     virtual void SetSoftclip(int clip, int gain);
     virtual void SetMasterVolume(int volume) ;
 	virtual bool Clipped() ;
@@ -40,6 +45,7 @@ private:
   fixed hardClip(fixed sample);
   fixed softClip(fixed sample);
   bool enableRendering_;
+  bool clipBypass_;
   std::string renderPath_;
   WavFileWriter *writer_;
   fixed volume_;

@@ -18,6 +18,7 @@ AudioMixer::AudioMixer(const char *name):
 	masterVolumeCached_ = -1 ;
 	dampCached_ = 1.0f ;
 	clipped_ = false ;
+    clipBypass_ = false ;
     peakValue_ = 0.0f ;
 	lastPeakClock_ = 0 ;
 	
@@ -158,8 +159,13 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
                          // pins full/red even at channel volume 1.
                          float v = fp2fl(*c) * (1.0f / 32767.0f) ;
                          if (v < 0.0f) v = -v ;
-                         if ((i & 1) == 0) { if (v > peakL) peakL = v ; }
-                         else { if (v > peakR) peakR = v ; }
+                          // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1):
+                          // with the stride-4 scan `i` is always even, so the
+                          // old `(i&1)` test could never classify a sample as
+                          // right; use the ABSOLUTE sample index `off+i` (the
+                          // interleaved position) so each side is measured.
+                          if (((off + i) & 1) == 0) { if (v > peakL) peakL = v ; }
+                          else { if (v > peakR) peakR = v ; }
                          c += 4 ;
                      }
                  }
@@ -186,17 +192,23 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
          // path is a pure fixed-point hard clip; when active, soft then hard.
          // The damp has already been applied above, so the clip loop is
          // float-free.
-         c = buffer;
-         if (softclip_ == -1) {
-             for (int i = 0; i < samplecount * 2; i++) {
-                 fixed sample = *c;
-                 *c++ = hardClip(sample);
-             }
-         } else {
-             for (int i = 0; i < samplecount * 2; i++) {
-                 fixed sample = *c;
-                 *c++ = hardClip(softClip(sample));
-             }
+         // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): with clipBypass_
+         // (channel/stream buses) the sum is left UNCLIPPED so the master bus
+         // -- and its pre-clip meter -- reads the real level of every channel;
+         // the master bus and the audio out keep the clip below.
+         if (!clipBypass_) {
+            c = buffer;
+            if (softclip_ == -1) {
+                for (int i = 0; i < samplecount * 2; i++) {
+                    fixed sample = *c;
+                    *c++ = hardClip(sample);
+                }
+            } else {
+                for (int i = 0; i < samplecount * 2; i++) {
+                    fixed sample = *c;
+                    *c++ = hardClip(softClip(sample));
+                }
+            }
          }
      }
     if (enableRendering_&&writer_) {
@@ -260,6 +272,8 @@ float AudioMixer::GetPeakValueR() {
 }
 
 void AudioMixer::SetVolume(fixed volume) { volume_ = volume; }
+
+void AudioMixer::SetClipBypass(bool bypass) { clipBypass_ = bypass; }
 
 void AudioMixer::SetSoftclip(int clip, int gain) {
     softclip_ = clip - 1;

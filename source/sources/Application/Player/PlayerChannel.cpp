@@ -157,8 +157,12 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
               // channel bars' dB scale works (a 0 dB ref of 32767.0).
               float v=fp2fl(*c)*(1.0f/32767.0f) ;
               if (v<0.0f) v=-v ;
-              if ((i&1)==0) { if (v>blockPeakL) blockPeakL=v ; }
-              else { if (v>blockPeakR) blockPeakR=v ; }
+               // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): with the
+               // stride-4 scan `i` is always even, so `(i&1)` could never
+               // classify a sample as right; use the ABSOLUTE sample index
+               // `off+i` (the interleaved position) so each side is measured.
+               if (((off+i)&1)==0) { if (v>blockPeakL) blockPeakL=v ; }
+               else { if (v>blockPeakR) blockPeakR=v ; }
               c+=4 ;
            }
        }

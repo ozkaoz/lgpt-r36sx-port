@@ -35,6 +35,17 @@ bool MixerService::Init() {
 		master_.Insert(bus_[i]);
 	}
 
+	// TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): channel/stream buses run
+	// UNCLIPPED so the master sum -- and its pre-clip meter -- reflects the
+	// real level of each channel.  Before this, every bus hard-clipped its
+	// output at 1.0, so a single hot channel (e.g. a 0 dBFS kick at volume
+	// 127) reached the master as exactly 1.0 and the master bar could never
+	// pass 0 dB.  The master bus and the audio out still hard-clip, so the
+	// int16 conversion stays guarded; the meters are measured pre-clip.
+	for (int i=0;i<MAX_BUS_COUNT;i++) {
+		bus_[i].SetClipBypass(true);
+	}
+
 	bool result = false;
 	if (out_) {
 		result = out_->Init();
@@ -156,7 +167,16 @@ void MixerService::SetSoftclip(int clip, int gain) {
     out_->SetSoftclip(clip, gain);
 }
 
-void MixerService::SetMasterVolume(int attn) { out_->SetMasterVolume(attn); }
+void MixerService::SetMasterVolume(int attn) {
+    // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): the master fader now
+    // feeds the master BUS instead of out_.  out_'s damp ran AFTER the bus
+    // metering, so turning the fader changed the sound but never the master
+    // bar.  With the damp on the bus (applied pre-scan, pre-clip, cached per
+    // object) GetMasterPeakL/R reads the real pre-clip level INCLUDING the
+    // fader, and the audible output is unchanged: bus damp + master clip ==
+    // the old out_ damp + clip (out_ stays at 100 / damp 1.0).
+    master_.SetMasterVolume(attn);
+}
 
 int MixerService::GetPlayedBufferPercentage() {
 	return out_->GetPlayedBufferPercentage() ;

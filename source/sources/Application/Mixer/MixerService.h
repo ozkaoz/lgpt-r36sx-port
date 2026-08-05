@@ -60,8 +60,13 @@ public:
     // from master_ (the STREAM_MIX_BUS), NOT from out_.  out_ renders AFTER
     // master_ clips the sum to 1.0, so its peak could never exceed 0 dB (the
     // red +3 zone was unreachable no matter how hot the mix).  master_ scans
-    // its own buffer BEFORE its clip stage (damp 1.0), so GetMasterPeak()
-    // returns the true pre-clip sum, which CAN exceed 1.0 / 0 dB.
+    // its own buffer BEFORE its clip stage, so GetMasterPeak() returns the
+    // true pre-clip sum, which CAN exceed 1.0 / 0 dB.
+    // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): two more links of that
+    // chain are now pre-clip too: the channel/stream buses run with their
+    // clip bypassed (SetClipBypass), so the master sum sees every channel's
+    // real level instead of a bus-clipped 1.0, and the master fader damp is
+    // applied on master_ itself (pre-scan), so the bar follows the fader.
     float GetMasterPeak() { return master_.GetPeakValue(); }
     // TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): per-side (L/R) peaks so
     // the MIX page can draw the split bars linked to the pan.
