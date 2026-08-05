@@ -696,6 +696,13 @@ bool AppWindow::onEvent(GUIEvent &event) {
             _currentView) {
             if (!_helpShortcutLatched) {
                 _helpShortcutLatched = true;
+                // TREEFROG_HELP_NAV_V14 (Bacon 1.1.1 V14): never stack a
+                // second Help over an open one.
+                ModalView *active = _currentView->GetModal();
+                if (active && active->IsHelpOverlay()) {
+                    _helpShortcutLatched = false;
+                    break;
+                }
                 // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): when a modal
                 // (the chopper) is open, show the Help for the modal that
                 // actually has focus instead of the base view underneath.
@@ -723,7 +730,20 @@ bool AppWindow::onEvent(GUIEvent &event) {
             break;
         }
 
-        if (_helpShortcutLatched || _audioShortcutLatched) break;
+        // TREEFROG_HELP_NAV_V14 (Bacon 1.1.1 V14): the shortcut latches used
+        // to swallow every press until BOTH chord buttons were released, so
+        // L1/R1 section navigation inside an open Help was eaten whenever
+        // SELECT stayed pressed (only the mixer felt like it worked).  The
+        // latch now only blocks while its own chord is still held.
+        if (_helpShortcutLatched || _audioShortcutLatched) {
+            if ((_mask & helpCombo) != helpCombo &&
+                (_mask & audioCombo) != audioCombo) {
+                _helpShortcutLatched = false;
+                _audioShortcutLatched = false;
+            } else {
+                break;
+            }
+        }
 
         if (_currentView)
             _currentView->ProcessButton(
@@ -788,6 +808,12 @@ bool AppWindow::onEvent(GUIEvent &event) {
             _currentView) {
             if (!_helpShortcutLatched) {
                 _helpShortcutLatched = true;
+                // TREEFROG_HELP_NAV_V14: never stack Help over Help.
+                ModalView *active = _currentView->GetModal();
+                if (active && active->IsHelpOverlay()) {
+                    _helpShortcutLatched = false;
+                    break;
+                }
                 _currentView->PushModal(
                     new HelpOverlay(*_currentView),
                     HelpOverlayApplyCallback);
@@ -808,7 +834,16 @@ bool AppWindow::onEvent(GUIEvent &event) {
             break;
         }
 
-        if (_helpShortcutLatched || _audioShortcutLatched) break;
+        // TREEFROG_HELP_NAV_V14: same latch relaxation as the mask path.
+        if (_helpShortcutLatched || _audioShortcutLatched) {
+            if ((_mask & helpCombo) != helpCombo &&
+                (_mask & audioCombo) != audioCombo) {
+                _helpShortcutLatched = false;
+                _audioShortcutLatched = false;
+            } else {
+                break;
+            }
+        }
 
         if (_currentView)
             _currentView->ProcessButton(_mask, true, event.When());

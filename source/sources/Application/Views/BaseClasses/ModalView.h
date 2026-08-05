@@ -19,6 +19,10 @@ class ModalView : public View {
     virtual void OnSuspend() {}
     virtual void OnRestore() {}
 
+    // TREEFROG_HELP_NAV_V14 (Bacon 1.1.1 V14): lets AppWindow detect an
+    // already-open Help so SELECT+R1 never stacks a second one.
+    virtual bool IsHelpOverlay() const { return false; }
+
   protected:
     void SetWindow(int width, int height);
     // TREEFROG_MODAL_OFFSET_V1: shifts the centered window vertically.

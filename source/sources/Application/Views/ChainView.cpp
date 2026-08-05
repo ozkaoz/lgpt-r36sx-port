@@ -20,9 +20,14 @@ ChainView::ChainView(GUIWindow &w, ViewData *viewData) : View(w, viewData) {
         clipboard_.phrase_[i] = 0xFF;
         clipboard_.transpose_[i] = 0;
     };
+    chainUndoCount_ = 0;
+    chainRedoCount_ = 0;
 }
 
 void ChainView::setPhrase(unsigned char value) {
+
+    pushChainUndo();
+
     viewData_->SetChainPhrase(value);
     lastPhrase_ = value;
     isDirty_ = true;
@@ -44,6 +49,7 @@ void ChainView::pasteLastPhrase() {
 
     unsigned char *c = viewData_->GetCurrentChainPointer();
     if ((*c == 0xFF)) {
+        pushChainUndo();
         *c = lastPhrase_;
         isDirty_ = true;
     } else {
@@ -57,6 +63,8 @@ void ChainView::updateCursor(int dx, int dy) {
 }
 
 void ChainView::updateCursorValue(int offset, int dx, int dy) {
+
+    pushChainUndo();
 
     unsigned char v = viewData_->UpdateChainCursorValue(offset, dx, dy);
     if (viewData_->chainCol_ == 0) {
@@ -125,6 +133,8 @@ void ChainView::warpToNeighbour(int offset) {
 };
 
 void ChainView::clonePosition() {
+
+    pushChainUndo();
 
     unsigned char *pos = viewData_->GetCurrentChainPointer();
     unsigned char current = *pos;
@@ -300,6 +310,8 @@ void ChainView::copySelection() {
 
 void ChainView::cutSelection() {
 
+    pushChainUndo();
+
     // Keep up with row,col of selection coz
     // fillClipboardData will trash it
 
@@ -342,6 +354,8 @@ void ChainView::cutSelection() {
  ******************************************************/
 
 void ChainView::pasteClipboard() {
+
+    pushChainUndo();
 
     // Get number of row to paste
 
@@ -411,15 +425,9 @@ void ChainView::ProcessButtonMask(unsigned short mask, bool pressed) {
         return;
     };
 
-    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot the edited chain +
-    // cursor before every pressed event so L1+X can revert any edit.
-    // TREEFROG_GLOBAL_UNDO_V4 (Bacon 1.1.1 V13): pure shoulder presses
-    // (L1/R1/L2/R2 alone) are combo ingredients, not edits; snapshotting
-    // them made the following L1+X/R1+X restore an identical state.
-    if ((mask & ~(EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2)) != 0) {
-        pushChainUndo();
-    }
-
+    // TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): undo snapshots are now
+    // captured inside the real edit mutations (setPhrase/updateCursorValue/
+    // clone/cut/paste), so navigation no longer pollutes the history.
     if (viewMode_ == VM_NEW) {
         if (mask == EPBM_A) {
             unsigned short next = viewData_->song_->phrase_->GetNext();
@@ -462,7 +470,12 @@ void ChainView::ProcessButtonMask(unsigned short mask, bool pressed) {
 }
 
 // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): chain snapshot undo/redo.
+// TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): pushes are captured at the edit
+// sites; a re-entrancy guard makes multi-row selection edits snapshot once.
+static bool g_chainUndoPushActive = false;
 void ChainView::pushChainUndo() {
+    if (g_chainUndoPushActive) return;
+    g_chainUndoPushActive = true;
     ChainEdit e;
     memcpy(e.data, viewData_->song_->chain_->data_ + 16 * viewData_->currentChain_, 16);
     memcpy(e.transpose, viewData_->song_->chain_->transpose_ + 16 * viewData_->currentChain_, 16);
@@ -474,6 +487,7 @@ void ChainView::pushChainUndo() {
     chainUndoCount_++;
     if (chainUndoCount_ > kChainHistorySize) chainUndoCount_ = kChainHistorySize;
     chainRedoCount_ = 0;
+    g_chainUndoPushActive = false;
 }
 
 static void chainUndoRestore(Song *song, const ChainView::ChainEdit &e, ViewData *viewData) {

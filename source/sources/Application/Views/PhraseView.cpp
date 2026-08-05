@@ -74,6 +74,8 @@ PhraseView::PhraseView(GUIWindow &w, ViewData *viewData)
         clipboard_.pitch_[i] = 0x00;
         clipboard_.instr_[i] = 0;
     };
+    phraseUndoCount_ = 0;
+    phraseRedoCount_ = 0;
     View::EnableNotification();
 }
 
@@ -187,6 +189,9 @@ FourCC *PhraseView::getCurrentCommandPointer() {
 }
 
 void PhraseView::enterCommandSelector() {
+
+    pushPhraseUndo();
+
     FourCC *cmdPtr = getCurrentCommandPointer();
     if (!cmdPtr) return;
     commandSelectorModalActive_ = true;
@@ -220,6 +225,8 @@ void PhraseView::onCommandSelectorPreview(ModalView &) {
 
 void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
                                    int yOffset, int bigStep) {
+
+    pushPhraseUndo();
 
     unsigned char *c = 0;
     unsigned char limit = 0;
@@ -431,6 +438,8 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
 // otherwise we take the current phrase as last
 
 void PhraseView::pasteLast() {
+
+    pushPhraseUndo();
 
     uchar *c = 0;
     uint *i = 0;
@@ -736,6 +745,9 @@ void PhraseView::extendSelection() {
         expands the lowest value of selection to the highest
  ******************************************************/
 void PhraseView::interpolateSelection() {
+
+    pushPhraseUndo();
+
     if (!clipboard_.active_) {
         return;
     }
@@ -842,6 +854,8 @@ void PhraseView::copySelection() {
 
 void PhraseView::cutSelection() {
 
+    pushPhraseUndo();
+
     // Keep up with row,col of selection coz
     // fillClipboardData will trash it
 
@@ -913,6 +927,8 @@ void PhraseView::cutSelection() {
  ******************************************************/
 
 void PhraseView::pasteClipboard() {
+
+    pushPhraseUndo();
 
     // Get number of row to paste
 
@@ -1045,17 +1061,14 @@ void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
         return;
     };
 
-    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot the edited phrase +
-    // cursor before every pressed event so L1+X can revert any edit.
-    // TREEFROG_GLOBAL_UNDO_V4 (Bacon 1.1.1 V13): pure shoulder presses
-    // (L1/R1/L2/R2 alone) are combo ingredients, not edits; snapshotting
-    // them made the following L1+X/R1+X restore an identical state.
-    if ((mask & ~(EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2)) != 0) {
-        pushPhraseUndo();
-    }
-
+    // TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): undo snapshots are now
+    // captured inside the real edit mutations (updateCursorValue/paste/cut/
+    // interpolate/chop assign/command selector), so navigation no longer
+    // pollutes the history.
     if (viewMode_ == VM_NEW) {
         if (mask == EPBM_A) {
+
+            pushPhraseUndo();
 
             // If note or I, we request a new instr
 
@@ -1105,6 +1118,9 @@ void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
 
     if (viewMode_ == VM_CLONE) {
         if ((mask & EPBM_A) && (mask & EPBM_L)) {
+
+            pushPhraseUndo();
+
             if (col_ == 0 || col_ == 3) {
                 InstrumentBank *bank = viewData_->project_->GetInstrumentBank();
                 unsigned char *c =
@@ -1179,7 +1195,12 @@ void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
 }
 
 // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): phrase snapshot undo/redo.
+// TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): pushes are captured at the edit
+// sites; a re-entrancy guard makes multi-row selection edits snapshot once.
+static bool g_phraseUndoPushActive = false;
 void PhraseView::pushPhraseUndo() {
+    if (g_phraseUndoPushActive) return;
+    g_phraseUndoPushActive = true;
     PhraseEdit e;
     memcpy(e.note, phrase_->note_ + 16 * viewData_->currentPhrase_, 16);
     memcpy(e.instr, phrase_->instr_ + 16 * viewData_->currentPhrase_, 16);
@@ -1199,6 +1220,7 @@ void PhraseView::pushPhraseUndo() {
     phraseUndoCount_++;
     if (phraseUndoCount_ > kPhraseHistorySize) phraseUndoCount_ = kPhraseHistorySize;
     phraseRedoCount_ = 0;
+    g_phraseUndoPushActive = false;
 }
 
 static void phraseUndoRestore(Phrase *phrase, const PhraseView::PhraseEdit &e, ViewData *viewData) {
@@ -1450,6 +1472,9 @@ int PhraseView::getSavedChopCountForRow(int row, int *sourceInstrument) {
 }
 
 bool PhraseView::updateChopNoteValueForRow(int row, ViewUpdateDirection direction) {
+
+    pushPhraseUndo();
+
     int sourceInstrument = -1;
     int count = getSavedChopCountForRow(row, &sourceInstrument);
     if (count <= 0 || sourceInstrument < 0) return false;
@@ -1485,6 +1510,9 @@ bool PhraseView::updateChopNoteValueForRow(int row, ViewUpdateDirection directio
 }
 
 bool PhraseView::pasteDefaultChopForRow(int row) {
+
+    pushPhraseUndo();
+
     int sourceInstrument = -1;
     int count = getSavedChopCountForRow(row, &sourceInstrument);
     if (count <= 0 || sourceInstrument < 0) return false;
@@ -1533,6 +1561,9 @@ int PhraseView::getChopSourceInstrumentForCurrentRow() {
 }
 
 bool PhraseView::assignChopFromPhrase(int delta, bool advanceRow) {
+
+    pushPhraseUndo();
+
     if (col_ != 0 && col_ != 3) {
         View::SetNotification("Chop assign: use note/instr column");
         return false;

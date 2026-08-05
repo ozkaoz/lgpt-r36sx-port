@@ -941,6 +941,13 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 
 	drawMeterBar(x,y,height,ms->GetMasterPeakL(),volume,masterSelected_,false,props,CD_PLAY,0,meterRecords_[SONG_CHANNEL_COUNT]) ;
 	drawMeterBar(x,y,height,ms->GetMasterPeakR(),volume,masterSelected_,false,props,CD_PLAY,1,meterRecords_[SONG_CHANNEL_COUNT]) ;
+	// TREEFROG_MIXER_VU_STOP_RESET_V1 (Bacon 1.1.1 V14): the CUE/MST meter
+	// reads the raw master peak; zero it while stopped so the bar returns to
+	// 0 like the channel bars instead of freezing at the last position.
+	if (!Player::GetInstance()->IsRunning()) {
+		meterRecords_[SONG_CHANNEL_COUNT].levelL=0.0f ;
+		meterRecords_[SONG_CHANNEL_COUNT].levelR=0.0f ;
+	}
 
 	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
 	props.invert_=masterSelected_ ;
@@ -1002,6 +1009,11 @@ void MixerView::PostFlushDraw() {
 	AppWindow *app=(AppWindow *)&w_ ;
 	uint16_t *fb=TreeFrogGetFramebuffer() ;
 	if (!fb) return ;
+	// TREEFROG_MIXER_MODAL_OVERLAY_V1 (Bacon 1.1.1 V14): modal menus (L1+A
+	// mixer menu, help, ...) and the FX pages own the whole screen; the
+	// pixel VU bars must not be repainted over them (menu letters were
+	// interleaved with the bars).
+	if (GetModal() || fxPage_ != FX_PAGE_MIX) return ;
 	unsigned short seamC=app->ResolveColor565(CD_BACKGROUND) ;
 	unsigned short borderC=app->ResolveColor565(CD_BORDER) ;
 	unsigned short redC=app->ResolveColor565(CD_ERROR) ;
@@ -1020,6 +1032,11 @@ void MixerView::PostFlushDraw() {
 		int filledR=(int)(r.levelR*(float)totalLevels+0.5f)*LEVEL_H ;
 		if (filledL>totalPx) filledL=totalPx ;
 		if (filledR>totalPx) filledR=totalPx ;
+		// TREEFROG_MIXER_BARS_BOTTOM_UP_V1 (Bacon 1.1.1 V14): bars grow from
+		// the bottom up, aligned with the Cue meter (previously they filled
+		// from the top and read inverted next to the Cue bar).
+		int filledLLevels=filledL/LEVEL_H ;
+		int filledRLevels=filledR/LEVEL_H ;
 		unsigned short fillC ;
 		if (r.selected) {
 			fillC=app->ResolveColor565(CD_HILITE2) ;
@@ -1031,11 +1048,12 @@ void MixerView::PostFlushDraw() {
 		int iBase=py*TREEFROG_LGPT_WIDTH+px ;
 		for (int row=0;row<totalPx;row++) {
 			bool inBand=(row>=totalPx-redBandPx) ;
-			bool fillL=(row<filledL) ;
-			bool fillR=(row<filledR) ;
-			// 1-px gap between levels (top row of each 3-px group); the red
-			// band is solid.
-			bool gapRow=((row%LEVEL_H)==2)&&!inBand ;
+			int levelIdx=(totalPx-1-row)/LEVEL_H ;
+			bool fillL=(levelIdx<filledLLevels) ;
+			bool fillR=(levelIdx<filledRLevels) ;
+			// 1-px gap between levels (bottom row of each 3-px group); the
+			// red band is solid.
+			bool gapRow=((row%LEVEL_H)==0)&&!inBand ;
 			unsigned short lC=(fillL&&inBand)?redC:
 			                  ((fillL&&!gapRow)?fillC:seamC) ;
 			unsigned short rC=(fillR&&inBand)?redC:
@@ -1764,17 +1782,22 @@ void MixerView::OnFrameUpdate(unsigned long frameClock) {
 	// the player is stopped.
 	{
 		Player *player=Player::GetInstance() ;
+		// TREEFROG_MIXER_VU_STOP_RESET_V1 (Bacon 1.1.1 V14): the player keeps
+		// the last peak values when the transport stops, so the bars used to
+		// freeze at the last position.  Sample 0 while stopped; the release
+		// decay then pulls every bar back to 0.
+		bool running=player->IsRunning() ;
 		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 			// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): each side of a
 			// channel is smoothed independently from its own post-pan peak.
-			float measuredL=player->GetChannelPeakL(i) ;
+			float measuredL=running?player->GetChannelPeakL(i):0.0f ;
 			if (measuredL>vuDisplayL_[i]) {
 				vuDisplayL_[i]=measuredL ;
 			} else {
 				vuDisplayL_[i]*=0.6f ;
 				if (vuDisplayL_[i]<0.001f) vuDisplayL_[i]=0.0f ;
 			}
-			float measuredR=player->GetChannelPeakR(i) ;
+			float measuredR=running?player->GetChannelPeakR(i):0.0f ;
 			if (measuredR>vuDisplayR_[i]) {
 				vuDisplayR_[i]=measuredR ;
 			} else {

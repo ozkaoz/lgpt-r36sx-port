@@ -129,6 +129,8 @@ SongView::SongView(GUIWindow &w, ViewData *viewData, const char *song)
     rAComboLatched_ = false;
     rBComboLatched_ = false;
     jumpLength_ = 0x10; // B-jump 16 rows like LSDJ
+    songUndoCount_ = 0;
+    songRedoCount_ = 0;
 }
 
 /****************
@@ -148,6 +150,8 @@ SongView::~SongView() {
 
 void SongView::updateChain(int offset) {
 
+    pushSongUndo();
+
     unsigned int chain = viewData_->UpdateSongChain(offset);
     updatingChain_ = true;
     lastChain_ = chain;
@@ -163,6 +167,9 @@ void SongView::updateChain(int offset) {
  ******************************************************/
 
 void SongView::setChain(unsigned char value) {
+
+    pushSongUndo();
+
     viewData_->SetSongChain(value);
     lastChain_ = value;
     isDirty_ = true;
@@ -232,6 +239,8 @@ void SongView::clearPosition() {
     // TREEFROG_SONG_CLEAR_ENTER_DEBUG_V1
     treefrog_song_debug_snapshot(this, "clearPosition.enter", 0, true);
 
+    pushSongUndo();
+
     int col = (int)viewData_->songX_;
     int row = (int)viewData_->songY_ + (int)viewData_->songOffset_;
 
@@ -259,11 +268,12 @@ void SongView::clearPosition() {
 
 void SongView::pasteLast() {
 
-    // If we're on an empty spot, we past the last chain
-    // otherwise we take the current chain as last
+    // TREEFROG_GLOBAL_UNDO_V5: capture pre-edit state even when the cell is
+    // empty (nothing to paste) is pointless; only push when we actually write.
 
     unsigned char *c = viewData_->GetCurrentSongPointer();
     if (*c == 0xFF) {
+        pushSongUndo();
         *c = lastChain_;
         viewData_->song_->chain_->SetUsed(*c);
         isDirty_ = true;
@@ -278,6 +288,8 @@ void SongView::pasteLast() {
  ******************************************************/
 
 void SongView::clonePosition() {
+
+    pushSongUndo();
 
     unsigned char *pos = viewData_->GetCurrentSongPointer();
     unsigned char current = *pos;
@@ -312,6 +324,8 @@ void SongView::clonePosition() {
  ******************************************************/
 
 void SongView::deepClonePosition() {
+    pushSongUndo();
+
     Phrase *ph = viewData_->song_->phrase_;
     Chain *ch = viewData_->song_->chain_;
     unsigned char *pos = viewData_->GetCurrentSongPointer();
@@ -483,6 +497,10 @@ void SongView::copySelection() {
 
 void SongView::cutSelection() {
 
+    // TREEFROG_GLOBAL_UNDO_V5: snapshot before destructive selection ops.
+
+    pushSongUndo();
+
     // first copy the data to clipboard
 
     fillClipboardData();
@@ -531,6 +549,8 @@ void SongView::pasteClipboard() {
 
     if (!clipboard_.data_)
         return;
+
+    pushSongUndo();
 
     // Check we're not out of scope
 
@@ -752,17 +772,10 @@ void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
         return;
     }
 
-    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot the song + cursor
-    // before every pressed event so L1+X can revert any edit and the
-    // cursor movement that went with it.
-    // TREEFROG_GLOBAL_UNDO_V4 (Bacon 1.1.1 V13): pure shoulder presses
-    // (L1/R1/L2/R2 alone) are combo ingredients, not edits.  Snapshotting
-    // them recorded the identical post-edit state, so the L1+X that
-    // followed restored nothing visible (L1+X/R1+X seemed dead in Song).
-    if ((mask & ~(EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2)) != 0) {
-        pushSongUndo();
-    }
-
+    // TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): undo snapshots are now
+    // captured inside the real edit mutations (updateChain/setChain/clear/
+    // paste/clone/cut), so cursor movement and non-editing presses no longer
+    // pollute the history and L1+X keeps Ctrl+Z semantics.
     if (mask == soloChord) {
         if (!rAComboLatched_) {
             rAComboLatched_ = true;
@@ -840,11 +853,14 @@ void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
 }
 
 // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): whole-song snapshot undo/redo.
+// TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): the snapshot covers the whole
+// song (2048 bytes) and the cursor, and is captured at the edit sites only.
 void SongView::pushSongUndo() {
     SongEdit e;
-    memcpy(e.data, viewData_->song_->data_, 256);
+    memcpy(e.data, viewData_->song_->data_, sizeof(e.data));
     e.songX = (unsigned char)viewData_->songX_;
-    e.chainRow = (unsigned char)viewData_->chainRow_;
+    e.songY = (unsigned char)viewData_->songY_;
+    e.songOffset = (unsigned char)viewData_->songOffset_;
     for (int i = kSongHistorySize - 1; i > 0; i--) songUndo_[i] = songUndo_[i - 1];
     songUndo_[0] = e;
     songUndoCount_++;
@@ -861,9 +877,10 @@ bool SongView::GlobalUndo() {
     songRedo_[0] = e;
     songRedoCount_++;
     if (songRedoCount_ > kSongHistorySize) songRedoCount_ = kSongHistorySize;
-    memcpy(viewData_->song_->data_, e.data, 256);
+    memcpy(viewData_->song_->data_, e.data, sizeof(e.data));
     viewData_->songX_ = e.songX;
-    viewData_->chainRow_ = e.chainRow;
+    viewData_->songY_ = e.songY;
+    viewData_->songOffset_ = e.songOffset;
     isDirty_ = true;
     return true;
 }
@@ -877,9 +894,10 @@ bool SongView::GlobalRedo() {
     songUndo_[0] = e;
     songUndoCount_++;
     if (songUndoCount_ > kSongHistorySize) songUndoCount_ = kSongHistorySize;
-    memcpy(viewData_->song_->data_, e.data, 256);
+    memcpy(viewData_->song_->data_, e.data, sizeof(e.data));
     viewData_->songX_ = e.songX;
-    viewData_->chainRow_ = e.chainRow;
+    viewData_->songY_ = e.songY;
+    viewData_->songOffset_ = e.songOffset;
     isDirty_ = true;
     return true;
 }

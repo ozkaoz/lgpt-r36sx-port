@@ -3,6 +3,7 @@
 #define _SONG_VIEW_H_
 
 #include "BaseClasses/View.h"
+#include "Application/Model/Song.h"
 
 class SongView;
 
@@ -18,9 +19,13 @@ class SongView : public View {
     virtual void OnFocus();
 
     // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): whole-song snapshot history for
-    // L1+X (undo) / R1+X (redo).  Snapshots are captured on every pressed
-    // event before the mask is dispatched, so any edit (chain set/clear/cut,
-    // paste, offsets) and the cursor position revert as a unit.
+    // L1+X (undo) / R1+X (redo).
+    // TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): snapshots are captured at the
+    // real edit sites (chain set/clear/cut, paste, offsets, clone), not on
+    // every pressed event, so L1+X reverts the last edit with Ctrl+Z
+    // semantics.  The snapshot covers the whole song (8 channels x 256 rows
+    // = 2048 bytes) plus the cursor; the previous 256-byte copy only covered
+    // rows 0..31, which made undo look dead for edits deeper in the song.
     virtual bool GlobalUndo();
     virtual bool GlobalRedo();
 
@@ -95,12 +100,13 @@ class SongView : public View {
     uint8_t jumpLength_; // When jumping columns with B
 
     // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): undo/redo history.  A SongEdit
-    // snapshots the 256 song rows plus the editor cursor.
+    // snapshots the whole song (8 channels x 256 rows) plus the cursor.
     static const int kSongHistorySize = 16;
     struct SongEdit {
-        unsigned char data[256];
+        unsigned char data[SONG_CHANNEL_COUNT * SONG_ROW_COUNT];
         unsigned char songX;
-        unsigned char chainRow;
+        unsigned char songY;
+        unsigned char songOffset;
     };
     SongEdit songUndo_[kSongHistorySize];
     int songUndoCount_;

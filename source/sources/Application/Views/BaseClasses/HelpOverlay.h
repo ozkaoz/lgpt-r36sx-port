@@ -34,6 +34,7 @@ class HelpOverlay : public ModalView {
     virtual void ProcessButtonMask(unsigned short mask, bool pressed);
     virtual void OnPlayerUpdate(PlayerEventType type, unsigned int currentTick);
     virtual void OnFocus();
+    virtual bool IsHelpOverlay() const { return true; }
 
   private:
     static const int kMaxWindowLines_ = 8;

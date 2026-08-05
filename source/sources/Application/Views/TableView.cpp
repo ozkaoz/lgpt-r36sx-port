@@ -48,6 +48,8 @@ TableView::TableView(GUIWindow &w, ViewData *viewData)
     clipboard_.active_ = false;
     clipboard_.width_ = 0;
     clipboard_.height_ = 0;
+    tableUndoCount_ = 0;
+    tableRedoCount_ = 0;
 }
 
 TableView::~TableView() {}
@@ -165,6 +167,9 @@ void TableView::extendSelection() {
         expands the lowest value of selection to the highest
  ******************************************************/
 void TableView::interpolateSelection() {
+
+    pushTableUndo();
+
     if (!clipboard_.active_) {
         return;
     }
@@ -226,6 +231,8 @@ void TableView::copySelection() {
 
 void TableView::cutSelection() {
 
+    pushTableUndo();
+
     // Keep up with row,col of selection coz
     // fillClipboardData will trash it
 
@@ -275,6 +282,8 @@ void TableView::cutSelection() {
  ******************************************************/
 
 void TableView::pasteClipboard() {
+
+    pushTableUndo();
 
     // Get number of row to paste
 
@@ -388,6 +397,8 @@ void TableView::warpToNeighbour(int dir) {
 }
 
 void TableView::updateCursorValue(int offset) {
+
+    pushTableUndo();
 
     unsigned char *c = 0;
     unsigned char limit = 0;
@@ -504,6 +515,9 @@ FourCC *TableView::getCurrentCommandPointer() {
 }
 
 void TableView::enterCommandSelector() {
+
+    pushTableUndo();
+
     FourCC *cmdPtr = getCurrentCommandPointer();
     if (!cmdPtr) return;
     commandSelectorModalActive_ = true;
@@ -526,6 +540,9 @@ void TableView::onCommandSelectorResult(ModalView &d) {
 void TableView::onCommandSelectorPreview(ModalView &) { isDirty_ = true; }
 
 void TableView::pasteLast() {
+
+    pushTableUndo();
+
     uint *i = 0;
 
     Table &table =
@@ -565,14 +582,10 @@ void TableView::ProcessButtonMask(unsigned short mask, bool pressed) {
     if (!pressed) {
         return;
     }
-    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot the edited table +
-    // cursor before every pressed event so L1+X can revert any edit.
-    // TREEFROG_GLOBAL_UNDO_V4 (Bacon 1.1.1 V13): pure shoulder presses
-    // (L1/R1/L2/R2 alone) are combo ingredients, not edits; snapshotting
-    // them made the following L1+X/R1+X restore an identical state.
-    if ((mask & ~(EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2)) != 0) {
-        pushTableUndo();
-    }
+    // TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): undo snapshots are now
+    // captured inside the real edit mutations (updateCursorValue/paste/cut/
+    // interpolate/command selector), so navigation no longer pollutes the
+    // history.
     if (viewMode_ == VM_SELECTION) {
         if (!clipboard_.active_) {
             clipboard_.active_ = true;
