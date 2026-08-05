@@ -926,11 +926,12 @@ static void write_wav_header(int fd, uint32_t data_bytes, uint32_t rate, uint16_
 #define FIFO_DUMP_DIR "/mnt/sdcard/LGPT_OTG_LOGS"
 #define FIFO_DUMP_PATH FIFO_DUMP_DIR "/fifo_capture.wav"
 #define FIFO_DUMP_FRAMES 96000
+#define FIFO_DUMP_BUF_FRAMES 32768
 static int fdump_fd = -1;
 static long fdump_frames_written = 0;
 static long fdump_frames_left = 0;
 static int fdump_peak = 0;
-static int16_t fdump_buf[32768];
+static int16_t fdump_buf[FIFO_DUMP_BUF_FRAMES * 2];
 static unsigned fdump_buf_frames = 0;
 
 static void fifo_dump_finish(const char *why);
@@ -978,16 +979,14 @@ static void fifo_dump_write(const int16_t frm[2]) {
     int p1 = frm[1] < 0 ? -frm[1] : frm[1];
     if (p0 > fdump_peak) fdump_peak = p0;
     if (p1 > fdump_peak) fdump_peak = p1;
-    if (fdump_buf_frames <
-        (unsigned)(sizeof(fdump_buf) / sizeof(fdump_buf[0]))) {
+    if (fdump_buf_frames < FIFO_DUMP_BUF_FRAMES) {
         fdump_buf[fdump_buf_frames * 2] = frm[0];
         fdump_buf[fdump_buf_frames * 2 + 1] = frm[1];
         ++fdump_buf_frames;
         ++fdump_frames_written;
     }
     --fdump_frames_left;
-    if (fdump_buf_frames >=
-        (unsigned)(sizeof(fdump_buf) / sizeof(fdump_buf[0])))
+    if (fdump_buf_frames >= FIFO_DUMP_BUF_FRAMES)
         fifo_dump_flush();
     if (fdump_frames_left <= 0) fifo_dump_finish("complete");
 }
