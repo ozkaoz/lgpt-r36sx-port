@@ -96,9 +96,9 @@ public:
 	// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): L1+X / R1+X undo/redo of the
 	// MIX-page and FX-page edits, A+B resets the hovered option to default
 	// (pan to C, channel volume 127, master volume 100, FX row to vdef).
-	virtual void GlobalUndo() ;
-	virtual void GlobalRedo() ;
-	virtual void GlobalResetOption() ;
+	virtual bool GlobalUndo() ;
+	virtual bool GlobalRedo() ;
+	virtual bool GlobalResetOption() ;
 	// TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1): repaints the L/R
 	// half-cell meter bars on top of the character screen every Flush.
 	virtual void PostFlushDraw() ;

@@ -18,6 +18,7 @@
 #include "Application/Views/BaseClasses/UiColors.h"
 #include "Application/Views/CommandSelectorCommon.h"
 #include "Application/Views/ModalDialogs/CommandSelectorModal.h"
+#include <string.h>
 
 #define FCC_EDIT MAKE_FOURCC('T', 'B', 'E', 'D')
 
@@ -564,6 +565,9 @@ void TableView::ProcessButtonMask(unsigned short mask, bool pressed) {
     if (!pressed) {
         return;
     }
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot the edited table +
+    // cursor before every pressed event so L1+X can revert any edit.
+    pushTableUndo();
     if (viewMode_ == VM_SELECTION) {
         if (!clipboard_.active_) {
             clipboard_.active_ = true;
@@ -576,6 +580,69 @@ void TableView::ProcessButtonMask(unsigned short mask, bool pressed) {
     } else {
         processNormalButtonMask(mask);
     };
+}
+
+// TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): table snapshot undo/redo.
+void TableView::pushTableUndo() {
+    Table &table = TableHolder::GetInstance()->GetTable(viewData_->currentTable_);
+    TableEdit e;
+    memcpy(e.cmd1, table.cmd1_, sizeof(e.cmd1));
+    memcpy(e.param1, table.param1_, sizeof(e.param1));
+    memcpy(e.cmd2, table.cmd2_, sizeof(e.cmd2));
+    memcpy(e.param2, table.param2_, sizeof(e.param2));
+    memcpy(e.cmd3, table.cmd3_, sizeof(e.cmd3));
+    memcpy(e.param3, table.param3_, sizeof(e.param3));
+    e.currentTable = (uchar)viewData_->currentTable_;
+    e.row = (uchar)row_;
+    e.col = (uchar)col_;
+    for (int i = kTableHistorySize - 1; i > 0; i--) tableUndo_[i] = tableUndo_[i - 1];
+    tableUndo_[0] = e;
+    tableUndoCount_++;
+    if (tableUndoCount_ > kTableHistorySize) tableUndoCount_ = kTableHistorySize;
+    tableRedoCount_ = 0;
+}
+
+static void tableUndoRestore(const TableView::TableEdit &e, ViewData *viewData) {
+    Table &table = TableHolder::GetInstance()->GetTable(e.currentTable);
+    memcpy(table.cmd1_, e.cmd1, sizeof(e.cmd1));
+    memcpy(table.param1_, e.param1, sizeof(e.param1));
+    memcpy(table.cmd2_, e.cmd2, sizeof(e.cmd2));
+    memcpy(table.param2_, e.param2, sizeof(e.param2));
+    memcpy(table.cmd3_, e.cmd3, sizeof(e.cmd3));
+    memcpy(table.param3_, e.param3, sizeof(e.param3));
+    viewData->currentTable_ = e.currentTable;
+}
+
+bool TableView::GlobalUndo() {
+    if (tableUndoCount_ == 0) return true;
+    TableEdit e = tableUndo_[0];
+    for (int i = 0; i < tableUndoCount_ - 1; i++) tableUndo_[i] = tableUndo_[i + 1];
+    tableUndoCount_--;
+    for (int i = kTableHistorySize - 1; i > 0; i--) tableRedo_[i] = tableRedo_[i - 1];
+    tableRedo_[0] = e;
+    tableRedoCount_++;
+    if (tableRedoCount_ > kTableHistorySize) tableRedoCount_ = kTableHistorySize;
+    tableUndoRestore(e, viewData_);
+    row_ = e.row;
+    col_ = e.col;
+    isDirty_ = true;
+    return true;
+}
+
+bool TableView::GlobalRedo() {
+    if (tableRedoCount_ == 0) return true;
+    TableEdit e = tableRedo_[0];
+    for (int i = 0; i < tableRedoCount_ - 1; i++) tableRedo_[i] = tableRedo_[i + 1];
+    tableRedoCount_--;
+    for (int i = kTableHistorySize - 1; i > 0; i--) tableUndo_[i] = tableUndo_[i - 1];
+    tableUndo_[0] = e;
+    tableUndoCount_++;
+    if (tableUndoCount_ > kTableHistorySize) tableUndoCount_ = kTableHistorySize;
+    tableUndoRestore(e, viewData_);
+    row_ = e.row;
+    col_ = e.col;
+    isDirty_ = true;
+    return true;
 }
 
 void TableView::processNormalButtonMask(unsigned short mask) {

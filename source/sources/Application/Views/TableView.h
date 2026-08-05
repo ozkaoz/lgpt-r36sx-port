@@ -14,6 +14,12 @@ class TableView : public View {
     virtual void DrawView();
     virtual void OnPlayerUpdate(PlayerEventType, unsigned int tick = 0);
     virtual void OnFocus();
+
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot of the edited table
+    // for L1+X (undo) / R1+X (redo).  Captured on every pressed event before
+    // the mask is dispatched.
+    virtual bool GlobalUndo();
+    virtual bool GlobalRedo();
     void onCommandSelectorResult(ModalView &d);
     void onCommandSelectorPreview(ModalView &d);
 
@@ -76,6 +82,27 @@ class TableView : public View {
     uchar saveRow_;
 
     uchar lastPosition_[3];
+
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): undo/redo history.  A TableEdit
+    // snapshots all 16 steps of the edited table plus the editor cursor.
+  public:
+    static const int kTableHistorySize = 16;
+    struct TableEdit {
+        uint cmd1[16];
+        ushort param1[16];
+        uint cmd2[16];
+        ushort param2[16];
+        uint cmd3[16];
+        ushort param3[16];
+        uchar currentTable;
+        uchar row;
+        uchar col;
+    };
+    TableEdit tableUndo_[kTableHistorySize];
+    int tableUndoCount_;
+    TableEdit tableRedo_[kTableHistorySize];
+    int tableRedoCount_;
+    void pushTableUndo();
 };
 
 #endif

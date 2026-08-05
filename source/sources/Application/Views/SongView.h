@@ -17,6 +17,13 @@ class SongView : public View {
     virtual void OnPlayerUpdate(PlayerEventType, unsigned int tick = 0);
     virtual void OnFocus();
 
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): whole-song snapshot history for
+    // L1+X (undo) / R1+X (redo).  Snapshots are captured on every pressed
+    // event before the mask is dispatched, so any edit (chain set/clear/cut,
+    // paste, offsets) and the cursor position revert as a unit.
+    virtual bool GlobalUndo();
+    virtual bool GlobalRedo();
+
   protected:
     void processNormalButtonMask(unsigned int mask);
     void processSelectionButtonMask(unsigned int mask);
@@ -86,6 +93,20 @@ class SongView : public View {
     bool rBComboLatched_;
     void nudgeTempo(int direction);
     uint8_t jumpLength_; // When jumping columns with B
+
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): undo/redo history.  A SongEdit
+    // snapshots the 256 song rows plus the editor cursor.
+    static const int kSongHistorySize = 16;
+    struct SongEdit {
+        unsigned char data[256];
+        unsigned char songX;
+        unsigned char chainRow;
+    };
+    SongEdit songUndo_[kSongHistorySize];
+    int songUndoCount_;
+    SongEdit songRedo_[kSongHistorySize];
+    int songRedoCount_;
+    void pushSongUndo();
 };
 
 #endif

@@ -1045,6 +1045,10 @@ void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
         return;
     };
 
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot the edited phrase +
+    // cursor before every pressed event so L1+X can revert any edit.
+    pushPhraseUndo();
+
     if (viewMode_ == VM_NEW) {
         if (mask == EPBM_A) {
 
@@ -1167,6 +1171,76 @@ void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
         viewMode_ = VM_NORMAL;
         processNormalButtonMask(mask);
     };
+}
+
+// TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): phrase snapshot undo/redo.
+void PhraseView::pushPhraseUndo() {
+    PhraseEdit e;
+    memcpy(e.note, phrase_->note_ + 16 * viewData_->currentPhrase_, 16);
+    memcpy(e.instr, phrase_->instr_ + 16 * viewData_->currentPhrase_, 16);
+    memcpy(e.vol, phrase_->vol_ + 16 * viewData_->currentPhrase_, 16);
+    memcpy(e.pitch, phrase_->pitch_ + 16 * viewData_->currentPhrase_, 16);
+    memcpy(e.cmd1, phrase_->cmd1_ + 16 * viewData_->currentPhrase_, 16 * sizeof(FourCC));
+    memcpy(e.param1, phrase_->param1_ + 16 * viewData_->currentPhrase_, 16 * sizeof(ushort));
+    memcpy(e.cmd2, phrase_->cmd2_ + 16 * viewData_->currentPhrase_, 16 * sizeof(FourCC));
+    memcpy(e.param2, phrase_->param2_ + 16 * viewData_->currentPhrase_, 16 * sizeof(ushort));
+    memcpy(e.cmd3, phrase_->cmd3_ + 16 * viewData_->currentPhrase_, 16 * sizeof(FourCC));
+    memcpy(e.param3, phrase_->param3_ + 16 * viewData_->currentPhrase_, 16 * sizeof(ushort));
+    e.currentPhrase = (uchar)viewData_->currentPhrase_;
+    e.row = (uchar)row_;
+    e.col = (uchar)col_;
+    for (int i = kPhraseHistorySize - 1; i > 0; i--) phraseUndo_[i] = phraseUndo_[i - 1];
+    phraseUndo_[0] = e;
+    phraseUndoCount_++;
+    if (phraseUndoCount_ > kPhraseHistorySize) phraseUndoCount_ = kPhraseHistorySize;
+    phraseRedoCount_ = 0;
+}
+
+static void phraseUndoRestore(Phrase *phrase, const PhraseView::PhraseEdit &e, ViewData *viewData) {
+    memcpy(phrase->note_ + 16 * e.currentPhrase, e.note, 16);
+    memcpy(phrase->instr_ + 16 * e.currentPhrase, e.instr, 16);
+    memcpy(phrase->vol_ + 16 * e.currentPhrase, e.vol, 16);
+    memcpy(phrase->pitch_ + 16 * e.currentPhrase, e.pitch, 16);
+    memcpy(phrase->cmd1_ + 16 * e.currentPhrase, e.cmd1, 16 * sizeof(FourCC));
+    memcpy(phrase->param1_ + 16 * e.currentPhrase, e.param1, 16 * sizeof(ushort));
+    memcpy(phrase->cmd2_ + 16 * e.currentPhrase, e.cmd2, 16 * sizeof(FourCC));
+    memcpy(phrase->param2_ + 16 * e.currentPhrase, e.param2, 16 * sizeof(ushort));
+    memcpy(phrase->cmd3_ + 16 * e.currentPhrase, e.cmd3, 16 * sizeof(FourCC));
+    memcpy(phrase->param3_ + 16 * e.currentPhrase, e.param3, 16 * sizeof(ushort));
+    viewData->currentPhrase_ = e.currentPhrase;
+    viewData->phraseCurPos_ = e.row;
+}
+
+bool PhraseView::GlobalUndo() {
+    if (phraseUndoCount_ == 0) return true;
+    PhraseEdit e = phraseUndo_[0];
+    for (int i = 0; i < phraseUndoCount_ - 1; i++) phraseUndo_[i] = phraseUndo_[i + 1];
+    phraseUndoCount_--;
+    for (int i = kPhraseHistorySize - 1; i > 0; i--) phraseRedo_[i] = phraseRedo_[i - 1];
+    phraseRedo_[0] = e;
+    phraseRedoCount_++;
+    if (phraseRedoCount_ > kPhraseHistorySize) phraseRedoCount_ = kPhraseHistorySize;
+    phraseUndoRestore(phrase_, e, viewData_);
+    row_ = e.row;
+    col_ = e.col;
+    isDirty_ = true;
+    return true;
+}
+
+bool PhraseView::GlobalRedo() {
+    if (phraseRedoCount_ == 0) return true;
+    PhraseEdit e = phraseRedo_[0];
+    for (int i = 0; i < phraseRedoCount_ - 1; i++) phraseRedo_[i] = phraseRedo_[i + 1];
+    phraseRedoCount_--;
+    for (int i = kPhraseHistorySize - 1; i > 0; i--) phraseUndo_[i] = phraseUndo_[i - 1];
+    phraseUndo_[0] = e;
+    phraseUndoCount_++;
+    if (phraseUndoCount_ > kPhraseHistorySize) phraseUndoCount_ = kPhraseHistorySize;
+    phraseUndoRestore(phrase_, e, viewData_);
+    row_ = e.row;
+    col_ = e.col;
+    isDirty_ = true;
+    return true;
 }
 
 void PhraseView::processNormalButtonMask(unsigned short mask) {

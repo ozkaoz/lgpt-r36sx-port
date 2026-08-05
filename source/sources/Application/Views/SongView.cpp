@@ -13,6 +13,7 @@
 #include <sstream>
 #include <stdlib.h>
 #include <string>
+#include <string.h>
 
 extern "C" const char *TreeFrogU2430SongComboBuildMarker(void) {
     return "U2430_SONG_RA_RB_EDGE_TOGGLE";
@@ -751,6 +752,11 @@ void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
         return;
     }
 
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot the song + cursor
+    // before every pressed event so L1+X can revert any edit and the
+    // cursor movement that went with it.
+    pushSongUndo();
+
     if (mask == soloChord) {
         if (!rAComboLatched_) {
             rAComboLatched_ = true;
@@ -825,6 +831,51 @@ void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
 
     // TREEFROG_SONG_PROCESS_BUTTON_EXIT_DEBUG_V1
     treefrog_song_debug_snapshot(this, "ProcessButtonMask.exit", mask, pressed);
+}
+
+// TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): whole-song snapshot undo/redo.
+void SongView::pushSongUndo() {
+    SongEdit e;
+    memcpy(e.data, viewData_->song_->data_, 256);
+    e.songX = (unsigned char)viewData_->songX_;
+    e.chainRow = (unsigned char)viewData_->chainRow_;
+    for (int i = kSongHistorySize - 1; i > 0; i--) songUndo_[i] = songUndo_[i - 1];
+    songUndo_[0] = e;
+    songUndoCount_++;
+    if (songUndoCount_ > kSongHistorySize) songUndoCount_ = kSongHistorySize;
+    songRedoCount_ = 0;
+}
+
+bool SongView::GlobalUndo() {
+    if (songUndoCount_ == 0) return true;
+    SongEdit e = songUndo_[0];
+    for (int i = 0; i < songUndoCount_ - 1; i++) songUndo_[i] = songUndo_[i + 1];
+    songUndoCount_--;
+    for (int i = kSongHistorySize - 1; i > 0; i--) songRedo_[i] = songRedo_[i - 1];
+    songRedo_[0] = e;
+    songRedoCount_++;
+    if (songRedoCount_ > kSongHistorySize) songRedoCount_ = kSongHistorySize;
+    memcpy(viewData_->song_->data_, e.data, 256);
+    viewData_->songX_ = e.songX;
+    viewData_->chainRow_ = e.chainRow;
+    isDirty_ = true;
+    return true;
+}
+
+bool SongView::GlobalRedo() {
+    if (songRedoCount_ == 0) return true;
+    SongEdit e = songRedo_[0];
+    for (int i = 0; i < songRedoCount_ - 1; i++) songRedo_[i] = songRedo_[i + 1];
+    songRedoCount_--;
+    for (int i = kSongHistorySize - 1; i > 0; i--) songUndo_[i] = songUndo_[i - 1];
+    songUndo_[0] = e;
+    songUndoCount_++;
+    if (songUndoCount_ > kSongHistorySize) songUndoCount_ = kSongHistorySize;
+    memcpy(viewData_->song_->data_, e.data, 256);
+    viewData_->songX_ = e.songX;
+    viewData_->chainRow_ = e.chainRow;
+    isDirty_ = true;
+    return true;
 }
 
 /******************************************************

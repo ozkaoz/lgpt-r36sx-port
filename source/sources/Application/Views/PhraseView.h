@@ -17,6 +17,12 @@ class PhraseView : public View {
     virtual void DrawView();
     virtual void OnPlayerUpdate(PlayerEventType, unsigned int tick = 0);
     virtual void OnFocus();
+
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot of the edited phrase
+    // for L1+X (undo) / R1+X (redo).  Captured on every pressed event before
+    // the mask is dispatched.
+    virtual bool GlobalUndo();
+    virtual bool GlobalRedo();
     void onCommandSelectorResult(ModalView &d);
     void onCommandSelectorPreview(ModalView &d);
 
@@ -99,6 +105,32 @@ class PhraseView : public View {
         ushort param3_[16];
     } clipboard_;
 
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): undo/redo history.  A PhraseEdit
+    // snapshots all 16 steps of the edited phrase plus the editor cursor.
+  public:
+    static const int kPhraseHistorySize = 16;
+    struct PhraseEdit {
+        uchar note[16];
+        uchar instr[16];
+        uchar vol[16];
+        uchar pitch[16];
+        uint cmd1[16];
+        ushort param1[16];
+        uint cmd2[16];
+        ushort param2[16];
+        uint cmd3[16];
+        ushort param3[16];
+        uchar currentPhrase;
+        uchar row;
+        uchar col;
+    };
+    PhraseEdit phraseUndo_[kPhraseHistorySize];
+    int phraseUndoCount_;
+    PhraseEdit phraseRedo_[kPhraseHistorySize];
+    int phraseRedoCount_;
+    void pushPhraseUndo();
+
+  private:
     int saveCol_;
     int saveRow_;
 

@@ -13,9 +13,9 @@ public:
 	virtual void ProcessButtonMask(unsigned short mask) ;
 	// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): L1+X / R1+X global undo/redo of
 	// focused-field edits, A+B resets the focused option to its default.
-	virtual void GlobalUndo() ;
-	virtual void GlobalRedo() ;
-	virtual void GlobalResetOption() ;
+	virtual bool GlobalUndo() ;
+	virtual bool GlobalRedo() ;
+	virtual bool GlobalResetOption() ;
 
 	void SetFocus(UIField *) ;
 	UIField *GetFocus() ;

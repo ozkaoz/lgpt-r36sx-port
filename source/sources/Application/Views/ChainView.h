@@ -13,6 +13,12 @@ class ChainView : public View {
     virtual void OnFocus();
     virtual void OnPlayerUpdate(PlayerEventType, unsigned int tick = 0);
 
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot of the edited chain
+    // for L1+X (undo) / R1+X (redo).  Captured on every pressed event before
+    // the mask is dispatched.
+    virtual bool GlobalUndo();
+    virtual bool GlobalRedo();
+
   protected:
     void updateCursor(int dx, int dy);
     void updateCursorValue(int offset, int dx = 0, int dy = 0);
@@ -60,6 +66,24 @@ class ChainView : public View {
         unsigned char transpose_[16];
     } clipboard_;
 
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): undo/redo history.  A ChainEdit
+    // snapshots the 16 steps of the edited chain plus the editor cursor.
+  public:
+    static const int kChainHistorySize = 16;
+    struct ChainEdit {
+        unsigned char data[16];
+        unsigned char transpose[16];
+        unsigned char currentChain;
+        unsigned char chainRow;
+        unsigned char chainCol;
+    };
+    ChainEdit chainUndo_[kChainHistorySize];
+    int chainUndoCount_;
+    ChainEdit chainRedo_[kChainHistorySize];
+    int chainRedoCount_;
+    void pushChainUndo();
+
+  private:
     int saveRow_;
     int saveCol_;
 };

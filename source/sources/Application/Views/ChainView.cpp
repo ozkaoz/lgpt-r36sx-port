@@ -4,6 +4,7 @@
 #include "System/Console/Trace.h"
 #include "UIController.h"
 #include "Application/Views/BaseClasses/UiColors.h"
+#include <string.h>
 
 ChainView::ChainView(GUIWindow &w, ViewData *viewData) : View(w, viewData) {
     updatingPhrase_ = false;
@@ -410,6 +411,10 @@ void ChainView::ProcessButtonMask(unsigned short mask, bool pressed) {
         return;
     };
 
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot the edited chain +
+    // cursor before every pressed event so L1+X can revert any edit.
+    pushChainUndo();
+
     if (viewMode_ == VM_NEW) {
         if (mask == EPBM_A) {
             unsigned short next = viewData_->song_->phrase_->GetNext();
@@ -449,6 +454,57 @@ void ChainView::ProcessButtonMask(unsigned short mask, bool pressed) {
         viewMode_ = VM_NORMAL;
         processNormalButtonMask(mask);
     }
+}
+
+// TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): chain snapshot undo/redo.
+void ChainView::pushChainUndo() {
+    ChainEdit e;
+    memcpy(e.data, viewData_->song_->chain_->data_ + 16 * viewData_->currentChain_, 16);
+    memcpy(e.transpose, viewData_->song_->chain_->transpose_ + 16 * viewData_->currentChain_, 16);
+    e.currentChain = (unsigned char)viewData_->currentChain_;
+    e.chainRow = (unsigned char)viewData_->chainRow_;
+    e.chainCol = (unsigned char)viewData_->chainCol_;
+    for (int i = kChainHistorySize - 1; i > 0; i--) chainUndo_[i] = chainUndo_[i - 1];
+    chainUndo_[0] = e;
+    chainUndoCount_++;
+    if (chainUndoCount_ > kChainHistorySize) chainUndoCount_ = kChainHistorySize;
+    chainRedoCount_ = 0;
+}
+
+static void chainUndoRestore(Song *song, const ChainView::ChainEdit &e, ViewData *viewData) {
+    memcpy(song->chain_->data_ + 16 * e.currentChain, e.data, 16);
+    memcpy(song->chain_->transpose_ + 16 * e.currentChain, e.transpose, 16);
+    viewData->currentChain_ = e.currentChain;
+    viewData->chainRow_ = e.chainRow;
+    viewData->chainCol_ = e.chainCol;
+}
+
+bool ChainView::GlobalUndo() {
+    if (chainUndoCount_ == 0) return true;
+    ChainEdit e = chainUndo_[0];
+    for (int i = 0; i < chainUndoCount_ - 1; i++) chainUndo_[i] = chainUndo_[i + 1];
+    chainUndoCount_--;
+    for (int i = kChainHistorySize - 1; i > 0; i--) chainRedo_[i] = chainRedo_[i - 1];
+    chainRedo_[0] = e;
+    chainRedoCount_++;
+    if (chainRedoCount_ > kChainHistorySize) chainRedoCount_ = kChainHistorySize;
+    chainUndoRestore(viewData_->song_, e, viewData_);
+    isDirty_ = true;
+    return true;
+}
+
+bool ChainView::GlobalRedo() {
+    if (chainRedoCount_ == 0) return true;
+    ChainEdit e = chainRedo_[0];
+    for (int i = 0; i < chainRedoCount_ - 1; i++) chainRedo_[i] = chainRedo_[i + 1];
+    chainRedoCount_--;
+    for (int i = kChainHistorySize - 1; i > 0; i--) chainUndo_[i] = chainUndo_[i - 1];
+    chainUndo_[0] = e;
+    chainUndoCount_++;
+    if (chainUndoCount_ > kChainHistorySize) chainUndoCount_ = kChainHistorySize;
+    chainUndoRestore(viewData_->song_, e, viewData_);
+    isDirty_ = true;
+    return true;
 }
 
 void ChainView::processNormalButtonMask(unsigned short mask) {

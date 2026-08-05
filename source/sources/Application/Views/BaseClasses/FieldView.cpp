@@ -317,8 +317,8 @@ void FieldView::pushFieldUndo() {
 	fieldRedoCount_=0 ;
 }
 
-void FieldView::GlobalUndo() {
-	if (fieldUndoCount_==0) return ;
+bool FieldView::GlobalUndo() {
+	if (fieldUndoCount_==0) return true ;
 	FieldEdit e=fieldUndo_[0] ;
 	for (int i=0;i<fieldUndoCount_-1;i++) {
 		fieldUndo_[i]=fieldUndo_[i+1] ;
@@ -334,10 +334,11 @@ void FieldView::GlobalUndo() {
 	focus_->SetFocus() ;
 	e.field->RestoreIntValue(e.value) ;
 	isDirty_=true ;
+	return true ;
 }
 
-void FieldView::GlobalRedo() {
-	if (fieldRedoCount_==0) return ;
+bool FieldView::GlobalRedo() {
+	if (fieldRedoCount_==0) return true ;
 	FieldEdit e=fieldRedo_[0] ;
 	for (int i=0;i<fieldRedoCount_-1;i++) {
 		fieldRedo_[i]=fieldRedo_[i+1] ;
@@ -353,11 +354,13 @@ void FieldView::GlobalRedo() {
 	focus_->SetFocus() ;
 	e.field->RestoreIntValue(e.value) ;
 	isDirty_=true ;
+	return true ;
 }
 
-void FieldView::GlobalResetOption() {
-	if (!focus_) return ;
+bool FieldView::GlobalResetOption() {
+	if (!focus_) return true ;
 	pushFieldUndo() ;
 	focus_->OnABClick() ;
 	isDirty_=true ;
+	return true ;
 }

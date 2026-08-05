@@ -473,8 +473,8 @@ void MixerView::restoreMixEdit(const MixEdit &edit) {
 	}
 }
 
-void MixerView::GlobalUndo() {
-	if (mixUndoCount_==0) return ;
+bool MixerView::GlobalUndo() {
+	if (mixUndoCount_==0) return true ;
 	MixEdit e=mixUndo_[0] ;
 	for (int i=0;i<mixUndoCount_-1;i++) {
 		mixUndo_[i]=mixUndo_[i+1] ;
@@ -489,10 +489,11 @@ void MixerView::GlobalUndo() {
 	restoreMixEdit(e) ;
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;
+	return true ;
 }
 
-void MixerView::GlobalRedo() {
-	if (mixRedoCount_==0) return ;
+bool MixerView::GlobalRedo() {
+	if (mixRedoCount_==0) return true ;
 	MixEdit e=mixRedo_[0] ;
 	for (int i=0;i<mixRedoCount_-1;i++) {
 		mixRedo_[i]=mixRedo_[i+1] ;
@@ -507,21 +508,22 @@ void MixerView::GlobalRedo() {
 	restoreMixEdit(e) ;
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;
+	return true ;
 }
 
 // TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): A+B restores the hovered option to
 // its default state.  On the FX pages that is fxResetRow (legacy vdef); on
-// the MIX page the hovered channel resets to volume 127 + pan center, the
+// the MIX page the hovered channel resets to volume 100 + pan center, the
 // master bar to volume 100.
-void MixerView::GlobalResetOption() {
+bool MixerView::GlobalResetOption() {
 	if (fxPage_!=FX_PAGE_MIX) {
 		fxResetRow() ;
-		return ;
+		return true ;
 	}
 	Mixer *mixer=Mixer::GetInstance() ;
 	if (masterSelected_) {
 		Project *project=viewData_->project_ ;
-		if (!project) return ;
+		if (!project) return true ;
 		pushMixUndo(ME_MASTERVOL,-1,(float)project->GetMasterVolume()) ;
 		Variable *var=project->FindVariable(VAR_MASTERVOL) ;
 		if (var) var->SetInt(100,false) ;
@@ -530,11 +532,12 @@ void MixerView::GlobalResetOption() {
 		int channel=viewData_->mixerCol_ ;
 		pushMixUndo(ME_VOL,channel,(float)mixer->GetChannelVolume(channel)) ;
 		pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel)) ;
-		mixer->SetChannelVolume(channel,127) ;
+		mixer->SetChannelVolume(channel,100) ;
 		mixer->SetChannelPan(channel,0) ;
 	}
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;
+	return true ;
 }
 
 
@@ -784,7 +787,7 @@ void MixerView::PostFlushDraw() {
 				              app->ResolveColor565(r.onColor)):
 				              trackC ;
 			}
-			int yBase=(py+row)*TREEFROG_LGPT_WIDTH ;
+			int yBase=(py+row*8)*TREEFROG_LGPT_WIDTH ;
 			int iBase=yBase+px ;
 			bool fillL=(cellFromBottom<=r.filledL) ;
 			bool fillR=(cellFromBottom<=r.filledR) ;

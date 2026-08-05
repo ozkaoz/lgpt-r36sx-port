@@ -294,22 +294,22 @@ void View::ProcessButton(unsigned short mask, bool pressed, long eventWhen) {
 			isDirty_=true ;
 		}
 	} else {
-		// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): global combos are consumed
-		// here, before the view sees the mask.  Pure L1+X / R1+X / A+B only;
-		// any extra button falls through to the view's own handling.
+		// TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): global combos are offered to
+		// the view first.  Pure L1+X / R1+X / A+B only; any extra button falls
+		// through to the view's own handling.  A view claims a combo by
+		// returning true from GlobalUndo()/GlobalRedo()/GlobalResetOption();
+		// when it returns false the mask reaches ProcessButtonMask so legacy
+		// behaviors (Song A+B clear, Phrase/Table A+B cut, ...) keep working.
 		if (pressed) {
 			if (mask == (unsigned short)(EPBM_L | EPBM_X)) {
-				GlobalUndo();
+				if (GlobalUndo()) return;
 			} else if (mask == (unsigned short)(EPBM_R | EPBM_X)) {
-				GlobalRedo();
+				if (GlobalRedo()) return;
 			} else if (mask == (unsigned short)(EPBM_A | EPBM_B)) {
-				GlobalResetOption();
-			} else {
-				ProcessButtonMask(mask, pressed);
+				if (GlobalResetOption()) return;
 			}
-		} else {
-			ProcessButtonMask(mask, pressed);
 		}
+		ProcessButtonMask(mask, pressed);
 	}
 	if (isDirty_) ((AppWindow &)w_).SetDirty() ;
 } ;
