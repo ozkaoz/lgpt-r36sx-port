@@ -146,29 +146,27 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
                  if (n > block) n = block ;
                  float peakL = 0.0f ;
                  float peakR = 0.0f ;
-                 if (gotData) {
-                     // H38.7 OPT_PERF: sample every 4th sample for the peak (see
-                     // PlayerChannel::Render for rationale).
-                     fixed *c = buffer + off ;
-                     for (int i = 0; i < n; i += 4) {
-                         // TREEFROG_VU_METERS_V7 (H38.7-r4): with FIXED_SHIFT=15
-                         // a sample is the raw int16 amplitude (0..32767), not the
-                         // documented 0..1. Normalize so the peak is a true linear
-                         // 0..1 level; without this the dB mapping reads +50..+90
-                         // dB for any audible sound at any volume and the bar
-                         // pins full/red even at channel volume 1.
-                         float v = fp2fl(*c) * (1.0f / 32767.0f) ;
-                         if (v < 0.0f) v = -v ;
-                          // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1):
-                          // with the stride-4 scan `i` is always even, so the
-                          // old `(i&1)` test could never classify a sample as
-                          // right; use the ABSOLUTE sample index `off+i` (the
-                          // interleaved position) so each side is measured.
-                          if (((off + i) & 1) == 0) { if (v > peakL) peakL = v ; }
-                          else { if (v > peakR) peakR = v ; }
-                         c += 4 ;
-                     }
-                 }
+                  if (gotData) {
+                      // H38.7 OPT_PERF: sample every 4th sample for the peak (see
+                      // PlayerChannel::Render for rationale).
+                      // TREEFROG_MIXER_STEREO_METERS_V3 (Bacon 1.1.1): a stride-4
+                      // scan can only ever visit EVEN indices (0,4,8,...), so
+                      // any per-index parity test classifies everything as L and
+                      // the R side stayed dead.  The buffer is interleaved and
+                      // off is always even (block is even), so c[0] is always L
+                      // and c[1] always R: take the pair per 8 samples (same
+                      // density as the old stride 4) and measure both sides.
+                      fixed *c = buffer + off ;
+                      for (int i = 0; i < n; i += 8) {
+                          float vL = fp2fl(c[0]) * (1.0f / 32767.0f) ;
+                          if (vL < 0.0f) vL = -vL ;
+                          if (vL > peakL) peakL = vL ;
+                          float vR = fp2fl(c[1]) * (1.0f / 32767.0f) ;
+                          if (vR < 0.0f) vR = -vR ;
+                          if (vR > peakR) peakR = vR ;
+                          c += 8 ;
+                      }
+                  }
                  if (peakL > peakValueL_) {
                      peakValueL_ = peakL;
                  } else {

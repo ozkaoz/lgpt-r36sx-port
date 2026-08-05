@@ -186,6 +186,7 @@ private:
     bool destructiveDeleteSelectedRange();
     bool restoreLastDestructiveEdit(bool redo);
     bool destructivePitchSample(int semitones);
+    bool normalizeSample();
     void previewPitchSetting();
     bool writePreviewPitchWav(short *samples, int frames, int channels, int rate, std::string &logicalPath);
     bool buildPitchedBuffer(int semitones, short **outSamples, int *outFrames, int *outChannels, int *outRate);

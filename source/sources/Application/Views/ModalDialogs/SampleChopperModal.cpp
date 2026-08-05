@@ -2060,6 +2060,7 @@ bool SampleChopperModal::restoreLastDestructiveEdit(bool redo) {
 void SampleChopperModal::togglePitchMode() {
     stopSamplePreview();
     if (!hasAssignedSample()) { setStatus("No sample for pitch"); return; }
+    if (!hasWaveform_) { setStatus("No waveform loaded"); return; }
     pitchMode_ = !pitchMode_;
     if (pitchMode_) {
         trimMode_ = false;
@@ -2570,6 +2571,82 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     return true;
 }
 
+bool SampleChopperModal::normalizeSample() {
+    if (!hasAssignedSample() || samplePath_.empty() || sourceSize_ <= 1) { setStatus("No sample to normalize"); return false; }
+    if (!lgptEndsWithWav(sampleName_)) { setStatus("Normalize WAV only"); return false; }
+
+    SoundSource *source = SamplePool::GetInstance()->GetSource(sampleIndex_);
+    if (!source) { setStatus("No source"); return false; }
+    int channels = source->GetChannelCount(-1);
+    int rate = source->GetSampleRate(-1);
+    int size = source->GetSize(-1);
+    short *samples = (short *)source->GetSampleBuffer(-1);
+    if (!samples || channels <= 0 || rate <= 0 || size <= 1) { setStatus("Bad sample buffer"); return false; }
+
+    int total = size * channels;
+    int peak = 0;
+    for (int i = 0; i < total; i++) {
+        int v = samples[i];
+        if (v < 0) v = -v;
+        if (v > peak) peak = v;
+    }
+    if (peak <= 0) { setStatus("Silent sample, nothing to normalize"); return false; }
+    if (peak >= 32600) { setStatus("Already at full level"); return false; }
+
+    double gain = 32767.0 / (double)peak;
+    stopSamplePreview();
+    char label[56]; snprintf(label, sizeof(label), "Normalize peak %d", peak);
+    showOperationProgress(label, 0);
+    clearLogicalHistory();
+    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Normalize", boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    if (!lgptCapturePhysicalSnapshot(source, g_lgptPhysicalUndoSamples, g_lgptPhysicalUndoFrames,
+                                     g_lgptPhysicalUndoChannels, g_lgptPhysicalUndoRate)) {
+        clearOperationProgress(); setStatus("Undo capture fail"); return false;
+    }
+    showOperationProgress(label, 40);
+
+    short *nextBuffer = (short *)malloc(total * sizeof(short));
+    if (!nextBuffer) { clearOperationProgress(); setStatus("No normalize memory"); return false; }
+    for (int i = 0; i < total; i++) {
+        int v = (int)((double)samples[i] * gain);
+        if (v < -32767) v = -32767;
+        if (v > 32767) v = 32767;
+        nextBuffer[i] = (short)v;
+    }
+    showOperationProgress(label, 60);
+
+    WavFile *wav = (WavFile *)source;
+    bool ok = wav->ReplaceBuffer(nextBuffer, size, channels, rate);
+    free(nextBuffer);
+    if (!ok) { clearOperationProgress(); setStatus("Cannot replace buffer"); return false; }
+    showOperationProgress(label, 72);
+    if (!wav->SaveBufferToPath(samplePath_.c_str())) { clearOperationProgress(); setStatus("Cannot write WAV"); return false; }
+    if (!lgptCapturePhysicalSnapshot(source, g_lgptPhysicalRedoSamples, g_lgptPhysicalRedoFrames,
+                                     g_lgptPhysicalRedoChannels, g_lgptPhysicalRedoRate)) {
+        clearOperationProgress(); setStatus("Redo capture fail"); return false;
+    }
+    showOperationProgress(label, 90);
+
+    /* The frame length is unchanged, so chop boundaries stay valid as-is. */
+    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++)
+        if (i >= boundaryCount_) boundaries_[i] = 0;
+    sourceSize_ = size;
+    sampleSize_ = size;
+    selectedChop_ = clampInt(selectedChop_, 0, boundaryCount_ - 2);
+    cursorFrame_ = boundaries_[selectedChop_];
+    viewStartFrame_ = 0;
+    chopsInitialized_ = true;
+    lgptFinishDestructiveEdit(boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    saveChopStateForCurrentSample();
+    refreshCurrentInstrumentAfterSampleEdit(sourceSize_);
+    prepareWaveformPreview();
+    centerViewOnCursor();
+    publishOverlayState();
+    char done[64]; snprintf(done, sizeof(done), "Normalized peak %d -> 32767 (0 dB)", peak);
+    showOperationProgress(done, 100);
+    return true;
+}
+
 void SampleChopperModal::previewTrimStart() {
     if (sourceSize_ <= 1) { setStatus("No sample"); return; }
     initializeChopsIfNeeded();
@@ -2932,7 +3009,7 @@ void SampleChopperModal::drawControls(GUITextProperties &props) {
     }
     drawStringAbs(0, 24, "R1+LR sample  L1+LR fast cursor", props);
     drawStringAbs(0, 25, "A cut/live Y del B play SELECT crop", props);
-    drawStringAbs(0, 26, trimMode_ ? "R1+A keep L2+Y del L1+X undo" : "R2+LR chop  R2+A full", props);
+    drawStringAbs(0, 26, trimMode_ ? "R1+A keep L2+Y del L1+X undo" : "R2+LR chop R2+A full R2+Y norm", props);
     drawStringAbs(0, 27, "L1+X undo  R1+X redo", props);
     SetColor(CD_HILITE1);
     drawStringAbs(0, 28, trimMode_ ? "CROP A/B range  Y start X end1s" : "SELECT crop L1+R1 pitch R1+B back", props);
@@ -3054,6 +3131,10 @@ void SampleChopperModal::ProcessButtonMask(unsigned short mask, bool pressed) {
 
     if (l1 && r1 && !(left || right || up || down || a || b || x || y || l2 || r2 || select)) {
         togglePitchMode(); return;
+    }
+
+    if (r2 && y && !(left || right || up || down || a || b || x || l1 || r1 || l2 || select)) {
+        normalizeSample(); return;
     }
 
     if (pitchMode_) {

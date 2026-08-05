@@ -144,28 +144,27 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
        // L/R bars of the MIX page reflect exactly how much pan is applied.
        float blockPeakL=0.0f ;
        float blockPeakR=0.0f ;
-       if (audible) {
-          // H38.7 OPT_PERF: sample every 4th sample for the peak. Saves 3/4
-          // of the fp2fl conversions per buffer with no audible or visual
-          // change in a 60fps bouncing meter.
-           fixed *c=buffer+off ;
-           for (int i=0;i<n;i+=4) {
-              // TREEFROG_MIXER_PER_CHANNEL_VU_V3 (H38.7-r4): fp2fl of a
-              // post-volume sample is the raw int16 amplitude (0..32767) with
-              // FIXED_SHIFT=15. Normalize to a true linear 0..1 so
-              // GetChannelPeak() matches the documented contract and the
-              // channel bars' dB scale works (a 0 dB ref of 32767.0).
-              float v=fp2fl(*c)*(1.0f/32767.0f) ;
-              if (v<0.0f) v=-v ;
-               // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): with the
-               // stride-4 scan `i` is always even, so `(i&1)` could never
-               // classify a sample as right; use the ABSOLUTE sample index
-               // `off+i` (the interleaved position) so each side is measured.
-               if (((off+i)&1)==0) { if (v>blockPeakL) blockPeakL=v ; }
-               else { if (v>blockPeakR) blockPeakR=v ; }
-              c+=4 ;
-           }
-       }
+        if (audible) {
+           // H38.7 OPT_PERF: sample every 4th sample for the peak. Saves 3/4
+           // of the fp2fl conversions per buffer with no audible or visual
+           // change in a 60fps bouncing meter.
+           // TREEFROG_MIXER_STEREO_METERS_V3 (Bacon 1.1.1): a stride-4 scan
+           // only visits EVEN indices, so a per-index parity test classified
+           // everything as L and the R side stayed dead.  The buffer is
+           // interleaved and off is always even (block is even): c[0] is L,
+           // c[1] is R; take the pair per 8 samples (same density) so both
+           // sides are measured and the pan shows on the bars.
+            fixed *c=buffer+off ;
+            for (int i=0;i<n;i+=8) {
+               float vL=fp2fl(c[0])*(1.0f/32767.0f) ;
+               if (vL<0.0f) vL=-vL ;
+               if (vL>blockPeakL) blockPeakL=vL ;
+               float vR=fp2fl(c[1])*(1.0f/32767.0f) ;
+               if (vR<0.0f) vR=-vR ;
+               if (vR>blockPeakR) blockPeakR=vR ;
+               c+=8 ;
+            }
+        }
        if (blockPeakL > peakValueL_) {
            peakValueL_ = blockPeakL ;
        } else {
