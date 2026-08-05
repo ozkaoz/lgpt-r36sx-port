@@ -93,6 +93,15 @@ public:
 	virtual void OnPlayerUpdate(PlayerEventType ,unsigned int tick=0) ;
 	virtual void OnFrameUpdate(unsigned long frameClock) ;
 	virtual void OnFocus() ;
+	// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): L1+X / R1+X undo/redo of the
+	// MIX-page and FX-page edits, A+B resets the hovered option to default
+	// (pan to C, channel volume 127, master volume 100, FX row to vdef).
+	virtual void GlobalUndo() ;
+	virtual void GlobalRedo() ;
+	virtual void GlobalResetOption() ;
+	// TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1): repaints the L/R
+	// half-cell meter bars on top of the character screen every Flush.
+	virtual void PostFlushDraw() ;
 protected:
 	void processNormalButtonMask(unsigned int mask) ;
     void processSelectionButtonMask(unsigned int mask) ;
@@ -105,13 +114,30 @@ protected:
 	void switchSoloMode() ;
 	void drawVolumeBar(int channel,int x,int y,int height) ;
 	void drawMasterBar(int x,int y,int height) ;
-	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): draws ONE side of a
-	// meter (a height-cell column at x).  drawVolumeBar/drawMasterBar call it
-	// twice (L at x, R at x+1) so each channel/master shows two independent
-	// bars that follow the pan.
+	// TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1):
+	// The two bars of a meter now share ONE cell column (8 px): the left bar
+	// paints px 0..2, a 2-px dark seam px 3..4, the right bar px 5..7, so the
+	// L/R split is visible at every pan.  drawMeterBar(side) records the
+	// side's fill into the meter record (side 0 keeps painting the cell track
+	// so the label column stays coherent; side 1 only records); the real
+	// pixels are drawn by PostFlushDraw() after the character screen is
+	// flushed.  drawVolumeBar/drawMasterBar pass both sides at the SAME x.
+	struct MeterRecord {
+		bool valid ;
+		int xCell ;
+		int yCell ;
+		int height ;
+		int filledL ;
+		bool overZeroL ;
+		int filledR ;
+		bool overZeroR ;
+		bool selected ;
+		bool muted ;
+		ColorDefinition onColor ;
+	} ;
 	void drawMeterBar(int x,int y,int height,float peak,int volume,
 	                  bool selected,bool muted,GUITextProperties &props,
-	                  ColorDefinition onColor) ;
+	                  ColorDefinition onColor,int side,MeterRecord &rec) ;
 	void showInstrumentFxMenu() ;
 
 	// TREEFROG_FX_PAGES_V1 (Fase 4.3)
@@ -151,6 +177,23 @@ protected:
 	void nudgeDelayReturn(int delta) ;
 	void nudgeReverbReturn(int delta) ;
 	void drawMixReturns(int y) ;
+	// TREEFROG_GLOBAL_UNDO_V1: MIX/FX edit history (L1+X undo, R1+X redo).
+	// kind: ME_VOL/ME_PAN/ME_MASTERVOL/ME_DLYRET/ME_RVBRET/ME_FX.
+	// channel: mixer channel (or -1 for master); ME_FX stores the param id.
+	// value: old int value (vol/pan/mastervol), old percent (returns), old
+	// float param (ME_FX).
+	struct MixEdit {
+		int kind ;
+		int channel ;
+		float value ;
+	} ;
+	static const int MIX_HISTORY_SIZE=16 ;
+	void pushMixUndo(int kind,int channel,float value) ;
+	void restoreMixEdit(const MixEdit &edit) ;
+	MixEdit mixUndo_[MIX_HISTORY_SIZE] ;
+	int mixUndoCount_ ;
+	MixEdit mixRedo_[MIX_HISTORY_SIZE] ;
+	int mixRedoCount_ ;
 	float fxGet(int id) const ;
 	void fxSet(int id,float v) ;
 	int fxRowForId(int id) const ;
@@ -194,5 +237,9 @@ private:
 	int fxRow_ ;                  // row cursor within the current page
 	// TREEFROG_FX_PAGES_V3 (Fase 9): 0=VOL 1=DLY RET 2=RVB RET on the MIX page
 	int fxEditTarget_ ;
+	// TREEFROG_MIXER_HALF_CELL_BARS_V1: per-meter records (channels 0..7 +
+	// master at SONG_CHANNEL_COUNT) refreshed by DrawView, painted by
+	// PostFlushDraw.
+	MeterRecord meterRecords_[SONG_CHANNEL_COUNT+1] ;
 } ;
 #endif

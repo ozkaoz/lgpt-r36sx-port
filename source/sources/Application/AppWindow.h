@@ -43,6 +43,11 @@ class AppWindow : public GUIWindow, I_Observer, Status {
     virtual void Clear(bool all = false);
     virtual void ClearRect(GUIRect &rect);
     virtual void SetColor(ColorDefinition cd);
+    // TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1): resolves a palette
+    // ColorDefinition to its current RGB565 value (pixel-level layers such
+    // as the L/R half-cell mixer bars draw with the exact same colors as
+    // the character screen).
+    unsigned short ResolveColor565(ColorDefinition cd) const;
     void SetDirty();
     void SynchronizeInputMask(unsigned short mask);
 

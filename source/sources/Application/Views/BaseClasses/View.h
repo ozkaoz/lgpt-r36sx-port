@@ -118,6 +118,21 @@ class View : public Observable {
 
     void Redraw();
 
+    // TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): global button combos dispatched
+    // by View::ProcessButton before the view handles the mask (only when no
+    // modal is open, so the chopper/help keep their own L1+X/R1+X handling).
+    // L1+X = undo, R1+X = redo, A+B = reset the focused option to default.
+    // Default no-op; views override with their own edit history.
+    virtual void GlobalUndo() {}
+    virtual void GlobalRedo() {}
+    virtual void GlobalResetOption() {}
+
+    // TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1): called by
+    // AppWindow::Flush after the char screen is rendered, so pixel-level
+    // layers (the L/R half-cell mixer bars) can draw on top every frame.
+    // Default no-op.
+    virtual void PostFlushDraw() {}
+
     // Override in subclasses
 
     virtual void DrawView() = 0;

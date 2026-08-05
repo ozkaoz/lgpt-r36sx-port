@@ -17,6 +17,9 @@ static const HelpLine kSongLines_[] = {
     {"START", "play/stop"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
+    // TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): global combos, every view
+    {"L1+X R1+X", "undo redo"},
+    {"A+B", "reset option"},
 };
 
 static const HelpLine kChainLines_[] = {
@@ -27,6 +30,8 @@ static const HelpLine kChainLines_[] = {
     {"START", "play/stop"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
+    {"L1+X R1+X", "undo redo"},
+    {"A+B", "reset option"},
 };
 
 static const HelpLine kPhraseLines_[] = {
@@ -37,6 +42,8 @@ static const HelpLine kPhraseLines_[] = {
     {"START", "play/stop"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
+    {"L1+X R1+X", "undo redo"},
+    {"A+B", "reset option"},
 };
 
 static const HelpLine kProjectLines_[] = {
@@ -46,6 +53,8 @@ static const HelpLine kProjectLines_[] = {
     {"START", "play/stop"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
+    {"L1+X R1+X", "undo redo"},
+    {"A+B", "reset option"},
 };
 
 static const HelpLine kInstrumentLines_[] = {
@@ -58,6 +67,8 @@ static const HelpLine kInstrumentLines_[] = {
     {"START", "play/stop"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
+    {"A+B", "reset field"},
+    {"L1+X R1+X", "undo redo"},
 };
 
 static const HelpLine kTableLines_[] = {
@@ -67,6 +78,8 @@ static const HelpLine kTableLines_[] = {
     {"START", "play/stop"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
+    {"L1+X R1+X", "undo redo"},
+    {"A+B", "reset option"},
 };
 
 static const HelpLine kGrooveLines_[] = {
@@ -76,6 +89,8 @@ static const HelpLine kGrooveLines_[] = {
     {"START", "play/stop"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
+    {"L1+X R1+X", "undo redo"},
+    {"A+B", "reset option"},
 };
 
 static const HelpLine kMixerLines_[] = {
@@ -95,6 +110,10 @@ static const HelpLine kMixerLines_[] = {
     {"R+UP", "back to Song"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
+    // TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1)
+    {"A+B", "reset vol/pan"},
+    {"L2+A+B", "pan center"},
+    {"L1+X R1+X", "undo redo"},
 };
 
 static const HelpSection kSections_[] = {
@@ -103,7 +122,6 @@ static const HelpSection kSections_[] = {
     {"PHRASE", kPhraseLines_, (int)(sizeof(kPhraseLines_) / sizeof(HelpLine))},
     {"PROJECT", kProjectLines_, (int)(sizeof(kProjectLines_) / sizeof(HelpLine))},
     {"INSTRUMENT", kInstrumentLines_, (int)(sizeof(kInstrumentLines_) / sizeof(HelpLine))},
-    {"TABLE", kTableLines_, (int)(sizeof(kTableLines_) / sizeof(HelpLine))},
     {"TABLE", kTableLines_, (int)(sizeof(kTableLines_) / sizeof(HelpLine))},
     {"GROOVE", kGrooveLines_, (int)(sizeof(kGrooveLines_) / sizeof(HelpLine))},
     {"MIXER", kMixerLines_, (int)(sizeof(kMixerLines_) / sizeof(HelpLine))},

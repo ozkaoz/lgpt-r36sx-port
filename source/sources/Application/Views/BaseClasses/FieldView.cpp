@@ -57,20 +57,24 @@ void FieldView::ProcessButtonMask(unsigned short mask) {
 	
 	if (mask&EPBM_A) {  // A or A+ARROW is sent to the field
 		if (mask&EPBM_DOWN) {
+			pushFieldUndo() ;
 			focus_->ProcessArrow(EPBM_DOWN) ;
 			isDirty_=true ;
 		}
 		if (mask&EPBM_UP){
+			pushFieldUndo() ;
 			focus_->ProcessArrow(EPBM_UP)  ;
 			isDirty_=true ;
 		}
 
 		if (mask&EPBM_LEFT) {
+			pushFieldUndo() ;
 			focus_->ProcessArrow(EPBM_LEFT) ;
 			isDirty_=true ;
 		}
 
 		if (mask&EPBM_RIGHT){
+			pushFieldUndo() ;
 			focus_->ProcessArrow(EPBM_RIGHT)  ;
 			isDirty_=true ;
 		}
@@ -88,20 +92,24 @@ void FieldView::ProcessButtonMask(unsigned short mask) {
 			};
 
 			if (mask&EPBM_DOWN) {
+				pushFieldUndo() ;
 				focus_->ProcessBArrow(EPBM_DOWN) ;
 				isDirty_=true ;
 			}
 			if (mask&EPBM_UP){
+				pushFieldUndo() ;
 				focus_->ProcessBArrow(EPBM_UP)  ;
 				isDirty_=true ;
 			}
 
 			if (mask&EPBM_LEFT) {
+				pushFieldUndo() ;
 				focus_->ProcessBArrow(EPBM_LEFT) ;
 				isDirty_=true ;
 			}
 
 			if (mask&EPBM_RIGHT){
+				pushFieldUndo() ;
 				focus_->ProcessBArrow(EPBM_RIGHT)  ;
 				isDirty_=true ;
 			}
@@ -288,4 +296,68 @@ int FieldView::GetFocusIndex() {
 		focusIndex++ ;
 	} ;
 	return focusIndex ;
+}
+
+// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): global undo/redo/reset for the
+// focused field.  History entries are (field, previous int value); edits
+// are captured in ProcessButtonMask before every arrow change.  Undoing
+// restores the value and re-focuses the field so repeated L1+X presses
+// walk the history backwards.
+void FieldView::pushFieldUndo() {
+	if (!focus_) return ;
+	int value=0 ;
+	if (!focus_->CaptureIntValue(value)) return ;
+	for (int i=FIELD_HISTORY_SIZE-1;i>0;i--) {
+		fieldUndo_[i]=fieldUndo_[i-1] ;
+	}
+	fieldUndo_[0].field=focus_ ;
+	fieldUndo_[0].value=value ;
+	fieldUndoCount_++ ;
+	if (fieldUndoCount_>FIELD_HISTORY_SIZE) fieldUndoCount_=FIELD_HISTORY_SIZE ;
+	fieldRedoCount_=0 ;
+}
+
+void FieldView::GlobalUndo() {
+	if (fieldUndoCount_==0) return ;
+	FieldEdit e=fieldUndo_[0] ;
+	for (int i=0;i<fieldUndoCount_-1;i++) {
+		fieldUndo_[i]=fieldUndo_[i+1] ;
+	}
+	fieldUndoCount_-- ;
+	for (int i=FIELD_HISTORY_SIZE-1;i>0;i--) {
+		fieldRedo_[i]=fieldRedo_[i-1] ;
+	}
+	fieldRedo_[0]=e ;
+	fieldRedoCount_++ ;
+	if (fieldRedoCount_>FIELD_HISTORY_SIZE) fieldRedoCount_=FIELD_HISTORY_SIZE ;
+	focus_=e.field ;
+	focus_->SetFocus() ;
+	e.field->RestoreIntValue(e.value) ;
+	isDirty_=true ;
+}
+
+void FieldView::GlobalRedo() {
+	if (fieldRedoCount_==0) return ;
+	FieldEdit e=fieldRedo_[0] ;
+	for (int i=0;i<fieldRedoCount_-1;i++) {
+		fieldRedo_[i]=fieldRedo_[i+1] ;
+	}
+	fieldRedoCount_-- ;
+	for (int i=FIELD_HISTORY_SIZE-1;i>0;i--) {
+		fieldUndo_[i]=fieldUndo_[i-1] ;
+	}
+	fieldUndo_[0]=e ;
+	fieldUndoCount_++ ;
+	if (fieldUndoCount_>FIELD_HISTORY_SIZE) fieldUndoCount_=FIELD_HISTORY_SIZE ;
+	focus_=e.field ;
+	focus_->SetFocus() ;
+	e.field->RestoreIntValue(e.value) ;
+	isDirty_=true ;
+}
+
+void FieldView::GlobalResetOption() {
+	if (!focus_) return ;
+	pushFieldUndo() ;
+	focus_->OnABClick() ;
+	isDirty_=true ;
 }

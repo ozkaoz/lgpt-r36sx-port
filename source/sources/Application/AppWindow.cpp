@@ -429,6 +429,11 @@ void AppWindow::Flush() {
 #if defined(PLATFORM_TREEFROG)
     TreeFrogChopperOverlayDraw();
 #endif
+    // TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1): after the char screen
+    // is fully rendered, let the active view paint its pixel-level layer
+    // (the L/R half-cell mixer bars).  Runs on every Flush so the bars
+    // always sit on top of the repainted cells.
+    if (_currentView) _currentView->PostFlushDraw();
     GUIWindow::Flush();
     Unlock();
     memcpy(_preScreen, _charScreen, 1200);
@@ -1158,6 +1163,38 @@ void AppWindow::Print(char *line) {
 };
 
 void AppWindow::SetColor(ColorDefinition cd) { colorIndex_ = cd; };
+
+// TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1): maps a ColorDefinition to
+// the RGB565 the character screen would render it with (same switch as
+// Flush(), same palette statics, 565 conversion identical to
+// TreeFrogGUIWindowImp::rgb565).
+unsigned short AppWindow::ResolveColor565(ColorDefinition cd) const {
+    GUIColor gcolor = normalColor_;
+    switch (cd) {
+    case CD_BACKGROUND: gcolor = backgroundColor_; break;
+    case CD_NORMAL: break;
+    case CD_BORDER: gcolor = borderColor_; break;
+    case CD_HILITE1: gcolor = highlightColor_; break;
+    case CD_HILITE2: gcolor = highlight2Color_; break;
+    case CD_CONSOLE: gcolor = consoleColor_; break;
+    case CD_CURSOR: gcolor = cursorColor_; break;
+    case CD_PLAY: gcolor = playColor_; break;
+    case CD_RECORD: gcolor = recordColor_; break;
+    case CD_MUTE: gcolor = muteColor_; break;
+    case CD_SONGVIEWFE: gcolor = songviewfeColor_; break;
+    case CD_SONGVIEW00: gcolor = songview00Color_; break;
+    case CD_ROW: gcolor = rownumberColor_; break;
+    case CD_ROW2: gcolor = rownumber2Color_; break;
+    case CD_MAJORBEAT: gcolor = majorbeatColor_; break;
+    case CD_WARNING: gcolor = warningColor_; break;
+    case CD_ERROR: gcolor = errorColor_; break;
+    default: break;
+    }
+    unsigned short r = (unsigned short)((gcolor._r & 0xff) >> 3);
+    unsigned short g = (unsigned short)((gcolor._g & 0xff) >> 2);
+    unsigned short b = (unsigned short)((gcolor._b & 0xff) >> 3);
+    return (unsigned short)((r << 11) | (g << 5) | b);
+};
 
 Path AppWindow::GetLastProjectPath() {
     Path lastProjectFile(LAST_PROJECT_NAME);

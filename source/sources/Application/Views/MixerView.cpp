@@ -9,11 +9,18 @@
 #include "Application/Utils/fixed.h"
 #include "Application/Utils/char.h"
 #include "Application/AppWindow.h"
+#if defined(PLATFORM_TREEFROG)
+#include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
+#endif
 #include <stdio.h>
 #include <string>
 #include <iostream>
 #include <sstream>
 #include <math.h>
+
+// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): MIX/FX edit history kinds for the
+// global L1+X / R1+X combos (MixEdit::kind).
+enum { ME_VOL, ME_PAN, ME_MASTERVOL, ME_DLYRET, ME_RVBRET, ME_FX } ;
 
 // TREEFROG_FX_PAGES_PARAMS_V2 (PLAN_FX_REDESIGN_ES.md, Fase 6):
 // Parameter table for the DELAY / REVERB / EQ / COMP pages.  Each row exposes
@@ -140,6 +147,12 @@ MixerView::MixerView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
 		vuDisplayL_[i]=0.0f ;
 		vuDisplayR_[i]=0.0f ;
 	}
+	// TREEFROG_MIXER_HALF_CELL_BARS_V1 + TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1)
+	for (int i=0;i<=SONG_CHANNEL_COUNT;i++) {
+		meterRecords_[i].valid=false ;
+	}
+	mixUndoCount_=0 ;
+	mixRedoCount_=0 ;
 }
 
 MixerView::~MixerView() {
@@ -196,17 +209,24 @@ void MixerView::updateVolume(int delta) {
 	// master FX returns (sends are per-instrument now, edited in Instrument).
 	if (fxPage_==FX_PAGE_MIX) {
 		if (fxEditTarget_==1) {
+			// TREEFROG_GLOBAL_UNDO_V1: record the old return level (percent).
+			pushMixUndo(ME_DLYRET,viewData_->mixerCol_,
+			            (float)fxReturnPercent(FxEngine::FxEngine::GetInstance().GetDelayReturn())) ;
 			nudgeDelayReturn(delta) ;
 			isDirty_=true ;
 			return ;
 		}
 		if (fxEditTarget_==2) {
+			pushMixUndo(ME_RVBRET,viewData_->mixerCol_,
+			            (float)fxReturnPercent(FxEngine::FxEngine::GetInstance().GetReverbReturn())) ;
 			nudgeReverbReturn(delta) ;
 			isDirty_=true ;
 			return ;
 		}
 	}
-	Mixer::GetInstance()->NudgeChannelVolume(viewData_->mixerCol_,delta) ;
+	Mixer *mixer=Mixer::GetInstance() ;
+	pushMixUndo(ME_VOL,viewData_->mixerCol_,(float)mixer->GetChannelVolume(viewData_->mixerCol_)) ;
+	mixer->NudgeChannelVolume(viewData_->mixerCol_,delta) ;
 	isDirty_=true ;
 }
 
@@ -214,6 +234,7 @@ void MixerView::adjustMasterVolume(int delta) {
 	Project *project=viewData_->project_ ;
 	if (!project) return ;
 	int v=project->GetMasterVolume() ;
+	pushMixUndo(ME_MASTERVOL,-1,(float)v) ;
 	v+=delta ;
 	if (v<10) v=10 ;
 	if (v>100) v=100 ;
@@ -318,16 +339,36 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 	// L2+LEFT/RIGHT pans the selected channel (L2+A adds the A coarse-step
 	// convention, so L2+A+LEFT/RIGHT moves by 10).  The master bar has no
 	// pan; L2 alone does nothing.
+	// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1):
+	// L2+A+B (pure chord) resets the pan to center (C) in one press.
 	if (mask&EPBM_L2) {
 		if (masterSelected_) return ;
+		if ((mask&EPBM_A) && (mask&EPBM_B) &&
+		    !(mask & (EPBM_LEFT | EPBM_RIGHT | EPBM_UP | EPBM_DOWN |
+		              EPBM_L | EPBM_R | EPBM_X | EPBM_Y |
+		              EPBM_SELECT | EPBM_START))) {
+			Mixer *mixer=Mixer::GetInstance() ;
+			int channel=viewData_->mixerCol_ ;
+			pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel)) ;
+			mixer->SetChannelPan(channel,0) ;
+			isDirty_=true ;
+			((AppWindow &)w_).SetDirty() ;
+			return ;
+		}
 		int step=(mask&EPBM_A)?10:1 ;
 		if (mask&EPBM_LEFT) {
-			Mixer::GetInstance()->NudgeChannelPan(viewData_->mixerCol_,-step) ;
+			Mixer *mixer=Mixer::GetInstance() ;
+			int channel=viewData_->mixerCol_ ;
+			pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel)) ;
+			mixer->NudgeChannelPan(channel,-step) ;
 			isDirty_=true ;
 			return ;
 		}
 		if (mask&EPBM_RIGHT) {
-			Mixer::GetInstance()->NudgeChannelPan(viewData_->mixerCol_,step) ;
+			Mixer *mixer=Mixer::GetInstance() ;
+			int channel=viewData_->mixerCol_ ;
+			pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel)) ;
+			mixer->NudgeChannelPan(channel,step) ;
 			isDirty_=true ;
 			return ;
 		}
@@ -388,6 +429,113 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 	if (mask&EPBM_UP) updateVolume(1) ;
 	if (mask&EPBM_DOWN) updateVolume(-1) ;
 } ;
+
+// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1):
+// MIX/FX edit history for the global L1+X / R1+X combos.
+void MixerView::pushMixUndo(int kind,int channel,float value) {
+	for (int i=MIX_HISTORY_SIZE-1;i>0;i--) {
+		mixUndo_[i]=mixUndo_[i-1] ;
+	}
+	mixUndo_[0].kind=kind ;
+	mixUndo_[0].channel=channel ;
+	mixUndo_[0].value=value ;
+	mixUndoCount_++ ;
+	if (mixUndoCount_>MIX_HISTORY_SIZE) mixUndoCount_=MIX_HISTORY_SIZE ;
+	mixRedoCount_=0 ;
+}
+
+void MixerView::restoreMixEdit(const MixEdit &edit) {
+	Mixer *mixer=Mixer::GetInstance() ;
+	Project *project=viewData_->project_ ;
+	switch (edit.kind) {
+	case ME_VOL:
+		mixer->SetChannelVolume(edit.channel,(int)edit.value) ;
+		break ;
+	case ME_PAN:
+		mixer->SetChannelPan(edit.channel,(int)edit.value) ;
+		break ;
+	case ME_MASTERVOL:
+		if (project) {
+			Variable *var=project->FindVariable(VAR_MASTERVOL) ;
+			if (var) var->SetInt((int)edit.value,false) ;
+			MixerService::GetInstance()->SetMasterVolume((int)edit.value) ;
+		}
+		break ;
+	case ME_DLYRET:
+		FxEngine::FxEngine::GetInstance().SetDelayReturn(fxReturnFromPercent((int)edit.value)) ;
+		break ;
+	case ME_RVBRET:
+		FxEngine::FxEngine::GetInstance().SetReverbReturn(fxReturnFromPercent((int)edit.value)) ;
+		break ;
+	case ME_FX:
+		fxSet(edit.channel,edit.value) ;
+		break ;
+	}
+}
+
+void MixerView::GlobalUndo() {
+	if (mixUndoCount_==0) return ;
+	MixEdit e=mixUndo_[0] ;
+	for (int i=0;i<mixUndoCount_-1;i++) {
+		mixUndo_[i]=mixUndo_[i+1] ;
+	}
+	mixUndoCount_-- ;
+	for (int i=MIX_HISTORY_SIZE-1;i>0;i--) {
+		mixRedo_[i]=mixRedo_[i-1] ;
+	}
+	mixRedo_[0]=e ;
+	mixRedoCount_++ ;
+	if (mixRedoCount_>MIX_HISTORY_SIZE) mixRedoCount_=MIX_HISTORY_SIZE ;
+	restoreMixEdit(e) ;
+	isDirty_=true ;
+	((AppWindow &)w_).SetDirty() ;
+}
+
+void MixerView::GlobalRedo() {
+	if (mixRedoCount_==0) return ;
+	MixEdit e=mixRedo_[0] ;
+	for (int i=0;i<mixRedoCount_-1;i++) {
+		mixRedo_[i]=mixRedo_[i+1] ;
+	}
+	mixRedoCount_-- ;
+	for (int i=MIX_HISTORY_SIZE-1;i>0;i--) {
+		mixUndo_[i]=mixUndo_[i-1] ;
+	}
+	mixUndo_[0]=e ;
+	mixUndoCount_++ ;
+	if (mixUndoCount_>MIX_HISTORY_SIZE) mixUndoCount_=MIX_HISTORY_SIZE ;
+	restoreMixEdit(e) ;
+	isDirty_=true ;
+	((AppWindow &)w_).SetDirty() ;
+}
+
+// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): A+B restores the hovered option to
+// its default state.  On the FX pages that is fxResetRow (legacy vdef); on
+// the MIX page the hovered channel resets to volume 127 + pan center, the
+// master bar to volume 100.
+void MixerView::GlobalResetOption() {
+	if (fxPage_!=FX_PAGE_MIX) {
+		fxResetRow() ;
+		return ;
+	}
+	Mixer *mixer=Mixer::GetInstance() ;
+	if (masterSelected_) {
+		Project *project=viewData_->project_ ;
+		if (!project) return ;
+		pushMixUndo(ME_MASTERVOL,-1,(float)project->GetMasterVolume()) ;
+		Variable *var=project->FindVariable(VAR_MASTERVOL) ;
+		if (var) var->SetInt(100,false) ;
+		MixerService::GetInstance()->SetMasterVolume(100) ;
+	} else {
+		int channel=viewData_->mixerCol_ ;
+		pushMixUndo(ME_VOL,channel,(float)mixer->GetChannelVolume(channel)) ;
+		pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel)) ;
+		mixer->SetChannelVolume(channel,127) ;
+		mixer->SetChannelPan(channel,0) ;
+	}
+	isDirty_=true ;
+	((AppWindow &)w_).SetDirty() ;
+}
 
 
 void MixerView::processSelectionButtonMask(unsigned int mask) {
@@ -467,18 +615,20 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// the fill passes 0 dB into the +3 zone (the top cell), exactly the
 	// condition that produces the clipped sound.  The 4-cell pitch separates
 	// the 3-digit volume numbers ("100 100" instead of "100100").
-	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1) + V2:
-	// The channel bar is now TWO independent one-cell bars (L at x, R at
-	// x+2, one-cell gap at x+1) occupying the space of the old single bar
-	// (the 4-cell pitch absorbs the extra column).  The gap makes both bars
-	// visible at all times (adjacent cells merged into one wide bar at pan
-	// center).  Each side shows its own post-pan peak, so the pan is visible
-	// in the bars themselves: center = both equal, hard left = left full /
-	// right empty.  Each side turns red on its own when it passes 0 dB into
-	// the +3 zone.  With the 0..127 volume scale (127 = +2.1 dB) the fill
-	// can push past 0 dB and reach the red zone.
-	drawMeterBar(x,y,height,vuDisplayL_[channel],volume,selected,muted,props,CD_NORMAL) ;
-	drawMeterBar(x+2,y,height,vuDisplayR_[channel],volume,selected,muted,props,CD_NORMAL) ;
+	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1) + TREEFROG_MIXER_HALF_CELL_BARS_V2:
+	// The channel bar is TWO independent bars sharing ONE cell column (8 px):
+	// L at px 0..2, a 2-px dark seam at px 3..4, R at px 5..7.  The old
+	// one-cell gap column (x+1) is gone and the bars are narrower, so they
+	// fit exactly over the previous single column ("quepan sobre su propia
+	// columna anterior").  Each side shows its own post-pan peak, so the pan
+	// is visible in the bars themselves: center = both equal, hard left =
+	// left full / right empty.  Each side turns red on its own when it
+	// passes 0 dB into the +3 zone.  With the 0..127 volume scale (127 =
+	// +2.1 dB) the fill can push past 0 dB and reach the red zone.  Side 0
+	// records L and paints the cell track; side 1 records R at the same x;
+	// the pixels are drawn by PostFlushDraw() after the char flush.
+	drawMeterBar(x,y,height,vuDisplayL_[channel],volume,selected,muted,props,CD_NORMAL,0,meterRecords_[channel]) ;
+	drawMeterBar(x,y,height,vuDisplayR_[channel],volume,selected,muted,props,CD_NORMAL,1,meterRecords_[channel]) ;
 
 	SetColor(selected?CD_HILITE2:(muted?CD_BORDER:CD_NORMAL)) ;
 	props.invert_=selected ;
@@ -541,8 +691,8 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	props.invert_=false ;
 	DrawString(x-1,y,"MST",props) ;
 
-	drawMeterBar(x,y,height,ms->GetMasterPeakL(),volume,masterSelected_,false,props,CD_PLAY) ;
-	drawMeterBar(x+2,y,height,ms->GetMasterPeakR(),volume,masterSelected_,false,props,CD_PLAY) ;
+	drawMeterBar(x,y,height,ms->GetMasterPeakL(),volume,masterSelected_,false,props,CD_PLAY,0,meterRecords_[SONG_CHANNEL_COUNT]) ;
+	drawMeterBar(x,y,height,ms->GetMasterPeakR(),volume,masterSelected_,false,props,CD_PLAY,1,meterRecords_[SONG_CHANNEL_COUNT]) ;
 
 	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
 	props.invert_=masterSelected_ ;
@@ -551,19 +701,33 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	props.invert_=false ;
 }
 
-// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1):
-// Draws ONE side of a meter: a height-cell column at x.  The fill =
-// mixVULevel(peak) * volume/100 * cells on the rebased DAW scale shared by
-// the channels and the master (0 dB row = cell 11 of 12, red +3 zone = the
-// top cell).  Selected bars light purple (master cyan), muted bars dim;
-// each side turns red independently when it passes 0 dB into the +3 zone.
+// TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1):
+// Records ONE side of a meter into the meter record.  Side 0 keeps painting
+// the cell track (so the label column and the char cache stay coherent);
+// side 1 only records.  The pixel-level L/R split (px 0..2 L, px 3..4 seam,
+// px 5..7 R) is drawn by PostFlushDraw() every Flush.
 void MixerView::drawMeterBar(int x,int y,int height,float peak,int volume,
                              bool selected,bool muted,GUITextProperties &props,
-                             ColorDefinition onColor) {
+                             ColorDefinition onColor,int side,MeterRecord &rec) {
+	rec.valid=true ;
+	rec.xCell=x ;
+	rec.yCell=y+1 ;
+	rec.height=height ;
+	rec.selected=selected ;
+	rec.muted=muted ;
+	rec.onColor=onColor ;
 	int totalCells=height ;
 	int filledCells=int(mixVULevel(peak)*float(volume)*0.01f*float(totalCells)) ;
 	if (filledCells>totalCells) filledCells=totalCells ;
 	bool overZero=(filledCells>=totalCells) ;
+	if (side==0) {
+		rec.filledL=filledCells ;
+		rec.overZeroL=overZero ;
+	} else {
+		rec.filledR=filledCells ;
+		rec.overZeroR=overZero ;
+	}
+	if (side!=0) return ;
 	for (int row=0;row<height;row++) {
 		int cellFromBottom=totalCells-row ;
 		bool on=(cellFromBottom<=filledCells) ;
@@ -584,6 +748,57 @@ void MixerView::drawMeterBar(int x,int y,int height,float peak,int volume,
 		}
 		DrawString(x,y+1+row," ",props) ;
 	}
+}
+
+// TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1):
+// Pixel layer of the L/R half-cell bars.  Runs from AppWindow::Flush AFTER
+// the character screen is rendered, so it repaints the bar columns on top
+// every frame: left bar px 0..2, dark seam px 3..4, right bar px 5..7.
+void MixerView::PostFlushDraw() {
+#if defined(PLATFORM_TREEFROG)
+	AppWindow *app=(AppWindow *)&w_ ;
+	uint16_t *fb=TreeFrogGetFramebuffer() ;
+	if (!fb) return ;
+	unsigned short trackC=app->ResolveColor565(CD_HILITE1) ;
+	unsigned short seamC=app->ResolveColor565(CD_BACKGROUND) ;
+	unsigned short borderC=app->ResolveColor565(CD_BORDER) ;
+	for (int m=0;m<=SONG_CHANNEL_COUNT;m++) {
+		MeterRecord &r=meterRecords_[m] ;
+		if (!r.valid) continue ;
+		int px=r.xCell*8 ;
+		int py=r.yCell*8 ;
+		for (int row=0;row<r.height;row++) {
+			int cellFromBottom=r.height-row ;
+			bool on=(cellFromBottom<=r.filledL)||(cellFromBottom<=r.filledR) ;
+			bool overZero=(cellFromBottom<=r.filledL&&r.overZeroL)||
+			              (cellFromBottom<=r.filledR&&r.overZeroR) ;
+			unsigned short fillC ;
+			if (r.selected) {
+				fillC=on?(overZero?app->ResolveColor565(CD_ERROR):
+				              app->ResolveColor565(CD_HILITE2)):
+				              trackC ;
+			} else if (r.muted) {
+				fillC=borderC ;
+			} else {
+				fillC=on?(overZero?app->ResolveColor565(CD_ERROR):
+				              app->ResolveColor565(r.onColor)):
+				              trackC ;
+			}
+			int yBase=(py+row)*TREEFROG_LGPT_WIDTH ;
+			int iBase=yBase+px ;
+			bool fillL=(cellFromBottom<=r.filledL) ;
+			bool fillR=(cellFromBottom<=r.filledR) ;
+			fb[iBase+0]=fillL?fillC:trackC ;
+			fb[iBase+1]=fillL?fillC:trackC ;
+			fb[iBase+2]=fillL?fillC:trackC ;
+			fb[iBase+3]=seamC ;
+			fb[iBase+4]=seamC ;
+			fb[iBase+5]=fillR?fillC:trackC ;
+			fb[iBase+6]=fillR?fillC:trackC ;
+			fb[iBase+7]=fillR?fillC:trackC ;
+		}
+	}
+#endif
 }
 
 // TREEFROG_FX_PAGES_V1 (Fase 4.3) -------------------------------------------
@@ -708,6 +923,8 @@ void MixerView::fxEditRow(int delta,bool coarse) {
 	int targetId=fxIdForRow(fxRow_) ;
 	if (targetId<0) return ;
 	const FxParamSpec &spec=kFxParams_[targetId] ;
+	// TREEFROG_GLOBAL_UNDO_V1: record the old float value for L1+X undo.
+	pushMixUndo(ME_FX,targetId,fxGet(targetId)) ;
 	if (fxUsesCurve(targetId)) {
 		fxEditCurve(targetId,delta,coarse) ;
 		isDirty_=true ;
@@ -731,6 +948,9 @@ void MixerView::fxEditRow(int delta,bool coarse) {
 void MixerView::fxResetRow() {
 	int targetId=fxIdForRow(fxRow_) ;
 	if (targetId<0) return ;
+	// TREEFROG_GLOBAL_UNDO_V1: A+B on the FX pages restores vdef; record the
+	// old value so L1+X brings it back.
+	pushMixUndo(ME_FX,targetId,fxGet(targetId)) ;
 	fxSet(targetId,kFxParams_[targetId].vdef) ;
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;

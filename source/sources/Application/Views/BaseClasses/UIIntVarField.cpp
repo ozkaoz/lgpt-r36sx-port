@@ -31,6 +31,23 @@ UIIntVarField::UIIntVarField(
 	barWidth_=0 ;
 } ;
 
+// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): A+B resets the option to its real
+// default state (Variable::Reset restores the constructor default).
+void UIIntVarField::OnABClick() {
+	src_.Reset() ;
+} ;
+
+// TREEFROG_GLOBAL_UNDO_V1: int value snapshot for the undo history.
+bool UIIntVarField::CaptureIntValue(int &out) {
+	out=src_.GetInt() ;
+	return true ;
+} ;
+
+// TREEFROG_GLOBAL_UNDO_V1: restore an int value snapshot.
+void UIIntVarField::RestoreIntValue(int v) {
+	src_.SetInt(v) ;
+} ;
+
 // TREEFROG_FX_SEND_BAR_V1 (Fase 8): switch this field to percent-bar mode.
 void UIIntVarField::SetBar(const char *label,int width) {
 	barLabel_=label ;

@@ -34,3 +34,11 @@ bool UIField::HasFocus() {
 bool UIField::IsStatic() {
 	return false ;
 } ;
+
+// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): default impls (no int value).
+bool UIField::CaptureIntValue(int &out) {
+	return false ;
+} ;
+
+void UIField::RestoreIntValue(int v) {
+} ;

@@ -22,6 +22,12 @@ public:
 	virtual void Draw(GUIWindow &w,int offset=0) ;
 	virtual void ProcessArrow(unsigned short mask) ;
 	virtual void OnClick() {} ;
+	// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): A+B resets the option to its
+	// default state; Capture/RestoreIntValue drive the global L1+X/R1+X
+	// undo/redo history.
+	virtual void OnABClick() ;
+	virtual bool CaptureIntValue(int &out) ;
+	virtual void RestoreIntValue(int v) ;
   
 	// TREEFROG_FX_SEND_BAR_V1 (PLAN_FX_REDESIGN_ES.md, Fase 8): optional
 	// percent-bar rendering for the EFFECT SENDS rows.  When enabled, Draw()
@@ -41,7 +47,7 @@ protected:
 	int xOffset_ ;
 	int yOffset_ ;
   int displayOffset_;
-	// Fase 8 send-bar members (only active when barLabel_ != 0)
+	// TREEFROG_FX_SEND_BAR_V1 members (only active when barLabel_ != 0)
 	const char *barLabel_ ;
 	int barWidth_ ;
 } ;
