@@ -843,12 +843,6 @@ static int16_t ring[RING_SAMPLES];
 static unsigned rpos = 0, wpos = 0, rfill = 0;
 static void ring_reset(void) { rpos = wpos = rfill = 0; }
 static unsigned ring_push_samples(const int16_t *s, unsigned n) { unsigned pushed = 0; while (pushed < n && rfill < RING_SAMPLES) { ring[wpos] = s[pushed++]; wpos = (wpos + 1) % RING_SAMPLES; rfill++; } return pushed; }
-static unsigned ring_drop_oldest_samples(unsigned n) {
-    unsigned dropped = n < rfill ? n : rfill;
-    rpos = (rpos + dropped) % RING_SAMPLES;
-    rfill -= dropped;
-    return dropped;
-}
 static long rs_fifo_total = 0;
 /* v12.1: discard stale producer data so a freshly opened stream starts with
  * current audio. Without this, the core's project audio accumulated while
@@ -872,83 +866,26 @@ static void flush_input_fifo(int in) {
 static void drain_fifo(int in, long *dropped) { int16_t inbuf[4096]; for (;;) { ssize_t r = read(in, inbuf, sizeof(inbuf)); if (r > 0) { unsigned samples = (unsigned)(r / 2); rs_fifo_total += (long)samples; unsigned pushed = ring_push_samples(inbuf, samples); if (pushed < samples && dropped) *dropped += (long)(samples - pushed); continue; } if (r == 0) break; if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) break; loge("read fifo"); break; } }
 
 /*
- * U2.51.8 ADAPTIVE_RATE_RESAMPLER (polyphase windowed-sinc)
+ * U2.53.0 PASSTHROUGH_REBUILD
  *
- * The libretro/picoarch producer delivers at the panel cadence, which is a
- * few percent slower than the device's 48 kHz adaptive clock, so a fixed
- * ring either starves (cutouts) or overflows (drops) depending on config.
+ * The fifo carries the core's final mix already resampled to 48 kHz stereo
+ * S16LE interleaved (TreeFrogUac2Bridge::SubmitStereo44100 anchors the
+ * 44100->48000 conversion). The SP-404MKII device clock is also 48 kHz, so
+ * the daemon needs no resampling at all: this is a plain ring -> PCM
+ * passthrough.
  *
- * v6 fixes the v5 artifacts that read as "low quality":
- *  - linear interpolation is replaced by a 16-tap Blackman windowed-sinc
- *    with a 256-phase polyphase table, so high-frequency content is neither
- *    dulled nor aliased;
- *  - the rate feedback runs on a 0.5 s EMA of the ring level instead of the
- *    instantaneous level, removing the 0.90-0.99 limit-cycle wobble that
- *    modulated pitch;
- *  - the learned ratio survives ring/PCM resets, so after a capture session
- *    playback resumes at the already-matched rate.
+ * The U2.51.8/U2.52.5 polyphase resampler plus ratio/feed-EMA control was
+ * removed. Its state survived stream resets and, on a ring freeze (mode
+ * switch without USB replug), the "rs_n < RS_TAPS" break left stale out[]
+ * periods that were re-emitted forever at full scale: the permanent
+ * "pitido". A passthrough can only emit what the fifo actually contains and
+ * a frozen fifo degrades to silence, never to stale audio.
  *
- * The ratio is locked to the producer rate by the ring level (target =
- * hardware buffer); the ring then stays near target and neither starves nor
- * trims. A constant PLAYBACK_GAIN keeps headroom so the SP-404MKII's USB
- * input stage (~+9 dB) does not saturate during USB-REC.
+ * PLAYBACK_GAIN keeps constant headroom so the SP-404MKII's USB input stage
+ * (~+9 dB) does not saturate during USB-REC.
  */
-#define RS_TAPS 16
-#define RS_PHASES 256
 #define PLAYBACK_GAIN 0.65f
 #define CAPTURE_GAIN 0.85f
-static float rs_table[RS_PHASES * RS_TAPS];
-static int rs_table_ready = 0;
-static double rs_fc = 0.0;
-static float rs_h[RS_TAPS];
-static float rs_hr[RS_TAPS];
-static int rs_n = 0;
-static unsigned rs_in_ch = 1;
-static long rs_base = 0;
-static double rs_pos = 0.0;
-static double rs_ratio = 1.0;
-static double rs_rfill_ema = 0.0;
-static int rs_ema_init = 0;
-static long rs_write_count = 0;
-/* RC9.8 feed EMA moved to file scope so every stream (re)open can restart
- * it at 1.0. The function-local version survived reconnects and stayed
- * pinned at the 1.08 clamp for ~20 s after a transient feed spike, draining
- * the ring 8% too fast (permanent starvation/buzz, the "pitido"). */
-static double rs_feed_ema = 1.0;
-static int rs_feed_windows_since_open = 0;
-
-static void rs_build_table(double fc) {
-    int p, j;
-    for (p = 0; p < RS_PHASES; ++p) {
-        double f = (double)p / (double)RS_PHASES;
-        for (j = 0; j < RS_TAPS; ++j) {
-            double t = (double)(RS_TAPS / 2 - 1 - j) + f;
-            double arg = M_PI * t * fc;
-            double s = fabs(arg) < 1e-9 ? 1.0 : sin(arg) / arg;
-            double w = 0.42 - 0.5 * cos(2.0 * M_PI * (j + 0.5) /
-                                        (double)RS_TAPS) +
-                       0.08 * cos(4.0 * M_PI * (j + 0.5) /
-                                  (double)RS_TAPS);
-            rs_table[p * RS_TAPS + j] = (float)(s * w);
-        }
-    }
-    rs_table_ready = 1;
-    rs_fc = fc;
-}
-
-static void resampler_reset(void) {
-    rs_n = 0;
-    rs_base = 0;
-    rs_pos = (double)(RS_TAPS / 2);
-    rs_ema_init = 0;
-    rs_in_ch = g_audio_channels;
-    /* RC9.8: every stream restarts from the 1.0 ratio and a clean feed EMA.
-     * A resurrected EMA/ratio from a dead stream re-pinned the ring drain
-     * and reproduced the starvation buzz on the next reconnect. */
-    rs_ratio = 1.0;
-    rs_feed_ema = 1.0;
-    rs_feed_windows_since_open = 0;
-}
 
 static int ring_pop_one_sample(int16_t *s) {
     if (rfill == 0) return -1;
@@ -976,6 +913,83 @@ static void write_wav_header(int fd, uint32_t data_bytes, uint32_t rate, uint16_
     uint16_t block_align = channels * 2; h[32]=block_align&255; h[33]=(block_align>>8)&255; h[34]=16;
     memcpy(h + 36, "data", 4); h[40]=data_bytes&255; h[41]=(data_bytes>>8)&255; h[42]=(data_bytes>>16)&255; h[43]=(data_bytes>>24)&255;
     lseek(fd, 0, SEEK_SET); write(fd, h, 44); lseek(fd, 0, SEEK_END);
+}
+
+/*
+ * U2.53.0 FIFO_DUMP diagnostic: on every primed stream, capture the first
+ * 2 s of RAW fifo content (pre-gain) to
+ * /mnt/sdcard/LGPT_OTG_LOGS/fifo_capture.wav.
+ * This settles whether the permanent full-scale tone is produced by the core
+ * (present in the fifo) or injected by the daemon path (absent from the
+ * fifo). The WAV is plain 48 kHz stereo S16LE.
+ */
+#define FIFO_DUMP_DIR "/mnt/sdcard/LGPT_OTG_LOGS"
+#define FIFO_DUMP_PATH FIFO_DUMP_DIR "/fifo_capture.wav"
+#define FIFO_DUMP_FRAMES 96000
+static int fdump_fd = -1;
+static long fdump_frames_written = 0;
+static long fdump_frames_left = 0;
+static int fdump_peak = 0;
+static int16_t fdump_buf[32768];
+static unsigned fdump_buf_frames = 0;
+
+static void fifo_dump_finish(const char *why);
+
+static void fifo_dump_flush(void) {
+    if (fdump_fd < 0 || fdump_buf_frames == 0) return;
+    (void)write(fdump_fd, fdump_buf,
+                (size_t)fdump_buf_frames * 4);
+    fdump_buf_frames = 0;
+}
+
+static void fifo_dump_finish(const char *why) {
+    if (fdump_fd < 0) return;
+    fifo_dump_flush();
+    uint32_t data_bytes = (uint32_t)fdump_frames_written * 4u;
+    write_wav_header(fdump_fd, data_bytes, 48000, 2);
+    close(fdump_fd);
+    fdump_fd = -1;
+    fprintf(stderr,
+            "FIFO_DUMP_COMPLETE why=%s path=%s frames=%ld bytes=%u peak=%d\n",
+            why, FIFO_DUMP_PATH, fdump_frames_written, data_bytes, fdump_peak);
+}
+
+static void fifo_dump_start(void) {
+    if (fdump_fd >= 0) return;
+    mkdir(FIFO_DUMP_DIR, 0777);
+    unlink(FIFO_DUMP_PATH);
+    fdump_fd = open(FIFO_DUMP_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fdump_fd < 0) {
+        loge("fifo dump open");
+        return;
+    }
+    fdump_frames_written = 0;
+    fdump_frames_left = FIFO_DUMP_FRAMES;
+    fdump_peak = 0;
+    fdump_buf_frames = 0;
+    write_wav_header(fdump_fd, 0, 48000, 2);
+    fprintf(stderr, "FIFO_DUMP_START path=%s frames=%d\n",
+            FIFO_DUMP_PATH, FIFO_DUMP_FRAMES);
+}
+
+static void fifo_dump_write(const int16_t frm[2]) {
+    if (fdump_fd < 0 || fdump_frames_left <= 0) return;
+    int p0 = frm[0] < 0 ? -frm[0] : frm[0];
+    int p1 = frm[1] < 0 ? -frm[1] : frm[1];
+    if (p0 > fdump_peak) fdump_peak = p0;
+    if (p1 > fdump_peak) fdump_peak = p1;
+    if (fdump_buf_frames <
+        (unsigned)(sizeof(fdump_buf) / sizeof(fdump_buf[0]))) {
+        fdump_buf[fdump_buf_frames * 2] = frm[0];
+        fdump_buf[fdump_buf_frames * 2 + 1] = frm[1];
+        ++fdump_buf_frames;
+        ++fdump_frames_written;
+    }
+    --fdump_frames_left;
+    if (fdump_buf_frames >=
+        (unsigned)(sizeof(fdump_buf) / sizeof(fdump_buf[0])))
+        fifo_dump_flush();
+    if (fdump_frames_left <= 0) fifo_dump_finish("complete");
 }
 
 
@@ -2510,7 +2524,6 @@ int main(int argc, char **argv) {
     const int lowlat = path_exists(LOWLAT_SENTINEL);
     const int period_frames = lowlat ? 240 : 480;
     const int periods = lowlat ? 4 : 8;
-    const unsigned producer_burst_frames = 800U;
     const int starvation_grace_ms = 24;
 
     setvbuf(stderr, 0, _IOLBF, 4096);
@@ -2580,6 +2593,7 @@ int main(int argc, char **argv) {
             if (cap.active) stop_capture("daemon-stop");
             if (mon_cap_pcm >= 0) { close(mon_cap_pcm); mon_cap_pcm = -1; }
             if (pcm >= 0) { close(pcm); pcm = -1; }
+            fifo_dump_finish("daemon-stop");
             close(in);
             if (keep >= 0) close(keep);
             mark_inactive();
@@ -2618,7 +2632,6 @@ int main(int argc, char **argv) {
             pcm = -1;
             playback_parked = 1;
             ring_reset();
-            resampler_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             good_write_streak = 0;
@@ -2642,7 +2655,6 @@ int main(int argc, char **argv) {
                         "U2517_PCM_PLAY_FORCE_REOPEN_AFTER_USB_REC_EXIT\n");
             }
             ring_reset();
-            resampler_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             good_write_streak = 0;
@@ -2654,6 +2666,7 @@ int main(int argc, char **argv) {
             if (pcm >= 0) {
                 close(pcm);
                 pcm = -1;
+                fifo_dump_finish("usb-disconnected");
                 fprintf(stderr, "PCM_PLAY_CLOSED_USB_DISCONNECTED\n");
             }
             active_period_frames = period_frames;
@@ -2661,7 +2674,6 @@ int main(int argc, char **argv) {
             write_text_file(PLAYBACK_PCM_STATUS, "waiting-for-usb\n");
             mark_inactive();
             ring_reset();
-            resampler_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             sleep_ms(20);
@@ -2771,13 +2783,6 @@ int main(int argc, char **argv) {
             stream_primed = 0;
             starvation_since_ms = 0;
             ++reconnects;
-            /* RC9.8: anchor the fresh stream at ratio 1.0 and restart the
-             * feed measurement. The first windows after an open measure the
-             * reconnect transient (engine double-cadence burst), not the
-             * producer/device balance. */
-            rs_ratio = 1.0;
-            rs_feed_ema = 1.0;
-            rs_feed_windows_since_open = 0;
             fprintf(stderr,
                     "PCM_PLAY_OPENED reconnects=%ld period_frames=%d channels=%u start_threshold_frames=%d\n",
                     reconnects, active_period_frames, g_audio_channels,
@@ -2795,35 +2800,13 @@ int main(int argc, char **argv) {
         }
 
         const unsigned required_samples =
-            (unsigned)active_period_frames * g_audio_channels;
+            (unsigned)active_period_frames * 2u;
         const unsigned hardware_buffer_samples =
             required_samples * (unsigned)periods;
-        const unsigned producer_burst_samples =
-            producer_burst_frames * g_audio_channels;
         /* Fill exactly the hardware buffer before auto-start. Once ALSA
          * starts, POLLOUT is the consumer clock and the 24 ms grace window
-         * bridges the 16.67 ms libretro producer cadence. An extra producer
-         * burst here only adds latency and is not required for continuity. */
+         * bridges the 16.67 ms libretro producer cadence. */
         const unsigned prime_target = hardware_buffer_samples;
-        const unsigned latency_limit =
-            prime_target + (producer_burst_samples * 3U);
-
-        if (rfill > latency_limit) {
-            unsigned trim = rfill - (prime_target +
-                                     producer_burst_samples);
-            trim -= trim % g_audio_channels;
-            latency_trimmed_samples +=
-                (long)ring_drop_oldest_samples(trim);
-            ++latency_trim_events;
-            if (latency_trim_events <= 4 ||
-                (latency_trim_events % 50) == 0) {
-                fprintf(stderr,
-                        "PLAYBACK_LATENCY_TRIM event=%ld trimmed_samples=%u total_trimmed=%ld ring_fill=%u target=%u limit=%u\n",
-                        latency_trim_events, trim,
-                        latency_trimmed_samples, rfill,
-                        prime_target, latency_limit);
-            }
-        }
 
         if (!stream_primed) {
             if (rfill < prime_target) {
@@ -2833,10 +2816,10 @@ int main(int argc, char **argv) {
             stream_primed = 1;
             starvation_since_ms = 0;
             fprintf(stderr,
-                    "PLAYBACK_CLOCKED_PRIMED ring_fill=%u target=%u hw_buffer_samples=%u producer_burst_samples=%u period_frames=%d channels=%u\n",
+                    "PLAYBACK_CLOCKED_PRIMED ring_fill=%u target=%u hw_buffer_samples=%u period_frames=%d channels=2\n",
                     rfill, prime_target, hardware_buffer_samples,
-                    producer_burst_samples, active_period_frames,
-                    g_audio_channels);
+                    active_period_frames);
+            fifo_dump_start();
         }
 
         int playback_poll_timeout_ms =
@@ -2855,7 +2838,6 @@ int main(int argc, char **argv) {
             close(pcm);
             pcm = -1;
             ring_reset();
-            resampler_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             good_write_streak = 0;
@@ -2872,7 +2854,7 @@ int main(int argc, char **argv) {
         drain_fifo(in, &dropped);
 
         int used_starvation_silence = 0;
-        if (rfill == 0) {
+        if (rfill < required_samples) {
             unsigned long long now_ms = monotonic_milliseconds();
             if (starvation_since_ms == 0)
                 starvation_since_ms = now_ms;
@@ -2884,152 +2866,34 @@ int main(int argc, char **argv) {
             }
             memset(out, 0, required_samples * sizeof(int16_t));
             used_starvation_silence = 1;
-            /* U2.52.5: do not resampler_reset() here. Keeping the polyphase
-             * state (rs_pos / history) makes the stream resume at a
-             * continuous phase; a reset jumped the phase and clicked. */
             ++starvation_events;
             ++starvation_silence_periods;
             starvation_since_ms = 0;
             if (starvation_events <= 4 ||
                 (starvation_events % 100) == 0) {
                 fprintf(stderr,
-                        "PLAYBACK_SOURCE_STARVATION event=%ld ring_fill=%u required=%u grace_ms=%d action=resampler-silence\n",
+                        "PLAYBACK_SOURCE_STARVATION event=%ld ring_fill=%u required=%u grace_ms=%d action=passthrough-silence\n",
                         starvation_events, rfill,
                         required_samples, starvation_grace_ms);
             }
         } else {
-            if (!rs_ema_init) {
-                rs_rfill_ema = (double)rfill;
-                rs_ema_init = 1;
-            }
-            rs_rfill_ema += ((double)rfill - rs_rfill_ema) * 0.005;
-
-            /* Restored control (v9): ring-fill EMA with a slow, deadbanded
-             * integral trim only. The 8s feedforward window (U2.51.9) and the
-             * ratio persistence file are removed so the ratio starts at 1.0
-             * each boot and converges via ring level alone, which is the
-             * behavior of the stable-era driver. The deadband keeps the
-             * ring's burst noise from moving the ratio, preventing the v6
-             * limit cycle between clamps. */
-
-            /* v12 ratio control: the producer is anchored at 1x realtime, so
-             * the ring-balancing ratio equals producer_rate / device_rate.
-             * feed_ratio_ema measures that directly from the playback fifo
-             * (see the BRIDGE_PROGRESS block, refreshed every ~2 s) and is
-             * the baseline; the integral below is only a short-term residual
-             * corrector with a deadband well above the producer burst noise
-             * (8% of target), so it can never re-enter the v11 limit cycle
-             * that wobbled pitch (ratio swinging 0.95..1.05, ring 565..6054,
-             * constant latency trims). Clamp widened to [0.92, 1.08] so a
-             * real clock mismatch is absorbed by the feed instead of pinning
-             * the ratio and trimming audio. */
-            double ring_error =
-                (rs_rfill_ema - (double)prime_target) /
-                (double)prime_target;
-            if (fabs(ring_error) > 0.08) {
-                double adj = ring_error > 0 ? 0.00002 : -0.00002;
-                rs_ratio += adj;
-            }
-            if (rs_ratio < 0.92) rs_ratio = 0.92;
-            if (rs_ratio > 1.08) rs_ratio = 1.08;
-            double fc = 0.45;
-            if (rs_ratio > 1.0) fc = 0.45 / rs_ratio;
-            if (!rs_table_ready || fabs(fc - rs_fc) > 0.005)
-                rs_build_table(fc);
-
             unsigned produced = 0;
-            int hard_starve = 0;
             int16_t frm[2];
             while (produced < required_samples) {
-                while ((int)rs_pos + RS_TAPS / 2 >
-                       rs_base + rs_n - 1) {
-                    if (ring_pop_frame(rs_in_ch, frm) != 0) {
-                        hard_starve = 1;
-                        break;
-                    }
-                    if (rs_n < RS_TAPS) {
-                        rs_h[rs_n] = (float)frm[0];
-                        if (rs_in_ch == 2)
-                            rs_hr[rs_n] = (float)frm[1];
-                        ++rs_n;
-                    } else {
-                        memmove(&rs_h[0], &rs_h[1],
-                                (RS_TAPS - 1) * sizeof(float));
-                        if (rs_in_ch == 2)
-                            memmove(&rs_hr[0], &rs_hr[1],
-                                    (RS_TAPS - 1) * sizeof(float));
-                        rs_h[RS_TAPS - 1] = (float)frm[0];
-                        if (rs_in_ch == 2)
-                            rs_hr[RS_TAPS - 1] = (float)frm[1];
-                        ++rs_base;
-                    }
-                }
-                if (hard_starve) break;
-                if (rs_n < RS_TAPS)
-                    break;
-                double ip = floor(rs_pos);
-                double fr = rs_pos - ip;
-                int pidx = (int)(fr * RS_PHASES);
-                if (pidx >= RS_PHASES) pidx = RS_PHASES - 1;
-                int idx_base = (int)ip - RS_TAPS / 2 - (int)rs_base;
-                if (idx_base < 0) idx_base = 0;
-                if (idx_base > RS_TAPS - 1) idx_base = RS_TAPS - 1;
-                float acc = 0.0f;
-                float accr = 0.0f;
-                int j;
-                if (rs_in_ch == 2) {
-                    for (j = 0; j < RS_TAPS; ++j) {
-                        float w = rs_table[pidx * RS_TAPS + j];
-                        acc += rs_h[idx_base + j] * w;
-                        accr += rs_hr[idx_base + j] * w;
-                    }
-                    float scaled = acc * PLAYBACK_GAIN;
-                    int32_t samp = (int32_t)scaled;
-                    if (samp > 32767) samp = 32767;
-                    if (samp < -32768) samp = -32768;
-                    out[produced++] = (int16_t)samp;
-                    float scaledr = accr * PLAYBACK_GAIN;
-                    int32_t sampr = (int32_t)scaledr;
-                    if (sampr > 32767) sampr = 32767;
-                    if (sampr < -32768) sampr = -32768;
-                    out[produced++] = (int16_t)sampr;
-                } else {
-                    for (j = 0; j < RS_TAPS; ++j)
-                        acc += rs_h[idx_base + j] *
-                               rs_table[pidx * RS_TAPS + j];
-                    float scaled = acc * PLAYBACK_GAIN;
-                    int32_t samp = (int32_t)scaled;
-                    if (samp > 32767) samp = 32767;
-                    if (samp < -32768) samp = -32768;
-                    out[produced++] = (int16_t)samp;
-                }
-                rs_pos += rs_ratio;
+                if (ring_pop_frame(2, frm) != 0) break;
+                out[produced++] = (int16_t)(frm[0] * PLAYBACK_GAIN);
+                out[produced++] = (int16_t)(frm[1] * PLAYBACK_GAIN);
+                fifo_dump_write(frm);
             }
-            if (hard_starve) {
+            if (produced < required_samples) {
                 for (; produced < required_samples; ++produced)
                     out[produced] = 0;
                 used_starvation_silence = 1;
-                /* U2.52.5: keep resampler state for phase continuity (see
-                 * the soft-starvation path above). */
                 ++starvation_events;
                 ++starvation_silence_periods;
                 starvation_since_ms = 0;
-                if (starvation_events <= 4 ||
-                    (starvation_events % 100) == 0) {
-                    fprintf(stderr,
-                            "PLAYBACK_SOURCE_STARVATION event=%ld ring_fill=%u required=%u grace_ms=%d action=resampler-partial\n",
-                            starvation_events, rfill,
-                            required_samples, starvation_grace_ms);
-                }
             } else {
                 starvation_since_ms = 0;
-            }
-            ++rs_write_count;
-            if (rs_write_count == 1 || (rs_write_count % 600) == 0) {
-                fprintf(stderr,
-                        "PLAYBACK_RESAMPLER ratio=%.4f ring_fill=%u target=%u ema=%.0f fc=%.3f gain=%.2f\n",
-                        rs_ratio, rfill, prime_target, rs_rfill_ema,
-                        rs_fc, (double)PLAYBACK_GAIN);
             }
         }
 
@@ -3052,7 +2916,7 @@ int main(int argc, char **argv) {
         convert_s16_to_device(
             out,
             active_period_frames,
-            g_audio_channels,
+            2u,
             devbuf,
             g_dev_play_channels,
             g_dev_play_bytes,
@@ -3079,7 +2943,7 @@ int main(int argc, char **argv) {
                             wr, -wr, strerror(-wr));
                 close(pcm);
                 pcm = -1;
-                resampler_reset();
+                fifo_dump_finish("fatal-close");
                 eio_backoff_sleep();
                 continue;
             }
@@ -3092,7 +2956,7 @@ int main(int argc, char **argv) {
                             reconnects);
                     close(pcm);
                     pcm = -1;
-                    resampler_reset();
+                    fifo_dump_finish("epipe-storm");
                     eio_backoff_sleep();
                     continue;
                 }
@@ -3125,56 +2989,10 @@ int main(int argc, char **argv) {
         if ((period_writes % 200) == 0) {
             long fifo_delta = rs_fifo_total - fifo_samples_last;
             fifo_samples_last = rs_fifo_total;
-            /* RC9.6 feedforward fix: the fifo carries interleaved samples, so
-             * convert the ~2 s delta to FRAMES (divide by the stream channels)
-             * before halving for the per-second rate. The old formula
-             * fifo_rate_per_s = fifo_delta / 2 assumed mono: a stereo producer
-             * (192000 samples per 2 s) computed feed = 96000/48000 = 2.0,
-             * pinned the ratio at the 1.08 clamp, drained the ring 8% too
-             * fast and produced the permanent starvation/buzz. With frames,
-             * mono and stereo both converge to producer_rate / device_rate
-             * (~1.0), so the ring stays balanced, latency trims stay off and
-             * the stream neither cuts nor changes speed. */
-            unsigned feed_ch = g_audio_channels ? g_audio_channels : 1u;
-            long producer_rate_per_s =
-                (fifo_delta / (long)feed_ch) / 2;
-            /* v12 feedforward: producer_rate_per_s / g_audio_rate is exactly
-             * the ring-balancing resampler ratio (producer / device). EMA over
-             * ~4 windows (~8 s) to smooth the fifo burst noise; this replaces
-             * the ring-level integral as the ratio baseline and cannot
-             * limit-cycle. */
-            {
-                double feed =
-                    (double)producer_rate_per_s / (double)g_audio_rate;
-                ++rs_feed_windows_since_open;
-                if (rs_feed_windows_since_open <= 2) {
-                    /* RC9.8: ignore the reconnect-transient windows. The
-                     * burst right after an open (engine double-cadence)
-                     * measured up to ~1.85x and pinned the EMA at the 1.08
-                     * clamp, draining the ring 8% too fast (buzz). */
-                    rs_feed_ema = 1.0;
-                } else if (feed > 1.15 || feed < 0.85) {
-                    /* RC9.8 spike rejection: a one-window transient feed
-                     * must not drag the EMA. The producer is anchored at 1x
-                     * realtime, so a legitimate window is always ~1.0. */
-                } else {
-                    rs_feed_ema += (feed - rs_feed_ema) * 0.25;
-                    if (rs_feed_ema < 0.92) rs_feed_ema = 0.92;
-                    if (rs_feed_ema > 1.08) rs_feed_ema = 1.08;
-                    rs_ratio = rs_feed_ema;
-                }
-                /* RC9.8 starvation override: an empty ring can never refill
-                 * while the drain is faster than the producer (ratio > 1.0).
-                 * Fall back to 1.0 so the ring re-primes from current audio;
-                 * the ring-level integral/trims keep tracking the real
-                 * device clock as before. */
-                if (rfill < required_samples && rs_ratio > 1.0)
-                    rs_ratio = 1.0;
-                fprintf(stderr,
-                        "PLAYBACK_FEEDRATIO producer_rate=%ld feed_ratio=%.4f ratio=%.4f channels=%u windows=%d\n",
-                        producer_rate_per_s, rs_feed_ema, rs_ratio,
-                        feed_ch, rs_feed_windows_since_open);
-            }
+            /* FIFO rate diagnostic: producer frames per second delivered by
+             * the core into the fifo (48000 = realtime; no resampling in the
+             * daemon, so this is the source pace only). */
+            long producer_rate_per_s = (fifo_delta / 2) / 2;
             fprintf(stderr,
                     "BRIDGE_PROGRESS_U2517 frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld starvation_silence=%ld starvation_events=%ld xruns=%ld dropped=%ld ring_fill=%u reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%d channels=%u prepare_failures=%ld latency_trim_events=%ld latency_trimmed_samples=%ld poll_timeouts=%ld short_writes=%ld primed=%d fifo_total=%ld fifo_rate_per_s=%ld\n",
                     total_frames, (double)total_frames / 48000.0,
