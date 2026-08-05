@@ -731,24 +731,14 @@ void MixerView::drawMeterBar(int x,int y,int height,float peak,int volume,
 		rec.overZeroR=overZero ;
 	}
 	if (side!=0) return ;
+	// TREEFROG_MIXER_PIXEL_BARS_V2 (Bacon 1.1.1): the pixel layer
+	// (PostFlushDraw) owns the whole meter column, so the char layer only
+	// blanks the cells.  This kills both artifacts of the mixed rendering:
+	// the old full-width mono bar (the char-layer inverted fill) and the
+	// dim track cells that read as static "--" dashes below the fill.
+	SetColor(CD_BACKGROUND) ;
+	props.invert_=false ;
 	for (int row=0;row<height;row++) {
-		int cellFromBottom=totalCells-row ;
-		bool on=(cellFromBottom<=filledCells) ;
-		if (selected) {
-			SetColor(on?(overZero?CD_ERROR:CD_HILITE2):CD_HILITE1) ;
-			props.invert_=on ;
-		} else if (muted) {
-			SetColor(CD_BORDER) ;
-			props.invert_=false ;
-		} else {
-			if (on) {
-				SetColor(overZero?CD_ERROR:onColor) ;
-				props.invert_=true ;
-			} else {
-				SetColor(CD_HILITE1) ;
-				props.invert_=false ;
-			}
-		}
 		DrawString(x,y+1+row," ",props) ;
 	}
 }
@@ -762,7 +752,6 @@ void MixerView::PostFlushDraw() {
 	AppWindow *app=(AppWindow *)&w_ ;
 	uint16_t *fb=TreeFrogGetFramebuffer() ;
 	if (!fb) return ;
-	unsigned short trackC=app->ResolveColor565(CD_HILITE1) ;
 	unsigned short seamC=app->ResolveColor565(CD_BACKGROUND) ;
 	unsigned short borderC=app->ResolveColor565(CD_BORDER) ;
 	for (int m=0;m<=SONG_CHANNEL_COUNT;m++) {
@@ -772,33 +761,33 @@ void MixerView::PostFlushDraw() {
 		int py=r.yCell*8 ;
 		for (int row=0;row<r.height;row++) {
 			int cellFromBottom=r.height-row ;
-			bool on=(cellFromBottom<=r.filledL)||(cellFromBottom<=r.filledR) ;
 			bool overZero=(cellFromBottom<=r.filledL&&r.overZeroL)||
 			              (cellFromBottom<=r.filledR&&r.overZeroR) ;
 			unsigned short fillC ;
 			if (r.selected) {
-				fillC=on?(overZero?app->ResolveColor565(CD_ERROR):
-				              app->ResolveColor565(CD_HILITE2)):
-				              trackC ;
+				fillC=(overZero?app->ResolveColor565(CD_ERROR):
+				                app->ResolveColor565(CD_HILITE2)) ;
 			} else if (r.muted) {
 				fillC=borderC ;
 			} else {
-				fillC=on?(overZero?app->ResolveColor565(CD_ERROR):
-				              app->ResolveColor565(r.onColor)):
-				              trackC ;
+				fillC=(overZero?app->ResolveColor565(CD_ERROR):
+				                app->ResolveColor565(r.onColor)) ;
 			}
+			// TREEFROG_MIXER_PIXEL_BARS_V2 (Bacon 1.1.1): unfilled rows are
+			// painted with the background so the meter area stays clean
+			// (no static "--" track dashes); the fill alone carries the bar.
 			int yBase=(py+row*8)*TREEFROG_LGPT_WIDTH ;
 			int iBase=yBase+px ;
 			bool fillL=(cellFromBottom<=r.filledL) ;
 			bool fillR=(cellFromBottom<=r.filledR) ;
-			fb[iBase+0]=fillL?fillC:trackC ;
-			fb[iBase+1]=fillL?fillC:trackC ;
-			fb[iBase+2]=fillL?fillC:trackC ;
+			fb[iBase+0]=fillL?fillC:seamC ;
+			fb[iBase+1]=fillL?fillC:seamC ;
+			fb[iBase+2]=fillL?fillC:seamC ;
 			fb[iBase+3]=seamC ;
 			fb[iBase+4]=seamC ;
-			fb[iBase+5]=fillR?fillC:trackC ;
-			fb[iBase+6]=fillR?fillC:trackC ;
-			fb[iBase+7]=fillR?fillC:trackC ;
+			fb[iBase+5]=fillR?fillC:seamC ;
+			fb[iBase+6]=fillR?fillC:seamC ;
+			fb[iBase+7]=fillR?fillC:seamC ;
 		}
 	}
 #endif

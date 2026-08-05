@@ -300,12 +300,20 @@ void View::ProcessButton(unsigned short mask, bool pressed, long eventWhen) {
 		// returning true from GlobalUndo()/GlobalRedo()/GlobalResetOption();
 		// when it returns false the mask reaches ProcessButtonMask so legacy
 		// behaviors (Song A+B clear, Phrase/Table A+B cut, ...) keep working.
+		// TREEFROG_GLOBAL_UNDO_V3 (Bacon 1.1.1): the runtime can keep extra
+		// bits latched into the atomic mask (same note as the Song Y+X
+		// handling), so the combos are matched with a mask instead of exact
+		// equality.  The other shoulder button is still excluded so L+X and
+		// R+X cannot both match when both shoulders are held; any other
+		// latched bit (dpad rocker, ...) no longer kills the combo.
 		if (pressed) {
-			if (mask == (unsigned short)(EPBM_L | EPBM_X)) {
+			if ((mask & (EPBM_L | EPBM_X)) == (EPBM_L | EPBM_X) &&
+			    (mask & EPBM_R) == 0) {
 				if (GlobalUndo()) return;
-			} else if (mask == (unsigned short)(EPBM_R | EPBM_X)) {
+			} else if ((mask & (EPBM_R | EPBM_X)) == (EPBM_R | EPBM_X) &&
+			           (mask & EPBM_L) == 0) {
 				if (GlobalRedo()) return;
-			} else if (mask == (unsigned short)(EPBM_A | EPBM_B)) {
+			} else if ((mask & (EPBM_A | EPBM_B)) == (EPBM_A | EPBM_B)) {
 				if (GlobalResetOption()) return;
 			}
 		}
