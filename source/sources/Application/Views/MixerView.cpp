@@ -467,15 +467,18 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// the fill passes 0 dB into the +3 zone (the top cell), exactly the
 	// condition that produces the clipped sound.  The 4-cell pitch separates
 	// the 3-digit volume numbers ("100 100" instead of "100100").
-	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1):
-	// The channel bar is now TWO independent one-cell bars side by side (L
-	// at x, R at x+1) occupying the same horizontal space the single bar
-	// used (the 4-cell pitch leaves the extra column free).  Each side
-	// shows its own post-pan peak, so the pan is visible in the bars
-	// themselves: center = both equal, hard left = left full / right empty.
-	// Each side turns red on its own when it passes 0 dB into the +3 zone.
+	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1) + V2:
+	// The channel bar is now TWO independent one-cell bars (L at x, R at
+	// x+2, one-cell gap at x+1) occupying the space of the old single bar
+	// (the 4-cell pitch absorbs the extra column).  The gap makes both bars
+	// visible at all times (adjacent cells merged into one wide bar at pan
+	// center).  Each side shows its own post-pan peak, so the pan is visible
+	// in the bars themselves: center = both equal, hard left = left full /
+	// right empty.  Each side turns red on its own when it passes 0 dB into
+	// the +3 zone.  With the 0..127 volume scale (127 = +2.1 dB) the fill
+	// can push past 0 dB and reach the red zone.
 	drawMeterBar(x,y,height,vuDisplayL_[channel],volume,selected,muted,props,CD_NORMAL) ;
-	drawMeterBar(x+1,y,height,vuDisplayR_[channel],volume,selected,muted,props,CD_NORMAL) ;
+	drawMeterBar(x+2,y,height,vuDisplayR_[channel],volume,selected,muted,props,CD_NORMAL) ;
 
 	SetColor(selected?CD_HILITE2:(muted?CD_BORDER:CD_NORMAL)) ;
 	props.invert_=selected ;
@@ -520,13 +523,14 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	// Master bars = mixVULevel(master peak) * masterVolume/100 on the rebased
 	// DAW scale shared with the channel bars and the CUE column.  At master
 	// volume 100 the 0 dB row is the real level of loud output
-	// (MixerService::GetMasterPeak, 0..1 linear); lower volumes scale the
-	// fill so the bar always reads like the loudness you actually hear.
-	// It turns red (CD_ERROR) only when the fill passes 0 dB into the +3
-	// zone (the top cell), i.e. the output really exceeds the 0 dB row.
-	// The peak is measured pre-clip (Bacon 1.1.1: the mix sum can exceed
-	// 0 dB), so the red zone is genuinely reachable.  Two bars are drawn (L
-	// at x, R at x+1) so the stereo balance of the mix is visible live.
+	// (MixerService::GetMasterPeak, true pre-clip mix sum, can exceed 1.0);
+	// lower volumes scale the fill so the bar always reads like the
+	// loudness you actually hear.  It turns red (CD_ERROR) only when the
+	// fill passes 0 dB into the +3 zone (the top cell), i.e. the output
+	// really exceeds the 0 dB row.  The peak is measured pre-clip (Bacon
+	// 1.1.1: the mix sum can exceed 0 dB), so the red zone is genuinely
+	// reachable.  Two bars are drawn (L at x, R at x+2, one-cell gap) so
+	// the stereo balance of the mix is visible live.
 	MixerService *ms=MixerService::GetInstance() ;
 
 	// TREEFROG_MIXER_MASTER_BAR_V1 (H38.7):
@@ -538,7 +542,7 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	DrawString(x-1,y,"MST",props) ;
 
 	drawMeterBar(x,y,height,ms->GetMasterPeakL(),volume,masterSelected_,false,props,CD_PLAY) ;
-	drawMeterBar(x+1,y,height,ms->GetMasterPeakR(),volume,masterSelected_,false,props,CD_PLAY) ;
+	drawMeterBar(x+2,y,height,ms->GetMasterPeakR(),volume,masterSelected_,false,props,CD_PLAY) ;
 
 	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
 	props.invert_=masterSelected_ ;

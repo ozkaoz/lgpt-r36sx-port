@@ -16,8 +16,11 @@ int Mixer::clampChannel(int i) const {
 } ;
 
 int Mixer::clampVolume(int volume) const {
+	// TREEFROG_MIXER_VOLUME_127_V1 (Bacon 1.1.1): the volume scale goes to
+	// 127 so a channel can boost past 100% (gain = volume/100, so 127 =
+	// +2.1 dB) and the bars can genuinely reach the red +3 zone.
 	if (volume<0) return 0 ;
-	if (volume>100) return 100 ;
+	if (volume>127) return 127 ;
 	return volume ;
 } ;
 

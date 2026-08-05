@@ -247,8 +247,10 @@ void PlayerChannel::SetMixBus(int i) {
 } ;
 
 void PlayerChannel::SetVolume(int volume) {
+	// TREEFROG_MIXER_VOLUME_127_V1 (Bacon 1.1.1): 0..127, gain = volume/100,
+	// so 127 gives a +2.1 dB boost over 0 dBFS and the bars reach +3 zone.
 	if (volume<0) volume=0 ;
-	if (volume>100) volume=100 ;
+	if (volume>127) volume=127 ;
 	volume_=volume ;
 } ;
 

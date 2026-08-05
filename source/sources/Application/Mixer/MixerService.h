@@ -56,13 +56,19 @@ public:
     // TREEFROG_VU_METERS_V1:
     // Live per-channel and master levels (0..1) for VU bars in the views.
     float GetChannelPeak(int channel) { return bus_[channel].GetPeakValue(); }
-    float GetMasterPeak() { return out_ ? out_->GetPeakValue() : 0.0f; }
+    // TREEFROG_UNCLIPPED_METER_V2 (Bacon 1.1.1): the master level is read
+    // from master_ (the STREAM_MIX_BUS), NOT from out_.  out_ renders AFTER
+    // master_ clips the sum to 1.0, so its peak could never exceed 0 dB (the
+    // red +3 zone was unreachable no matter how hot the mix).  master_ scans
+    // its own buffer BEFORE its clip stage (damp 1.0), so GetMasterPeak()
+    // returns the true pre-clip sum, which CAN exceed 1.0 / 0 dB.
+    float GetMasterPeak() { return master_.GetPeakValue(); }
     // TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): per-side (L/R) peaks so
     // the MIX page can draw the split bars linked to the pan.
     float GetChannelPeakL(int channel) { return bus_[channel].GetPeakValueL(); }
     float GetChannelPeakR(int channel) { return bus_[channel].GetPeakValueR(); }
-    float GetMasterPeakL() { return out_ ? out_->GetPeakValueL() : 0.0f; }
-    float GetMasterPeakR() { return out_ ? out_->GetPeakValueR() : 0.0f; }
+    float GetMasterPeakL() { return master_.GetPeakValueL(); }
+    float GetMasterPeakR() { return master_.GetPeakValueR(); }
 	
 	virtual void Execute(FourCC id,float value) ;
 
