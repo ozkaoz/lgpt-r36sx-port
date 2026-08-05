@@ -29,7 +29,12 @@ public:
     // reports its own channel level; the AudioOut instance reports the master
     // level, so the Mixer and Record views can draw live VU bars.
     float GetPeakValue() ;
-    void ResetPeak() { peakValue_ = 0.0f; }
+    // TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): per-side smoothed peaks
+    // of the post-volume, PRE-CLIP output (so the MIX page can draw
+    // independent L/R bars that follow the pan and CAN exceed 1.0 / 0 dB).
+    float GetPeakValueL() ;
+    float GetPeakValueR() ;
+    void ResetPeak() { peakValue_ = 0.0f; peakValueL_ = 0.0f; peakValueR_ = 0.0f; }
 	
 private:
   fixed hardClip(fixed sample);
@@ -47,6 +52,8 @@ private:
   float dampCached_;
   bool clipped_;
   float peakValue_;
+  float peakValueL_;
+  float peakValueR_;
   unsigned long lastPeakClock_ ;
 } ;
 #endif

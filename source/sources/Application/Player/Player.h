@@ -91,6 +91,8 @@ public:
 	// TREEFROG_MIXER_PER_CHANNEL_VU_V1 (H38.7):
 	// Live per-channel level (0..1) of the audio the channel is producing now.
 	float GetChannelPeak(int channel) { return mixer_->GetChannelPeak(channel) ; }
+	float GetChannelPeakL(int channel) { return mixer_->GetChannelPeakL(channel) ; }
+	float GetChannelPeakR(int channel) { return mixer_->GetChannelPeakR(channel) ; }
 	
 	// Live queuing
 

@@ -82,16 +82,21 @@ static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
     { "CMP SCL", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_SC (softclip)
 } ;
 
-// TREEFROG_MIXER_VU_DB_SCALE_V2 (H38.6):
-// The bar fill is scaled by BOTH the volume setting and the live output
-// level: fill = (volume/100) * dB-scaled(peak). This keeps the bars honest
-// on hardware where the measured peak itself does not follow the volume:
-// volume 0 -> empty, volume 1 -> near empty, 50 -> half, 100 -> full, while
-// the dB-scaled peak still makes the bar bounce with the music.
+// TREEFROG_MIXER_VU_DB_SCALE_V5 (Bacon 1.1.1):
+// DAW/VU-style rebased scale.  The displayed 0 dB row corresponds to the
+// typical loud output at volume 100 (measured ~-12 dBFS real peaks for loud
+// material on the normalized 0..1 peaks), so at volume 100 the bar genuinely
+// reaches the 0 dB row and strong material pushes into the red +3 dB zone
+// above it -- 0 dB is reachable, red means over 0 dB.  Displayed dB = real
+// dB + 12 on a -36..+3 span (39 dB): level = (db+36)/39 maps 0 dB to cell
+// 11 of 12 and +3 dB to the top cell, which is exactly where the fill turns
+// red (filledCells >= totalCells).  The V3 -50..0 scale was honest but made
+// red unreachable: loud material read 9/12 cells at volume 100 and the +3
+// zone did not exist.
 static float mixVULevel(float peak) {
 	if (peak <= 0.0f) return 0.0f ;
-	float db = 20.0f * log10f(peak) ;
-	float level = (db + 50.0f) / 50.0f ;
+	float db = 20.0f * log10f(peak) + 12.0f ;
+	float level = (db + 36.0f) / 39.0f ;
 	if (level < 0.0f) level = 0.0f ;
 	if (level > 1.0f) level = 1.0f ;
 	return level ;
@@ -132,6 +137,8 @@ MixerView::MixerView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
 	fxEditTarget_=0 ;
 	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 		vuDisplay_[i]=0.0f ;
+		vuDisplayL_[i]=0.0f ;
+		vuDisplayR_[i]=0.0f ;
 	}
 }
 
@@ -307,6 +314,26 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 		return ;
 	}
 
+	// TREEFROG_MIXER_PAN_V1 (Bacon 1.1.1):
+	// L2+LEFT/RIGHT pans the selected channel (L2+A adds the A coarse-step
+	// convention, so L2+A+LEFT/RIGHT moves by 10).  The master bar has no
+	// pan; L2 alone does nothing.
+	if (mask&EPBM_L2) {
+		if (masterSelected_) return ;
+		int step=(mask&EPBM_A)?10:1 ;
+		if (mask&EPBM_LEFT) {
+			Mixer::GetInstance()->NudgeChannelPan(viewData_->mixerCol_,-step) ;
+			isDirty_=true ;
+			return ;
+		}
+		if (mask&EPBM_RIGHT) {
+			Mixer::GetInstance()->NudgeChannelPan(viewData_->mixerCol_,step) ;
+			isDirty_=true ;
+			return ;
+		}
+		return ;
+	}
+
 	// Parameter pages (DELAY/REVERB/EQ/COMP): UP/DOWN row, LEFT/RIGHT edit.
 	if (fxPage_!=FX_PAGE_MIX) {
 		// TREEFROG_FX_NAV_A_B_DEFAULT_V1: A+B restores the hovered row to its
@@ -403,7 +430,6 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// TREEFROG_MIXER_VU_SMOOTH_V1 (H38.7): the drawn level is the per-frame
 	// smoothed display value (instant attack, smooth release), never the raw
 	// audio peak, so the bar cannot jump full->empty in one frame.
-	float peak=vuDisplay_[channel] ;
 	bool selected=(!masterSelected_ && channel==viewData_->mixerCol_) ;
 	bool muted=player->IsChannelMuted(channel) ;
 	GUITextProperties props ;
@@ -433,35 +459,23 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// numeric value below. Selected bars stay purple, muted bars dim.  RC5:
 	// each row is a single cell (one-column meter) so the 9 meters of the
 	// MIX page fit the centered bank; totalCells == height.
-	int totalCells=height ;
-	int filledCells=int(mixVULevel(peak)*float(volume)*0.01f*float(totalCells)) ;
-	if (filledCells>totalCells) filledCells=totalCells ;
-	int volMarker=(volume*totalCells+99)/100 ;
-	if (volMarker>totalCells) volMarker=totalCells ;
-	for (int row=0;row<height;row++) {
-		int cellFromBottom=totalCells-row ;
-		bool on=(cellFromBottom<=filledCells) ;
-		bool marker=((!on)&&(cellFromBottom==volMarker)) ;
-		if (selected) {
-			SetColor(on?CD_HILITE2:CD_HILITE1) ;
-			props.invert_=on ;
-		} else if (muted) {
-			SetColor(CD_BORDER) ;
-			props.invert_=false ;
-		} else {
-			if (on) {
-				SetColor(CD_NORMAL) ;
-				props.invert_=true ;
-			} else if (marker) {
-				SetColor(CD_HILITE2) ;
-				props.invert_=true ;
-			} else {
-				SetColor(CD_HILITE1) ;
-				props.invert_=false ;
-			}
-		}
-		DrawString(x,y+1+row," ",props) ;
-	}
+	// TREEFROG_MIXER_ZERO_DB_CLIP_V5 (Bacon 1.1.1):
+	// The bar fill = mixVULevel(peak) * volume/100 * cells on the rebased
+	// DAW scale shared with the master bar and the CUE column.  At volume
+	// 100 the 0 dB row (cell 11 of 12) is the real level of loud material,
+	// so it is genuinely reachable; the bar turns red (CD_ERROR) only when
+	// the fill passes 0 dB into the +3 zone (the top cell), exactly the
+	// condition that produces the clipped sound.  The 4-cell pitch separates
+	// the 3-digit volume numbers ("100 100" instead of "100100").
+	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1):
+	// The channel bar is now TWO independent one-cell bars side by side (L
+	// at x, R at x+1) occupying the same horizontal space the single bar
+	// used (the 4-cell pitch leaves the extra column free).  Each side
+	// shows its own post-pan peak, so the pan is visible in the bars
+	// themselves: center = both equal, hard left = left full / right empty.
+	// Each side turns red on its own when it passes 0 dB into the +3 zone.
+	drawMeterBar(x,y,height,vuDisplayL_[channel],volume,selected,muted,props,CD_NORMAL) ;
+	drawMeterBar(x+1,y,height,vuDisplayR_[channel],volume,selected,muted,props,CD_NORMAL) ;
 
 	SetColor(selected?CD_HILITE2:(muted?CD_BORDER:CD_NORMAL)) ;
 	props.invert_=selected ;
@@ -469,32 +483,51 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	DrawString(x-1,y+height+2,buffer,props) ;
 	props.invert_=false ;
 
+	// TREEFROG_MIXER_PAN_V1 (Bacon 1.1.1):
+	// The row under the volume numbers shows the stereo pan of every
+	// channel: "L/R" + the hard-side value (0..100), "C" for center, drawn
+	// under the number column (4 cells, so hard pans read "L100"/"R100"
+	// without touching the neighbour).  A muted channel shows its "M"
+	// marker instead -- its pan is inaudible anyway.  Center pans sit at
+	// the same digit column as the L/R values (right-aligned value).
+	int pan=mixer->GetChannelPan(channel) ;
 	if (muted) {
 		SetColor(CD_HILITE2) ;
 		DrawString(x,y+height+3,"M",props) ;
+	} else {
+		SetColor(selected?CD_HILITE2:CD_NORMAL) ;
+		props.invert_=selected ;
+		if (pan==0) {
+			DrawString(x-1,y+height+3,"  C",props) ;
+		} else if (pan<0) {
+			sprintf(buffer,"L%3d",-pan) ;
+			DrawString(x-1,y+height+3,buffer,props) ;
+		} else {
+			sprintf(buffer,"R%3d",pan) ;
+			DrawString(x-1,y+height+3,buffer,props) ;
+		}
+		props.invert_=false ;
 	}
 }
 
 void MixerView::drawMasterBar(int x,int y,int height) {
 	Project *project=viewData_->project_ ;
 	int volume=project?project->GetMasterVolume():100 ;
-	Mixer *mixer=Mixer::GetInstance() ;
 	GUITextProperties props ;
 	char buffer[8] ;
 
-	// TREEFROG_MIXER_MASTER_SUM_V3 (H38.7):
-	// The master bar is the DYNAMIC SUM of the per-channel DISPLAY levels,
-	// i.e. exactly the same dB-scaled level each channel bar shows
-	// (mixVULevel(display) * volume/100). This keeps the master consistent
-	// with the channel bars and adds headroom so a single quiet element reads
-	// near-empty instead of pinning the meter to 100% (half the sum scale is
-	// reserved, so two full-loudness channels reach full scale).
-	float sum=0.0f ;
-	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
-		sum += mixVULevel(vuDisplay_[i]) * (float)mixer->GetChannelVolume(i) * 0.01f ;
-	}
-	float masterLevel=sum*0.5f ;
-	if (masterLevel>1.0f) masterLevel=1.0f ;
+	// TREEFROG_MIXER_MASTER_VU_V5 (Bacon 1.1.1) + TREEFROG_MIXER_STEREO_METERS_V1:
+	// Master bars = mixVULevel(master peak) * masterVolume/100 on the rebased
+	// DAW scale shared with the channel bars and the CUE column.  At master
+	// volume 100 the 0 dB row is the real level of loud output
+	// (MixerService::GetMasterPeak, 0..1 linear); lower volumes scale the
+	// fill so the bar always reads like the loudness you actually hear.
+	// It turns red (CD_ERROR) only when the fill passes 0 dB into the +3
+	// zone (the top cell), i.e. the output really exceeds the 0 dB row.
+	// The peak is measured pre-clip (Bacon 1.1.1: the mix sum can exceed
+	// 0 dB), so the red zone is genuinely reachable.  Two bars are drawn (L
+	// at x, R at x+1) so the stereo balance of the mix is visible live.
+	MixerService *ms=MixerService::GetInstance() ;
 
 	// TREEFROG_MIXER_MASTER_BAR_V1 (H38.7):
 	// Master (MST) bar drawn live on the left of the channel bars, in cyan so
@@ -504,24 +537,41 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	props.invert_=false ;
 	DrawString(x-1,y,"MST",props) ;
 
+	drawMeterBar(x,y,height,ms->GetMasterPeakL(),volume,masterSelected_,false,props,CD_PLAY) ;
+	drawMeterBar(x+1,y,height,ms->GetMasterPeakR(),volume,masterSelected_,false,props,CD_PLAY) ;
+
+	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
+	props.invert_=masterSelected_ ;
+	sprintf(buffer,"%3d",volume) ;
+	DrawString(x-1,y+height+2,buffer,props) ;
+	props.invert_=false ;
+}
+
+// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1):
+// Draws ONE side of a meter: a height-cell column at x.  The fill =
+// mixVULevel(peak) * volume/100 * cells on the rebased DAW scale shared by
+// the channels and the master (0 dB row = cell 11 of 12, red +3 zone = the
+// top cell).  Selected bars light purple (master cyan), muted bars dim;
+// each side turns red independently when it passes 0 dB into the +3 zone.
+void MixerView::drawMeterBar(int x,int y,int height,float peak,int volume,
+                             bool selected,bool muted,GUITextProperties &props,
+                             ColorDefinition onColor) {
 	int totalCells=height ;
-	int filledCells=int(masterLevel*float(volume)*0.01f*float(totalCells)) ;
+	int filledCells=int(mixVULevel(peak)*float(volume)*0.01f*float(totalCells)) ;
 	if (filledCells>totalCells) filledCells=totalCells ;
-	int volMarker=(volume*totalCells+99)/100 ;
-	if (volMarker>totalCells) volMarker=totalCells ;
+	bool overZero=(filledCells>=totalCells) ;
 	for (int row=0;row<height;row++) {
 		int cellFromBottom=totalCells-row ;
 		bool on=(cellFromBottom<=filledCells) ;
-		bool marker=((!on)&&(cellFromBottom==volMarker)) ;
-		if (masterSelected_) {
-			SetColor(on?CD_HILITE2:CD_HILITE1) ;
+		if (selected) {
+			SetColor(on?(overZero?CD_ERROR:CD_HILITE2):CD_HILITE1) ;
 			props.invert_=on ;
+		} else if (muted) {
+			SetColor(CD_BORDER) ;
+			props.invert_=false ;
 		} else {
 			if (on) {
-				SetColor(CD_PLAY) ;
-				props.invert_=true ;
-			} else if (marker) {
-				SetColor(CD_HILITE2) ;
+				SetColor(overZero?CD_ERROR:onColor) ;
 				props.invert_=true ;
 			} else {
 				SetColor(CD_HILITE1) ;
@@ -530,12 +580,6 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 		}
 		DrawString(x,y+1+row," ",props) ;
 	}
-
-	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
-	props.invert_=masterSelected_ ;
-	sprintf(buffer,"%3d",volume) ;
-	DrawString(x-1,y+height+2,buffer,props) ;
-	props.invert_=false ;
 }
 
 // TREEFROG_FX_PAGES_V1 (Fase 4.3) -------------------------------------------
@@ -1077,18 +1121,21 @@ void MixerView::drawMixReturns(int y) {
 	int rvb=fxReturnPercent(fx.GetReverbReturn()) ;
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
-	DrawString(0,y,"RET",props) ;
+	// TREEFROG_FX_PAGES_V4 (Bacon 1.1.1): the return readout is centered
+	// under the meter bank: "RET D:xxx R:xxx FX RETURNS" (26 chars) starts at
+	// column 7, leaving a 7-cell margin on both sides.
+	DrawString(7,y,"RET",props) ;
 	SetColor((fxEditTarget_==1)?CD_HILITE2:CD_NORMAL) ;
 	props.invert_=(fxEditTarget_==1) ;
 	sprintf(buffer,"D:%3d",dly) ;
-	DrawString(4,y,buffer,props) ;
+	DrawString(11,y,buffer,props) ;
 	SetColor((fxEditTarget_==2)?CD_HILITE2:CD_NORMAL) ;
 	props.invert_=(fxEditTarget_==2) ;
 	sprintf(buffer,"R:%3d",rvb) ;
-	DrawString(11,y,buffer,props) ;
+	DrawString(17,y,buffer,props) ;
 	props.invert_=false ;
 	SetColor(CD_NORMAL) ;
-	DrawString(18,y,"FX RETURNS",props) ;
+	DrawString(23,y,"FX RETURNS",props) ;
 }
 
 void MixerView::drawFxPages() {
@@ -1096,28 +1143,50 @@ void MixerView::drawFxPages() {
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
 	if (fxPage_==FX_PAGE_MIX) {
-		// RC6 (compact single-cell meters): the MIX page lays out 9 meters
-		// (MST + 8 channels) of one cell each, uniformly spaced every 3
-		// columns across the full 40-cell width.  The bank is exactly
-		// bankWidth=(9-1)*3+1=25 cells, so firstMeterX=(40-25)/2=7 leaves a
-		// 7-cell left and an 8-cell right margin (odd-bank tolerance).  The
-		// whole block (labels, bars, volume numbers, mute markers and the
-		// FX RETURNS line) is centered vertically in the safe band 3..25.
-		const int meterCount=SONG_CHANNEL_COUNT+1 ;
-		const int meterWidth=1 ;
-		const int meterPitch=3 ;
-		const int bankWidth=(meterCount-1)*meterPitch+meterWidth ;
-		const int firstMeterX=(UiDraw::kScreenWidth-bankWidth)/2 ;
+		// RC6 (compact single-cell meters) + TREEFROG_MIXER_ZERO_DB_CLIP_V5
+		// (Bacon 1.1.1): the MIX page lays out 10 columns: the static CUE
+		// scale (+3/0/-6/-12/-24/-36 dB, compact, right-aligned to the
+		// master), the MST live bar, the 8 channel bars one cell each 4
+		// columns apart, and the CH/VL labels right of the last channel.
+		// The 4-cell pitch gives the 3-digit volume numbers and the pan
+		// readouts one cell of separation (the V4.1 3-cell pitch printed
+		// "100100100100").  The bank spans the CUE scale at x=0..1 .. the
+		// CH label at x=38..39.  The whole block (labels, bars, volume
+		// numbers, pan/mute markers and the centered FX RETURNS line) stays
+		// in the safe band 3..25 of the 40x30 screen.
+		const int masterX=4 ;
+		const int channel0X=8 ;
+		const int channelPitch=4 ;
+		const int chLabelX=38 ;
 		const int labelY=6 ;
 		const int barHeight=12 ;
 		const int numY=labelY+barHeight+2 ;
-		const int muteY=numY+1 ;
-		const int retY=muteY+1 ;
-		DrawString(0,labelY,"CH",props) ;
-		DrawString(0,numY,"VL",props) ;
-		drawMasterBar(firstMeterX,labelY,barHeight) ;
+		const int retY=numY+2 ;
+		DrawString(chLabelX,labelY,"CH",props) ;
+		DrawString(chLabelX,numY,"VL",props) ;
+		// TREEFROG_MIXER_ZERO_DB_CLIP_V5 (Bacon 1.1.1):
+		// Static CUE scale drawn to the LEFT of the master, right-aligned to
+		// the master column so the marks sit as close to the bars as possible
+		// (compact 2-3 cell labels).  The labels mark the +3, 0, -6, -12, -24
+		// and -36 dB rows of the 12-cell bar using the same mixVULevel mapping
+		// the master and channel bars use, so the 0 dB row is exactly the row
+		// where the fills sit at volume 100 and the +3 row (red) is the cell
+		// where they turn red.  The scale never moves with the volume; the
+		// bars move against this fixed reference.
+		SetColor(CD_NORMAL) ;
+		DrawString(masterX-3,labelY,"C",props) ;
+		SetColor(CD_ERROR) ;
+		DrawString(masterX-3,labelY+1+0,"+3",props) ;
+		SetColor(CD_HILITE2) ;
+		DrawString(masterX-3,labelY+1+1,"0",props) ;
+		SetColor(CD_HILITE1) ;
+		DrawString(masterX-3,labelY+1+3,"-6",props) ;
+		DrawString(masterX-4,labelY+1+5,"-12",props) ;
+		DrawString(masterX-4,labelY+1+8,"-24",props) ;
+		DrawString(masterX-4,labelY+1+12,"-36",props) ;
+		drawMasterBar(masterX,labelY,barHeight) ;
 		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
-			drawVolumeBar(i,firstMeterX+(i+1)*meterPitch,labelY,barHeight) ;
+			drawVolumeBar(i,channel0X+i*channelPitch,labelY,barHeight) ;
 		}
 		drawMixReturns(retY) ;
 	} else {
@@ -1219,12 +1288,21 @@ void MixerView::OnFrameUpdate(unsigned long frameClock) {
 	{
 		Player *player=Player::GetInstance() ;
 		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
-			float measured=player->GetChannelPeak(i) ;
-			if (measured>vuDisplay_[i]) {
-				vuDisplay_[i]=measured ;
+			// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): each side of a
+			// channel is smoothed independently from its own post-pan peak.
+			float measuredL=player->GetChannelPeakL(i) ;
+			if (measuredL>vuDisplayL_[i]) {
+				vuDisplayL_[i]=measuredL ;
 			} else {
-				vuDisplay_[i]*=0.6f ;
-				if (vuDisplay_[i]<0.001f) vuDisplay_[i]=0.0f ;
+				vuDisplayL_[i]*=0.6f ;
+				if (vuDisplayL_[i]<0.001f) vuDisplayL_[i]=0.0f ;
+			}
+			float measuredR=player->GetChannelPeakR(i) ;
+			if (measuredR>vuDisplayR_[i]) {
+				vuDisplayR_[i]=measuredR ;
+			} else {
+				vuDisplayR_[i]*=0.6f ;
+				if (vuDisplayR_[i]<0.001f) vuDisplayR_[i]=0.0f ;
 			}
 		}
 	}
@@ -1233,6 +1311,11 @@ void MixerView::OnFrameUpdate(unsigned long frameClock) {
 	// Frame updates are independent of Player transport (same as the USB-C
 	// record meter): request a redraw every frame so the VU bars track the
 	// channel activity in real time, including quick mute/stop decay.
+	// TREEFROG_MIXER_ZERO_DB_CLIP_V4 (Bacon 1.1.1):
+	// No clip latch here: the bars compute their over-0 dB state directly
+	// from the displayed level (filledCells vs the 0 dB row) every frame,
+	// which tracks the real clipping of the output path even when the core's
+	// internal hard-clip flag (Player::Clipped) is never raised.
 	++frameRefreshDivider_ ;
 	if (frameRefreshDivider_ >= 1) {
 		frameRefreshDivider_ = 0 ;

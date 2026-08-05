@@ -105,6 +105,13 @@ protected:
 	void switchSoloMode() ;
 	void drawVolumeBar(int channel,int x,int y,int height) ;
 	void drawMasterBar(int x,int y,int height) ;
+	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): draws ONE side of a
+	// meter (a height-cell column at x).  drawVolumeBar/drawMasterBar call it
+	// twice (L at x, R at x+1) so each channel/master shows two independent
+	// bars that follow the pan.
+	void drawMeterBar(int x,int y,int height,float peak,int volume,
+	                  bool selected,bool muted,GUITextProperties &props,
+	                  ColorDefinition onColor) ;
 	void showInstrumentFxMenu() ;
 
 	// TREEFROG_FX_PAGES_V1 (Fase 4.3)
@@ -178,6 +185,10 @@ private:
 	// with a smooth per-frame exponential release, so the bars never jump
 	// from full to empty in a single frame (which looked like screen flicker).
 	float vuDisplay_[SONG_CHANNEL_COUNT] ;
+	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): per-side display levels
+	// (L/R), smoothed the same way as vuDisplay_.
+	float vuDisplayL_[SONG_CHANNEL_COUNT] ;
+	float vuDisplayR_[SONG_CHANNEL_COUNT] ;
 	// TREEFROG_FX_PAGES_V1 (Fase 4.3)
 	int fxPage_ ;                 // current FxPage
 	int fxRow_ ;                  // row cursor within the current page

@@ -114,13 +114,80 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
              }
          }
 
+         // TREEFROG_UNCLIPPED_METER_V1 (Bacon 1.1.1):
+         // The master-volume damp is applied here, BEFORE metering and
+         // clipping.  The old order (damp inside the clip loop) made the
+         // meters read the post-clip level, so the master bar could never
+         // exceed 1.0 (0 dB) no matter how hot the mix sum was.  Damp first,
+         // then measure the TRUE pre-clip level (which CAN exceed 0 dB), then
+         // clamp for the int16 output (the driver conversion wraps above 1.0,
+         // so the clip itself must stay).
+         if (damp != 1.0f) {
+             for (int i = 0; i < samplecount * 2; i++) {
+                 fixed v = fl2fp(damp * fp2fl(*c));
+                 *c++ = v;
+             }
+         }
+
+         // TREEFROG_VU_METERS_V1 + TREEFROG_MIXER_STEREO_METERS_V1:
+         // Track the smoothed peak of the output (audible level).  Fast
+         // attack, slow decay, so the mixer bars bounce with the music.
+         // The scan runs in short sub-blocks with a decay between them, so
+         // the meters dip between closely-spaced notes (hi-hats) instead of
+         // staying pinned at the held peak of the whole buffer.  Measured on
+         // the post-damp, PRE-CLIP buffer and split per side (even samples =
+         // L, odd = R in the interleaved buffer), so each bar reflects the
+         // true level of its side -- including mix sums above 0 dB.
+         {
+             const int block = 128 ; // stereo samples
+             for (int off = 0; off < samplecount * 2; off += block) {
+                 int n = samplecount * 2 - off ;
+                 if (n > block) n = block ;
+                 float peakL = 0.0f ;
+                 float peakR = 0.0f ;
+                 if (gotData) {
+                     // H38.7 OPT_PERF: sample every 4th sample for the peak (see
+                     // PlayerChannel::Render for rationale).
+                     fixed *c = buffer + off ;
+                     for (int i = 0; i < n; i += 4) {
+                         // TREEFROG_VU_METERS_V7 (H38.7-r4): with FIXED_SHIFT=15
+                         // a sample is the raw int16 amplitude (0..32767), not the
+                         // documented 0..1. Normalize so the peak is a true linear
+                         // 0..1 level; without this the dB mapping reads +50..+90
+                         // dB for any audible sound at any volume and the bar
+                         // pins full/red even at channel volume 1.
+                         float v = fp2fl(*c) * (1.0f / 32767.0f) ;
+                         if (v < 0.0f) v = -v ;
+                         if ((i & 1) == 0) { if (v > peakL) peakL = v ; }
+                         else { if (v > peakR) peakR = v ; }
+                         c += 4 ;
+                     }
+                 }
+                 if (peakL > peakValueL_) {
+                     peakValueL_ = peakL;
+                 } else {
+                     // Fast release so the master bar empties in a few ms of
+                     // quiet, giving a live-meter feel even for dense patterns.
+                     peakValueL_ *= 0.5f;
+                     if (peakValueL_ < 0.002f) peakValueL_ = 0.0f;
+                 }
+                 if (peakR > peakValueR_) {
+                     peakValueR_ = peakR;
+                 } else {
+                     peakValueR_ *= 0.5f;
+                     if (peakValueR_ < 0.002f) peakValueR_ = 0.0f;
+                 }
+             }
+             lastPeakClock_ = System::GetInstance()->GetClock() ;
+         }
+
          // Apply soft/hard clipping before recording.
-         // H38.7 OPT_PERF: when the softclipper is bypassed and the volume is
-         // 100 (damp == 1.0) the per-sample path was a no-op that still round
-         // tripped every sample through float. Skip the float conversion and
-         // keep only the cheap fixed-point hard clip.
+         // H38.7 OPT_PERF: when the softclipper is bypassed the per-sample
+         // path is a pure fixed-point hard clip; when active, soft then hard.
+         // The damp has already been applied above, so the clip loop is
+         // float-free.
          c = buffer;
-         if (softclip_ == -1 && damp == 1.0f) {
+         if (softclip_ == -1) {
              for (int i = 0; i < samplecount * 2; i++) {
                  fixed sample = *c;
                  *c++ = hardClip(sample);
@@ -128,8 +195,7 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
          } else {
              for (int i = 0; i < samplecount * 2; i++) {
                  fixed sample = *c;
-                 sample = fl2fp(damp * fp2fl(hardClip(softClip(sample))));
-                 *c++ = sample;
+                 *c++ = hardClip(softClip(sample));
              }
          }
      }
@@ -139,42 +205,6 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
 		} ;
 		writer_->AddBuffer(buffer,samplecount) ;
 	}
-
-     // TREEFROG_VU_METERS_V1:
-     // Track the smoothed peak of the post-volume output (audible level).
-     // Fast attack, slow decay, so the mixer bars bounce with the music.
-     {
-         // TREEFROG_VU_METERS_V6 (H38.7): scan the mixed buffer in short
-         // sub-blocks and decay between them, so the master meter dips between
-         // closely-spaced notes (hi-hats) instead of staying pinned at the
-         // held peak of the whole buffer.
-         const int block = 128 ; // stereo samples
-         for (int off = 0; off < samplecount * 2; off += block) {
-             int n = samplecount * 2 - off ;
-             if (n > block) n = block ;
-             float peak = 0.0f ;
-             if (gotData) {
-                 // H38.7 OPT_PERF: sample every 4th sample for the peak (see
-                 // PlayerChannel::Render for rationale).
-                 fixed *c = buffer + off ;
-                 for (int i = 0; i < n; i += 4) {
-                     float v = fp2fl(*c) ;
-                     if (v < 0.0f) v = -v ;
-                     if (v > peak) peak = v ;
-                     c += 4 ;
-                 }
-             }
-             if (peak > peakValue_) {
-                 peakValue_ = peak;
-             } else {
-                 // Fast release so the master bar empties in a few ms of
-                 // quiet, giving a live-meter feel even for dense patterns.
-                 peakValue_ *= 0.5f;
-                 if (peakValue_ < 0.002f) peakValue_ = 0.0f;
-             }
-         }
-         lastPeakClock_ = System::GetInstance()->GetClock() ;
-     }
 
      SAFE_FREE(mixBuffer) ;
      return gotData ;
@@ -202,6 +232,31 @@ float AudioMixer::GetPeakValue() {
         lastPeakClock_ = now ;
     }
     return peakValue_ ;
+}
+
+// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): per-side variants of
+// GetPeakValue() with the same idle decay (see GetPeakValue for the
+// rationale).
+float AudioMixer::GetPeakValueL() {
+    unsigned long now = System::GetInstance()->GetClock() ;
+    unsigned long elapsed = (lastPeakClock_ == 0) ? 0 : (now - lastPeakClock_) ;
+    if (elapsed > 100) {
+        peakValueL_ *= powf(0.5f, (float)elapsed / 16.6f) ;
+        if (peakValueL_ < 0.002f) peakValueL_ = 0.0f ;
+        lastPeakClock_ = now ;
+    }
+    return peakValueL_ ;
+}
+
+float AudioMixer::GetPeakValueR() {
+    unsigned long now = System::GetInstance()->GetClock() ;
+    unsigned long elapsed = (lastPeakClock_ == 0) ? 0 : (now - lastPeakClock_) ;
+    if (elapsed > 100) {
+        peakValueR_ *= powf(0.5f, (float)elapsed / 16.6f) ;
+        if (peakValueR_ < 0.002f) peakValueR_ = 0.0f ;
+        lastPeakClock_ = now ;
+    }
+    return peakValueR_ ;
 }
 
 void AudioMixer::SetVolume(fixed volume) { volume_ = volume; }

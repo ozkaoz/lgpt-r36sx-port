@@ -108,6 +108,7 @@ void PlayerMixer::Update(Observable &o,I_ObservableData *d) {
   for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
     channel_[i]->SetMixBus(mixer->GetBus(i));
     channel_[i]->SetVolume(mixer->GetChannelVolume(i));
+    channel_[i]->SetPan(mixer->GetChannelPan(i));
   }
   MixerService *ms=MixerService::GetInstance();
   ms->SetPregain(project_->GetPregain());

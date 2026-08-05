@@ -13,9 +13,12 @@ PlayerChannel::PlayerChannel(int index) {
     instr_=0 ;
     muted_=false ;
 	volume_=100 ;
+	pan_=0 ;
 	mixBus_=0 ;
 	busIndex_=-1 ;
 	peakValue_ = 0.0f ;
+	peakValueL_ = 0.0f ;
+	peakValueR_ = 0.0f ;
 	lastPeakClock_ = 0 ;
 }
 
@@ -45,18 +48,33 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
    if (instr_) {
      bool tableSlice=SyncMaster::GetInstance()->TableSlice() ;
      bool status=instr_->Render(index_,buffer,samplecount,tableSlice) ;
-     audible=((status)&&(!muted_)&&(volume_>0)) ;
-      if (audible&&(volume_!=100)) {
+      audible=((status)&&(!muted_)&&(volume_>0)) ;
+      if (audible&&((volume_!=100)||(pan_!=0))) {
         /* H38.7 OPT_PERF: scale the whole buffer once in fixed point.
          * The old ((long long)x * volume_)/100LL did a 64-bit division
          * per sample (software divdi3 on MIPS32). A precomputed fixed
-         * scale turns that into one multiply+shift per sample. */
-        fixed scale=fl2fp((float)volume_/100.0f) ;
-        fixed *current=buffer ;
-        int count=samplecount*2 ;
-        while (count--) {
-           *current=fp_mul(*current,scale) ;
-           current++ ;
+         * scale turns that into one multiply+shift per sample.
+         * TREEFROG_MIXER_PAN_V1 (Bacon 1.1.1): the pan applies in the same
+         * pass with a compensated equal-power law (cos/sin, both channels
+         * scaled by sqrt(2)): pan 0 keeps both gains at 1.0 so the output
+         * is bit-identical to the legacy path, and a hard pan boosts the
+         * active side +3 dB while the opposite side goes silent. */
+        float panL=1.0f ;
+        float panR=1.0f ;
+        if (pan_!=0) {
+           float angle=((float)pan_+100.0f)/200.0f*1.57079632679f ;
+           panL=cosf(angle)*1.41421356237f ;
+           panR=sinf(angle)*1.41421356237f ;
+        }
+        fixed scaleL=fl2fp((float)volume_/100.0f*panL) ;
+        fixed scaleR=fl2fp((float)volume_/100.0f*panR) ;
+        fixed *left=buffer ;
+        fixed *right=buffer+1 ;
+        for (int i=0;i<samplecount;i++) {
+           *left=fp_mul(*left,scaleL) ;
+           *right=fp_mul(*right,scaleR) ;
+           left+=2 ;
+           right+=2 ;
         }
      }
    }
@@ -121,24 +139,40 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
    for (int off=0; off<samplecount*2; off+=block) {
        int n=samplecount*2-off ;
        if (n>block) n=block ;
-       float blockPeak=0.0f ;
+       // TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): the scan is split
+       // per side (even samples = L, odd = R) on the post-pan buffer, so the
+       // L/R bars of the MIX page reflect exactly how much pan is applied.
+       float blockPeakL=0.0f ;
+       float blockPeakR=0.0f ;
        if (audible) {
           // H38.7 OPT_PERF: sample every 4th sample for the peak. Saves 3/4
           // of the fp2fl conversions per buffer with no audible or visual
           // change in a 60fps bouncing meter.
-          fixed *c=buffer+off ;
-          for (int i=0;i<n;i+=4) {
-             float v=fp2fl(*c) ;
-             if (v<0.0f) v=-v ;
-             if (v>blockPeak) blockPeak=v ;
-             c+=4 ;
-          }
+           fixed *c=buffer+off ;
+           for (int i=0;i<n;i+=4) {
+              // TREEFROG_MIXER_PER_CHANNEL_VU_V3 (H38.7-r4): fp2fl of a
+              // post-volume sample is the raw int16 amplitude (0..32767) with
+              // FIXED_SHIFT=15. Normalize to a true linear 0..1 so
+              // GetChannelPeak() matches the documented contract and the
+              // channel bars' dB scale works (a 0 dB ref of 32767.0).
+              float v=fp2fl(*c)*(1.0f/32767.0f) ;
+              if (v<0.0f) v=-v ;
+              if ((i&1)==0) { if (v>blockPeakL) blockPeakL=v ; }
+              else { if (v>blockPeakR) blockPeakR=v ; }
+              c+=4 ;
+           }
        }
-       if (blockPeak > peakValue_) {
-           peakValue_ = blockPeak ;
+       if (blockPeakL > peakValueL_) {
+           peakValueL_ = blockPeakL ;
        } else {
-           peakValue_ *= 0.5f ;
-           if (peakValue_ < 0.002f) peakValue_ = 0.0f ;
+           peakValueL_ *= 0.5f ;
+           if (peakValueL_ < 0.002f) peakValueL_ = 0.0f ;
+       }
+       if (blockPeakR > peakValueR_) {
+           peakValueR_ = blockPeakR ;
+       } else {
+           peakValueR_ *= 0.5f ;
+           if (peakValueR_ < 0.002f) peakValueR_ = 0.0f ;
        }
    }
    return audible ;
@@ -158,6 +192,30 @@ float PlayerChannel::GetPeakValue() {
         lastPeakClock_ = now ;
     }
     return peakValue_ ;
+} ;
+
+// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): per-side variants of
+// GetPeakValue() with the same idle decay.
+float PlayerChannel::GetPeakValueL() {
+    unsigned long now = System::GetInstance()->GetClock() ;
+    unsigned long elapsed = (lastPeakClock_ == 0) ? 0 : (now - lastPeakClock_) ;
+    if (elapsed > 100) {
+        peakValueL_ *= powf(0.5f, (float)elapsed / 16.6f) ;
+        if (peakValueL_ < 0.002f) peakValueL_ = 0.0f ;
+        lastPeakClock_ = now ;
+    }
+    return peakValueL_ ;
+} ;
+
+float PlayerChannel::GetPeakValueR() {
+    unsigned long now = System::GetInstance()->GetClock() ;
+    unsigned long elapsed = (lastPeakClock_ == 0) ? 0 : (now - lastPeakClock_) ;
+    if (elapsed > 100) {
+        peakValueR_ *= powf(0.5f, (float)elapsed / 16.6f) ;
+        if (peakValueR_ < 0.002f) peakValueR_ = 0.0f ;
+        lastPeakClock_ = now ;
+    }
+    return peakValueR_ ;
 } ;
 
 I_Instrument *PlayerChannel::GetInstrument() {
@@ -194,6 +252,12 @@ void PlayerChannel::SetVolume(int volume) {
 	volume_=volume ;
 } ;
 
+void PlayerChannel::SetPan(int pan) {
+	if (pan<-100) pan=-100 ;
+	if (pan>100) pan=100 ;
+	pan_=pan ;
+} ;
+
 void PlayerChannel::Reset() {
 	if (mixBus_) {
 		mixBus_->Remove(*this) ;
@@ -201,5 +265,6 @@ void PlayerChannel::Reset() {
 	mixBus_=0 ;
 	muted_=false ;
 	volume_=100 ;
+	pan_=0 ;
 	busIndex_=-1 ;
 } ;

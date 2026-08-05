@@ -82,6 +82,8 @@ static const HelpLine kMixerLines_[] = {
     {"L/R", "channel"},
     {"UP/DN", "volume"},
     {"L->MST", "master select"},
+    {"L2+L/R", "pan"},
+    {"L2+A+L/R", "pan coarse"},
     {"R2", "edit target"},
     {"SELECT", "page cycle"},
     {"R1+A", "solo"},

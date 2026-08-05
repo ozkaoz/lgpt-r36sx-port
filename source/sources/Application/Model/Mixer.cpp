@@ -33,12 +33,19 @@ int Mixer::clampSend(int send) const {
 	return send ;
 } ;
 
+int Mixer::clampPan(int pan) const {
+	if (pan<-100) return -100 ;
+	if (pan>100) return 100 ;
+	return pan ;
+} ;
+
 void Mixer::Clear() {
 	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 		channelBus_[i]=i ;
 		channelVolume_[i]=100 ;
 		channelDelaySend_[i]=0 ;
 		channelReverbSend_[i]=0 ;
+		channelPan_[i]=0 ;
 	}
 	NotifyFxSends() ;
 } ;
@@ -66,6 +73,21 @@ void Mixer::SetChannelVolume(int i,int volume) {
 void Mixer::NudgeChannelVolume(int i,int delta) {
 	i=clampChannel(i) ;
 	SetChannelVolume(i,GetChannelVolume(i)+delta) ;
+} ;
+
+int Mixer::GetChannelPan(int i) {
+	i=clampChannel(i) ;
+	return clampPan(channelPan_[i]) ;
+} ;
+
+void Mixer::SetChannelPan(int i,int pan) {
+	i=clampChannel(i) ;
+	channelPan_[i]=clampPan(pan) ;
+} ;
+
+void Mixer::NudgeChannelPan(int i,int delta) {
+	i=clampChannel(i) ;
+	SetChannelPan(i,GetChannelPan(i)+delta) ;
 } ;
 
 int Mixer::GetChannelDelaySend(int i) {
@@ -120,6 +142,7 @@ void Mixer::SaveContent(TiXmlNode *node) {
 		channel.SetAttribute("INDEX",i) ;
 		channel.SetAttribute("BUS",GetBus(i)) ;
 		channel.SetAttribute("VOLUME",GetChannelVolume(i)) ;
+		channel.SetAttribute("PAN",GetChannelPan(i)) ;
 		channel.SetAttribute("DELAYSEND",GetChannelDelaySend(i)) ;
 		channel.SetAttribute("REVERBSEND",GetChannelReverbSend(i)) ;
 		node->InsertEndChild(channel) ;
@@ -180,6 +203,7 @@ void Mixer::RestoreContent(TiXmlElement *element) {
 		int index=-1 ;
 		int bus=0 ;
 		int volume=100 ;
+		int pan=0 ;
 		int delaySend=0 ;
 		int reverbSend=0 ;
 		if (current->Attribute("INDEX",&index)) {
@@ -189,6 +213,11 @@ void Mixer::RestoreContent(TiXmlElement *element) {
 				}
 				if (current->Attribute("VOLUME",&volume)) {
 					SetChannelVolume(index,volume) ;
+				}
+				// TREEFROG_MIXER_PAN_V1 (Bacon 1.1.1): PAN is optional for
+				// backwards compatibility; missing attribute = center.
+				if (current->Attribute("PAN",&pan)) {
+					SetChannelPan(index,pan) ;
 				}
 				if (current->Attribute("DELAYSEND",&delaySend)) {
 					SetChannelDelaySend(index,delaySend) ;
