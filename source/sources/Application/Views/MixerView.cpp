@@ -3,8 +3,11 @@
 #include "Application/Model/Mixer.h"
 #include "Application/Mixer/MixerService.h"
 #include "Application/Model/Project.h"
+#include "Application/Model/ProjectDatas.h"
+#include "Application/Instruments/SampleInstrument.h"
 #include "Application/Views/UIController.h"
 #include "Application/Views/BaseClasses/UiDraw.h"
+#include "Application/Views/BaseClasses/ModalView.h"
 #include "Application/Audio/FxEngine/FxEngine.h"
 #include "Application/Utils/fixed.h"
 #include "Application/Utils/char.h"
@@ -20,7 +23,220 @@
 
 // TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): MIX/FX edit history kinds for the
 // global L1+X / R1+X combos (MixEdit::kind).
-enum { ME_VOL, ME_PAN, ME_MASTERVOL, ME_DLYRET, ME_RVBRET, ME_FX } ;
+// TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13): ME_SOFTCLIP /
+// ME_SOFTCLIPGAIN track the master limiter/clip edits of the L1+A menu.
+enum { ME_VOL, ME_PAN, ME_MASTERVOL, ME_DLYRET, ME_RVBRET, ME_FX,
+       ME_SOFTCLIP, ME_SOFTCLIPGAIN } ;
+
+// TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13):
+// L1+A on the mixer opens this menu.  On the master bar it edits the master
+// limiter (softclip) and clip gain and jumps to the DELAY/REVERB/EQ/COMP
+// pages; on a channel bar it jumps to the FILTER/BITCRUSHER/PLAYBACK/
+// FX SENDS/AUTOMATION sections of the instrument editor.  The menu is a
+// real modal; pendingAction_ is read by MixerActionMenuApplyCallback after
+// the modal closes (the action runs once the menu is gone, so the switch to
+// the Instrument view cannot leave a stale modal behind).
+class MixerActionMenuModal : public ModalView {
+  public:
+    MixerActionMenuModal(MixerView &view)
+        : ModalView(view), mixer_(view), item_(0),
+          pendingAction_(0), masterMenu_(view.masterSelected_) {}
+    virtual ~MixerActionMenuModal() {}
+
+    virtual void DrawView() ;
+    virtual void ProcessButtonMask(unsigned short mask, bool pressed) ;
+    virtual void OnFocus() { isDirty_ = true; }
+    virtual void OnPlayerUpdate(PlayerEventType, unsigned int) {}
+
+    MixerView &mixer_ ;
+    int pendingAction_ ;
+
+  private:
+    int item_ ;
+    bool masterMenu_ ;
+} ;
+
+void MixerActionMenuApplyCallback(View &view, ModalView &dialog) ;
+
+void MixerActionMenuModal::DrawView() {
+    GUITextProperties props ;
+    props.invert_ = false ;
+    int rowCount = masterMenu_ ? 6 : 5 ;
+    SetWindow(26, rowCount + 3) ;
+
+    char title[32] ;
+    if (masterMenu_) {
+        snprintf(title, sizeof(title), "MASTER MENU") ;
+    } else {
+        snprintf(title, sizeof(title), "TRACK %02X MENU",
+                 mixer_.viewData_->mixerCol_) ;
+    }
+    SetColor(CD_HILITE1) ;
+    int tx = (GetWindowWidth() - (int)strlen(title)) / 2 ;
+    if (tx < 0) tx = 0 ;
+    DrawString(tx, 0, title, props) ;
+
+    Project *project = mixer_.viewData_->project_ ;
+    int channel = mixer_.viewData_->mixerCol_ ;
+    const int labelX = 1 ;
+    const int valueX = 14 ;
+    for (int i = 0; i < rowCount; i++) {
+        int row = 1 + i ;
+        bool selected = (i == item_) ;
+        char label[16] ;
+        char value[16] ;
+        if (masterMenu_) {
+            switch (i) {
+            case 0:
+                snprintf(label, sizeof(label), "LIMITER") ;
+                if (project) {
+                    int idx = project->GetSoftclip() ;
+                    if (idx < 0) idx = 0 ;
+                    if (idx > 4) idx = 4 ;
+                    snprintf(value, sizeof(value), "%s", softclipStates[idx]) ;
+                } else snprintf(value, sizeof(value), "-") ;
+                break ;
+            case 1:
+                snprintf(label, sizeof(label), "CLIP GAIN") ;
+                if (project) {
+                    int idx = project->GetSoftclipGain() ;
+                    if (idx < 0) idx = 0 ;
+                    if (idx > 1) idx = 1 ;
+                    snprintf(value, sizeof(value), "%s",
+                             softclipGainStates[idx]) ;
+                } else snprintf(value, sizeof(value), "-") ;
+                break ;
+            default:
+                snprintf(label, sizeof(label), "FX %s",
+                         i == 2 ? "DELAY" :
+                         i == 3 ? "REVERB" :
+                         i == 4 ? "EQ" : "COMP") ;
+                snprintf(value, sizeof(value), "A: open") ;
+                break ;
+            }
+        } else {
+            static const char *sections[5] = {
+                "FILTER", "BITCRUSHER", "PLAYBACK", "FX SENDS",
+                "AUTOMATION" } ;
+            snprintf(label, sizeof(label), "%s", sections[i]) ;
+            snprintf(value, sizeof(value), "A: open") ;
+        }
+        SetColor(CD_NORMAL) ;
+        props.invert_ = false ;
+        DrawString(labelX, row, label, props) ;
+        SetColor(selected ? CD_HILITE2 : CD_HILITE1) ;
+        props.invert_ = selected ;
+        DrawString(valueX, row, value, props) ;
+        props.invert_ = false ;
+        SetColor(CD_NORMAL) ;
+    }
+
+    (void)channel ;
+    SetColor(CD_NORMAL) ;
+    props.invert_ = false ;
+    DrawString(1, rowCount + 1, "UP/DN move  A open", props) ;
+    DrawString(1, rowCount + 2,
+               masterMenu_ ? "L/R edit  B close" : "B close", props) ;
+}
+
+void MixerActionMenuModal::ProcessButtonMask(unsigned short mask,
+                                             bool pressed) {
+    if (!pressed) return ;
+    if (mask & EPBM_B) {
+        EndModal(0) ;
+        return ;
+    }
+    int rowCount = masterMenu_ ? 6 : 5 ;
+    if (mask & EPBM_UP) {
+        item_-- ;
+        if (item_ < 0) item_ = rowCount - 1 ;
+        return ;
+    }
+    if (mask & EPBM_DOWN) {
+        item_++ ;
+        if (item_ >= rowCount) item_ = 0 ;
+        return ;
+    }
+    // L/R edits the value rows of the master menu (limiter / clip gain);
+    // every edit is recorded in the mix undo history (L1+X restores).
+    if (masterMenu_ && item_ <= 1 &&
+        (mask & (EPBM_LEFT | EPBM_RIGHT)) != 0) {
+        Project *project = mixer_.viewData_->project_ ;
+        if (!project) return ;
+        int delta = (mask & EPBM_RIGHT) ? 1 : -1 ;
+        if (item_ == 0) {
+            int idx = project->GetSoftclip() + delta ;
+            if (idx < 0) idx = 0 ;
+            if (idx > 4) idx = 4 ;
+            if (idx == project->GetSoftclip()) return ;
+            mixer_.pushMixUndo(ME_SOFTCLIP, -1,
+                               (float)project->GetSoftclip()) ;
+            Variable *var = project->FindVariable(VAR_SOFTCLIP) ;
+            if (var) var->SetInt(idx, false) ;
+            MixerService::GetInstance()->SetSoftclip(
+                idx, project->GetSoftclipGain()) ;
+        } else {
+            int idx = project->GetSoftclipGain() + delta ;
+            if (idx < 0) idx = 0 ;
+            if (idx > 1) idx = 1 ;
+            if (idx == project->GetSoftclipGain()) return ;
+            mixer_.pushMixUndo(ME_SOFTCLIPGAIN, -1,
+                               (float)project->GetSoftclipGain()) ;
+            Variable *var = project->FindVariable(VAR_SOFTCLIP_GAIN) ;
+            if (var) var->SetInt(idx, false) ;
+            MixerService::GetInstance()->SetSoftclip(
+                project->GetSoftclip(), idx) ;
+        }
+        isDirty_ = true ;
+        return ;
+    }
+    if (mask & EPBM_A) {
+        // 1..4 = master FX pages (DELAY..COMP); 101+ = track sections.
+        if (masterMenu_ && item_ >= 2) {
+            pendingAction_ = item_ - 1 ;
+        } else if (!masterMenu_) {
+            pendingAction_ = 101 + item_ ;
+        }
+        EndModal(pendingAction_) ;
+        return ;
+    }
+}
+
+void MixerView::JumpToFxPage(FxPage page) {
+    if (page < FX_PAGE_MIX || page >= FX_PAGE_COUNT) return ;
+    fxPage_ = page ;
+    fxRow_ = 0 ;
+    isDirty_ = true ;
+    ((AppWindow &)w_).SetDirty() ;
+}
+
+void MixerActionMenuApplyCallback(View &view, ModalView &dialog) {
+    MixerActionMenuModal *menu = (MixerActionMenuModal *)&dialog ;
+    MixerView &mixer = menu->mixer_ ;
+    int action = menu->pendingAction_ ;
+    menu->pendingAction_ = 0 ;
+    if (action >= 101) {
+        // Track section: open the Instrument view for the hovered channel
+        // and land on the requested section (FILTER/BITCRUSHER/PLAYBACK/
+        // FX SENDS/AUTOMATION).
+        int section = action - 101 ;
+        if (section < 0 || section > 4) return ;
+        static const unsigned int hintIds[5] = {
+            SIP_FILTMIX, SIP_CRUSH, SIP_INTERPOLATION, SIP_DRY,
+            SIP_TABLEAUTO } ;
+        int channel = mixer.viewData_->mixerCol_ ;
+        if (channel >= 0 && channel < SONG_CHANNEL_COUNT) {
+            mixer.viewData_->currentInstrument_ = channel ;
+            mixer.viewData_->instrumentFocusHint_ = hintIds[section] ;
+            ViewType vt = VT_INSTRUMENT ;
+            ViewEvent ve(VET_SWITCH_VIEW, &vt) ;
+            mixer.SetChanged() ;
+            mixer.NotifyObservers(&ve) ;
+        }
+    } else if (action >= 1 && action <= 4) {
+        mixer.JumpToFxPage((FxPage)(FX_PAGE_DELAY + action - 1)) ;
+    }
+}
 
 // TREEFROG_FX_PAGES_PARAMS_V2 (PLAN_FX_REDESIGN_ES.md, Fase 6):
 // Parameter table for the DELAY / REVERB / EQ / COMP pages.  Each row exposes
@@ -375,6 +591,19 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 		return ;
 	}
 
+	// TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13): L1+A (pure chord)
+	// opens the master/track action menu.  Master bar: limiter (softclip),
+	// clip gain, FX page jumps.  Channel bar: instrument section jumps
+	// (FILTER/BITCRUSHER/PLAYBACK/FX SENDS/AUTOMATION).
+	if ((mask&EPBM_L) && (mask&EPBM_A) &&
+	    !(mask & (EPBM_LEFT | EPBM_RIGHT | EPBM_UP | EPBM_DOWN |
+	              EPBM_R | EPBM_L2 | EPBM_R2 | EPBM_X | EPBM_Y |
+	              EPBM_SELECT | EPBM_START))) {
+		DoModal(new MixerActionMenuModal(*this),
+		        MixerActionMenuApplyCallback) ;
+		return ;
+	}
+
 	// Parameter pages (DELAY/REVERB/EQ/COMP): UP/DOWN row, LEFT/RIGHT edit.
 	if (fxPage_!=FX_PAGE_MIX) {
 		// TREEFROG_FX_NAV_A_B_DEFAULT_V1: A+B restores the hovered row to its
@@ -469,6 +698,22 @@ void MixerView::restoreMixEdit(const MixEdit &edit) {
 		break ;
 	case ME_FX:
 		fxSet(edit.channel,edit.value) ;
+		break ;
+	case ME_SOFTCLIP:
+		if (project) {
+			Variable *var=project->FindVariable(VAR_SOFTCLIP) ;
+			if (var) var->SetInt((int)edit.value,false) ;
+			MixerService::GetInstance()->SetSoftclip((int)edit.value,
+			                                         project->GetSoftclipGain()) ;
+		}
+		break ;
+	case ME_SOFTCLIPGAIN:
+		if (project) {
+			Variable *var=project->FindVariable(VAR_SOFTCLIP_GAIN) ;
+			if (var) var->SetInt((int)edit.value,false) ;
+			MixerService::GetInstance()->SetSoftclip(project->GetSoftclip(),
+			                                         (int)edit.value) ;
+		}
 		break ;
 	}
 }
@@ -719,16 +964,16 @@ void MixerView::drawMeterBar(int x,int y,int height,float peak,int volume,
 	rec.selected=selected ;
 	rec.muted=muted ;
 	rec.onColor=onColor ;
-	int totalCells=height ;
-	int filledCells=int(mixVULevel(peak)*float(volume)*0.01f*float(totalCells)) ;
-	if (filledCells>totalCells) filledCells=totalCells ;
-	bool overZero=(filledCells>=totalCells) ;
+	// TREEFROG_MIXER_COMPACT_BARS_V1 (Bacon 1.1.1 V13): the record carries
+	// the normalized post-volume level; PostFlushDraw renders the compact
+	// 2-px-step meter from it.
+	float level=mixVULevel(peak)*float(volume)*0.01f ;
+	if (level<0.0f) level=0.0f ;
+	if (level>1.0f) level=1.0f ;
 	if (side==0) {
-		rec.filledL=filledCells ;
-		rec.overZeroL=overZero ;
+		rec.levelL=level ;
 	} else {
-		rec.filledR=filledCells ;
-		rec.overZeroR=overZero ;
+		rec.levelR=level ;
 	}
 	if (side!=0) return ;
 	// TREEFROG_MIXER_PIXEL_BARS_V2 (Bacon 1.1.1): the pixel layer
@@ -747,6 +992,11 @@ void MixerView::drawMeterBar(int x,int y,int height,float peak,int volume,
 // Pixel layer of the L/R half-cell bars.  Runs from AppWindow::Flush AFTER
 // the character screen is rendered, so it repaints the bar columns on top
 // every frame: left bar px 0..2, dark seam px 3..4, right bar px 5..7.
+// TREEFROG_MIXER_COMPACT_BARS_V1 (Bacon 1.1.1 V13): M8-style compact meters:
+// each level is 3 px tall (2 px fill + 1 px gap), so a 12-cell bar renders
+// 32 fine steps instead of 12 chunky 8-px blocks.  The top 12.5% of the bar
+// is the 0 dB+ zone: it fills solid red when the level reaches it (instead
+// of the whole bar turning red at full scale).
 void MixerView::PostFlushDraw() {
 #if defined(PLATFORM_TREEFROG)
 	AppWindow *app=(AppWindow *)&w_ ;
@@ -754,40 +1004,51 @@ void MixerView::PostFlushDraw() {
 	if (!fb) return ;
 	unsigned short seamC=app->ResolveColor565(CD_BACKGROUND) ;
 	unsigned short borderC=app->ResolveColor565(CD_BORDER) ;
+	unsigned short redC=app->ResolveColor565(CD_ERROR) ;
+	const int LEVEL_H=3 ;
 	for (int m=0;m<=SONG_CHANNEL_COUNT;m++) {
 		MeterRecord &r=meterRecords_[m] ;
 		if (!r.valid) continue ;
 		int px=r.xCell*8 ;
 		int py=r.yCell*8 ;
-		for (int row=0;row<r.height;row++) {
-			int cellFromBottom=r.height-row ;
-			bool overZero=(cellFromBottom<=r.filledL&&r.overZeroL)||
-			              (cellFromBottom<=r.filledR&&r.overZeroR) ;
-			unsigned short fillC ;
-			if (r.selected) {
-				fillC=(overZero?app->ResolveColor565(CD_ERROR):
-				                app->ResolveColor565(CD_HILITE2)) ;
-			} else if (r.muted) {
-				fillC=borderC ;
-			} else {
-				fillC=(overZero?app->ResolveColor565(CD_ERROR):
-				                app->ResolveColor565(r.onColor)) ;
-			}
-			// TREEFROG_MIXER_PIXEL_BARS_V2 (Bacon 1.1.1): unfilled rows are
-			// painted with the background so the meter area stays clean
-			// (no static "--" track dashes); the fill alone carries the bar.
-			int yBase=(py+row*8)*TREEFROG_LGPT_WIDTH ;
-			int iBase=yBase+px ;
-			bool fillL=(cellFromBottom<=r.filledL) ;
-			bool fillR=(cellFromBottom<=r.filledR) ;
-			fb[iBase+0]=fillL?fillC:seamC ;
-			fb[iBase+1]=fillL?fillC:seamC ;
-			fb[iBase+2]=fillL?fillC:seamC ;
+		int totalPx=r.height*8 ;
+		int totalLevels=totalPx/LEVEL_H ;
+		if (totalLevels<1) continue ;
+		// 0 dB+ zone: the top 12.5% of the bar, rendered solid red.
+		int redBandPx=(totalLevels/8)*LEVEL_H ;
+		int filledL=(int)(r.levelL*(float)totalLevels+0.5f)*LEVEL_H ;
+		int filledR=(int)(r.levelR*(float)totalLevels+0.5f)*LEVEL_H ;
+		if (filledL>totalPx) filledL=totalPx ;
+		if (filledR>totalPx) filledR=totalPx ;
+		unsigned short fillC ;
+		if (r.selected) {
+			fillC=app->ResolveColor565(CD_HILITE2) ;
+		} else if (r.muted) {
+			fillC=borderC ;
+		} else {
+			fillC=app->ResolveColor565(r.onColor) ;
+		}
+		int iBase=py*TREEFROG_LGPT_WIDTH+px ;
+		for (int row=0;row<totalPx;row++) {
+			bool inBand=(row>=totalPx-redBandPx) ;
+			bool fillL=(row<filledL) ;
+			bool fillR=(row<filledR) ;
+			// 1-px gap between levels (top row of each 3-px group); the red
+			// band is solid.
+			bool gapRow=((row%LEVEL_H)==2)&&!inBand ;
+			unsigned short lC=(fillL&&inBand)?redC:
+			                  ((fillL&&!gapRow)?fillC:seamC) ;
+			unsigned short rC=(fillR&&inBand)?redC:
+			                  ((fillR&&!gapRow)?fillC:seamC) ;
+			fb[iBase+0]=lC ;
+			fb[iBase+1]=lC ;
+			fb[iBase+2]=lC ;
 			fb[iBase+3]=seamC ;
 			fb[iBase+4]=seamC ;
-			fb[iBase+5]=fillR?fillC:seamC ;
-			fb[iBase+6]=fillR?fillC:seamC ;
-			fb[iBase+7]=fillR?fillC:seamC ;
+			fb[iBase+5]=rC ;
+			fb[iBase+6]=rC ;
+			fb[iBase+7]=rC ;
+			iBase+=TREEFROG_LGPT_WIDTH ;
 		}
 	}
 #endif

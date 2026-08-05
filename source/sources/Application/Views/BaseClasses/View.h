@@ -48,7 +48,12 @@ enum ViewType {
     VT_TABLE,  // Table screen under phrase
     VT_TABLE2, // Table screen under instrument
     VT_GROOVE,
-    VT_MIXER
+    VT_MIXER,
+    // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): view type of the graphical
+    // sample chopper, so HelpOverlay can open on the CHOPPER help section.
+    // Kept at the end of the enum so existing VT_* ordinal values (used by
+    // HelpRegistry and focus switching) are unaffected.
+    VT_CHOPPER
 };
 
 enum ViewMode {
@@ -164,7 +169,13 @@ class View : public Observable {
     // destroying them.
     bool PushModal(ModalView *view, ModalViewCallback cb = 0);
     bool HasModal() const;
-    ViewType GetViewType() const { return viewType_; }
+    // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): returns the active modal,
+    // so AppWindow can show Help for the modal that actually has focus (the
+    // chopper) instead of the base view underneath it.
+    ModalView *GetModal() const { return modalView_; }
+    // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): made virtual so the
+    // chopper modal can report VT_CHOPPER and Help opens on its section.
+    virtual ViewType GetViewType() const { return viewType_; }
 
     void EnableNotification();
     void SetNotification(const char *notification, int offset = 2);

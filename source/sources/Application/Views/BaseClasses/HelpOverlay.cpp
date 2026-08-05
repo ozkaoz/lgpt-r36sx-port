@@ -117,7 +117,9 @@ void HelpOverlay::DrawView() {
         }
     }
     SetColor(CD_NORMAL);
-    DrawString(0, 10, "B close  UP/DN  L/R next", props);
+    // TREEFROG_HELP_NAV_V1 (Bacon 1.1.1 V13): L1/R1 move between help
+    // sections (same keys as the chopper submenus), L2/R2 first/last.
+    DrawString(0, 10, "B close  UP/DN  L1/R1 tabs", props);
     // RC4 P6 (PLAN_RC4 11.7): proportional scroll indicator (right edge)
     // when the section overflows, and centered tabs for the section
     // navigation (prev / current / next), reusing the shared primitives.
@@ -133,7 +135,8 @@ void HelpOverlay::DrawView() {
             HelpRegistry::GetSectionAt((sectionIndex_ + 1) % HelpRegistry::GetSectionCount());
         UiDraw::DrawTabs(*this, 1, prevSec ? prevSec->title : "?",
                          section ? section->title : "?",
-                         nextSec ? nextSec->title : "?");
+                         nextSec ? nextSec->title : "?",
+                         true);
     }
 }
 
@@ -173,16 +176,18 @@ void HelpOverlay::ProcessButtonMask(unsigned short mask, bool pressed) {
             ClampCursor();
         } else {
             // Content mode: UP/DOWN scroll, L/R next/prev section,
-            // L1/R1 first/last, L/R also move, A toggles the index.
+            // L1/R1 next/prev section (close to the browser), L2/R2
+            // first/last, A toggles the index.
             if ((mask & EPBM_UP) != 0) {
                 lineScroll_--;
             } else if ((mask & EPBM_DOWN) != 0) {
                 lineScroll_++;
-            } else if ((mask & EPBM_L) != 0) {
-                sectionIndex_--;
-                lineScroll_ = 0;
-            } else if ((mask & EPBM_R) != 0) {
-                sectionIndex_++;
+            } else if ((mask & (EPBM_L | EPBM_R)) != 0) {
+                if ((mask & EPBM_L) != 0) {
+                    sectionIndex_--;
+                } else {
+                    sectionIndex_++;
+                }
                 lineScroll_ = 0;
             } else if ((mask & EPBM_L2) != 0) {
                 sectionIndex_ = 0;

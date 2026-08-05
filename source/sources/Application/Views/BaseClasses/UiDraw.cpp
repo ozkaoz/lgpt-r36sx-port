@@ -210,16 +210,33 @@ void UiDraw::DrawProgressBar(View &view, int x, int y, int width, int filled) {
 }
 
 void UiDraw::DrawTabs(View &view, int y, const char *left,
-                      const char *current, const char *right) {
-    char buffer[64];
+                      const char *current, const char *right,
+                      bool highlightCurrent) {
     GUITextProperties props;
     props.invert_ = false;
-    snprintf(buffer, sizeof(buffer), "<- %s [%s] %s ->", left, current, right);
-    view.SetColor(CD_HILITE1);
-    int len = (int)strlen(buffer);
+    char head[64];
+    char body[64];
+    char tail[64];
+    snprintf(head, sizeof(head), "<- %s [", left);
+    snprintf(body, sizeof(body), "%s", current);
+    snprintf(tail, sizeof(tail), "] %s ->", right);
+    int len = (int)(strlen(head) + strlen(body) + strlen(tail));
     int x = (UiDraw::kScreenWidth - len) / 2;
     if (x < 0) x = 0;
-    view.DrawString(clampX(x), clampY(y), buffer, props);
+    view.SetColor(CD_HILITE1);
+    view.DrawString(clampX(x), clampY(y), head, props);
+    x += (int)strlen(head);
+    if (highlightCurrent) {
+        view.SetColor(CD_HILITE2);
+        props.invert_ = true;
+        view.DrawString(clampX(x), clampY(y), body, props);
+        props.invert_ = false;
+        view.SetColor(CD_HILITE1);
+    } else {
+        view.DrawString(clampX(x), clampY(y), body, props);
+    }
+    x += (int)strlen(body);
+    view.DrawString(clampX(x), clampY(y), tail, props);
     view.SetColor(CD_NORMAL);
 }
 

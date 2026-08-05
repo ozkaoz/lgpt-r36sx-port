@@ -99,6 +99,9 @@ public:
 	virtual bool GlobalUndo() ;
 	virtual bool GlobalRedo() ;
 	virtual bool GlobalResetOption() ;
+	// TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13): L1+A menu jumps
+	// straight to a master FX page (DELAY/REVERB/EQ/COMP).
+	void JumpToFxPage(FxPage page) ;
 	// TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1): repaints the L/R
 	// half-cell meter bars on top of the character screen every Flush.
 	virtual void PostFlushDraw() ;
@@ -127,10 +130,12 @@ protected:
 		int xCell ;
 		int yCell ;
 		int height ;
-		int filledL ;
-		bool overZeroL ;
-		int filledR ;
-		bool overZeroR ;
+		// TREEFROG_MIXER_COMPACT_BARS_V1 (Bacon 1.1.1 V13): normalized
+		// level (0..1) of each side after volume scaling; the pixel layer
+		// derives the compact 2-px levels from it.  Replaces the old
+		// cell-count fill/over fields.
+		float levelL ;
+		float levelR ;
 		bool selected ;
 		bool muted ;
 		ColorDefinition onColor ;
@@ -203,6 +208,10 @@ protected:
 	int fxCountOnPage(FxPage page) const ;
 	int fxIdForRow(int row) const ;
 	bool fxIdOnPage(int id,FxPage page) const ;
+	// TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13): L1+A master/track
+	// action menu (defined in MixerView.cpp); it reads the private mixer
+	// state and records softclip edits in the mix undo history.
+	friend class MixerActionMenuModal ;
 private:
 	const char *song_ ;
 

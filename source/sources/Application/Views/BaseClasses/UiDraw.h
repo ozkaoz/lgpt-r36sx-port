@@ -116,8 +116,11 @@ class UiDraw {
                                 int filled);
 
     // Conceptual tab strip, e.g. "<-Page1-" style navigation hint.
+    // TREEFROG_HELP_NAV_V1 (Bacon 1.1.1 V13): when highlightCurrent is set
+    // the current tab is drawn inverted in CD_HILITE2 (help browser).
     static void DrawTabs(View &view, int y, const char *left,
-                         const char *current, const char *right);
+                         const char *current, const char *right,
+                         bool highlightCurrent = false);
 
     // Modal frame: centered window with a border box and title bar.
     static void DrawModalFrame(View &view, int width, int height,

@@ -15,7 +15,8 @@ class View;
  *
  *   UP/DN    scroll the current section's lines (window fits 8 rows)
  *   L/R      previous / next section
- *   L1/R1    jump to first / last section
+ *   L1/R1    previous / next section (same as L/R)
+ *   L2/R2    jump to first / last section
  *   A        toggle the section index
  *   B        close (also SELECT+R1)
  *

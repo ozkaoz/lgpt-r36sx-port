@@ -2251,9 +2251,10 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
     }
 
     SetColor(CD_NORMAL);
-    drawStringAbs(1, 24, "UD item LR value    B preview", props);
-    drawStringAbs(1, 25, "A apply B preview  L1+X undo", props);
-    drawStringAbs(1, 26, "R1+X redo  L1+R1 exit R2+LR", props);
+    /* Bacon 1.1.1 V13: compact pipe-separated hint lines matching the
+       chopper main screen; full list in the CHOP PITCH help section. */
+    drawStringAbs(1, 24, "UP/DN Item | L/R Value | B Preview", props);
+    drawStringAbs(1, 25, "A Apply | L1+R1 Exit | R2+LR Target", props);
 }
 
 void SampleChopperModal::applyEnvelopeToBuffer(short *samples, int frames, int channels, int rate, int attackMs, int sustainPercent, int releaseMs) {
@@ -2995,7 +2996,7 @@ void SampleChopperModal::drawSampleInfo(GUITextProperties &props) {
     buffer[37] = 0; drawStringAbs(2, 4, buffer, props);
     if (!hasAssignedSample()) { drawStringAbs(2, 5, "No sample assigned", props); drawStringAbs(2, 6, "No chop actions", props); }
     else { std::string name = sampleName_; if (name.size() > 31) name = name.substr(0, 31); snprintf(buffer, sizeof(buffer), "Name:%s", name.c_str()); buffer[37] = 0; drawStringAbs(2, 5, buffer, props); snprintf(buffer, sizeof(buffer), "Frame:%d/%d Chop:%02d/%02d%s", cursorFrame_, sourceSize_ > 0 ? sourceSize_ - 1 : 0, hasActiveSliceRange() ? selectedChop_ : 0, hasActiveSliceRange() ? (boundaryCount_ - 1) : 0, trimMode_ ? " ADJ" : ""); buffer[37] = 0; drawStringAbs(2, 6, buffer, props); }
-    if (statusMessage_[0]) { SetColor(CD_HILITE1); drawStringAbs(2, 21, statusMessage_, props); }
+    if (statusMessage_[0]) { SetColor(CD_HILITE1); drawStringAbs(2, 23, statusMessage_, props); }
 }
 
 void SampleChopperModal::drawEmptyWaveformText(GUITextProperties &props) { SetColor(CD_HILITE1); drawStringAbs(2, 13, "----------- no sample loaded -----------", props); }
@@ -3007,12 +3008,13 @@ void SampleChopperModal::drawControls(GUITextProperties &props) {
            Avoid duplicating help lines at the bottom of the 320x240 screen. */
         return;
     }
-    drawStringAbs(0, 24, "R1+LR sample  L1+LR fast cursor", props);
-    drawStringAbs(0, 25, "A cut/live Y del B play SELECT crop", props);
-    drawStringAbs(0, 26, trimMode_ ? "R1+A keep L2+Y del L1+X undo" : "R2+LR chop R2+A full R2+Y norm", props);
-    drawStringAbs(0, 27, "L1+X undo  R1+X redo", props);
-    SetColor(CD_HILITE1);
-    drawStringAbs(0, 28, trimMode_ ? "CROP A/B range  Y start X end1s" : "SELECT crop L1+R1 pitch R1+B back", props);
+    /* Bacon 1.1.1 V13: single hint line on the chopper; the full combo list
+       lives in the CHOPPER help section (SELECT+R1).  Trim mode swaps the
+       line for the crop actions. */
+    drawStringAbs(0, 24,
+                  trimMode_ ? "R1+A Keep  L2+Y Del  A+B Nudge  R1+B Back"
+                            : "Select: Crop | L1+R1: Pitch | R1+B: Back",
+                  props);
 }
 
 void SampleChopperModal::showOperationProgress(const char *message, int percent) {

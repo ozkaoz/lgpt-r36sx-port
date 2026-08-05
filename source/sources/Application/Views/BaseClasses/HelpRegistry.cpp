@@ -108,11 +108,50 @@ static const HelpLine kMixerLines_[] = {
     {"A", "coarse"},
     {"START", "play"},
     {"R+UP", "back to Song"},
+    {"L1+A", "master/track menu"},
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
     // TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1)
     {"A+B", "reset vol/pan"},
     {"L2+A+B", "pan center"},
+    {"L1+X R1+X", "undo redo"},
+};
+
+// TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): help section for the
+// graphical chopper and its pitch/env submenu (SELECT+R1 inside the
+// chopper shows this section).
+static const HelpLine kChopperLines_[] = {
+    {"L/R", "cursor"},
+    {"UP/DN", "zoom"},
+    {"A", "add chop"},
+    {"Y", "del chop"},
+    {"B", "play chop"},
+    {"SELECT", "trim mode"},
+    {"L1+L/R", "fast cursor"},
+    {"R1+L/R", "sample"},
+    {"R2+L/R", "chop sel"},
+    {"R2+A", "play full"},
+    {"R2+Y", "normalize"},
+    {"L1+R1", "pitch/env"},
+    {"A+B", "range nudge"},
+    {"R1+A", "crop apply"},
+    {"L2+Y", "del range"},
+    {"R1+B", "back"},
+    {"L2+B", "stop"},
+    {"SELECT+R1", "help"},
+    {"SELECT+R2", "audio driver"},
+    {"L1+X R1+X", "undo redo"},
+};
+
+// TREEFROG_CHOPPER_HELP_V1: pitch/env submenu of the chopper (shown when
+// the modal is in pitch mode; the same section covers both submenus).
+static const HelpLine kChopperPitchLines_[] = {
+    {"L/R UP/DN", "item value"},
+    {"B", "preview"},
+    {"A", "apply pitch/env"},
+    {"L1+R1", "exit submenu"},
+    {"R2+L/R", "chop target"},
+    {"SELECT", "trim mode"},
     {"L1+X R1+X", "undo redo"},
 };
 
@@ -125,12 +164,24 @@ static const HelpSection kSections_[] = {
     {"TABLE", kTableLines_, (int)(sizeof(kTableLines_) / sizeof(HelpLine))},
     {"GROOVE", kGrooveLines_, (int)(sizeof(kGrooveLines_) / sizeof(HelpLine))},
     {"MIXER", kMixerLines_, (int)(sizeof(kMixerLines_) / sizeof(HelpLine))},
+    // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13)
+    {"CHOPPER", kChopperLines_,
+     (int)(sizeof(kChopperLines_) / sizeof(HelpLine))},
+    {"CHOP PITCH", kChopperPitchLines_,
+     (int)(sizeof(kChopperPitchLines_) / sizeof(HelpLine))},
 };
 static const int kSectionCount_ =
     (int)(sizeof(kSections_) / sizeof(HelpSection));
 
 const HelpSection *HelpRegistry::GetSection(ViewType vt) {
-    if (vt < VT_SONG || vt > VT_MIXER) return 0;
+    if (vt < VT_SONG || vt > VT_MIXER) {
+        // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): the chopper is a
+        // modal, not a regular view type; map it to its help section.
+        if (vt == VT_CHOPPER) {
+            return &kSections_[kSectionCount_ - 2];
+        }
+        return 0;
+    }
     return &kSections_[vt];
 }
 

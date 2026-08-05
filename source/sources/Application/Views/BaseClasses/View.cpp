@@ -238,6 +238,10 @@ bool View::PushModal(ModalView *view, ModalViewCallback cb) {
     if (hadModal) {
         suspendedModal_ = modalView_;
         suspendedModalCallback_ = modalViewCallback_;
+        // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): let the suspended
+        // modal stop drawing its private overlay (chopper waveform) while
+        // the pushed window is shown on top.
+        if (suspendedModal_) suspendedModal_->OnSuspend();
     }
     modalView_ = view;
     modalViewCallback_ = cb;
@@ -252,7 +256,10 @@ void View::RestoreSuspendedModal() {
         modalViewCallback_ = suspendedModalCallback_;
         suspendedModal_ = 0;
         suspendedModalCallback_ = 0;
-        if (modalView_) modalView_->OnFocus();
+        if (modalView_) {
+            modalView_->OnRestore();
+            modalView_->OnFocus();
+        }
         isDirty_ = true;
     }
 }

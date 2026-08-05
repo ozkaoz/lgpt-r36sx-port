@@ -696,8 +696,14 @@ bool AppWindow::onEvent(GUIEvent &event) {
             _currentView) {
             if (!_helpShortcutLatched) {
                 _helpShortcutLatched = true;
+                // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): when a modal
+                // (the chopper) is open, show the Help for the modal that
+                // actually has focus instead of the base view underneath.
+                View *helpTarget = _currentView;
+                ModalView *topModal = _currentView->GetModal();
+                if (topModal) helpTarget = topModal;
                 _currentView->PushModal(
-                    new HelpOverlay(*_currentView),
+                    new HelpOverlay(*helpTarget),
                     HelpOverlayApplyCallback);
                 _isDirty = true;
             }

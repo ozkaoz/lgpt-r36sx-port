@@ -12,6 +12,13 @@ class ModalView : public View {
     bool IsFinished();
     int GetReturnCode();
 
+    // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): a modal pushed on top of
+    // this one (e.g. Help over the chopper) suspends it.  Subclasses can
+    // pause/restore their private overlay state (chopper waveform pixels)
+    // so it does not draw over the pushed window.
+    virtual void OnSuspend() {}
+    virtual void OnRestore() {}
+
   protected:
     void SetWindow(int width, int height);
     // TREEFROG_MODAL_OFFSET_V1: shifts the centered window vertically.

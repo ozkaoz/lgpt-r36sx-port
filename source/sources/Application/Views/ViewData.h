@@ -68,6 +68,12 @@ public:
 
 	int currentInstrument_ ;    // .Current edited instrument
 
+	// TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13): when nonzero, the
+	// Instrument view focuses the field bound to this variable ID on entry
+	// (used by the mixer L1+A track menu to land on the requested section).
+	// Consumed (reset to 0) by InstrumentView::onInstrumentChange.
+	unsigned int instrumentFocusHint_ ;
+
 	int currentTable_ ;			// .Current edited table
 
 	int currentGroove_ ;			// .Current edited groove

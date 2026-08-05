@@ -83,12 +83,22 @@ void InstrumentView::onInstrumentChange() {
 	} ;
 
 	SetFocus(T_SimpleList<UIField>::GetFirst()) ;
+	// TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13): the mixer L1+A track
+	// menu can request a landing section by variable ID; it wins over the
+	// remembered field and is consumed.
+	unsigned int hint=viewData_->instrumentFocusHint_ ;
+	viewData_->instrumentFocusHint_=0 ;
 	IteratorPtr<UIField> it2(T_SimpleList<UIField>::GetIterator()) ;
 	for (it2->Begin();!it2->IsDone();it2->Next()) {
         UIField &rawField=it2->CurrentItem() ;
         if (rawField.IsStatic()) continue ;
         UIIntVarField &field=(UIIntVarField &)rawField ;
-        if (field.GetVariableID()==lastFocusID_) {
+        if (hint!=0) {
+            if (field.GetVariableID()==hint) {
+                SetFocus(&field) ;
+                break ;
+            }
+        } else if (field.GetVariableID()==lastFocusID_) {
             SetFocus(&field) ;
             break ;
         }

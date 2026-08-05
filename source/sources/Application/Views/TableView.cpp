@@ -567,7 +567,12 @@ void TableView::ProcessButtonMask(unsigned short mask, bool pressed) {
     }
     // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): snapshot the edited table +
     // cursor before every pressed event so L1+X can revert any edit.
-    pushTableUndo();
+    // TREEFROG_GLOBAL_UNDO_V4 (Bacon 1.1.1 V13): pure shoulder presses
+    // (L1/R1/L2/R2 alone) are combo ingredients, not edits; snapshotting
+    // them made the following L1+X/R1+X restore an identical state.
+    if ((mask & ~(EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2)) != 0) {
+        pushTableUndo();
+    }
     if (viewMode_ == VM_SELECTION) {
         if (!clipboard_.active_) {
             clipboard_.active_ = true;

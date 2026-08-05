@@ -14,6 +14,7 @@ ViewData::ViewData(Project *project) {
 	chainRow_=0 ;
 	currentTable_=0 ;
 	currentInstrument_=0 ;
+	instrumentFocusHint_=0 ;
 	currentGroove_=0 ;
 	mixerCol_=0 ;
 	mixerRow_=0 ;
