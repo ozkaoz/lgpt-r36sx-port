@@ -201,6 +201,11 @@ void HelpOverlay::ProcessButtonMask(unsigned short mask, bool pressed) {
             }
             ClampCursor();
         }
+        // TREEFROG_HELP_NAV_V15 (Bacon 1.1.1 V15): a consumed navigation
+        // press must repaint the overlay; previously the section index
+        // changed silently and the screen only updated on the next unrelated
+        // dirty event, so L1/R1 looked dead.
+        isDirty_ = true;
     }
 }
 

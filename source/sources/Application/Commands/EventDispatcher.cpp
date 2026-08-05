@@ -50,7 +50,7 @@ EventDispatcher::~EventDispatcher() {
 void EventDispatcher::Execute(FourCC id,float value) {
 
 	if (window_) {
-		GUIEventPadButtonType mapping ;
+		GUIEventPadButtonType mapping = EPBT_SELECT ;
 		switch(id) {
 			case TRIG_EVENT_A:
 				mapping=EPBT_A;

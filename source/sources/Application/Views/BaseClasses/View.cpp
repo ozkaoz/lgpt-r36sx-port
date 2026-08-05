@@ -267,9 +267,16 @@ void View::RestoreSuspendedModal() {
 
 void View::Redraw() {
 	if (modalView_) {
+		// TREEFROG_HELP_OVER_SUSPENDED_MODAL_V1 (Bacon 1.1.1 V15): draw the
+		// suspended modal (the chopper) under the pushed overlay (Help) so
+		// the user still sees the screen they left instead of the bare base
+		// view underneath.  It is painted after the base view (which clears
+		// the screen) and before the top modal.  The suspended modal stays
+		// input-dead; only the top modal receives buttons.
 		if (isDirty_) {
 			DrawView() ;
 		}
+		if (suspendedModal_) suspendedModal_->Redraw() ;
 		modalView_->Redraw() ;
 	} else {
 		DrawView() ;
@@ -316,12 +323,26 @@ void View::ProcessButton(unsigned short mask, bool pressed, long eventWhen) {
 		if (pressed) {
 			if ((mask & (EPBM_L | EPBM_X)) == (EPBM_L | EPBM_X) &&
 			    (mask & EPBM_R) == 0) {
-				if (GlobalUndo()) return;
+				// TREEFROG_GLOBAL_UNDO_V4 (Bacon 1.1.1): the claimed combo
+				// returns early and would otherwise skip the SetDirty at the
+				// bottom of this method, so the undo/redo change was never
+				// repainted until the next unrelated input event.  Request a
+				// redraw explicitly before returning.
+				if (GlobalUndo()) {
+					((AppWindow &)w_).SetDirty();
+					return;
+				}
 			} else if ((mask & (EPBM_R | EPBM_X)) == (EPBM_R | EPBM_X) &&
 			           (mask & EPBM_L) == 0) {
-				if (GlobalRedo()) return;
+				if (GlobalRedo()) {
+					((AppWindow &)w_).SetDirty();
+					return;
+				}
 			} else if ((mask & (EPBM_A | EPBM_B)) == (EPBM_A | EPBM_B)) {
-				if (GlobalResetOption()) return;
+				if (GlobalResetOption()) {
+					((AppWindow &)w_).SetDirty();
+					return;
+				}
 			}
 		}
 		ProcessButtonMask(mask, pressed);

@@ -114,7 +114,18 @@ INCLUDES := \
 	-I$(SYSROOT)/usr/include
 
 CFLAGS := $(DEFINES) $(INCLUDES) $(TREEFROG_FLAGS) $(OPT_FLAGS) -include stdint.h -include SDL_types_force.h -Wall
-CXXFLAGS := $(CFLAGS) -std=gnu++03
+# Bacon 1.1.1 V15: the upstream LGPT tree still trips a set of legacy
+# categories (string-literal to char* conversions, unused statics from old
+# builds, multi-character constants, ...).  They are pre-existing noise, not
+# port regressions, so the port silences them and keeps -Wall/-Wextra-style
+# diagnostics for real problems (e.g. -Wmaybe-uninitialized stays on).
+CFLAGS += -Wno-write-strings -Wno-unused-variable -Wno-unused-function \
+          -Wno-unused-but-set-variable -Wno-switch -Wno-sign-compare \
+          -Wno-multichar -Wno-nonnull-compare -Wno-strict-overflow \
+          -Wno-parentheses -Wno-unused-value
+# -Wno-delete-incomplete only exists for C++/ObjC++, so it cannot live in the
+# shared CFLAGS (the C compiler would warn about the option itself).
+CXXFLAGS := $(CFLAGS) -std=gnu++03 -Wno-delete-incomplete
 LDFLAGS := $(TREEFROG_FLAGS) -shared -Wl,--gc-sections -Wl,--no-undefined -L$(SYSROOT)/usr/lib -L$(SYSROOT)/lib
 LIBS := -lpthread -lrt -lm
 

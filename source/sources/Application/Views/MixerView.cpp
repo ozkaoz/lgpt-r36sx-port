@@ -39,8 +39,9 @@ enum { ME_VOL, ME_PAN, ME_MASTERVOL, ME_DLYRET, ME_RVBRET, ME_FX,
 class MixerActionMenuModal : public ModalView {
   public:
     MixerActionMenuModal(MixerView &view)
-        : ModalView(view), mixer_(view), item_(0),
-          pendingAction_(0), masterMenu_(view.masterSelected_) {}
+        : ModalView(view), mixer_(view),
+          pendingAction_(0), item_(0),
+          masterMenu_(view.masterSelected_) {}
     virtual ~MixerActionMenuModal() {}
 
     virtual void DrawView() ;
@@ -1026,8 +1027,17 @@ void MixerView::PostFlushDraw() {
 		int totalPx=r.height*8 ;
 		int totalLevels=totalPx/LEVEL_H ;
 		if (totalLevels<1) continue ;
-		// 0 dB+ zone: the top 12.5% of the bar, rendered solid red.
-		int redBandPx=(totalLevels/8)*LEVEL_H ;
+		// 0 dB+ zone: the top of the bar above the 0 dB row on the shared
+		// -36..+3 scale (mixVULevel(0 dB) = 36/39), rendered solid red.  The
+		// zone starts right above 0 dB (the "0" CUE mark) and covers the +3
+		// top cell, matching the CUE scale's +3/0 markers.  TREEFROG_MIXER_RED_BAND_TOP_V1
+		// (Bacon 1.1.1 V15): with the bottom-up bars the band must sit at the
+		// top of the bar (row 0 = top of screen), not at the bottom as the
+		// pre-V14 top-down row test left it.
+		const float zeroDbLevel=36.0f/39.0f ;
+		int redBandLevels=totalLevels-(int)(zeroDbLevel*(float)totalLevels+0.5f) ;
+		if (redBandLevels<1) redBandLevels=1 ;
+		int redBandPx=redBandLevels*LEVEL_H ;
 		int filledL=(int)(r.levelL*(float)totalLevels+0.5f)*LEVEL_H ;
 		int filledR=(int)(r.levelR*(float)totalLevels+0.5f)*LEVEL_H ;
 		if (filledL>totalPx) filledL=totalPx ;
@@ -1047,7 +1057,7 @@ void MixerView::PostFlushDraw() {
 		}
 		int iBase=py*TREEFROG_LGPT_WIDTH+px ;
 		for (int row=0;row<totalPx;row++) {
-			bool inBand=(row>=totalPx-redBandPx) ;
+			bool inBand=(row<redBandPx) ;
 			int levelIdx=(totalPx-1-row)/LEVEL_H ;
 			bool fillL=(levelIdx<filledLLevels) ;
 			bool fillR=(levelIdx<filledRLevels) ;

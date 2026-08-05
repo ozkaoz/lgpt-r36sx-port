@@ -687,6 +687,27 @@ bool AppWindow::onEvent(GUIEvent &event) {
         const unsigned short helpCombo =
             EPBM_SELECT | EPBM_R;
 
+        // TREEFROG_HELP_NAV_V15 (Bacon 1.1.1 V15): while a Help overlay is
+        // open, L1/R1/L2/R2 presses always reach it for section navigation,
+        // even when SELECT is still held from the chord that opened it.  The
+        // atomic mask cannot tell "tap R1 for the next section" from
+        // "SELECT+R1 again", so navigation wins; the overlay closes with B
+        // (as its footer states).  Only the nav bits are forwarded so the
+        // SELECT+R1 close chord inside the overlay can never misfire.
+        if (_currentView) {
+            ModalView *navModal = _currentView->GetModal();
+            if (navModal && navModal->IsHelpOverlay()) {
+                const unsigned short navPress =
+                    _mask & (EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2);
+                if (navPress != 0) {
+                    _currentView->ProcessButton(
+                        navPress, true, event.When());
+                    _isDirty = true;
+                    break;
+                }
+            }
+        }
+
         // TREEFROG_HELP_OVERLAY_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md):
         // SELECT+R1 opens the context help overlay (latched, non-modal
         // state change); SELECT+R2 keeps the Audio Driver dialog.
@@ -804,6 +825,21 @@ bool AppWindow::onEvent(GUIEvent &event) {
          * RC4 P1 (PLAN_RC4 11.3): Help may open over an active dialog via
          * PushModal (suspend + restore) instead of replacing it.
          */
+        // TREEFROG_HELP_NAV_V15: same L1/R1/L2/R2 forwarding as the mask
+        // path while a Help overlay is open.
+        if (_currentView) {
+            ModalView *navModal = _currentView->GetModal();
+            if (navModal && navModal->IsHelpOverlay()) {
+                const unsigned short navPress =
+                    _mask & (EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2);
+                if (navPress != 0) {
+                    _currentView->ProcessButton(
+                        navPress, true, event.When());
+                    _isDirty = true;
+                    break;
+                }
+            }
+        }
         if ((_mask & helpCombo) == helpCombo &&
             _currentView) {
             if (!_helpShortcutLatched) {
@@ -814,8 +850,14 @@ bool AppWindow::onEvent(GUIEvent &event) {
                     _helpShortcutLatched = false;
                     break;
                 }
+                // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): same modal
+                // targeting as the mask path so Help over the chopper opens
+                // on the chopper section, not the base view underneath.
+                View *helpTarget = _currentView;
+                ModalView *topModal = _currentView->GetModal();
+                if (topModal) helpTarget = topModal;
                 _currentView->PushModal(
-                    new HelpOverlay(*_currentView),
+                    new HelpOverlay(*helpTarget),
                     HelpOverlayApplyCallback);
                 _isDirty = true;
             }

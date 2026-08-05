@@ -2999,7 +2999,7 @@ void SampleChopperModal::drawSampleInfo(GUITextProperties &props) {
     if (statusMessage_[0]) { SetColor(CD_HILITE1); drawStringAbs(2, 23, statusMessage_, props); }
 }
 
-void SampleChopperModal::drawEmptyWaveformText(GUITextProperties &props) { SetColor(CD_HILITE1); drawStringAbs(2, 13, "----------- no sample loaded -----------", props); }
+void SampleChopperModal::drawEmptyWaveformText(GUITextProperties &props) { SetColor(CD_HILITE1); drawStringAbs(2, 13, "            no sample loaded            ", props); }
 
 void SampleChopperModal::drawControls(GUITextProperties &props) {
     SetColor(CD_NORMAL);
@@ -3058,25 +3058,28 @@ void SampleChopperModal::clearOperationProgress() {
 void SampleChopperModal::drawOperationOverlay(GUITextProperties &props) {
     if (!operationActive_) return;
     char msg[64];
-    const int x = 3;
-    const int y = 10;
+    /* Bacon 1.1.1 V15: port-wide graphical language (centered title over a
+       label/value block, same as the Pitch/Env panel) -- no ASCII box of
+       '+'/'-'/'|' characters.  The percent row is the current operation. */
+    UiDraw::DrawCenteredTitleAt(*this, 10, "OPERATION");
+    MenuLayout ml = UiDraw::MakeCenteredMenuLayout(2, 10, 22, 2);
+    SetColor(CD_NORMAL);
+    props.invert_ = false;
+    DrawString(ml.labelX, ml.startY, "Status", props);
+    SetColor(CD_HILITE2);
+    snprintf(msg, sizeof(msg), "%-22.22s", operationMessage_);
+    DrawString(ml.valueX, ml.startY, msg, props);
     SetColor(CD_HILITE1);
     props.invert_ = true;
-    drawStringAbs(x, y + 0, "+--------------------------------+", props);
-    snprintf(msg, sizeof(msg), "| %-30.30s |", operationMessage_);
-    drawStringAbs(x, y + 1, msg, props);
-    snprintf(msg, sizeof(msg), "|              %3d%%              |", operationPercent_);
-    msg[34] = 0;
-    drawStringAbs(x, y + 2, msg, props);
-    if (operationPercent_ >= 100) {
-        drawStringAbs(x, y + 3, "|              OK                |", props);
-        drawStringAbs(x, y + 4, "| A close  L1+X undo R1+X redo  |", props);
-    } else {
-        drawStringAbs(x, y + 3, "|          Please wait           |", props);
-        drawStringAbs(x, y + 4, "|       Processing sample        |", props);
-    }
-    drawStringAbs(x, y + 5, "+--------------------------------+", props);
+    snprintf(msg, sizeof(msg), "%3d%%", operationPercent_);
+    DrawString(ml.labelX, ml.startY + 1, msg, props);
     props.invert_ = false;
+    SetColor(CD_NORMAL);
+    DrawString(2, ml.startY + 3,
+               operationPercent_ >= 100
+                   ? "A close  L1+X undo  R1+X redo"
+                   : "Processing sample, please wait",
+               props);
 }
 
 void SampleChopperModal::DrawView() {
