@@ -1,5 +1,42 @@
 # Changelog
 
+## Release: Bacon 1.1 - Audio Driver Refact, Sampler Audio Added
+
+- **Estado**: release de estabilización del driver de audio Sampler
+  (SP404MKII) con refactor del módulo playback del daemon. Consolida RC9.7 +
+  RC9.8 + U2.53.0 + U2.53.1. Los cuatro drivers de audio (Windows / Local /
+  Android / Sampler) verificados funcionando correctamente en consola.
+- **Pitido permanente del Sampler eliminado (U2.53.0)**: el rearmer desde
+  cero del módulo playback (`r36s_sp404_host_audio_io.c`) sustituye el
+  resampler polifase + feed EMA + feed-ratio + latency-trims por un
+  passthrough puro ring→PCM: pop 2ch, gain 0.65, conversión a 4ch (L/R en
+  ch1/2), silencio de período completo en starvation (nunca se re-emite audio
+  stale) y drop-on-full del ring. El diagnóstico FIFO_DUMP confirmó que el
+  contenido del fifo del core es audio limpio del proyecto; el tono full-scale
+  provenía del path del daemon (re-emisión de buffers stale tras cambio de
+  modo sin replug).
+- **FIFO_DUMP (U2.53.0)**: captura los primeros 2 s del contenido crudo del
+  fifo (pre-gain, 48 kHz estéreo) a
+  `/mnt/sdcard/LGPT_OTG_LOGS/fifo_capture.wav` en cada stream primed, para
+  distinguir si un tono lo genera el core (presente en el WAV) o el daemon
+  (ausente).
+- **Fix crash del daemon (U2.53.1)**: overflow del buffer FIFO_DUMP. El
+  array de 32768 muestras (16384 frames estéreo) se indexaba como frames x2
+  (hasta índice 65535), por lo que desde el frame 16384 (~341 ms de audio)
+  el daemon escribía fuera de límites y moría con el primer golpe del
+  proyecto, dejando el fifo sin lector (port congelado) y un WAV de solo
+  cabecera. Fix: `FIFO_DUMP_BUF_FRAMES 32768` con buffer `[32768*2]` y
+  guard/flush coherentes.
+- **RC9.8**: fix del pitido constante del Sampler — feed EMA reseteado en
+  cada open + rechazo de spikes transitorios + override de starvation (ratio
+  1.0). El feed EMA sobrevivía los reconnects y quedaba clavado en el clamp
+  1.08 tras un burst de ~1.85x, drenando el ring 8% más rápido.
+- **RC9.7**: etiqueta `Sampler` sin sufijo `[OUT]`, barra de preescucha
+  USB-REC sólida (`UIIntVarField`), descripción `SP404: console sound to
+  sampler (EXT SOURCE)`.
+- **Verificación**: build `BUILD_U2523_OK`, install + verify en SD
+  (`VERIFY_U2523_OK`, `ERRORS=0`), retest en consola con los 4 drivers.
+
 ## Release candidate: RC9.7 - Audio driver Sampler (SP404MKII)
 
 - **Estado**: iteración de acabado sobre RC9.6 centrada en el driver de
