@@ -23,9 +23,13 @@ public:
 	int GetFocusIndex() ;
 	void SetSize(int size) ;
 private:
+	// TREEFROG_GLOBAL_UNDO_V7 (Bacon 1.1.1 V16): newValue is the post-edit
+	// value captured when the undo entry is popped (GlobalUndo reads the
+	// field before restoring), so R1+X redo restores the edited state.
 	struct FieldEdit {
 		UIField *field ;
 		int value ;
+		int newValue ;
 	} ;
 	void pushFieldUndo() ;
 	static const int FIELD_HISTORY_SIZE=16 ;

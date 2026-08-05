@@ -854,13 +854,12 @@ void SongView::ProcessButtonMask(unsigned short mask, bool pressed) {
 
 // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): whole-song snapshot undo/redo.
 // TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): the snapshot covers the whole
-// song (2048 bytes) and the cursor, and is captured at the edit sites only.
+// song (2048 bytes) and is captured at the edit sites only.
+// TREEFROG_GLOBAL_UNDO_V8 (Bacon 1.1.1 V16): the cursor is left untouched --
+// undo/redo reverts the last ACTION; navigation is not part of the history.
 void SongView::pushSongUndo() {
     SongEdit e;
     memcpy(e.data, viewData_->song_->data_, sizeof(e.data));
-    e.songX = (unsigned char)viewData_->songX_;
-    e.songY = (unsigned char)viewData_->songY_;
-    e.songOffset = (unsigned char)viewData_->songOffset_;
     for (int i = kSongHistorySize - 1; i > 0; i--) songUndo_[i] = songUndo_[i - 1];
     songUndo_[0] = e;
     songUndoCount_++;
@@ -878,9 +877,6 @@ bool SongView::GlobalUndo() {
     songRedoCount_++;
     if (songRedoCount_ > kSongHistorySize) songRedoCount_ = kSongHistorySize;
     memcpy(viewData_->song_->data_, e.data, sizeof(e.data));
-    viewData_->songX_ = e.songX;
-    viewData_->songY_ = e.songY;
-    viewData_->songOffset_ = e.songOffset;
     isDirty_ = true;
     return true;
 }
@@ -895,9 +891,6 @@ bool SongView::GlobalRedo() {
     songUndoCount_++;
     if (songUndoCount_ > kSongHistorySize) songUndoCount_ = kSongHistorySize;
     memcpy(viewData_->song_->data_, e.data, sizeof(e.data));
-    viewData_->songX_ = e.songX;
-    viewData_->songY_ = e.songY;
-    viewData_->songOffset_ = e.songOffset;
     isDirty_ = true;
     return true;
 }

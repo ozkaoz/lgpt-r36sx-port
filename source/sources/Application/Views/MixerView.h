@@ -183,17 +183,21 @@ protected:
 	void nudgeReverbReturn(int delta) ;
 	void drawMixReturns(int y) ;
 	// TREEFROG_GLOBAL_UNDO_V1: MIX/FX edit history (L1+X undo, R1+X redo).
-	// kind: ME_VOL/ME_PAN/ME_MASTERVOL/ME_DLYRET/ME_RVBRET/ME_FX.
-	// channel: mixer channel (or -1 for master); ME_FX stores the param id.
-	// value: old int value (vol/pan/mastervol), old percent (returns), old
-	// float param (ME_FX).
+	// kind: ME_VOL/ME_PAN/ME_MASTERVOL/ME_DLYRET/ME_RVBRET/ME_FX/ME_MUTE/
+	// ME_SOLO.  channel: mixer channel (or -1 for master); ME_FX stores the
+	// param id.  value: old int value (vol/pan/mastervol), old percent
+	// (returns), old float param (ME_FX), old mute state / mute mask
+	// (ME_MUTE/ME_SOLO).  TREEFROG_GLOBAL_UNDO_V7 (Bacon 1.1.1 V16):
+	// newValue: post-edit value captured at push time so REDO restores the
+	// exact edited state (R1+X), not the state before the edit again.
 	struct MixEdit {
 		int kind ;
 		int channel ;
 		float value ;
+		float newValue ;
 	} ;
 	static const int MIX_HISTORY_SIZE=16 ;
-	void pushMixUndo(int kind,int channel,float value) ;
+	void pushMixUndo(int kind,int channel,float value,float newValue=-1.0f) ;
 	void restoreMixEdit(const MixEdit &edit) ;
 	MixEdit mixUndo_[MIX_HISTORY_SIZE] ;
 	int mixUndoCount_ ;

@@ -312,6 +312,7 @@ void FieldView::pushFieldUndo() {
 	}
 	fieldUndo_[0].field=focus_ ;
 	fieldUndo_[0].value=value ;
+	fieldUndo_[0].newValue=value ;
 	fieldUndoCount_++ ;
 	if (fieldUndoCount_>FIELD_HISTORY_SIZE) fieldUndoCount_=FIELD_HISTORY_SIZE ;
 	fieldRedoCount_=0 ;
@@ -330,6 +331,11 @@ bool FieldView::GlobalUndo() {
 	fieldRedo_[0]=e ;
 	fieldRedoCount_++ ;
 	if (fieldRedoCount_>FIELD_HISTORY_SIZE) fieldRedoCount_=FIELD_HISTORY_SIZE ;
+	// TREEFROG_GLOBAL_UNDO_V7: the popped entry now holds the edited value;
+	// capture it while the field still shows the edit so REDO can restore it.
+	int capturedValue=0 ;
+	e.newValue = e.field->CaptureIntValue(capturedValue)
+	                 ? capturedValue : e.value ;
 	focus_=e.field ;
 	focus_->SetFocus() ;
 	e.field->RestoreIntValue(e.value) ;
@@ -352,7 +358,9 @@ bool FieldView::GlobalRedo() {
 	if (fieldUndoCount_>FIELD_HISTORY_SIZE) fieldUndoCount_=FIELD_HISTORY_SIZE ;
 	focus_=e.field ;
 	focus_->SetFocus() ;
-	e.field->RestoreIntValue(e.value) ;
+	// TREEFROG_GLOBAL_UNDO_V7: redo restores the post-edit value (the user
+	// expects R1+X to replay the action, not to sit still).
+	e.field->RestoreIntValue(e.newValue) ;
 	isDirty_=true ;
 	return true ;
 }

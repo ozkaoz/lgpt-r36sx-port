@@ -203,6 +203,9 @@ AppWindow::AppWindow(I_GUIWindowImp &imp) : GUIWindow(imp) {
     _mask = 0;
     _audioShortcutLatched = false;
     _helpShortcutLatched = false;
+    _pendingShoulderPress = 0;
+    _lastShoulderPress = 0;
+    _chordLastWasRedo = false;
     colorIndex_ = CD_NORMAL;
 
     EventDispatcher *ed = EventDispatcher::GetInstance();
@@ -679,6 +682,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
          * The event value is the complete logical LGPT mask.  Replace _mask
          * atomically instead of reconstructing it one button at a time.
          */
+        const unsigned short chordOldMask = _mask;
         SynchronizeInputMask(
             (unsigned short)(event.GetValue() & 0xffffL));
 
@@ -703,6 +707,84 @@ bool AppWindow::onEvent(GUIEvent &event) {
                     _currentView->ProcessButton(
                         navPress, true, event.When());
                     _isDirty = true;
+                    break;
+                }
+            }
+        }
+
+        // TREEFROG_GLOBAL_UNDO_V6 (Bacon 1.1.1 V16): reliable L1+X / R1+X
+        // chords.  Chaining undo into redo faster than the pad releases the
+        // other shoulder yields a latched L|R|X poll; View::ProcessButton
+        // rejects both chords there (L|X must not contain R, R|X must not
+        // contain L) and redo silently dies.  Resolve using the previous
+        // mask: the shoulder that just pressed wins (fresh R -> redo, fresh
+        // L -> undo); if neither shoulder is fresh, the most recent shoulder
+        // press wins; last resort is the direction of the last chord.  A
+        // lone shoulder press is held one poll in case X joins it, so an
+        // R1-first R1+X can never leak its R1 as a standalone press (Song
+        // R1 = mute toggle) before the chord is recognized.
+        if (_currentView) {
+            const unsigned short newMask = _mask;
+            if (newMask & EPBM_X) {
+                const bool hasL = (newMask & EPBM_L) != 0;
+                const bool hasR = (newMask & EPBM_R) != 0;
+                if (hasL && hasR) {
+                    const bool freshL =
+                        hasL && ((chordOldMask & EPBM_L) == 0);
+                    const bool freshR =
+                        hasR && ((chordOldMask & EPBM_R) == 0);
+                    unsigned short combo;
+                    if (freshR && !freshL) {
+                        combo = EPBM_R | EPBM_X;
+                    } else if (freshL && !freshR) {
+                        combo = EPBM_L | EPBM_X;
+                    } else if (_lastShoulderPress == EPBM_L) {
+                        combo = EPBM_L | EPBM_X;
+                    } else if (_lastShoulderPress == EPBM_R) {
+                        combo = EPBM_R | EPBM_X;
+                    } else {
+                        combo = _chordLastWasRedo
+                                    ? (EPBM_R | EPBM_X)
+                                    : (EPBM_L | EPBM_X);
+                    }
+                    _chordLastWasRedo =
+                        (combo == (EPBM_R | EPBM_X));
+                    _pendingShoulderPress = 0;
+                    _currentView->ProcessButton(
+                        combo, true, event.When());
+                    _isDirty = true;
+                    break;
+                }
+                if (hasL != hasR) {
+                    // Unambiguous X+shoulder: record the direction for the
+                    // fallbacks, drop any stale pending press, and let the
+                    // normal delivery path below handle it.
+                    _chordLastWasRedo = hasR;
+                    _lastShoulderPress = hasL ? EPBM_L : EPBM_R;
+                    _pendingShoulderPress = 0;
+                }
+            } else {
+                // No X in this poll: release a pending lone shoulder press
+                // unless it is now part of a SELECT+shoulder chord (help /
+                // audio) or an L1+R1 combo, which the mask path delivers.
+                if (_pendingShoulderPress != 0) {
+                    const unsigned short pend = _pendingShoulderPress;
+                    _pendingShoulderPress = 0;
+                    if (!((newMask & EPBM_SELECT) &&
+                          (newMask & pend))) {
+                        _currentView->ProcessButton(
+                            pend, true, event.When());
+                        _isDirty = true;
+                    }
+                }
+                const unsigned short shoulderOnly =
+                    newMask & (EPBM_L | EPBM_R);
+                if ((shoulderOnly == EPBM_L ||
+                     shoulderOnly == EPBM_R) &&
+                    (chordOldMask & shoulderOnly) == 0) {
+                    // Fresh lone shoulder: wait one poll for X to join it.
+                    _pendingShoulderPress = shoulderOnly;
+                    _lastShoulderPress = shoulderOnly;
                     break;
                 }
             }
@@ -775,6 +857,20 @@ bool AppWindow::onEvent(GUIEvent &event) {
     }
 
     case ET_PADMASKUP: {
+        // TREEFROG_GLOBAL_UNDO_V6: a lone shoulder held one poll for a chord
+        // was released without X -- deliver the standalone press now so the
+        // view still gets it (Song R1 = mute toggle, ...), then the release.
+        const unsigned short upMask =
+            (unsigned short)(event.GetValue() & 0xffffL);
+        if (_pendingShoulderPress != 0 &&
+            (upMask & _pendingShoulderPress) == 0) {
+            const unsigned short pend = _pendingShoulderPress;
+            _pendingShoulderPress = 0;
+            if (_currentView) {
+                _currentView->ProcessButton(pend, true, event.When());
+                _isDirty = true;
+            }
+        }
         SynchronizeInputMask(
             (unsigned short)(event.GetValue() & 0xffffL));
 
@@ -838,6 +934,31 @@ bool AppWindow::onEvent(GUIEvent &event) {
                     _isDirty = true;
                     break;
                 }
+            }
+        }
+        // TREEFROG_GLOBAL_UNDO_V6: per-button frontends see the same
+        // latched L|R|X case; the button that just went down wins.
+        if (_currentView && v != 0) {
+            if ((v == EPBM_L || v == EPBM_R) &&
+                (_mask & EPBM_X) &&
+                (_mask & (EPBM_L | EPBM_R)) == (EPBM_L | EPBM_R)) {
+                const bool isR = (v == EPBM_R);
+                _chordLastWasRedo = isR;
+                _lastShoulderPress = v;
+                _currentView->ProcessButton(
+                    isR ? (EPBM_R | EPBM_X) : (EPBM_L | EPBM_X),
+                    true, event.When());
+                _isDirty = true;
+                break;
+            }
+            if (v == EPBM_X &&
+                (_mask & (EPBM_L | EPBM_R)) == (EPBM_L | EPBM_R)) {
+                _currentView->ProcessButton(
+                    _chordLastWasRedo ? (EPBM_R | EPBM_X)
+                                      : (EPBM_L | EPBM_X),
+                    true, event.When());
+                _isDirty = true;
+                break;
             }
         }
         if ((_mask & helpCombo) == helpCombo &&

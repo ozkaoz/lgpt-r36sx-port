@@ -1213,8 +1213,6 @@ void PhraseView::pushPhraseUndo() {
     memcpy(e.cmd3, phrase_->cmd3_ + 16 * viewData_->currentPhrase_, 16 * sizeof(FourCC));
     memcpy(e.param3, phrase_->param3_ + 16 * viewData_->currentPhrase_, 16 * sizeof(ushort));
     e.currentPhrase = (uchar)viewData_->currentPhrase_;
-    e.row = (uchar)row_;
-    e.col = (uchar)col_;
     for (int i = kPhraseHistorySize - 1; i > 0; i--) phraseUndo_[i] = phraseUndo_[i - 1];
     phraseUndo_[0] = e;
     phraseUndoCount_++;
@@ -1234,8 +1232,9 @@ static void phraseUndoRestore(Phrase *phrase, const PhraseView::PhraseEdit &e, V
     memcpy(phrase->param2_ + 16 * e.currentPhrase, e.param2, 16 * sizeof(ushort));
     memcpy(phrase->cmd3_ + 16 * e.currentPhrase, e.cmd3, 16 * sizeof(FourCC));
     memcpy(phrase->param3_ + 16 * e.currentPhrase, e.param3, 16 * sizeof(ushort));
+    // TREEFROG_GLOBAL_UNDO_V8: the edit target is restored so the change is
+    // visible, but the cursor stays where the user left it.
     viewData->currentPhrase_ = e.currentPhrase;
-    viewData->phraseCurPos_ = e.row;
 }
 
 bool PhraseView::GlobalUndo() {
@@ -1248,8 +1247,7 @@ bool PhraseView::GlobalUndo() {
     phraseRedoCount_++;
     if (phraseRedoCount_ > kPhraseHistorySize) phraseRedoCount_ = kPhraseHistorySize;
     phraseUndoRestore(phrase_, e, viewData_);
-    row_ = e.row;
-    col_ = e.col;
+    viewData_->phraseCurPos_ = row_;
     isDirty_ = true;
     return true;
 }
@@ -1264,8 +1262,7 @@ bool PhraseView::GlobalRedo() {
     phraseUndoCount_++;
     if (phraseUndoCount_ > kPhraseHistorySize) phraseUndoCount_ = kPhraseHistorySize;
     phraseUndoRestore(phrase_, e, viewData_);
-    row_ = e.row;
-    col_ = e.col;
+    viewData_->phraseCurPos_ = row_;
     isDirty_ = true;
     return true;
 }

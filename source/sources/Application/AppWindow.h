@@ -99,6 +99,13 @@ class AppWindow : public GUIWindow, I_Observer, Status {
     unsigned short _mask;
     bool _audioShortcutLatched;
     bool _helpShortcutLatched;
+    // TREEFROG_GLOBAL_UNDO_V6 (Bacon 1.1.1 V16): chord-state for L1+X / R1+X.
+    // _pendingShoulderPress holds a lone shoulder press one poll while we wait
+    // for X to join it; _lastShoulderPress / _chordLastWasRedo disambiguate a
+    // latched L|R|X mask (undo chained into redo before L1 fully released).
+    unsigned short _pendingShoulderPress;
+    unsigned short _lastShoulderPress;
+    bool _chordLastWasRedo;
     unsigned long _lastA;
     unsigned long _lastB;
     char _statusLine[80];

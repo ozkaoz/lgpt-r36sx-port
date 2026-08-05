@@ -100,13 +100,13 @@ class SongView : public View {
     uint8_t jumpLength_; // When jumping columns with B
 
     // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): undo/redo history.  A SongEdit
-    // snapshots the whole song (8 channels x 256 rows) plus the cursor.
+    // snapshots the whole song (8 channels x 256 rows).  TREEFROG_GLOBAL_UNDO_V8
+    // (Bacon 1.1.1 V16): the cursor is NOT part of the snapshot anymore --
+    // undo/redo must revert the last action, and moving the cursor back to
+    // the edit site reads as "undo did nothing" after navigating away.
     static const int kSongHistorySize = 16;
     struct SongEdit {
         unsigned char data[SONG_CHANNEL_COUNT * SONG_ROW_COUNT];
-        unsigned char songX;
-        unsigned char songY;
-        unsigned char songOffset;
     };
     SongEdit songUndo_[kSongHistorySize];
     int songUndoCount_;

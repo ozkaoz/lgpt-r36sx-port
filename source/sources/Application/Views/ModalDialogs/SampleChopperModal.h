@@ -46,9 +46,13 @@ public:
     virtual ViewType GetViewType() const { return VT_CHOPPER; }
     // TREEFROG_CHOPPER_HELP_V1: while Help (or another modal) is pushed on
     // top, the waveform pixel overlay must not draw over it; it is cleared on
-    // suspend and re-published when the chopper regains focus.
-    virtual void OnSuspend() { clearOverlayState(); }
-    virtual void OnRestore() { publishOverlayState(); isDirty_ = true; }
+    // suspend and re-published when the chopper regains focus.  TREEFROG_CHOPPER_HELP_V2
+    // (Bacon 1.1.1 V16): DrawView() runs every frame while suspended (the
+    // base Redraw always repaints a modal-less view) and publishOverlayState()
+    // would re-enable g_chopperOverlayActive right back over the Help box;
+    // the suspended_ flag keeps the overlay off until OnRestore().
+    virtual void OnSuspend() { suspended_ = true; clearOverlayState(); }
+    virtual void OnRestore() { suspended_ = false; publishOverlayState(); isDirty_ = true; }
 
 private:
     enum {
@@ -129,6 +133,7 @@ private:
     bool chopsInitialized_;
     bool trimMode_;
     bool pitchMode_;
+    bool suspended_;
     int pitchSemitones_;
     int pitchEditParam_;
     int pitchAttackMs_;

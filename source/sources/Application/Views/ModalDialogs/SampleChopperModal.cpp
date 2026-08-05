@@ -989,6 +989,7 @@ SampleChopperModal::SampleChopperModal(View &view,
       chopsInitialized_(false),
       trimMode_(false),
       pitchMode_(false),
+      suspended_(false),
       pitchSemitones_(0),
       pitchEditParam_(0),
       pitchAttackMs_(0),
@@ -2707,7 +2708,10 @@ void SampleChopperModal::prepareWaveformPreview() {
 
 void SampleChopperModal::publishOverlayState() {
 #if defined(PLATFORM_TREEFROG)
-    g_chopperOverlayActive = (hasWaveform_ && !operationActive_ && !pitchMode_) ? 1 : 0;
+    // TREEFROG_CHOPPER_HELP_V2 (Bacon 1.1.1 V16): while suspended under a
+    // pushed modal (Help), the overlay must stay disabled; DrawView() keeps
+    // running and would otherwise re-publish it over the modal.
+    g_chopperOverlayActive = (!suspended_ && hasWaveform_ && !operationActive_ && !pitchMode_) ? 1 : 0;
     g_chopperCursorPx = frameToPixel(cursorFrame_);
     if (g_chopperCursorPx < 0) g_chopperCursorPx = 0;
     for (int i = 0; i < MAX_COLUMNS; i++) { g_chopperMinColumn[i] = minColumn_[i]; g_chopperMaxColumn[i] = maxColumn_[i]; }
@@ -3061,6 +3065,11 @@ void SampleChopperModal::drawOperationOverlay(GUITextProperties &props) {
     /* Bacon 1.1.1 V15: port-wide graphical language (centered title over a
        label/value block, same as the Pitch/Env panel) -- no ASCII box of
        '+'/'-'/'|' characters.  The percent row is the current operation. */
+    /* Bacon 1.1.1 V16: the operation panel sits over the pixel waveform
+       band; clear its full cell area (title row 9 through hint row 13, y
+       72..127) so stale waveform pixels never show between the text rows.
+       The glyph cells are opaque, but the panel has no box around it. */
+    tf_rect(0, 72, 320, 56, tf_rgb565(10, 10, 24));
     UiDraw::DrawCenteredTitleAt(*this, 10, "OPERATION");
     MenuLayout ml = UiDraw::MakeCenteredMenuLayout(2, 10, 22, 2);
     SetColor(CD_NORMAL);

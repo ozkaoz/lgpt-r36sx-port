@@ -26,7 +26,7 @@
 // TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13): ME_SOFTCLIP /
 // ME_SOFTCLIPGAIN track the master limiter/clip edits of the L1+A menu.
 enum { ME_VOL, ME_PAN, ME_MASTERVOL, ME_DLYRET, ME_RVBRET, ME_FX,
-       ME_SOFTCLIP, ME_SOFTCLIPGAIN } ;
+       ME_SOFTCLIP, ME_SOFTCLIPGAIN, ME_MUTE, ME_SOLO } ;
 
 // TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13):
 // L1+A on the mixer opens this menu.  On the master bar it edits the master
@@ -171,7 +171,8 @@ void MixerActionMenuModal::ProcessButtonMask(unsigned short mask,
             if (idx > 4) idx = 4 ;
             if (idx == project->GetSoftclip()) return ;
             mixer_.pushMixUndo(ME_SOFTCLIP, -1,
-                               (float)project->GetSoftclip()) ;
+                               (float)project->GetSoftclip(),
+                               (float)idx) ;
             Variable *var = project->FindVariable(VAR_SOFTCLIP) ;
             if (var) var->SetInt(idx, false) ;
             MixerService::GetInstance()->SetSoftclip(
@@ -182,7 +183,8 @@ void MixerActionMenuModal::ProcessButtonMask(unsigned short mask,
             if (idx > 1) idx = 1 ;
             if (idx == project->GetSoftclipGain()) return ;
             mixer_.pushMixUndo(ME_SOFTCLIPGAIN, -1,
-                               (float)project->GetSoftclipGain()) ;
+                               (float)project->GetSoftclipGain(),
+                               (float)idx) ;
             Variable *var = project->FindVariable(VAR_SOFTCLIP_GAIN) ;
             if (var) var->SetInt(idx, false) ;
             MixerService::GetInstance()->SetSoftclip(
@@ -426,24 +428,33 @@ void MixerView::updateVolume(int delta) {
 	// master FX returns (sends are per-instrument now, edited in Instrument).
 	if (fxPage_==FX_PAGE_MIX) {
 		if (fxEditTarget_==1) {
-			// TREEFROG_GLOBAL_UNDO_V1: record the old return level (percent).
-			pushMixUndo(ME_DLYRET,viewData_->mixerCol_,
-			            (float)fxReturnPercent(FxEngine::FxEngine::GetInstance().GetDelayReturn())) ;
+			// TREEFROG_GLOBAL_UNDO_V7: capture old and new percent.
+			FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
+			int oldRet=fxReturnPercent(fx.GetDelayReturn()) ;
 			nudgeDelayReturn(delta) ;
+			pushMixUndo(ME_DLYRET,viewData_->mixerCol_,
+			            (float)oldRet,
+			            (float)fxReturnPercent(fx.GetDelayReturn())) ;
 			isDirty_=true ;
 			return ;
 		}
 		if (fxEditTarget_==2) {
-			pushMixUndo(ME_RVBRET,viewData_->mixerCol_,
-			            (float)fxReturnPercent(FxEngine::FxEngine::GetInstance().GetReverbReturn())) ;
+			FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
+			int oldRet=fxReturnPercent(fx.GetReverbReturn()) ;
 			nudgeReverbReturn(delta) ;
+			pushMixUndo(ME_RVBRET,viewData_->mixerCol_,
+			            (float)oldRet,
+			            (float)fxReturnPercent(fx.GetReverbReturn())) ;
 			isDirty_=true ;
 			return ;
 		}
 	}
 	Mixer *mixer=Mixer::GetInstance() ;
-	pushMixUndo(ME_VOL,viewData_->mixerCol_,(float)mixer->GetChannelVolume(viewData_->mixerCol_)) ;
+	int oldVol=mixer->GetChannelVolume(viewData_->mixerCol_) ;
 	mixer->NudgeChannelVolume(viewData_->mixerCol_,delta) ;
+	pushMixUndo(ME_VOL,viewData_->mixerCol_,
+	            (float)oldVol,
+	            (float)mixer->GetChannelVolume(viewData_->mixerCol_)) ;
 	isDirty_=true ;
 }
 
@@ -451,10 +462,12 @@ void MixerView::adjustMasterVolume(int delta) {
 	Project *project=viewData_->project_ ;
 	if (!project) return ;
 	int v=project->GetMasterVolume() ;
-	pushMixUndo(ME_MASTERVOL,-1,(float)v) ;
-	v+=delta ;
-	if (v<10) v=10 ;
-	if (v>100) v=100 ;
+	int v2=v+delta ;
+	if (v2<10) v2=10 ;
+	if (v2>100) v2=100 ;
+	// TREEFROG_GLOBAL_UNDO_V7: old value for undo, clamped post-edit for redo.
+	pushMixUndo(ME_MASTERVOL,-1,(float)v,(float)v2) ;
+	v=v2 ;
 	Variable *var=project->FindVariable(VAR_MASTERVOL) ;
 	if (var) var->SetInt(v,false) ;
 	MixerService::GetInstance()->SetMasterVolume(v) ;
@@ -463,14 +476,33 @@ void MixerView::adjustMasterVolume(int delta) {
 
 void MixerView::toggleMute() {
 	if (masterSelected_) return ;
-	UIController::GetInstance()->ToggleMute(viewData_->mixerCol_,viewData_->mixerCol_) ;
+	// TREEFROG_GLOBAL_UNDO_V7: mute toggles are undoable/redoable (the user
+	// expects R1+A on the mixer to be an action L1+X can take back).
+	Player *player=Player::GetInstance() ;
+	int channel=viewData_->mixerCol_ ;
+	bool oldMuted=player->IsChannelMuted(channel) ;
+	UIController::GetInstance()->ToggleMute(channel,channel) ;
+	pushMixUndo(ME_MUTE,channel,oldMuted?1.0f:0.0f,oldMuted?0.0f:1.0f) ;
 	isDirty_=true ;
 }
 
 void MixerView::switchSoloMode() {
 	if (masterSelected_) return ;
-	UIController::GetInstance()->SwitchSoloMode(viewData_->mixerCol_,viewData_->mixerCol_,!soloMode_) ;
+	// TREEFROG_GLOBAL_UNDO_V7: solo toggles are undoable/redoable.  The full
+	// 8-bit mute mask is captured before and after the toggle; the undo
+	// restores the pre-toggle mask, the redo the post-toggle mask.
+	Player *player=Player::GetInstance() ;
+	int channel=viewData_->mixerCol_ ;
+	unsigned char oldMask=0,newMask=0 ;
+	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+		if (player->IsChannelMuted(i)) oldMask|=(unsigned char)(1<<i) ;
+	}
+	UIController::GetInstance()->SwitchSoloMode(channel,channel,!soloMode_) ;
 	soloMode_=!soloMode_ ;
+	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+		if (player->IsChannelMuted(i)) newMask|=(unsigned char)(1<<i) ;
+	}
+	pushMixUndo(ME_SOLO,channel,(float)oldMask,(float)newMask) ;
 	isDirty_=true ;
 }
 
@@ -566,7 +598,7 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 		              EPBM_SELECT | EPBM_START))) {
 			Mixer *mixer=Mixer::GetInstance() ;
 			int channel=viewData_->mixerCol_ ;
-			pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel)) ;
+			pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel),0.0f) ;
 			mixer->SetChannelPan(channel,0) ;
 			isDirty_=true ;
 			((AppWindow &)w_).SetDirty() ;
@@ -576,16 +608,20 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 		if (mask&EPBM_LEFT) {
 			Mixer *mixer=Mixer::GetInstance() ;
 			int channel=viewData_->mixerCol_ ;
-			pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel)) ;
+			int oldPan=mixer->GetChannelPan(channel) ;
 			mixer->NudgeChannelPan(channel,-step) ;
+			pushMixUndo(ME_PAN,channel,(float)oldPan,
+			            (float)mixer->GetChannelPan(channel)) ;
 			isDirty_=true ;
 			return ;
 		}
 		if (mask&EPBM_RIGHT) {
 			Mixer *mixer=Mixer::GetInstance() ;
 			int channel=viewData_->mixerCol_ ;
-			pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel)) ;
+			int oldPan=mixer->GetChannelPan(channel) ;
 			mixer->NudgeChannelPan(channel,step) ;
+			pushMixUndo(ME_PAN,channel,(float)oldPan,
+			            (float)mixer->GetChannelPan(channel)) ;
 			isDirty_=true ;
 			return ;
 		}
@@ -662,13 +698,14 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 
 // TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1):
 // MIX/FX edit history for the global L1+X / R1+X combos.
-void MixerView::pushMixUndo(int kind,int channel,float value) {
+void MixerView::pushMixUndo(int kind,int channel,float value,float newValue) {
 	for (int i=MIX_HISTORY_SIZE-1;i>0;i--) {
 		mixUndo_[i]=mixUndo_[i-1] ;
 	}
 	mixUndo_[0].kind=kind ;
 	mixUndo_[0].channel=channel ;
 	mixUndo_[0].value=value ;
+	mixUndo_[0].newValue=newValue ;
 	mixUndoCount_++ ;
 	if (mixUndoCount_>MIX_HISTORY_SIZE) mixUndoCount_=MIX_HISTORY_SIZE ;
 	mixRedoCount_=0 ;
@@ -677,45 +714,70 @@ void MixerView::pushMixUndo(int kind,int channel,float value) {
 void MixerView::restoreMixEdit(const MixEdit &edit) {
 	Mixer *mixer=Mixer::GetInstance() ;
 	Project *project=viewData_->project_ ;
+	// TREEFROG_GLOBAL_UNDO_V7: REDO restores the post-edit value captured at
+	// push time; plain restores (UNDO) fall back to the pre-edit value.
+	const float val=(edit.newValue>=0.0f)?edit.newValue:edit.value ;
 	switch (edit.kind) {
 	case ME_VOL:
-		mixer->SetChannelVolume(edit.channel,(int)edit.value) ;
+		mixer->SetChannelVolume(edit.channel,(int)val) ;
 		break ;
 	case ME_PAN:
-		mixer->SetChannelPan(edit.channel,(int)edit.value) ;
+		mixer->SetChannelPan(edit.channel,(int)val) ;
 		break ;
 	case ME_MASTERVOL:
 		if (project) {
 			Variable *var=project->FindVariable(VAR_MASTERVOL) ;
-			if (var) var->SetInt((int)edit.value,false) ;
-			MixerService::GetInstance()->SetMasterVolume((int)edit.value) ;
+			if (var) var->SetInt((int)val,false) ;
+			MixerService::GetInstance()->SetMasterVolume((int)val) ;
 		}
 		break ;
 	case ME_DLYRET:
-		FxEngine::FxEngine::GetInstance().SetDelayReturn(fxReturnFromPercent((int)edit.value)) ;
+		FxEngine::FxEngine::GetInstance().SetDelayReturn(fxReturnFromPercent((int)val)) ;
 		break ;
 	case ME_RVBRET:
-		FxEngine::FxEngine::GetInstance().SetReverbReturn(fxReturnFromPercent((int)edit.value)) ;
+		FxEngine::FxEngine::GetInstance().SetReverbReturn(fxReturnFromPercent((int)val)) ;
 		break ;
 	case ME_FX:
-		fxSet(edit.channel,edit.value) ;
+		fxSet(edit.channel,val) ;
 		break ;
 	case ME_SOFTCLIP:
 		if (project) {
 			Variable *var=project->FindVariable(VAR_SOFTCLIP) ;
-			if (var) var->SetInt((int)edit.value,false) ;
-			MixerService::GetInstance()->SetSoftclip((int)edit.value,
+			if (var) var->SetInt((int)val,false) ;
+			MixerService::GetInstance()->SetSoftclip((int)val,
 			                                         project->GetSoftclipGain()) ;
 		}
 		break ;
 	case ME_SOFTCLIPGAIN:
 		if (project) {
 			Variable *var=project->FindVariable(VAR_SOFTCLIP_GAIN) ;
-			if (var) var->SetInt((int)edit.value,false) ;
+			if (var) var->SetInt((int)val,false) ;
 			MixerService::GetInstance()->SetSoftclip(project->GetSoftclip(),
-			                                         (int)edit.value) ;
+			                                         (int)val) ;
 		}
 		break ;
+	case ME_MUTE:
+		// TREEFROG_GLOBAL_UNDO_V7: channel mute toggles are undoable.  The
+		// restore value is the mute state to reach (0/1).
+		Player::GetInstance()->SetChannelMute(
+		    edit.channel, (val>=0.5f)) ;
+		break ;
+	case ME_SOLO: {
+		// TREEFROG_GLOBAL_UNDO_V7: solo toggles are undoable.  The value is
+		// the full 8-bit mute mask (old on undo, new on redo); restoring it
+		// directly avoids touching UIController::soloMask_ so a later solo
+		// off still returns to the pre-solo mask.
+		unsigned char mask=(unsigned char)(int)val ;
+		Player *player=Player::GetInstance() ;
+		int unmuted=0 ;
+		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+			bool muted=((mask&(1<<i))!=0) ;
+			player->SetChannelMute(i,muted) ;
+			if (!muted) unmuted++ ;
+		}
+		soloMode_=(unmuted==1) ;
+		break ;
+	}
 	}
 }
 
@@ -770,14 +832,14 @@ bool MixerView::GlobalResetOption() {
 	if (masterSelected_) {
 		Project *project=viewData_->project_ ;
 		if (!project) return true ;
-		pushMixUndo(ME_MASTERVOL,-1,(float)project->GetMasterVolume()) ;
+		pushMixUndo(ME_MASTERVOL,-1,(float)project->GetMasterVolume(),100.0f) ;
 		Variable *var=project->FindVariable(VAR_MASTERVOL) ;
 		if (var) var->SetInt(100,false) ;
 		MixerService::GetInstance()->SetMasterVolume(100) ;
 	} else {
 		int channel=viewData_->mixerCol_ ;
-		pushMixUndo(ME_VOL,channel,(float)mixer->GetChannelVolume(channel)) ;
-		pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel)) ;
+		pushMixUndo(ME_VOL,channel,(float)mixer->GetChannelVolume(channel),100.0f) ;
+		pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel),0.0f) ;
 		mixer->SetChannelVolume(channel,100) ;
 		mixer->SetChannelPan(channel,0) ;
 	}
@@ -1205,7 +1267,8 @@ void MixerView::fxEditRow(int delta,bool coarse) {
 	if (targetId<0) return ;
 	const FxParamSpec &spec=kFxParams_[targetId] ;
 	// TREEFROG_GLOBAL_UNDO_V1: record the old float value for L1+X undo.
-	pushMixUndo(ME_FX,targetId,fxGet(targetId)) ;
+	float oldVal=fxGet(targetId) ;
+	pushMixUndo(ME_FX,targetId,oldVal) ;
 	if (fxUsesCurve(targetId)) {
 		fxEditCurve(targetId,delta,coarse) ;
 		isDirty_=true ;
@@ -1219,6 +1282,8 @@ void MixerView::fxEditRow(int delta,bool coarse) {
 	if (v<spec.vmin) v=spec.vmin ;
 	if (v>spec.vmax) v=spec.vmax ;
 	fxSet(targetId,v) ;
+	// TREEFROG_GLOBAL_UNDO_V7: record the post-edit value for redo.
+	if (mixUndoCount_>0) mixUndo_[0].newValue=v ;
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;
 }
@@ -1231,7 +1296,7 @@ void MixerView::fxResetRow() {
 	if (targetId<0) return ;
 	// TREEFROG_GLOBAL_UNDO_V1: A+B on the FX pages restores vdef; record the
 	// old value so L1+X brings it back.
-	pushMixUndo(ME_FX,targetId,fxGet(targetId)) ;
+	pushMixUndo(ME_FX,targetId,fxGet(targetId),kFxParams_[targetId].vdef) ;
 	fxSet(targetId,kFxParams_[targetId].vdef) ;
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;
@@ -1617,8 +1682,10 @@ void MixerView::drawMixReturns(int y) {
 	// shows the master FX returns (wet levels of the delay/reverb into the
 	// master bus) instead of the old per-track D/R send readouts, which are
 	// now per-instrument (Fase 6/7) and edited in InstrumentView.  The
-	// return level being edited by UP/DOWN is highlighted.  RC5: the row is
-	// drawn on its own line below the meters (y), still inside the safe band.
+	// return level being edited by UP/DOWN is highlighted.  TREEFROG_MIXER_RET_TOP_V1
+	// (Bacon 1.1.1 V16): the row is a header on the top safe-band row (y=3),
+	// above the CUE scale and bars, freeing the bottom of the screen for the
+	// taller 15-cell bars.
 	GUITextProperties props ;
 	char buffer[16] ;
 	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
@@ -1627,7 +1694,7 @@ void MixerView::drawMixReturns(int y) {
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
 	// TREEFROG_FX_PAGES_V4 (Bacon 1.1.1): the return readout is centered
-	// under the meter bank: "RET D:xxx R:xxx FX RETURNS" (26 chars) starts at
+	// over the meter bank: "RET D:xxx R:xxx FX RETURNS" (26 chars) starts at
 	// column 7, leaving a 7-cell margin on both sides.
 	DrawString(7,y,"RET",props) ;
 	SetColor((fxEditTarget_==1)?CD_HILITE2:CD_NORMAL) ;
@@ -1653,27 +1720,27 @@ void MixerView::drawFxPages() {
 		// scale (+3/0/-6/-12/-24/-36 dB, compact, right-aligned to the
 		// master), the MST live bar, the 8 channel bars one cell each 4
 		// columns apart, and the CH/VL labels right of the last channel.
-		// The 4-cell pitch gives the 3-digit volume numbers and the pan
-		// readouts one cell of separation (the V4.1 3-cell pitch printed
-		// "100100100100").  The bank spans the CUE scale at x=0..1 .. the
-		// CH label at x=38..39.  The whole block (labels, bars, volume
-		// numbers, pan/mute markers and the centered FX RETURNS line) stays
-		// in the safe band 3..25 of the 40x30 screen.
+		// The bank spans the CUE scale at x=0..1 .. the CH label at x=38..39.
+		// The whole block (labels, bars, volume numbers, pan/mute markers and
+		// the centered FX RETURNS line) stays in the safe band 3..25 of the
+		// 40x30 screen.  TREEFROG_MIXER_TALL_BARS_V1 (Bacon 1.1.1 V16): the
+		// 15-cell bars reclaim the rows freed by the RET/FX RETURNS move to
+		// the top: header at 3, labelY 4, bars 5..19, volumes at 21.
 		const int masterX=4 ;
 		const int channel0X=8 ;
 		const int channelPitch=4 ;
 		const int chLabelX=38 ;
-		const int labelY=6 ;
-		const int barHeight=12 ;
+		const int labelY=4 ;
+		const int barHeight=15 ;
 		const int numY=labelY+barHeight+2 ;
-		const int retY=numY+2 ;
+		const int retY=3 ;
 		DrawString(chLabelX,labelY,"CH",props) ;
 		DrawString(chLabelX,numY,"VL",props) ;
 		// TREEFROG_MIXER_ZERO_DB_CLIP_V5 (Bacon 1.1.1):
 		// Static CUE scale drawn to the LEFT of the master, right-aligned to
 		// the master column so the marks sit as close to the bars as possible
 		// (compact 2-3 cell labels).  The labels mark the +3, 0, -6, -12, -24
-		// and -36 dB rows of the 12-cell bar using the same mixVULevel mapping
+		// and -36 dB rows of the 15-cell bar using the same mixVULevel mapping
 		// the master and channel bars use, so the 0 dB row is exactly the row
 		// where the fills sit at volume 100 and the +3 row (red) is the cell
 		// where they turn red.  The scale never moves with the volume; the
@@ -1685,10 +1752,10 @@ void MixerView::drawFxPages() {
 		SetColor(CD_HILITE2) ;
 		DrawString(masterX-3,labelY+1+1,"0",props) ;
 		SetColor(CD_HILITE1) ;
-		DrawString(masterX-3,labelY+1+3,"-6",props) ;
-		DrawString(masterX-4,labelY+1+5,"-12",props) ;
-		DrawString(masterX-4,labelY+1+8,"-24",props) ;
-		DrawString(masterX-4,labelY+1+12,"-36",props) ;
+		DrawString(masterX-3,labelY+1+2,"-6",props) ;
+		DrawString(masterX-4,labelY+1+3,"-12",props) ;
+		DrawString(masterX-4,labelY+1+6,"-24",props) ;
+		DrawString(masterX-4,labelY+1+14,"-36",props) ;
 		drawMasterBar(masterX,labelY,barHeight) ;
 		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 			drawVolumeBar(i,channel0X+i*channelPitch,labelY,barHeight) ;
