@@ -1,5 +1,14 @@
 # Release: Bacon 1.2.1 - Chopper UAF Hardening
 
+## Actualización (pre-release): EQ de 8 bandas + Spectrum en vivo
+
+- EQ gráfico de **8 bandas por instrumento de sample** (bell / low shelf /
+  high shelf / low pass / high pass / notch, respuesta RBJ), con máscara de
+  bandas por pad y bypass global. Parámetros por `SetInstrument`.
+- Analizador de espectro en vivo (FFT) sobre el overlay del modal.
+- Actívandolo en la vista de instrumento: campo **EQ 8-B** / `SIP_EQEN`.
+- La pre-release `Bacon-1.2.1` se mantiene como pre-release con estos assets.
+
 ## Resumen
 
 Release de estabilidad sobre **Bacon 1.2 (Mixer Dev)**. Corrige el crash del

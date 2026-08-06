@@ -1,5 +1,31 @@
 # Changelog
 
+## Update: Bacon 1.2.1 U2.52.7 - Per-instrument 8-Band EQ + Live Spectrum
+
+- **Estado**: actualización de la pre-release Bacon 1.2.1 (Chopper UAF
+  Hardening). Añade un EQ gráfico de 8 bandas por instrumento de sample y un
+  analizador de espectro en vivo sobre el mismo modal.
+- **EQ por instrumento** (`Application/Audio/InstrumentEq`): 8 bandas
+  configurables por sample instrument con respuesta RBJ (bell, low/high shelf,
+  low/high pass, notch), bypass global y máscara de bandas por pad.
+  Parámetros expuestos a scripting vía `SetVariable`.
+- **Analizador de espectro** (`Application/Audio/SpectrumAnalyzer`): FFT por
+  ventana simple sobre el buffer de la voz, alimenta el overlay del EQ en
+  vivo. Corregido el wrap del buffer circular en `runFft()`.
+- **Interfaz** (`Application/Views/ModalDialogs/InstrumentEqModal`): modal
+  con grid de bandas, curva de respuesta calculada con RBJ y espectro
+  superpuesto; control por pads/zones, byte EQ 8-B en la vista de instrumento
+  (`SIP_EQEN`) y máscara de bandas. Integrado en `AppWindow` vía
+  `TreeFrogInstrumentEqOverlayDraw`.
+- **Cache de EQ coherente** (`SampleInstrument::syncInstrumentEq`): el
+  acumulador `eqCache_` se ajusta al tamaño real del array de parámetros
+  (34) para que el fingerprint coincida y el cambio de bandas invalide
+  correctamente el filtro.
+- **Fix formato** (`InstrumentView.cpp`): `"EQ 8-B:%d"` en lugar del `%s`
+  incorrecto para el valor INT (UB).
+- **Build 100% limpio**: `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`. Core
+  `11790c46940fc3d6ca924ad12235c1210e0c8e1af318038458cbe832ca4e5688`.
+
 ## Release: Bacon 1.2.1 U2.52.6 - Import Fix + Legacy Folder Cleanup
 
 - **Estado**: hotfix de instalación sobre Bacon 1.2.1 (Chopper UAF Hardening).

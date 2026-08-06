@@ -20,6 +20,45 @@ extern bool LGPTChopperGetChopRangeForSampleIndex(int sampleIndex, int chopIndex
 #include "Application/Player/SyncMaster.h"
 #include "Application/Model/Mixer.h"
 #include "Application/Audio/FxEngine/FxEngine.h"
+#include "Application/Audio/SpectrumAnalyzer.h"
+
+// TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: per-instrument 8-band EQ synced from the
+// persisted variables.  Fingerprint-cached so the audio thread recomputes the
+// (float) RBJ coefficients only when a variable changed.
+void SampleInstrument::syncInstrumentEq() {
+    int vals[34];
+    vals[0] = eqEnable_->GetInt();
+    vals[1] = eqMask_->GetInt();
+    for (int i = 0; i < 8; i++) {
+        vals[2 + 4 * i] = eqFreq_[i]->GetInt();
+        vals[3 + 4 * i] = eqGain_[i]->GetInt();
+        vals[4 + 4 * i] = eqType_[i]->GetInt();
+        vals[5 + 4 * i] = eqQ_[i]->GetInt();
+    }
+    bool unchanged = (memcmp(vals, eqCache_, sizeof(eqCache_)) == 0);
+    if (unchanged) return;
+    memcpy(eqCache_, vals, sizeof(eqCache_));
+
+    eqDsp_.SetBypass(vals[0] ? false : true);
+    int mask = vals[1];
+    for (int band = 0; band < 8; band++) {
+        float hz = float(vals[2 + 4 * band]) / 100.0f;
+        if (hz < 20.0f) hz = 20.0f;
+        if (hz > 20000.0f) hz = 20000.0f;
+        float db = float(vals[3 + 4 * band]);
+        float q = float(vals[5 + 4 * band]) / 100.0f;
+        if (q < 0.1f) q = 0.1f;
+        if (q > 10.0f) q = 10.0f;
+        int type = vals[4 + 4 * band];
+        if (type < 0) type = 0;
+        if (type >= (int)FxEngine::InstrumentEq::kTypeCount) type = 0;
+        eqDsp_.SetBandFreq(band, fl2fp(hz));
+        eqDsp_.SetBandGainDb(band, fl2fp(db));
+        eqDsp_.SetBandType(band, (FxEngine::InstrumentEq::BandType)type);
+        eqDsp_.SetBandQ(band, fl2fp(q));
+        eqDsp_.SetBandEnabled(band, ((mask >> band) & 1) != 0);
+    }
+}
 
 fixed SampleInstrument::feedback_[SONG_CHANNEL_COUNT][FB_BUFFER_LENGTH*2] ;
 
@@ -143,6 +182,48 @@ SampleInstrument::SampleInstrument() {
      Insert(dlySend_);
      rvbSend_ = new Variable("rvb send", SIP_RVB_SEND, 0, 100);
      Insert(rvbSend_);
+
+     // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: 8-band graphic EQ variables.
+     // Persistent as instrument PARAMs; read by syncInstrumentEq() at render
+     // time (audio thread) with a fingerprint cache to avoid recomputing
+     // coefficients when untouched.
+     {
+         static const FourCC freqIDs[8] = {
+             SIP_EQF0, SIP_EQF1, SIP_EQF2, SIP_EQF3,
+             SIP_EQF4, SIP_EQF5, SIP_EQF6, SIP_EQF7 };
+         static const FourCC gainIDs[8] = {
+             SIP_EQG0, SIP_EQG1, SIP_EQG2, SIP_EQG3,
+             SIP_EQG4, SIP_EQG5, SIP_EQG6, SIP_EQG7 };
+         static const FourCC typeIDs[8] = {
+             SIP_EQT0, SIP_EQT1, SIP_EQT2, SIP_EQT3,
+             SIP_EQT4, SIP_EQT5, SIP_EQT6, SIP_EQT7 };
+         static const FourCC qIDs[8] = {
+             SIP_EQ_Q0, SIP_EQ_Q1, SIP_EQ_Q2, SIP_EQ_Q3,
+             SIP_EQ_Q4, SIP_EQ_Q5, SIP_EQ_Q6, SIP_EQ_Q7 };
+         eqEnable_ = new Variable("eq bypass", SIP_EQEN, 1);
+         Insert(eqEnable_);
+         eqMask_ = new Variable("eq bands", SIP_EQMASK, 255);
+         Insert(eqMask_);
+         for (int i = 0; i < 8; i++) {
+             // freq index / Q are stored as fixed-point scaled by 100 so the
+             // persisted integer keeps a usable resolution.
+             char name[16];
+             sprintf(name, "eqf%d", i);
+             eqFreq_[i] = new Variable(name, freqIDs[i], 100 * fp2fl(eqDsp_.GetBandFreq(i)));
+             Insert(eqFreq_[i]);
+             sprintf(name, "eqt%d", i);
+             eqType_[i] = new Variable(name, typeIDs[i], 0);
+             Insert(eqType_[i]);
+             sprintf(name, "eqg%d", i);
+             eqGain_[i] = new Variable(name, gainIDs[i], 0);
+             Insert(eqGain_[i]);
+             sprintf(name, "eqq%d", i);
+             eqQ_[i] = new Variable(name, qIDs[i], 100);   // 1.00 * 100
+             Insert(eqQ_[i]);
+         }
+     for (int i = 0; i < 34; i++) eqCache_[i] = -1;
+     syncInstrumentEq();
+     }
 
      // Initalize instrument's voices update list
 
@@ -1057,6 +1138,18 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 		rp->feedbackIn_=(feedbackIn-feedbackStart)/2 ;
 		rp->feedbackOut_=(feedbackPick-feedbackStart)/2 ;
 		somethingToMix=true ;
+    }
+
+    // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: per-instrument 8-band EQ applied to
+    // the finished interleaved stereo dry output (post-pan, pre-FX-send).
+    // syncInstrumentEq() is fingerprint-cached: no float work unless an EQ
+    // variable changed.  When all bands are neutral eqDsp_ bounces at Process()
+    // with a single branch (zero cost).  The warm spectrum feed is likewise a
+    // no-op unless the EQ modal is open.
+    if (somethingToMix) {
+        syncInstrumentEq() ;
+        eqDsp_.Process(channel, buffer, size) ;
+        SpectrumAnalyzer::Get().Feed(buffer, size) ;
     }
 
     return somethingToMix ; 

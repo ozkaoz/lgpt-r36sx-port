@@ -95,6 +95,21 @@ log "INSTRUMENTFOLDER_CONFIG=$INSTRUMENT_CONFIG"
 log "INSTRUMENTFOLDER_RESOLVED=$INSTRUMENTS"
 log "INSTRUMENTFOLDER_OK=1"
 
+# U2.52.7 STEREO_48K_PROVISION:
+# The UAC2 bridge sentinel and the default USB audio profile used to be
+# created only by install.sh/install_stock.sh. A freshly formatted SD staged as
+# flat layers (stock + TreeFrogUI + release ZIP) has neither, so the Windows
+# gadget setup exited with OTG_DISABLED_NO_SENTINEL and the PC never saw the
+# console. Provisions both on every launcher start, like the runtime dirs.
+if [ ! -e "$DATA/otg/enable_lgpt_uac2_bridge" ]; then
+    : > "$DATA/otg/enable_lgpt_uac2_bridge" 2>>"$LOG" || true
+    log "UAC2_SENTINEL_PROVISIONED=1"
+fi
+if [ ! -s "$DATA/otg/audio_usb_profile" ]; then
+    printf 'STEREO_48K\n' > "$DATA/otg/audio_usb_profile" 2>>"$LOG" || true
+    log "AUDIO_USB_PROFILE_PROVISIONED=STEREO_48K"
+fi
+
 [ -x "$PICO" ] || fail 30 "TreeFrogUI picoarch missing or not executable: $PICO"
 [ -s "$CORE" ] || fail 31 "LGPT core missing or empty: $CORE"
 [ -r "$ROM" ] || fail 32 "TreeFrogUI launcher entry missing: $ROM"

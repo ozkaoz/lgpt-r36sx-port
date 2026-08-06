@@ -284,15 +284,15 @@ static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
     { "EQ  BYP", FX_PAGE_EQ,       0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_EQ_BYP
     { "LO  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_LOW_EN
     { "LO  FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,100.0f,  "%5.0f" },  // FX_P_EQ_LOW_FRQ
-    { "LO  GAI", FX_PAGE_EQ,      -12.0f,  12.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_LOW_GAI
+    { "LO  GAI", FX_PAGE_EQ,      -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_LOW_GAI
     { "LO  Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_LOW_Q
     { "MID EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_MID_EN
     { "MID FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,1000.0f, "%5.0f" },  // FX_P_EQ_MID_FRQ
-    { "MID GAI", FX_PAGE_EQ,      -12.0f,  12.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_MID_GAI
+    { "MID GAI", FX_PAGE_EQ,      -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_MID_GAI
     { "MID Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_MID_Q
     { "HI  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_HI_EN
     { "HI  FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,10000.0f,"%5.0f" },  // FX_P_EQ_HI_FRQ
-    { "HI  GAI", FX_PAGE_EQ,      -12.0f,  12.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_HI_GAI
+    { "HI  GAI", FX_PAGE_EQ,      -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_HI_GAI
     { "HI  Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_HI_Q
     // COMP page (dedicated menu - Fase 13: BYP first so it is never
     // off-screen, then THR/RAT/KNE/ATK/REL/MKU/LNK/SC in the order
@@ -1369,17 +1369,18 @@ void MixerView::fxSet(int id,float v) {
 	case FX_P_RVB_BYP:  fx.SetReverbBypass(v>=0.5f) ; break ;
 	case FX_P_EQ_BYP:   fx.SetEqBypass(v>=0.5f) ; break ;
 	case FX_P_EQ_LOW_FRQ: fx.SetEqBandFreq(0,fl2fp(v)) ; break ;
-	case FX_P_EQ_LOW_GAI: fx.SetEqBandGainDb(0,fl2fp(v)) ; break ;
+	case FX_P_EQ_LOW_GAI: fx.SetEqBandGainDb(0,fl2fp(v)) ;
+	                     fx.SetEqBandEnabled(0,true) ; fx.SetEqBypass(false) ; break ;
 	case FX_P_EQ_LOW_Q:   fx.SetEqBandQ(0,fl2fp(v)) ; break ;
 	case FX_P_EQ_LOW_EN:  fx.SetEqBandEnabled(0,v>=0.5f) ; break ;
 	case FX_P_EQ_MID_FRQ: fx.SetEqBandFreq(1,fl2fp(v)) ; break ;
-	case FX_P_EQ_MID_GAI: fx.SetEqBandGainDb(1,fl2fp(v)) ; break ;
+	case FX_P_EQ_MID_GAI: fx.SetEqBandGainDb(1,fl2fp(v)) ;
+	                     fx.SetEqBandEnabled(1,true) ; fx.SetEqBypass(false) ; break ;
 	case FX_P_EQ_MID_Q:   fx.SetEqBandQ(1,fl2fp(v)) ; break ;
 	case FX_P_EQ_MID_EN:  fx.SetEqBandEnabled(1,v>=0.5f) ; break ;
 	case FX_P_EQ_HI_FRQ:  fx.SetEqBandFreq(2,fl2fp(v)) ; break ;
-	case FX_P_EQ_HI_GAI:  fx.SetEqBandGainDb(2,fl2fp(v)) ; break ;
-	case FX_P_EQ_HI_Q:    fx.SetEqBandQ(2,fl2fp(v)) ; break ;
-	case FX_P_EQ_HI_EN:   fx.SetEqBandEnabled(2,v>=0.5f) ; break ;
+	case FX_P_EQ_HI_GAI:  fx.SetEqBandGainDb(2,fl2fp(v)) ;
+	                     fx.SetEqBandEnabled(2,true) ; fx.SetEqBypass(false) ; break ;
 	case FX_P_CMP_THR:    fx.SetCompThresholdDb(fl2fp(v)) ; break ;
 	case FX_P_CMP_RAT:    fx.SetCompRatio(fl2fp(v)) ; break ;
 	case FX_P_CMP_KNE:    fx.SetCompKneeDb(fl2fp(v)) ; break ;

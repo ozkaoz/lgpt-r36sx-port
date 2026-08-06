@@ -22,6 +22,7 @@ extern "C" void TreeFrogInputTrace_LogView(
 #include "Foundation/Variables/Variable.h"
 #include "ModalDialogs/ImportSampleDialog.h"
 #include "ModalDialogs/SampleChopperModal.h"
+#include "ModalDialogs/InstrumentEqModal.h"
 #include "ModalDialogs/MessageBox.h"
 #include "System/System/System.h"
 #include "System/FileSystem/FileSystem.h"
@@ -289,11 +290,26 @@ void InstrumentView::fillSampleParameters() {
 	f1->SetBar("DELAY",14) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
-	position._y+=1 ;
+position._y+=1 ;
 	v=instrument->FindVariable(SIP_RVB_SEND) ;
 	f1=new UIIntVarField(position,*v,"rvb:%3d",-1,100,1,10) ;
 	f1->SetBar("REVERB",14) ;
 	T_SimpleList<UIField>::Insert(f1) ;
+
+	// ----------------------------------------------------------
+	// Block 6: GRAPHIC EQ (TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1).
+	// A focused ENTER/ACTION opens the graphical 8-band editor Modal; the
+	// EQ bypass can also be toggled from this field directly.
+	// ----------------------------------------------------------
+	position._y+=2 ;  // skip header row
+	col2=position ;
+	col2._x+=12 ;
+	v=instrument->FindVariable(SIP_EQEN) ;
+	f1=new UIIntVarField(position,*v,"EQ 8-B:%d",0,1,1,1) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SIP_EQMASK) ;
+	f2=new UIIntVarOffField(col2,*v,"mask:%2.2X",0,0xFF,1,0x10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
 
 	// ----------------------------------------------------------
 	// Offline render FX (print fx / wet / pad).  Only compiled on
@@ -522,6 +538,14 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
                     View::SetNotification(printer.GetNotification());
                     break;
                 }
+                case SIP_EQEN: {
+                    if (getInstrumentType() == IT_SAMPLE) {
+                        DoModal(new InstrumentEqModal(*this,
+                                 viewData_->currentInstrument_));
+                        isDirty_ = true;
+                    }
+                    break ;
+                }
                 default:
                     break ;
 			}
@@ -576,7 +600,8 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
             if (rawFocus && !rawFocus->IsStatic()) {
                 FourCC varID = ((UIIntVarField *)rawFocus)->GetVariableID();
                 if ((varID == SIP_TABLE) || (varID == MIP_TABLE) ||
-                    (varID == SIP_SAMPLE) || (varID == SIP_PRINTFX)) {
+                    (varID == SIP_SAMPLE) || (varID == SIP_PRINTFX) ||
+                    (varID == SIP_EQEN)) {
                     viewMode_ = VM_NEW;
                 }
             }

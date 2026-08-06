@@ -16,8 +16,8 @@ namespace FxEngine {
         else (cur) += __st; \
     } while (0)
 // Gain limits (dB).
-#define FX_EQ_MIN_DB (-12.0f)
-#define FX_EQ_MAX_DB (12.0f)
+#define FX_EQ_MIN_DB (-24.0f)
+#define FX_EQ_MAX_DB (24.0f)
 // Shelf slope when SetBandQ is used on LOW/HIGH (mapped, clamped).
 #define FX_EQ_SHELF_Q_MIN 0.5f
 #define FX_EQ_SHELF_Q_MAX 2.0f

@@ -25,6 +25,7 @@
 
 #if defined(PLATFORM_TREEFROG)
 extern "C" void TreeFrogChopperOverlayDraw(void);
+extern "C" void TreeFrogInstrumentEqOverlayDraw(void);
 #endif
 
 
@@ -431,6 +432,7 @@ void AppWindow::Flush() {
     long flushEnd = System::GetInstance()->GetClock();
 #if defined(PLATFORM_TREEFROG)
     TreeFrogChopperOverlayDraw();
+    TreeFrogInstrumentEqOverlayDraw();
 #endif
     // TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1): after the char screen
     // is fully rendered, let the active view paint its pixel-level layer

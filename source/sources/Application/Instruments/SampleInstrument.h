@@ -10,6 +10,8 @@
 #include "Foundation/Observable.h"
 #include "Foundation/Types/Types.h"
 #include "Foundation/Variables/WatchedVariable.h"
+#include "Application/Audio/InstrumentEq.h"
+#include "Application/Audio/SpectrumAnalyzer.h"
 
 enum SampleInstrumentLoopMode {
     SILM_ONESHOT = 0,
@@ -56,6 +58,47 @@ enum SampleInstrumentLoopMode {
 #define SIP_DRY MAKE_FOURCC('D', 'R', 'Y', '_')
 #define SIP_DLY_SEND MAKE_FOURCC('D', 'S', 'N', 'D')
 #define SIP_RVB_SEND MAKE_FOURCC('R', 'S', 'N', 'D')
+
+// TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: 8-band graphic EQ per sample instrument.
+// SIP_EQEN: master enable (0/1).  SIP_EQMASK: bitmask of enabled bands.
+// SIP_EQF0..7: frequency scaled by 100 (Hz).  SIP_EQG0..7: band gain in dB
+// (-24..+24).  SIP_EQT0..7: band type (0=bell,1=low shelf,2=high shelf,
+// 3=low pass,4=high pass,5=notch).  SIP_EQ_Q0..7: Q scaled by 100.
+// All persisted automatically as instrument PARAMs.
+#define SIP_EQEN MAKE_FOURCC('E', 'Q', 'E', 'N')
+#define SIP_EQMASK MAKE_FOURCC('E', 'Q', 'M', 'K')
+#define SIP_EQF0 MAKE_FOURCC('E', 'Q', 'F', '0')
+#define SIP_EQF1 MAKE_FOURCC('E', 'Q', 'F', '1')
+#define SIP_EQF2 MAKE_FOURCC('E', 'Q', 'F', '2')
+#define SIP_EQF3 MAKE_FOURCC('E', 'Q', 'F', '3')
+#define SIP_EQF4 MAKE_FOURCC('E', 'Q', 'F', '4')
+#define SIP_EQF5 MAKE_FOURCC('E', 'Q', 'F', '5')
+#define SIP_EQF6 MAKE_FOURCC('E', 'Q', 'F', '6')
+#define SIP_EQF7 MAKE_FOURCC('E', 'Q', 'F', '7')
+#define SIP_EQG0 MAKE_FOURCC('E', 'Q', 'G', '0')
+#define SIP_EQG1 MAKE_FOURCC('E', 'Q', 'G', '1')
+#define SIP_EQG2 MAKE_FOURCC('E', 'Q', 'G', '2')
+#define SIP_EQG3 MAKE_FOURCC('E', 'Q', 'G', '3')
+#define SIP_EQG4 MAKE_FOURCC('E', 'Q', 'G', '4')
+#define SIP_EQG5 MAKE_FOURCC('E', 'Q', 'G', '5')
+#define SIP_EQG6 MAKE_FOURCC('E', 'Q', 'G', '6')
+#define SIP_EQG7 MAKE_FOURCC('E', 'Q', 'G', '7')
+#define SIP_EQT0 MAKE_FOURCC('E', 'Q', 'T', '0')
+#define SIP_EQT1 MAKE_FOURCC('E', 'Q', 'T', '1')
+#define SIP_EQT2 MAKE_FOURCC('E', 'Q', 'T', '2')
+#define SIP_EQT3 MAKE_FOURCC('E', 'Q', 'T', '3')
+#define SIP_EQT4 MAKE_FOURCC('E', 'Q', 'T', '4')
+#define SIP_EQT5 MAKE_FOURCC('E', 'Q', 'T', '5')
+#define SIP_EQT6 MAKE_FOURCC('E', 'Q', 'T', '6')
+#define SIP_EQT7 MAKE_FOURCC('E', 'Q', 'T', '7')
+#define SIP_EQ_Q0 MAKE_FOURCC('E', 'Q', 'Q', '0')
+#define SIP_EQ_Q1 MAKE_FOURCC('E', 'Q', 'Q', '1')
+#define SIP_EQ_Q2 MAKE_FOURCC('E', 'Q', 'Q', '2')
+#define SIP_EQ_Q3 MAKE_FOURCC('E', 'Q', 'Q', '3')
+#define SIP_EQ_Q4 MAKE_FOURCC('E', 'Q', 'Q', '4')
+#define SIP_EQ_Q5 MAKE_FOURCC('E', 'Q', 'Q', '5')
+#define SIP_EQ_Q6 MAKE_FOURCC('E', 'Q', 'Q', '6')
+#define SIP_EQ_Q7 MAKE_FOURCC('E', 'Q', 'Q', '7')
 
 #define FB_BUFFER_LENGTH 3500 // (in samples)
 
@@ -121,6 +164,22 @@ protected:
 		void doTickUpdate(int channel) ;
 		void doKRateUpdate(int channel) ;
 		void updateFeedback(renderParams *rp) ;
+
+private:
+       // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: 8-band graphic EQ + live spectrum.
+       // eqDsp_ holds the per-channel biquad states; eqCache_ snapshots the
+       // persisted variables so coefficients are recomputed only on change
+       // (control rate) and the audio thread never does per-frame floats.
+       void syncInstrumentEq() ;
+
+       Variable *eqEnable_ ;
+       Variable *eqMask_ ;
+       Variable *eqGain_[8] ;
+       Variable *eqFreq_[8] ;
+       Variable *eqType_[8] ;
+       Variable *eqQ_[8] ;
+       int eqCache_[34] ;
+       FxEngine::InstrumentEq eqDsp_ ;
 
 private:
        SoundSource *source_ ;
