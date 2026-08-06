@@ -46,4 +46,17 @@ chmod 0755 "$OUT_DIR/r36s_sp404_host_audio_io" "$OUT_DIR/r36s_midi_host_io"
 grep -aFq 'R36SX_SP404_AUDIO_DAEMON_ABI=1' "$OUT_DIR/r36s_sp404_host_audio_io" || fail "Missing SP404 ABI1 marker"
 grep -aFq 'R36SX_MIDI_DAEMON_ABI=1' "$OUT_DIR/r36s_midi_host_io" || fail "Missing MIDI ABI1 marker"
 sha256sum "$CORE" "$DAEMON" "$OUT_DIR/r36s_sp404_host_audio_io" "$OUT_DIR/r36s_midi_host_io" | tee "$OUT_DIR/SHA256SUMS.txt"
+
+# U2.52.6: strict diagnostic gate. Only GCC's real diagnostic format
+# (file:line:col: error:/warning:) is accepted. Plain grep -i 'error' would
+# match filenames like tinyxmlerror.cpp or paths like System/Errors/ and
+# report false positives, so the scan keys on the exact compiler pattern.
+DIAG_LOG="$LOG_DIR/BUILD_U2523_$TS.log"
+DIAG_LINES="$(grep -aE ':[0-9]+:[0-9]+: (error|warning|note):' "$DIAG_LOG" || true)"
+if [[ -n "$DIAG_LINES" ]]; then
+    echo "DIAGNOSTIC_GATE_FAILED"
+    printf '%s\n' "$DIAG_LINES"
+    exit 1
+fi
+echo "DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS"
 echo BUILD_U2523_OK

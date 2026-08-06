@@ -21,9 +21,7 @@ mkdir -p "$SD/LGPT_OTG_LOGS"
 # Simulate a ZIP/Explorer copy that lost empty runtime folders.
 rm -rf \
     "$SD/lgpt/samples" \
-    "$SD/lgpt/samplelib" \
     "$SD/lgpt/instruments" \
-    "$SD/lgpt/project" \
     "$SD/lgpt/projects" \
     "$SD/lgpt/tmp" \
     "$SD/lgpt/usbrecs"
@@ -44,9 +42,7 @@ LGPT_SD_ROOT="$SD" "$SD/cubegm/lgpt"
 for rel in \
     lgpt/samples \
     lgpt/samples/records \
-    lgpt/samplelib \
     lgpt/instruments \
-    lgpt/project \
     lgpt/projects \
     lgpt/tmp/record \
     lgpt/usbrecs; do

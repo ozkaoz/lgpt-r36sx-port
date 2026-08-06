@@ -68,14 +68,15 @@ INSTRUMENTS="$(map_sd_path "$INSTRUMENT_CONFIG" 2>/dev/null || true)"
 [ -n "$INSTRUMENTS" ] || fail 24 "INSTRUMENTFOLDER must be under /mnt/sdcard: $INSTRUMENT_CONFIG"
 
 # These paths are runtime requirements. Git and ZIP do not retain empty folders,
-# so the launcher also provisions them on every start.
+# so the launcher also provisions them on every start. U2.52.6: legacy
+# single-plural $DATA/samplelib and $DATA/project are intentionally NOT
+# provisioned anymore; the sample browser uses SAMPLELIB (lgpt/samples) and
+# projects live in $DATA/projects.
 mkdir -p \
     "$DATA" \
     "$SAMPLELIB" \
     "$SAMPLELIB/records" \
-    "$DATA/samplelib" \
     "$INSTRUMENTS" \
-    "$DATA/project" \
     "$DATA/projects" \
     "$DATA/tmp/record" \
     "$DATA/usbrecs" \

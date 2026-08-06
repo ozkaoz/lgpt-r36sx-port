@@ -16,7 +16,7 @@
 #include "SoundFontManager.h"
 #include "Application/Model/Config.h"
 
-#define SAMPLE_LIB "root:samplelib" 
+#define SAMPLE_LIB "root:samples" 
 
 
 static bool IsTransientInternalSampleName(const char *name) {
@@ -325,8 +325,54 @@ int SamplePool::ImportSample(Path &path) {
         return -1;
     }
 
+    /* U2.52.6: never fail import silently when the project samples folder
+     * is missing (e.g. after an external delete of the project tree). The
+     * project folder must not surface as a bare "Import failed" with no
+     * log trail, so the samples folder is rebuilt on demand. */
+    {
+        std::string dstFull = dstPath.GetPath();
+        std::string dstDir = dstFull;
+        size_t lastSlash = dstDir.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            dstDir = dstDir.substr(0, lastSlash);
+        }
+        struct stat st;
+        if (stat(dstDir.c_str(), &st) != 0) {
+            errno = 0;
+            /* mkdir -p semantics: create each missing component so an
+             * entirely deleted project folder is rebuilt on import. */
+            std::string walk;
+            size_t pos = 0;
+            while (pos <= dstDir.size()) {
+                size_t next = dstDir.find('/', pos);
+                if (next == std::string::npos) next = dstDir.size();
+                std::string part = dstDir.substr(0, next);
+                if (!part.empty()) {
+                    if (stat(part.c_str(), &st) != 0) {
+                        if (mkdir(part.c_str(), 0755) != 0 && errno != EEXIST) {
+                            Trace::Error("ImportSample: cannot recreate %s "
+                                         "(errno=%d)", part.c_str(), errno);
+                            break;
+                        }
+                    }
+                }
+                if (next >= dstDir.size()) break;
+                pos = next + 1;
+            }
+            if (stat(dstDir.c_str(), &st) != 0) {
+                Trace::Error("ImportSample: samples folder still missing: %s",
+                             dstDir.c_str());
+            } else {
+                Trace::Log("ImportSample", "recreated missing samples "
+                           "folder %s", dstDir.c_str());
+            }
+        }
+    }
+
     I_File *fout=FileSystem::GetInstance()->Open(dstPath.GetPath().c_str(),"w");
     if (!fout) {
+        Trace::Error("Failed to open project sample %s for writing "
+                     "(errno=%d)", dstPath.GetCanonicalPath().c_str(), errno);
         fin->Close();
         delete fin;
         return -1;

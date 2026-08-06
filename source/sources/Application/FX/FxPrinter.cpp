@@ -2,7 +2,7 @@
 
 FxPrinter::FxPrinter(ViewData* viewData)
     : samples_dir("project:samples"),
-      impulse_dir("root:samplelib"),
+      impulse_dir("root:samples"),
       viewData_(viewData) {
     int curInstr = viewData_->currentInstrument_;
     InstrumentBank* bank = viewData_->project_->GetInstrumentBank();
