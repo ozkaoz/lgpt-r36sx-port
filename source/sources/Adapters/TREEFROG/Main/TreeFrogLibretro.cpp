@@ -94,6 +94,22 @@ static unsigned long audio_budget_last_ms = 0;
 static uint32_t last_phys_for_taps = 0;
 static uint32_t last_phys_for_combo = 0;
 
+static unsigned long treefrog_v11_frame_counter = 0;
+
+/*
+ * TREEFROG_BOOT_DIAG (Bacon 1.1.1 V17-diagnostico): boot-stage marker log
+ * persisted to the SD so a device hang at startup leaves evidence.  The
+ * frontend discards /tmp on power-off, so the core writes one line per boot
+ * stage to /mnt/sdcard/LGPT_OTG_LOGS/boot_debug.log.  Pure diagnostics: it
+ * does not change the audio driver, the input path or any view logic.
+ */
+static void boot_diag_log(const char *stage) {
+    FILE *f = fopen("/mnt/sdcard/LGPT_OTG_LOGS/boot_debug.log", "a");
+    if (!f) return;
+    fprintf(f, "%lu BOOTDIAG %s\n", treefrog_v11_frame_counter, stage);
+    fclose(f);
+}
+
 /*
  * U2.45.0 SAMPLER_EXCLUSIVE_SOURCE_NO_DEBOUNCE
  *
@@ -978,7 +994,6 @@ static uint16_t *make_video_output(uint16_t *src, unsigned *w, unsigned *h, size
 }
 
 
-static unsigned long treefrog_v11_frame_counter = 0;
 #if TREEFROG_INPUT_DEBUG
 #define TREEFROG_V133_RETRO_TRACE 1
 static void v11_log_retro(const char *msg) {
@@ -1133,6 +1148,7 @@ static void TreeFrogV51LogProjectRoot(const char *) {}
 
 
 void retro_init(void) {
+    boot_diag_log("retro_init.enter");
     memset(framebuffer, 0, sizeof(framebuffer));
     memset(audio_buffer, 0, sizeof(audio_buffer));
     reset_runtime_state(false);
@@ -1151,11 +1167,16 @@ bool retro_load_game(const struct retro_game_info *game) {
     const char *path = game ? game->path : 0;
     truncate_debug_logs();
     reset_runtime_state(false);
+    boot_diag_log("retro_load_game.before-boot");
     TreeFrogSystem::Boot(path);
+    boot_diag_log("retro_load_game.after-boot");
 
     TreeFrogCreateWindowParams params;
     params.framebuffer_ = framebuffer;
+    boot_diag_log("retro_load_game.before-init");
     app_ready = Application::GetInstance()->Init(params);
+    boot_diag_log(app_ready ? "retro_load_game.init-ok"
+                            : "retro_load_game.init-failed");
     return app_ready;
 }
 
@@ -1193,6 +1214,11 @@ void retro_run(void) {
     ++g_treefrog_v40_run_count;
 
     if (!app_ready) {
+        if (g_treefrog_v40_run_count < 4) {
+            char m[72];
+            snprintf(m, sizeof(m), "retro_run.not-ready n=%u", g_treefrog_v40_run_count);
+            boot_diag_log(m);
+        }
         memset(audio_buffer, 0, 800 * 2 * sizeof(int16_t));
         if (audio_batch_cb) audio_batch_cb(audio_buffer, 800);
         if (video_cb) {
@@ -1213,6 +1239,12 @@ void retro_run(void) {
 
     GUIWindow *w = Application::GetInstance()->GetWindow();
     if (w) w->Update();
+
+    if (g_treefrog_v40_run_count < 6) {
+        char m[72];
+        snprintf(m, sizeof(m), "retro_run.ready-update n=%u", g_treefrog_v40_run_count);
+        boot_diag_log(m);
+    }
 
     /*
      * U2.51.11 WALL_CLOCK_AUDIO_BUDGET:

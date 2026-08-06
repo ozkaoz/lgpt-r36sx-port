@@ -36,7 +36,7 @@ if [[ -s "$HOST_AUDIO_BUILD" && -s "$HOST_USBMIDI_BUILD" && -s "$HOST_AUDIO" && 
 else
   echo "WARN: host USB audio modules not built/installed"
 fi
-[[ "$(cat "$SD/lgpt/otg/audio_usb_profile" 2>/dev/null)" == MONO_48K ]] || ERRORS=$((ERRORS+1))
+[[ "$(cat "$SD/lgpt/otg/audio_usb_profile" 2>/dev/null)" == STEREO_48K ]] || ERRORS=$((ERRORS+1))
 echo "ERRORS=$ERRORS"
 [[ "$ERRORS" -eq 0 ]]
 echo VERIFY_U2523_OK

@@ -3,10 +3,15 @@
 #include "Application/Model/Groove.h"
 #include "Application/Utils/char.h"
 #include "Application/Views/BaseClasses/UiColors.h"
+#include <string.h>
 
 GrooveView::GrooveView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
 	position_=0 ;
 	lastPosition_=0 ;
+	grooveUndoCount_=0 ;
+	grooveRedoCount_=0 ;
+	memset(grooveUndo_,0,sizeof(grooveUndo_)) ;
+	memset(grooveRedo_,0,sizeof(grooveRedo_)) ;
 }
 
 GrooveView::~GrooveView() {
@@ -20,6 +25,7 @@ void GrooveView::updateCursor(int dir) {
 } ;
 
 void GrooveView::updateCursorValue(int val,bool sync) {
+	pushGrooveUndo() ;
 	unsigned char *grooveData=Groove::GetInstance()->GetGrooveData(viewData_->currentGroove_) ;
 	int value=grooveData[position_] ;
 	val+=value ;
@@ -28,6 +34,64 @@ void GrooveView::updateCursorValue(int val,bool sync) {
 	grooveData[position_]=val ;
 	isDirty_=true; 
 } ;
+
+// TREEFROG_GLOBAL_UNDO_GROOVE (Bacon 1.1.1): full 16-byte groove snapshots
+// so that L1+X / R1+X act as a real global undo/redo in the groove editor.
+void GrooveView::pushGrooveUndo() {
+	Groove *gr=Groove::GetInstance() ;
+	unsigned char *grooveData=gr->GetGrooveData(viewData_->currentGroove_) ;
+	if (grooveUndoCount_>0) {
+		bool unchanged=true ;
+		for (int i=0;i<16;i++) {
+			if (grooveUndo_[grooveUndoCount_-1].data[i]!=grooveData[i]) { unchanged=false ; break ; }
+		}
+		if (unchanged) return ;
+	}
+	if (grooveUndoCount_==kGrooveHistorySize) {
+		for (int i=0;i<kGrooveHistorySize-1;i++) {
+			memcpy(grooveUndo_[i].data,grooveUndo_[i+1].data,16) ;
+		}
+		grooveUndoCount_-- ;
+	}
+	memcpy(grooveUndo_[grooveUndoCount_].data,grooveData,16) ;
+	grooveUndoCount_++ ;
+}
+
+bool GrooveView::GlobalUndo() {
+	if (grooveUndoCount_==0) return false ;
+	Groove *gr=Groove::GetInstance() ;
+	unsigned char *grooveData=gr->GetGrooveData(viewData_->currentGroove_) ;
+	grooveUndoCount_-- ;
+	if (grooveRedoCount_==kGrooveHistorySize) {
+		for (int i=0;i<kGrooveHistorySize-1;i++) {
+			memcpy(grooveRedo_[i].data,grooveRedo_[i+1].data,16) ;
+		}
+		grooveRedoCount_-- ;
+	}
+	memcpy(grooveRedo_[grooveRedoCount_].data,grooveData,16) ;
+	grooveRedoCount_++ ;
+	memcpy(grooveData,grooveUndo_[grooveUndoCount_].data,16) ;
+	isDirty_=true ;
+	return true ;
+}
+
+bool GrooveView::GlobalRedo() {
+	if (grooveRedoCount_==0) return false ;
+	Groove *gr=Groove::GetInstance() ;
+	unsigned char *grooveData=gr->GetGrooveData(viewData_->currentGroove_) ;
+	if (grooveUndoCount_==kGrooveHistorySize) {
+		for (int i=0;i<kGrooveHistorySize-1;i++) {
+			memcpy(grooveUndo_[i].data,grooveUndo_[i+1].data,16) ;
+		}
+		grooveUndoCount_-- ;
+	}
+	memcpy(grooveUndo_[grooveUndoCount_].data,grooveData,16) ;
+	grooveUndoCount_++ ;
+	grooveRedoCount_-- ;
+	memcpy(grooveData,grooveRedo_[grooveRedoCount_].data,16) ;
+	isDirty_=true ;
+	return true ;
+}
 
 void GrooveView::warpGroove(int dir) {
 	int current=viewData_->currentGroove_ ;
@@ -43,6 +107,7 @@ void GrooveView::warpGroove(int dir) {
 } ;
 
 void GrooveView::initCursorValue() {
+	pushGrooveUndo() ;
 	unsigned char *grooveData=Groove::GetInstance()->GetGrooveData(viewData_->currentGroove_) ;
 	if (grooveData[position_]==NO_GROOVE_DATA) {
 		grooveData[position_]=1 ;
@@ -51,6 +116,7 @@ void GrooveView::initCursorValue() {
 } ;
 
 void GrooveView::clearCursorValue() {
+	pushGrooveUndo() ;
 	unsigned char *grooveData=Groove::GetInstance()->GetGrooveData(viewData_->currentGroove_) ;
 	grooveData[position_]=NO_GROOVE_DATA ;
 	isDirty_=true ;
@@ -98,6 +164,14 @@ void GrooveView::ProcessButtonMask(unsigned short mask,bool pressed) {
 				initCursorValue() ;
 			} ;
 	  } else {
+		  // X Modifier (TREEFROG_NAV_X_DIR Bacon 1.1.1): quick navigation.
+		  // X+UP/DOWN: page jump (4 cells), X+LEFT/RIGHT: big groove jump.
+		  if (mask&EPBM_X) {
+			  if (mask&EPBM_DOWN) updateCursor(4) ;
+			  if (mask&EPBM_UP) updateCursor(-4) ;
+			  if (mask&EPBM_LEFT) warpGroove(-0x10) ;
+			  if (mask&EPBM_RIGHT) warpGroove(0x10) ;
+		  } else {
 		  // R Modifier
 
           	if (mask&EPBM_R) {
@@ -119,6 +193,7 @@ void GrooveView::ProcessButtonMask(unsigned short mask,bool pressed) {
 					player->OnStartButton(PM_PHRASE,viewData_->songX_,false,viewData_->chainRow_) ;
     			}
 		    }
+	  }
 	  } 
 	    
 	}

@@ -49,6 +49,14 @@ int LZ_CompressFast( unsigned char *in, unsigned char *out,
 void LZ_Uncompress( unsigned char *in, unsigned char *out,
                     unsigned int insize );
 
+/* Bacon 1.1.1 V18: bounded decompression.  Decodes at most maxOut bytes
+ * into out and validates every token (offset within the history window,
+ * length within the output budget, stream bounds).  Returns the number of
+ * bytes written, or -1 when the stream is corrupt/oversized.  The legacy
+ * unbounded LZ_Uncompress above must not be used on untrusted data. */
+int LZ_Uncompress_Safe( unsigned char *in, unsigned char *out,
+                        unsigned int insize, unsigned int maxOut );
+
 
 #ifdef __cplusplus
 }

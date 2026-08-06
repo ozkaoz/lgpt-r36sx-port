@@ -130,6 +130,7 @@ private:
     bool operationActive_;
     int operationPercent_;
     char operationMessage_[64];
+    char operationComboLabel_[16];
     bool chopsInitialized_;
     bool trimMode_;
     bool pitchMode_;
@@ -242,6 +243,15 @@ private:
     void drawSampleInfo(GUITextProperties &props);
     void drawEmptyWaveformText(GUITextProperties &props);
     void drawControls(GUITextProperties &props);
+    // TREEFROG_U2_39_CHOPPER_SPLIT_ZERO (Bacon 1.1.1): split whole sample in
+    // N equal parts (L1+B cycles 4/8/16/32) and zero-cross snapping for the
+    // selected chop start/end (L1+A / L1+B in trim mode).
+    void splitSampleIntoEqualParts(int parts);
+    void snapSelectedBoundaryToZeroCross(bool isStart);
+    void cycleSplitParts();
+    void clearAllChops();
+    void setOperationCombo(const char *combo);
+    int splitParts_;
 };
 
 #endif

@@ -55,6 +55,13 @@ void FieldView::ProcessButtonMask(unsigned short mask) {
 	}
 
 	
+	// TREEFROG_NAV_X_DIR (Bacon 1.1.1): X+directions jump focus by 4 fields.
+	// Also covers horizontal jumps (X+LEFT/RIGHT) using the same fast step.
+	if (mask & EPBM_X) {
+		moveFocusFast(mask) ;
+		return ;
+	}
+
 	if (mask&EPBM_A) {  // A or A+ARROW is sent to the field
 		if (mask&EPBM_DOWN) {
 			pushFieldUndo() ;
@@ -371,4 +378,38 @@ bool FieldView::GlobalResetOption() {
 	focus_->OnABClick() ;
 	isDirty_=true ;
 	return true ;
+}
+
+// TREEFROG_NAV_X_DIR (Bacon 1.1.1): quick focus jumps. X+UP/DOWN / X+LEFT/RIGHT
+// move the focus by 4 focusable fields, wrapping around the field list.
+void FieldView::moveFocusFast(unsigned short mask) {
+	static const int kFastStep = 4 ;
+	UIField *cells[128] ;
+	int count = 0 ;
+	IteratorPtr<UIField> it(T_SimpleList<UIField>::GetIterator()) ;
+	for (it->Begin();!it->IsDone();it->Next()) {
+		UIField &current=it->CurrentItem() ;
+		if (!current.IsStatic() && count<128) {
+			cells[count]=&current ;
+			count++ ;
+		}
+	}
+	if (count==0) return ;
+	int idx=0 ;
+	if (focus_) {
+		for (int i=0;i<count;i++) {
+			if (cells[i]==focus_) { idx=i ; break ; }
+		}
+	}
+	int dist = 0 ;
+	if (mask & (EPBM_DOWN|EPBM_RIGHT)) dist = kFastStep ;
+	if (mask & (EPBM_UP|EPBM_LEFT)) dist = -kFastStep ;
+	if (dist==0) return ;
+	idx += dist ;
+	idx %= count ;
+	if (idx<0) idx+=count ;
+	focus_->ClearFocus() ;
+	focus_=cells[idx] ;
+	focus_->SetFocus() ;
+	isDirty_=true ;
 }

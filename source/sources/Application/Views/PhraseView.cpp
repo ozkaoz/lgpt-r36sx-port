@@ -1197,6 +1197,25 @@ void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
 // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): phrase snapshot undo/redo.
 // TREEFROG_GLOBAL_UNDO_V5 (Bacon 1.1.1 V14): pushes are captured at the edit
 // sites; a re-entrancy guard makes multi-row selection edits snapshot once.
+// TREEFROG_GLOBAL_UNDO_V9 (Bacon 1.1.1): two edit paths can snapshot the SAME
+// pre-edit state twice in one press (pasteLast() then pasteDefaultChopForRow()
+// both push when an empty row is pasted into a chopped instrument).  Dropping
+// consecutive duplicate snapshots here keeps the history to real mutations
+// only, so undo/redo no longer walk through invisible no-op steps.
+typedef PhraseView::PhraseEdit PhraseEditT;
+static bool phraseEditEqual(const PhraseEditT &a, const PhraseEditT &b) {
+    if (a.currentPhrase != b.currentPhrase) return false;
+    return memcmp(a.note, b.note, sizeof(a.note)) == 0 &&
+           memcmp(a.instr, b.instr, sizeof(a.instr)) == 0 &&
+           memcmp(a.vol, b.vol, sizeof(a.vol)) == 0 &&
+           memcmp(a.pitch, b.pitch, sizeof(a.pitch)) == 0 &&
+           memcmp(a.cmd1, b.cmd1, sizeof(a.cmd1)) == 0 &&
+           memcmp(a.param1, b.param1, sizeof(a.param1)) == 0 &&
+           memcmp(a.cmd2, b.cmd2, sizeof(a.cmd2)) == 0 &&
+           memcmp(a.param2, b.param2, sizeof(a.param2)) == 0 &&
+           memcmp(a.cmd3, b.cmd3, sizeof(a.cmd3)) == 0 &&
+           memcmp(a.param3, b.param3, sizeof(a.param3)) == 0;
+}
 static bool g_phraseUndoPushActive = false;
 void PhraseView::pushPhraseUndo() {
     if (g_phraseUndoPushActive) return;
@@ -1213,6 +1232,12 @@ void PhraseView::pushPhraseUndo() {
     memcpy(e.cmd3, phrase_->cmd3_ + 16 * viewData_->currentPhrase_, 16 * sizeof(FourCC));
     memcpy(e.param3, phrase_->param3_ + 16 * viewData_->currentPhrase_, 16 * sizeof(ushort));
     e.currentPhrase = (uchar)viewData_->currentPhrase_;
+    /* TREEFROG_GLOBAL_UNDO_V9: a repeat snapshot of the SAME pre-edit state
+       (second push in the same gesture) adds nothing to the history. */
+    if (phraseUndoCount_ > 0 && phraseEditEqual(e, phraseUndo_[0])) {
+        g_phraseUndoPushActive = false;
+        return;
+    }
     for (int i = kPhraseHistorySize - 1; i > 0; i--) phraseUndo_[i] = phraseUndo_[i - 1];
     phraseUndo_[0] = e;
     phraseUndoCount_++;
@@ -1423,6 +1448,20 @@ void PhraseView::processNormalButtonMask(unsigned short mask) {
                 if (mask & EPBM_L) {
 
                 } else {
+                    // X Modifier (TREEFROG_NAV_X_DIR Bacon 1.1.1):
+                    // quick page navigation: X+UP/DOWN jumps 4 rows,
+                    // X+LEFT/RIGHT jumps 2 columns.
+
+                    if (mask & EPBM_X) {
+                        if (mask & EPBM_DOWN)
+                            updateCursor(0, 4);
+                        if (mask & EPBM_UP)
+                            updateCursor(0, -4);
+                        if (mask & EPBM_LEFT)
+                            updateCursor(-2, 0);
+                        if (mask & EPBM_RIGHT)
+                            updateCursor(2, 0);
+                    } else {
                     // No modifier
 
                     if (mask & EPBM_DOWN)
@@ -1436,6 +1475,7 @@ void PhraseView::processNormalButtonMask(unsigned short mask) {
                     if (mask & EPBM_START) {
                         player->OnStartButton(PM_PHRASE, viewData_->songX_,
                                               false, viewData_->chainRow_);
+                    }
                     }
                 }
             }
@@ -1666,6 +1706,20 @@ void PhraseView::processSelectionButtonMask(unsigned short mask) {
                 if (mask & EPBM_L) {
 
                 } else {
+                    // X Modifier (TREEFROG_NAV_X_DIR Bacon 1.1.1):
+                    // quick page navigation: X+UP/DOWN jumps 4 rows,
+                    // X+LEFT/RIGHT jumps 2 columns.
+
+                    if (mask & EPBM_X) {
+                        if (mask & EPBM_DOWN)
+                            updateCursor(0, 4);
+                        if (mask & EPBM_UP)
+                            updateCursor(0, -4);
+                        if (mask & EPBM_LEFT)
+                            updateCursor(-2, 0);
+                        if (mask & EPBM_RIGHT)
+                            updateCursor(2, 0);
+                    } else {
                     // No modifier
 
                     if (mask & EPBM_DOWN)
@@ -1679,6 +1733,7 @@ void PhraseView::processSelectionButtonMask(unsigned short mask) {
                     if (mask & EPBM_START) {
                         player->OnStartButton(PM_PHRASE, viewData_->songX_,
                                               false, viewData_->chainRow_);
+                    }
                     }
                 }
             }

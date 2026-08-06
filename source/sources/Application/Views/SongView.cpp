@@ -1038,6 +1038,22 @@ void SongView::processNormalButtonMask(unsigned int mask) {
                         nudgeTempo(1);
                 } else {
 
+                    // X Modifier (TREEFROG_NAV_X_DIR Bacon 1.1.1):
+                    // X+UP/DOWN jumps 4 rows like the Phrase view.
+                    // TREEFROG_NAV_SONG_X_4ROW (Bacon 1.1.1): page jumps (one
+                    // full screen, 16 rows) only via B+UP/DOWN.
+
+                    if (mask & EPBM_X) {
+                        if (mask & EPBM_DOWN)
+                            updateCursor(0, 4);
+                        if (mask & EPBM_UP)
+                            updateCursor(0, -4);
+                        if (mask & EPBM_LEFT)
+                            updateCursor(-4, 0);
+                        if (mask & EPBM_RIGHT)
+                            updateCursor(4, 0);
+                    } else {
+
                     // No modifier
 
                     if (mask & EPBM_DOWN)
@@ -1051,6 +1067,7 @@ void SongView::processNormalButtonMask(unsigned int mask) {
 
                     if (mask & EPBM_START) {
                         onStart();
+                    }
                     }
                 }
             }

@@ -22,6 +22,10 @@ public:
 	void ClearFocus() ;
 	int GetFocusIndex() ;
 	void SetSize(int size) ;
+
+	// TREEFROG_NAV_X_DIR (Bacon 1.1.1): X+directions jump focus by 4 fields.
+	void moveFocusFast(unsigned short mask) ;
+
 private:
 	// TREEFROG_GLOBAL_UNDO_V7 (Bacon 1.1.1 V16): newValue is the post-edit
 	// value captured when the undo entry is popped (GlobalUndo reads the

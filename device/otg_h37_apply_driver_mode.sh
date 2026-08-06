@@ -170,7 +170,7 @@ h35_load_host_stack(){
 }
 
 case "$MODE" in
-  WINDOWS) atomic_write "$RUNTIME/audio_usb_profile" "MONO_48K" ;;
+  WINDOWS) atomic_write "$RUNTIME/audio_usb_profile" "STEREO_48K" ;;
   ANDROID) atomic_write "$RUNTIME/audio_usb_profile" "STEREO_44K1_AOA_BULK";;
   USB_OUT|SP404_IN) atomic_write "$RUNTIME/audio_usb_profile" "MONO_48K";;
   MIDI) atomic_write "$RUNTIME/audio_usb_profile" "MIDI_48K";;

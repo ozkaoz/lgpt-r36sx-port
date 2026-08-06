@@ -744,6 +744,21 @@ void TableView::processNormalButtonMask(unsigned short mask) {
                 if (mask & EPBM_R) {
                 } else {
 
+                    // X Modifier (TREEFROG_NAV_X_DIR Bacon 1.1.1):
+                    // quick page navigation: X+UP/DOWN jumps 4 rows,
+                    // X+LEFT/RIGHT jumps 2 columns.
+
+                    if (mask & EPBM_X) {
+                        if (mask & EPBM_DOWN)
+                            updateCursor(0, 4);
+                        if (mask & EPBM_UP)
+                            updateCursor(0, -4);
+                        if (mask & EPBM_LEFT)
+                            updateCursor(-2, 0);
+                        if (mask & EPBM_RIGHT)
+                            updateCursor(2, 0);
+                    } else {
+
                     // No modifier
 
                     if (mask & EPBM_DOWN)
@@ -757,6 +772,7 @@ void TableView::processNormalButtonMask(unsigned short mask) {
                     if (mask & EPBM_START) {
                         player->OnStartButton(PM_PHRASE, viewData_->songX_,
                                               false, viewData_->chainRow_);
+                    }
                     }
                 }
             }
@@ -806,6 +822,20 @@ void TableView::processSelectionButtonMask(unsigned short mask) {
                 if (mask & EPBM_L) {
 
                 } else {
+                    // X Modifier (TREEFROG_NAV_X_DIR Bacon 1.1.1):
+                    // quick page navigation: X+UP/DOWN jumps 4 rows,
+                    // X+LEFT/RIGHT jumps 2 columns.
+
+                    if (mask & EPBM_X) {
+                        if (mask & EPBM_DOWN)
+                            updateCursor(0, 4);
+                        if (mask & EPBM_UP)
+                            updateCursor(0, -4);
+                        if (mask & EPBM_LEFT)
+                            updateCursor(-2, 0);
+                        if (mask & EPBM_RIGHT)
+                            updateCursor(2, 0);
+                    } else {
                     // No modifier
 
                     if (mask & EPBM_DOWN)
@@ -819,6 +849,7 @@ void TableView::processSelectionButtonMask(unsigned short mask) {
                     if (mask & EPBM_START) {
                         player->OnStartButton(PM_PHRASE, viewData_->songX_,
                                               false, viewData_->chainRow_);
+                    }
                     }
                 }
             }

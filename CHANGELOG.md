@@ -1,5 +1,58 @@
 # Changelog
 
+## Release: Bacon 1.2 - Mixer Dev
+
+- **Estado**: release del desarrollo completo del mixer sobre la línea Bacon
+  (consolida las iteraciones V6-V16 sobre Bacon 1.1.1): medidores estéreo L/R
+  con medición pre-clip, undo/redo global real en todas las vistas,
+  normalización de samples en el chopper y perfil USB de audio estéreo 48 kHz
+  como default de instalación (`audio_usb_profile = STEREO_48K`).
+- **Medidores estéreo L/R pre-clip (V6-V9)**: cada canal y el master dibujan
+  dos barras independientes (L en x, R en x+2 con hueco), leyendo cada lado su
+  propio pico post-pan; el clipeo se quita del medidor (el scan es PRE-clip,
+  la zona roja +3 dB es alcanzable, el hardClip int16 se mantiene solo en el
+  transporte). Fix real del par L/R (el buffer es interleaved: `c[0]` es
+  siempre L y `c[1]` siempre R), buses de canal/stream sin clip
+  (`SetClipBypass`), fader master moviendo el bus medido, escala de canal
+  0..127 (127 = +2.1 dB) y barra grande del mixer corregida a 12 celdas.
+- **Undo/redo global (V10-V16)**: `L1+X` deshace y `R1+X` rehace en Song,
+  Chain, Phrase y Table con historiales de 16 entradas y snapshots capturados
+  dentro de los mutadores reales (Song completo 2048 B, cursor preservado:
+  undo/redo deshace la ÚLTIMA ACCIÓN, nunca la navegación). Reclamado
+  opt-in (devuelven bool), de modo que el legacy A+B de clear/cut se
+  conserva fuera de FieldView/MixerView. Solo/Mute del mixer deshacibles
+  (mascaras ME_MUTE/ME_SOLO) y redo que restaura el valor post-edición.
+- **A+B reset option (V10-V11)**: en vistas de edición, A+B restaura el
+  parámetro enfocado a su default (el canal del mixer resetea a volumen 100,
+  no 127, y pan 0).
+- **Barras VU bottom-up (V14-V16)**: niveles de 3 px alineados al medidor Cue,
+  banda roja 0 dB+ arriba, reset a 0 al detener playback, menús del mixer
+  opacos (PostFlushDraw se salta con modal o páginas FX) y MIX page con
+  `RET D:xxx R:xxx FX RETURNS` como cabecera y barras de 15 celdas.
+- **Menú L1+A del mixer (V13)**: master → LIMITER (softclip Bypass/Subtle/
+  Medium/Heavy/Insane), CLIP GAIN y saltos a las páginas DELAY/REVERB/EQ/COMP;
+  track → FILTER/BITCRUSHER/PLAYBACK/FX SENDS/AUTOMATION aterrizando en la
+  sección del Instrument view del canal.
+- **Chopper (V9, V13-V16)**: `R2+Y` NORMALIZA el sample (ganancia a
+  32767/peak 0 dBFS, undo/redo con L1+X/R1+X, boundaries intactos);
+  `togglePitchMode` blindado con `hasWaveform_`; overlay de operación sin
+  caja ASCII; el overlay de onda nunca se pinta sobre el Help.
+- **Help (V13-V15)**: secciones CHOPPER/CHOP PITCH registradas, navegación
+  L1/R1 siempre (aunque SELECT quede pulsado), guard anti-apilamiento y
+  chopper visible bajo el help.
+- **USB audio (U2523)**: el perfil por defecto de instalación pasa a
+  `STEREO_48K` (`scripts/install.sh`, `install_stock.sh`, `verify.sh`,
+  `device/otg_h37_apply_driver_mode.sh` + copia en SD), verificado por
+  `VERIFY_U2523_OK` con `ERRORS=0`.
+- **SD limpia**: eliminadas las carpetas corruptas `F:\lgpt\project` y
+  `F:\lgpt\samplelib` (nombres con bytes basura, "Error irrecuperable" de
+  chkdsk) y `F:\FOUND.000`; el launcher recrea el árbol en el primer arranque
+  (verificado por `tests/test_copy_root_launcher.sh`).
+- **Verificación**: build `BUILD_U2523_OK` (core
+  `d3178aab497e...`, daemons SP404 `b75a2477226a...`, MIDI `3f0ea7a23db7...`,
+  USB `53258f2b8b37...`), install + verify en SD (`VERIFY_U2523_OK`,
+  `ERRORS=0`), suite de layout y launcher en verde.
+
 ## Release: Bacon 1.1 - Audio Driver Refact, Sampler Audio Added
 
 - **Estado**: release de estabilización del driver de audio Sampler

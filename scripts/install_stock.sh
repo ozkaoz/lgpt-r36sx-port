@@ -16,7 +16,7 @@ cp -f "$ROOT/deployment/config.stock.xml" "$SD/lgpt/config.xml"
 cp -f "$ROOT/recovery/u2_38au8_sync_uac2/usb_f_uac2.ko" "$SD/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/usb_f_uac2.ko"
 for f in otg_u241_common.sh otg_u241_setup_once.sh otg_u241_apply_profile_once.sh otg_u241_shutdown.sh; do install -m 0755 "$ROOT/device/$f" "$SD/lgpt/otg/bin/$f"; done
 : > "$SD/lgpt/otg/enable_lgpt_uac2_bridge"
-printf 'MONO_48K\n' > "$SD/lgpt/otg/audio_usb_profile"
+printf 'STEREO_48K\n' > "$SD/lgpt/otg/audio_usb_profile"
 printf 'LOCAL_CONSOLE\n' > "$SD/lgpt/otg/audio_driver_mode"
 rm -f "$SD/lgpt/otg/lowlat_240" "$SD/lgpt/last_project"
 sync

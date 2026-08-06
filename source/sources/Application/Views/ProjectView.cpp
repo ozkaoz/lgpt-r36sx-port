@@ -8,6 +8,7 @@
 #include "Application/Views/BaseClasses/UiDraw.h"
 #include "Application/Views/ModalDialogs/NewProjectDialog.h"
 #include "Application/Views/ModalDialogs/SelectProjectDialog.h"
+#include <unistd.h>
 #include "Application/Views/ModalDialogs/AudioDriverModal.h"
 #include "BaseClasses/UIActionField.h"
 #include "BaseClasses/UIField.h"
@@ -89,6 +90,12 @@ static void SaveAsProjectCallback(View &v,ModalView &dialog) {
 					}
 				}
 			}
+
+		/* TREEFROG_SAVE_SYNC_V1 (Bacon 1.1.1): Save-As copied the project
+		   data to a NEW directory; flush everything (data + FAT metadata)
+		   before the view switch so a hard power-off cannot leave the new
+		   project half-written on the card. */
+		sync();
 
 		((ProjectView &)v).OnSaveAsProject((char*)str_dstprjdir.c_str());
 		}

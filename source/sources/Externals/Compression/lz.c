@@ -495,7 +495,7 @@ void LZ_Uncompress( unsigned char *in, unsigned char *out,
     unsigned char marker, symbol;
     unsigned int  i, inpos, outpos, length, offset;
 
-    /* Do we have anything to compress? */
+    /* Do we have anything to decompress? */
     if( insize < 1 )
     {
         return;
@@ -509,10 +509,12 @@ void LZ_Uncompress( unsigned char *in, unsigned char *out,
     outpos = 0;
     do
     {
+        if (inpos >= insize) return;
         symbol = in[ inpos ++ ];
         if( symbol == marker )
         {
             /* We had a marker byte */
+            if (inpos >= insize) return;
             if( in[ inpos ] == 0 )
             {
                 /* It was a single occurrence of the marker byte */
@@ -540,4 +542,122 @@ void LZ_Uncompress( unsigned char *in, unsigned char *out,
         }
     }
     while( inpos < insize );
+}
+
+/*************************************************************************
+* LZ_Uncompress_Safe() - Bounded LZ77 decoder for untrusted data.
+*  in     - Input (compressed) buffer.
+*  out    - Output (uncompressed) buffer.
+*  insize - Number of input bytes.
+*  maxOut - Capacity of the output buffer in bytes.
+* Decodes like LZ_Uncompress but validates every token: an offset that
+* reaches outside the already-decoded history, a length that would exceed
+* maxOut, or a stream that runs out of input aborts the decode and returns
+* -1.  On success returns the number of bytes written (<= maxOut).
+*************************************************************************/
+
+int LZ_Uncompress_Safe( unsigned char *in, unsigned char *out,
+    unsigned int insize, unsigned int maxOut )
+{
+    unsigned char marker, symbol;
+    unsigned int  i, inpos, outpos, length, offset;
+
+    /* Do we have anything to decompress? */
+    if( insize < 1 )
+    {
+        return -1;
+    }
+
+    /* Get marker symbol from input stream */
+    marker = in[ 0 ];
+    inpos = 1;
+
+    /* Main decompression loop */
+    outpos = 0;
+    do
+    {
+        /* Guard: never read past the input stream */
+        if( inpos >= insize )
+        {
+            return -1;
+        }
+        symbol = in[ inpos ++ ];
+        if( symbol == marker )
+        {
+            /* We had a marker byte */
+            if( inpos >= insize )
+            {
+                return -1;
+            }
+            if( in[ inpos ] == 0 )
+            {
+                /* It was a single occurrence of the marker byte */
+                if( outpos + 1 > maxOut )
+                {
+                    return -1;
+                }
+                out[ outpos ++ ] = marker;
+                ++ inpos;
+            }
+            else
+            {
+                /* Extract true length and offset, bounded to the stream */
+                unsigned int lenBytes = 0;
+                length = 0;
+                while( inpos < insize && lenBytes < 8 )
+                {
+                    unsigned char c = in[ inpos ++ ];
+                    ++ lenBytes;
+                    length = (length << 7) | (c & 0x7f);
+                    if( !(c & 0x80) ) break;
+                }
+                if( lenBytes >= 8 )
+                {
+                    return -1;
+                }
+                offset = 0;
+                lenBytes = 0;
+                while( inpos < insize && lenBytes < 8 )
+                {
+                    unsigned char c = in[ inpos ++ ];
+                    ++ lenBytes;
+                    offset = (offset << 7) | (c & 0x7f);
+                    if( !(c & 0x80) ) break;
+                }
+                if( lenBytes >= 8 )
+                {
+                    return -1;
+                }
+
+                /* Validate the back-reference before write */
+                if( length == 0 || offset == 0 || offset > outpos )
+                {
+                    return -1;
+                }
+                if( ((unsigned long)outpos + (unsigned long)length) > (unsigned long)maxOut )
+                {
+                    return -1;
+                }
+
+                /* Copy corresponding data from history window */
+                for( i = 0; i < length; ++ i )
+                {
+                    out[ outpos ] = out[ outpos - offset ];
+                    ++ outpos;
+                }
+            }
+        }
+        else
+        {
+            /* No marker, plain copy */
+            if( outpos + 1 > maxOut )
+            {
+                return -1;
+            }
+            out[ outpos ++ ] = symbol;
+        }
+    }
+    while( inpos < insize );
+
+    return (int)outpos;
 }

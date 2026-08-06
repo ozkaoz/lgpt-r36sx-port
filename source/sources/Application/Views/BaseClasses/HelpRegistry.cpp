@@ -19,6 +19,9 @@ static const HelpLine kSongLines_[] = {
     {"SELECT+R2", "audio driver"},
     // TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1): global combos, every view
     {"L1+X R1+X", "undo redo"},
+    // TREEFROG_NAV_X_DIR / TREEFROG_NAV_SONG_X_4ROW (Bacon 1.1.1)
+    {"X+UP/DN", "jump 4 rows"},
+    {"B+UP/DN", "page (16 rows)"},
     {"A+B", "reset option"},
 };
 
@@ -31,6 +34,7 @@ static const HelpLine kChainLines_[] = {
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
     {"L1+X R1+X", "undo redo"},
+    {"X+dir", "quick jump"},
     {"A+B", "reset option"},
 };
 
@@ -43,6 +47,10 @@ static const HelpLine kPhraseLines_[] = {
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
     {"L1+X R1+X", "undo redo"},
+    // TREEFROG_NAV_X_DIR (Bacon 1.1.1): phrase quick nav; B+UP/DN pages
+    // through the chain's phrases, X+UP/DN jumps 4 rows inside the phrase.
+    {"X+UP/DN", "jump 4 rows"},
+    {"B+UP/DN", "page (next phrase)"},
     {"A+B", "reset option"},
 };
 
@@ -54,6 +62,7 @@ static const HelpLine kProjectLines_[] = {
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
     {"L1+X R1+X", "undo redo"},
+    {"X+dir", "quick jump"},
     {"A+B", "reset option"},
 };
 
@@ -69,6 +78,7 @@ static const HelpLine kInstrumentLines_[] = {
     {"SELECT+R2", "audio driver"},
     {"A+B", "reset field"},
     {"L1+X R1+X", "undo redo"},
+    {"X+dir", "quick jump"},
 };
 
 static const HelpLine kTableLines_[] = {
@@ -79,6 +89,7 @@ static const HelpLine kTableLines_[] = {
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
     {"L1+X R1+X", "undo redo"},
+    {"X+dir", "quick jump"},
     {"A+B", "reset option"},
 };
 
@@ -90,6 +101,7 @@ static const HelpLine kGrooveLines_[] = {
     {"SELECT+R1", "help"},
     {"SELECT+R2", "audio driver"},
     {"L1+X R1+X", "undo redo"},
+    {"X+dir", "quick jump"},
     {"A+B", "reset option"},
 };
 
@@ -117,9 +129,8 @@ static const HelpLine kMixerLines_[] = {
     {"L1+X R1+X", "undo redo"},
 };
 
-// TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): help section for the
-// graphical chopper and its pitch/env submenu (SELECT+R1 inside the
-// chopper shows this section).
+// TREEFROG_CHOPPER_HELP_V2 (Bacon 1.1.1): full chopper combo list, including
+// the split cycle and the trim-mode zero-cross snap combos the user verified.
 static const HelpLine kChopperLines_[] = {
     {"L/R", "cursor"},
     {"UP/DN", "zoom"},
@@ -131,15 +142,16 @@ static const HelpLine kChopperLines_[] = {
     {"R1+L/R", "sample"},
     {"R2+L/R", "chop sel"},
     {"R2+A", "play full"},
-    {"R2+Y", "normalize"},
+    {"R2+Y", "normalize (trim)"},
+    {"L1+A", "snap start 0ch"},
+    {"L1+B", "split a4/8/16/32/0"},
+    {"L1+B", "snap end 0ch (trim)"},
     {"L1+R1", "pitch/env"},
     {"A+B", "range nudge"},
     {"R1+A", "crop apply"},
     {"L2+Y", "del range"},
     {"R1+B", "back"},
     {"L2+B", "stop"},
-    {"SELECT+R1", "help"},
-    {"SELECT+R2", "audio driver"},
     {"L1+X R1+X", "undo redo"},
 };
 

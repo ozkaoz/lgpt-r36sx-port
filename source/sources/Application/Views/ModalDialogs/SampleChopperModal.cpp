@@ -9,6 +9,7 @@
 #include "Application/Views/BaseClasses/UiDraw.h"
 #include "System/FileSystem/FileSystem.h"
 #include "Services/Time/TimeService.h"
+#include <unistd.h>
 #if defined(PLATFORM_TREEFROG)
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
 extern "C" void TreeFrogForceVideoRefresh(void);
@@ -411,6 +412,7 @@ static void lgptWritePersistentChopState(const LGPTChopperSavedState &saved) {
     file->Printf("\nEND\n");
     file->Close();
     delete file;
+    sync();
 }
 
 
@@ -998,6 +1000,7 @@ SampleChopperModal::SampleChopperModal(View &view,
       pitchScope_(0),
       selectedChop_(0),
       boundaryCount_(0),
+      splitParts_(4),
       undoHistoryCount_(0),
       redoHistoryCount_(0),
       sampleName_(sampleName ? sampleName : "") {
@@ -1780,10 +1783,138 @@ void SampleChopperModal::cropToSelectedRange() {
     setStatus(msg);
 }
 
+void SampleChopperModal::splitSampleIntoEqualParts(int parts) {
+    initializeChopsIfNeeded();
+    if (sourceSize_ <= 1) { setStatus("No sample to split"); return; }
+    setOperationCombo("L1 + B");
+    if (parts < 2 || parts > 32) parts = 4;
+    int step = sourceSize_ / parts;
+    if (step < 1) { setStatus("Sample too small"); return; }
+    pushLogicalUndo("Split sample");
+    boundaryCount_ = 0;
+    for (int i = 0; i < parts; i++) {
+        if (boundaryCount_ >= MAX_CHOP_BOUNDARIES) break;
+        boundaries_[boundaryCount_++] = i * step;
+    }
+    int last = sourceSize_ - 1;
+    if (boundaryCount_ == 0 || boundaries_[boundaryCount_ - 1] != last) {
+        if (boundaryCount_ < MAX_CHOP_BOUNDARIES) boundaries_[boundaryCount_++] = last;
+        else boundaries_[boundaryCount_ - 1] = last;
+    }
+    sortBoundaries();
+    selectedChop_ = 0;
+    trimMode_ = false;
+    cursorFrame_ = 0;
+    saveChopStateForCurrentSample();
+    ensureCursorVisible();
+    prepareWaveformPreview();
+    publishOverlayState();
+    char m[64];
+    snprintf(m, sizeof(m), "Split sample in %d parts", parts);
+    setStatus(m);
+}
+
+void SampleChopperModal::setOperationCombo(const char *combo) {
+    if (!combo) combo = "";
+    snprintf(operationComboLabel_, sizeof(operationComboLabel_), "%s", combo);
+    operationComboLabel_[sizeof(operationComboLabel_) - 1] = 0;
+}
+
+/* TREEFROG_U2_39_CHOPPER_SPLIT_ZERO (Bacon 1.1.1): L1+B at 32 parts clears
+   every cut (whole sample shows as a single region, no visible cut lines)
+   and the next L1+B starts the cycle again at 4. */
+void SampleChopperModal::clearAllChops() {
+    initializeChopsIfNeeded();
+    if (sourceSize_ <= 1) { setStatus("No sample to clear"); return; }
+    pushLogicalUndo("Clear chops");
+    boundaryCount_ = 2;
+    boundaries_[0] = 0;
+    boundaries_[1] = sourceSize_ - 1;
+    for (int i = 2; i < MAX_CHOP_BOUNDARIES; i++) boundaries_[i] = 0;
+    selectedChop_ = 0;
+    trimMode_ = false;
+    cursorFrame_ = 0;
+    saveChopStateForCurrentSample();
+    ensureCursorVisible();
+    prepareWaveformPreview();
+    publishOverlayState();
+    setStatus("No cuts (L1+B to split again)");
+}
+
+void SampleChopperModal::cycleSplitParts() {
+    static const int kSplitCycle[] = {4, 8, 16, 32, 0, 4};
+    int next = 1;
+    for (int i = 0; i < 4; i++) {
+        if (splitParts_ == kSplitCycle[i]) { next = i + 1; break; }
+    }
+    splitParts_ = kSplitCycle[next];
+    if (splitParts_ == 0) {
+        clearAllChops();
+        return;
+    }
+    splitSampleIntoEqualParts(splitParts_);
+}
+
+void SampleChopperModal::snapSelectedBoundaryToZeroCross(bool isStart) {
+    if (!hasAssignedSample() || sourceSize_ <= 1) { setStatus("No sample loaded"); return; }
+    initializeChopsIfNeeded();
+    if (boundaryCount_ < 2) { setStatus("No chops to snap"); return; }
+    SoundSource *source = SamplePool::GetInstance()->GetSource(sampleIndex_);
+    if (!source) { setStatus("No WAV source"); return; }
+    short *samples = (short *)source->GetSampleBuffer(-1);
+    int channels = source->GetChannelCount(-1);
+    if (!samples || channels <= 0) { setStatus("Bad sample buffer"); return; }
+
+    int idx = selectedChop_;
+    if (!isStart) idx = clampInt(idx + 1, 1, boundaryCount_ - 1);
+    if (idx < 0 || idx >= boundaryCount_) { setStatus("Invalid boundary"); return; }
+    int frame = boundaries_[idx];
+    int minFrame = (idx == 0) ? 0 : boundaries_[idx - 1] + 1;
+    int maxFrame = (idx == boundaryCount_ - 1) ? (sourceSize_ - 1) : (boundaries_[idx + 1] - 1);
+    int lo = frame - 64; if (lo < minFrame) lo = minFrame;
+    int hi = frame + 64; if (hi > maxFrame) hi = maxFrame;
+    int best = frame;
+    long bestScore = -1;
+    for (int f = lo; f <= hi; f++) {
+        long score = 0;
+        for (int c = 0; c < channels; c++) {
+            int s = samples[f * channels + c];
+            score += (s < 0) ? -s : s;
+        }
+        if (bestScore < 0 || score < bestScore) { bestScore = score; best = f; }
+    }
+    if (best != frame) {
+        pushLogicalUndo(isStart ? "Snap start" : "Snap end");
+        boundaries_[idx] = best;
+        cursorFrame_ = best;
+        sortBoundaries();
+        saveChopStateForCurrentSample();
+        ensureCursorVisible();
+        prepareWaveformPreview();
+        publishOverlayState();
+        char m[64];
+        snprintf(m, sizeof(m), "Zero-cross %s %d", isStart ? "start" : "end", best);
+        setStatus(m);
+    } else {
+        setStatus("Already at zero-cross");
+    }
+}
 
 bool SampleChopperModal::destructiveCropToSelectedRange() {
     if (!hasAssignedSample() || samplePath_.empty() || sourceSize_ <= 1) { setStatus("No WAV to crop"); return false; }
     if (!lgptEndsWithWav(sampleName_)) { setStatus("Crop WAV only"); return false; }
+
+    // TREEFROG_U2_38_CHOPPER_CROP_CRASH_FIX (Bacon 1.1.1): editing the shared
+    // SoundSource buffer (ReplaceBuffer) while any voice/stream still references
+    // it or while the file is open in the AudioFileStreamer is a use-after-free.
+    // Halt *all* playback (song voices + streaming preview) before touching the
+    // pool buffer or rewriting the WAV on disk; the waveform preview stays.
+    stopSamplePreview();
+    Player *p=Player::GetInstance();
+    if (p) {
+        if (p->IsRunning()) p->Stop();
+        if (p->IsStreaming()) p->StopStreaming();
+    }
 
     initializeChopsIfNeeded();
     if (boundaryCount_ < 2) { setStatus("No range to crop"); return false; }
@@ -1809,7 +1940,8 @@ bool SampleChopperModal::destructiveCropToSelectedRange() {
     if (start == 0 && end == size - 1) { setStatus("Crop unchanged"); return false; }
 
     stopSamplePreview();
-    showOperationProgress("Keep range", 5);
+    setOperationCombo("R1 + A");
+    showOperationProgress("Operacion Crop", 5);
 
     clearLogicalHistory();
     lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Crop", boundaries_, boundaryCount_, selectedChop_, sourceSize_);
@@ -1817,19 +1949,19 @@ bool SampleChopperModal::destructiveCropToSelectedRange() {
                                      g_lgptPhysicalUndoChannels, g_lgptPhysicalUndoRate)) {
         clearOperationProgress(); setStatus("Undo capture fail"); return false;
     }
-    showOperationProgress("Keep range", 25);
+    showOperationProgress("Operacion Crop", 25);
 
     int sampleWords = frameCount * channels;
     short *cropped = (short *)malloc(sampleWords * sizeof(short));
     if (!cropped) { clearOperationProgress(); setStatus("No crop memory"); return false; }
     memcpy(cropped, samples + (start * channels), sampleWords * sizeof(short));
-    showOperationProgress("Keep range", 50);
+    showOperationProgress("Operacion Crop", 50);
 
     if (!wav->ReplaceBuffer(cropped, frameCount, channels, rate)) {
         free(cropped); clearOperationProgress(); setStatus("Cannot crop buffer"); return false;
     }
     free(cropped);
-    showOperationProgress("Keep range", 70);
+    showOperationProgress("Operacion Crop", 70);
 
     if (!wav->SaveBufferToPath(samplePath_.c_str())) {
         wav->ReplaceBuffer(g_lgptPhysicalUndoSamples, g_lgptPhysicalUndoFrames,
@@ -1839,7 +1971,8 @@ bool SampleChopperModal::destructiveCropToSelectedRange() {
         prepareWaveformPreview(); publishOverlayState();
         clearOperationProgress(); setStatus("Cannot write crop"); return false;
     }
-    showOperationProgress("Keep range", 85);
+    showOperationProgress("Operacion Crop", 85);
+    sync();
 
     sourceSize_ = frameCount;
     sampleSize_ = frameCount;
@@ -1873,6 +2006,15 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
     if (!hasAssignedSample() || samplePath_.empty() || sourceSize_ <= 1) { setStatus("No WAV to edit"); return false; }
     if (!lgptEndsWithWav(sampleName_)) { setStatus("Delete WAV only"); return false; }
 
+    // TREEFROG_U2_38_CHOPPER_CROP_CRASH_FIX: same as for crop — halt all
+    // playback before freeing/replacing the shared SoundSource buffer.
+    stopSamplePreview();
+    Player *p=Player::GetInstance();
+    if (p) {
+        if (p->IsRunning()) p->Stop();
+        if (p->IsStreaming()) p->StopStreaming();
+    }
+
     initializeChopsIfNeeded();
     if (boundaryCount_ < 2) { setStatus("No range to delete"); return false; }
 
@@ -1897,7 +2039,8 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
     if (nextSize <= 1) { setStatus("Cannot delete all"); return false; }
 
     stopSamplePreview();
-    showOperationProgress("Delete range", 5);
+    setOperationCombo("L2 + Y");
+    showOperationProgress("Operacion Delete", 5);
 
     clearLogicalHistory();
     lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Delete", boundaries_, boundaryCount_, selectedChop_, sourceSize_);
@@ -1905,7 +2048,7 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
                                      g_lgptPhysicalUndoChannels, g_lgptPhysicalUndoRate)) {
         clearOperationProgress(); setStatus("Undo capture fail"); return false;
     }
-    showOperationProgress("Delete range", 25);
+    showOperationProgress("Operacion Delete", 25);
 
     int sampleWords = nextSize * channels;
     short *edited = (short *)malloc(sampleWords * sizeof(short));
@@ -1920,13 +2063,13 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
     if (tailFrames > 0) {
         memcpy(edited + (outFrame * channels), samples + ((end + 1) * channels), tailFrames * channels * sizeof(short));
     }
-    showOperationProgress("Delete range", 50);
+    showOperationProgress("Operacion Delete", 50);
 
     if (!wav->ReplaceBuffer(edited, nextSize, channels, rate)) {
         free(edited); clearOperationProgress(); setStatus("Cannot edit buffer"); return false;
     }
     free(edited);
-    showOperationProgress("Delete range", 70);
+    showOperationProgress("Operacion Delete", 70);
 
     if (!wav->SaveBufferToPath(samplePath_.c_str())) {
         wav->ReplaceBuffer(g_lgptPhysicalUndoSamples, g_lgptPhysicalUndoFrames,
@@ -1936,7 +2079,8 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
         prepareWaveformPreview(); publishOverlayState();
         clearOperationProgress(); setStatus("Cannot write edit"); return false;
     }
-    showOperationProgress("Delete range", 85);
+    showOperationProgress("Operacion Delete", 85);
+    sync();
 
     int oldBoundaries[MAX_CHOP_BOUNDARIES];
     int oldCount = boundaryCount_;
@@ -1979,7 +2123,7 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
     centerViewOnCursor();
     publishOverlayState();
     isDirty_ = true;
-    showOperationProgress("Delete complete", 100);
+    showOperationProgress("Operacion Delete", 100);
     return true;
 }
 
@@ -2016,14 +2160,15 @@ bool SampleChopperModal::restoreLastDestructiveEdit(bool redo) {
 
     stopSamplePreview();
     clearLogicalHistory();
-    showOperationProgress(redo ? "Redo edit" : "Undo edit", 10);
+    setOperationCombo(redo ? "R1 + X" : "L1 + X");
+    showOperationProgress(redo ? "Operacion Redo" : "Operacion Undo", 10);
     if (!lgptRestorePhysicalSnapshotToWav(wav, samplePath_.c_str(), restoreSamples,
                                           restoreFrames, restoreChannels, restoreRate)) {
         clearOperationProgress();
         setStatus(redo ? "Redo restore fail" : "Undo restore fail");
         return false;
     }
-    showOperationProgress(redo ? "Redo edit" : "Undo edit", 70);
+    showOperationProgress(redo ? "Operacion Redo" : "Operacion Undo", 70);
 
     sourceSize_ = restoreFrames;
     sampleSize_ = restoreFrames;
@@ -2053,7 +2198,7 @@ bool SampleChopperModal::restoreLastDestructiveEdit(bool redo) {
     centerViewOnCursor();
     publishOverlayState();
     isDirty_ = true;
-    showOperationProgress(redo ? "Redo complete" : "Undo complete", 100);
+    showOperationProgress(redo ? "Operacion Redo" : "Operacion Undo", 100);
     return true;
 }
 
@@ -2062,6 +2207,7 @@ void SampleChopperModal::togglePitchMode() {
     stopSamplePreview();
     if (!hasAssignedSample()) { setStatus("No sample for pitch"); return; }
     if (!hasWaveform_) { setStatus("No waveform loaded"); return; }
+    if (sourceSize_ <= 1 || sourceChannels_ <= 0 || sourceRate_ <= 0) { setStatus("Sample not ready for pitch"); return; }
     pitchMode_ = !pitchMode_;
     if (pitchMode_) {
         trimMode_ = false;
@@ -2209,8 +2355,10 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
        waveform band, not only the former narrow panel. This removes the right
        side bars visible in U2.28 and avoids drawing over the Frame line. */
     g_chopperOverlayActive = 0;
-    tf_rect(0, 60, 320, 112, tf_rgb565(10, 10, 24));
-    tf_rect(0, 188, 320, 44, tf_rgb565(10, 10, 24));
+    /* TREEFROG_U2_40_PITCH_OVERLAY_CLEANUP (Bacon 1.1.1): clear the whole
+       panel (60..240) so no stale chopper text remains visible behind the
+       pitch/env submenu (previously rows 22+ kept ghost letters). */
+    tf_rect(0, 60, 320, 180, tf_rgb565(10, 10, 24));
 #endif
 
     // RC6: the Pitch/Env submenu follows the port-wide graphical language
@@ -2407,16 +2555,20 @@ void SampleChopperModal::previewPitchSetting() {
         return;
     }
 
-    showOperationProgress("Build preview", 5);
+    showOperationProgress("Operacion Preview", 5);
+    setOperationCombo("B");
+#if defined(PLATFORM_TREEFROG)
+    tf_rect(0, 0, 0, 0, 0);
+#endif
     short *pitched = 0;
     int frames = 0, channels = 0, rate = 0;
     if (!preparePitchEnvelopePreviewBuffer(&pitched, &frames, &channels, &rate)) { clearOperationProgress(); setStatus("Pitch preview fail"); return; }
-    showOperationProgress("Build preview", 65);
+    showOperationProgress("Operacion Preview", 65);
     std::string logical;
     bool ok = writePreviewPitchWav(pitched, frames, channels, rate, logical);
     free(pitched);
     if (!ok) { clearOperationProgress(); setStatus("Pitch preview write fail"); return; }
-    showOperationProgress("Build preview", 90);
+    showOperationProgress("Operacion Preview", 90);
     Path path(logical.c_str());
     Player::GetInstance()->StopStreaming();
     TimeService::GetInstance()->Sleep(80);
@@ -2467,7 +2619,8 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     if (originalRangeFrames <= 1) { setStatus("Range too small"); return false; }
 
     stopSamplePreview();
-    char label[56]; snprintf(label, sizeof(label), "Pitch/env %s P%+d", pitchScope_ ? "chop" : "sample", semitones);
+    setOperationCombo("A");
+    char label[56]; snprintf(label, sizeof(label), "Operacion Pitch %s P%+d", pitchScope_ ? "chop" : "sample", semitones);
     showOperationProgress(label, 0);
     clearLogicalHistory();
     lgptBeginDestructiveEdit(samplePath_, sampleIndex_, pitchScope_ ? "PitchEnvChop" : "PitchEnv", boundaries_, boundaryCount_, selectedChop_, sourceSize_);
@@ -2519,6 +2672,7 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     if (!ok) { clearOperationProgress(); setStatus("Cannot pitch buffer"); return false; }
     showOperationProgress(label, 80);
     if (!wav->SaveBufferToPath(samplePath_.c_str())) { clearOperationProgress(); setStatus("Cannot write pitch"); return false; }
+    sync();
     if (!lgptCapturePhysicalSnapshot(source, g_lgptPhysicalRedoSamples, g_lgptPhysicalRedoFrames,
                                      g_lgptPhysicalRedoChannels, g_lgptPhysicalRedoRate)) {
         clearOperationProgress(); setStatus("Redo capture fail"); return false;
@@ -2569,7 +2723,7 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     prepareWaveformPreview();
     centerViewOnCursor();
     publishOverlayState();
-    showOperationProgress(pitchScope_ ? "Pitch chop complete" : "Pitch sample complete", 100);
+    showOperationProgress(pitchScope_ ? "Operacion Pitch chop" : "Operacion Pitch", 100);
     return true;
 }
 
@@ -2597,7 +2751,8 @@ bool SampleChopperModal::normalizeSample() {
 
     double gain = 32767.0 / (double)peak;
     stopSamplePreview();
-    char label[56]; snprintf(label, sizeof(label), "Normalize peak %d", peak);
+    setOperationCombo("R2 + Y");
+    char label[56]; snprintf(label, sizeof(label), "Operacion normalizar peak %d", peak);
     showOperationProgress(label, 0);
     clearLogicalHistory();
     lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Normalize", boundaries_, boundaryCount_, selectedChop_, sourceSize_);
@@ -2623,6 +2778,7 @@ bool SampleChopperModal::normalizeSample() {
     if (!ok) { clearOperationProgress(); setStatus("Cannot replace buffer"); return false; }
     showOperationProgress(label, 72);
     if (!wav->SaveBufferToPath(samplePath_.c_str())) { clearOperationProgress(); setStatus("Cannot write WAV"); return false; }
+    sync();
     if (!lgptCapturePhysicalSnapshot(source, g_lgptPhysicalRedoSamples, g_lgptPhysicalRedoFrames,
                                      g_lgptPhysicalRedoChannels, g_lgptPhysicalRedoRate)) {
         clearOperationProgress(); setStatus("Redo capture fail"); return false;
@@ -3031,8 +3187,15 @@ void SampleChopperModal::showOperationProgress(const char *message, int percent)
     g_chopperOperationPercent = operationPercent_;
 #endif
     char status[64];
-    if (operationPercent_ >= 100) snprintf(status, sizeof(status), "%s OK A/L1+X/R1+X", operationMessage_);
-    else snprintf(status, sizeof(status), "%s %d%%", operationMessage_, operationPercent_);
+    /* Bacon 1.1.1 V17: progress overlays name the operation AND the trigger
+       combo, e.g. "R2 + Y Operacion normalizar 45%" / "R1 + X Operacion
+       Redo OK" (helper: setOperationCombo() before the operation). */
+    if (operationPercent_ >= 100)
+        snprintf(status, sizeof(status), "%s %s OK A/L1+X/R1+X",
+                 operationComboLabel_, operationMessage_);
+    else
+        snprintf(status, sizeof(status), "%s %s %d%%",
+                 operationComboLabel_, operationMessage_, operationPercent_);
     setStatus(status);
     DrawView();
     publishOverlayState();
@@ -3052,6 +3215,7 @@ void SampleChopperModal::clearOperationProgress() {
     operationActive_ = false;
     operationPercent_ = 0;
     operationMessage_[0] = 0;
+    operationComboLabel_[0] = 0;
 #if defined(PLATFORM_TREEFROG)
     g_chopperOperationActive = 0;
     g_chopperOperationPercent = 0;
@@ -3147,7 +3311,20 @@ void SampleChopperModal::ProcessButtonMask(unsigned short mask, bool pressed) {
         togglePitchMode(); return;
     }
 
-    if (r2 && y && !(left || right || up || down || a || b || x || l1 || r1 || l2 || select)) {
+    // TREEFROG_U2_39_CHOPPER_SPLIT_ZERO (Bacon 1.1.1):
+    // L1+B (no other keys): split the whole sample into 4/8/16/32 equal
+    // parts, cycling on each press. In trim mode L1+A/L1+B snap the selected
+    // chop start/end to the nearest zero-cross instead.
+    if (l1 && b && !(left || right || up || down || a || x || y || r1 || l2 || r2 || select)) {
+        if (trimMode_) { snapSelectedBoundaryToZeroCross(false); return; }
+        cycleSplitParts(); return;
+    }
+    if (trimMode_ && l1 && a && !(left || right || up || down || b || x || y || r1 || l2 || r2 || select)) {
+        snapSelectedBoundaryToZeroCross(true); return;
+    }
+
+    /* Bacon 1.1.1 V17: R2+Y normalize is trim-mode only. */
+    if (trimMode_ && r2 && y && !(left || right || up || down || a || b || x || l1 || r1 || l2 || select)) {
         normalizeSample(); return;
     }
 

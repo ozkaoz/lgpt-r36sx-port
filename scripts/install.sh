@@ -65,7 +65,7 @@ if [[ "$HOST_MODULES" -eq 1 ]]; then
     fi
   done
 fi
-printf 'MONO_48K\n' > "$SD/lgpt/otg/audio_usb_profile"
+printf 'STEREO_48K\n' > "$SD/lgpt/otg/audio_usb_profile"
 : > "$SD/lgpt/otg/enable_lgpt_uac2_bridge"
 printf 'LOCAL_CONSOLE\n' > "$SD/lgpt/otg/audio_driver_mode"
 rm -f "$SD/lgpt/otg/lowlat_240" "$SD/lgpt/otg/disable_mute_local" "$SD/lgpt/otg/mute_local_during_otg"

@@ -526,13 +526,22 @@ void AppWindow::LoadProject(const Path &p) {
     // En R36SX/TreeFrog, salir sin guardarlo deja una carpeta lgpt_* sin lgptsav.dat;
     // esa carpeta rompe la siguiente ejecución en retro_run(frame=0). Guardamos una
     // persistencia inicial inmediatamente después de completar la inicialización.
+    // TREEFROG_SAVE_SYNC_V1 (Bacon 1.1.1): solo se autoguarda cuando NO existe
+    // lgptsav.dat.  Un archivo existente que falló al parsear (FAT cortada por
+    // apagado brusco, formato antiguo...) no debe ser pisado con un proyecto
+    // vacío por defecto: eso destruiría datos recuperables.
     if (!succeeded) {
-        PersistencyService::GetInstance()->Save();
-        Trace::Log("TREEFROG_V40_ESTABLE", "autosaved initial project: %s", _root.GetPath().c_str());
-        FILE *fp = fopen("/tmp/r36sx_lgpt_logs/reentry_debug.log", "a");
-        if (fp) {
-            fprintf(fp, "TREEFROG_V40_ESTABLE_APPWINDOW: autosaved_initial_project path=%s\n", _root.GetPath().c_str());
-            fclose(fp);
+        Path initialCheck("project:lgptsav.dat");
+        if (!initialCheck.Exists()) {
+            PersistencyService::GetInstance()->Save();
+            Trace::Log("TREEFROG_V40_ESTABLE", "autosaved initial project: %s", _root.GetPath().c_str());
+            FILE *fp = fopen("/tmp/r36sx_lgpt_logs/reentry_debug.log", "a");
+            if (fp) {
+                fprintf(fp, "TREEFROG_V40_ESTABLE_APPWINDOW: autosaved_initial_project path=%s\n", _root.GetPath().c_str());
+                fclose(fp);
+            }
+        } else {
+            Trace::Log("TREEFROG_SAVE_SYNC_V1", "load failed but lgptsav.dat exists; NOT overwriting with default project");
         }
     }
 

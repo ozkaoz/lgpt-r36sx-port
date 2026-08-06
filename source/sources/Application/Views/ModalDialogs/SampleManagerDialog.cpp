@@ -81,6 +81,12 @@ int SampleManagerDialog::getUseCount(int sampleIndex) {
     // Count real sequence usage, not mere assignment to an instrument slot.
     // A newly imported sample assigned to an unused instrument is shown as --
     // and is eligible for normal purge/delete, matching project-memory cleanup.
+    //
+    // TREEFROG_U2_37_MANAGE_SAMPLE_USE_FIX (Bacon 1.1.1): a sample that is
+    // assigned to an instrument which plays at least one note in ANY phrase is
+    // considered "in use" (Song row 0 / Hi-Hat case), even if the phrase was
+    // not flagged as used by the parser. Per-instrument counting (counted[])
+    // keeps the number stable and avoids counting repeated notes multiple times.
     if (!viewData_ || !viewData_->project_ || !viewData_->project_->song_ || sampleIndex < 0) return 0;
     InstrumentBank *bank = viewData_->project_->GetInstrumentBank();
     Song *song = viewData_->project_->song_;
@@ -97,7 +103,6 @@ int SampleManagerDialog::getUseCount(int sampleIndex) {
         if (!v || v->GetInt() != sampleIndex) continue;
 
         for (int p = 0; p < PHRASE_COUNT && !counted[instrIndex]; p++) {
-            if (!song->phrase_->IsUsed((uchar)p)) continue;
             for (int r = 0; r < 16; r++) {
                 int offset = 16 * p + r;
                 if (song->phrase_->note_[offset] != 0xFF &&
@@ -170,6 +175,13 @@ int SampleManagerDialog::unassignSampleFromInstruments(int sampleIndex) {
 void SampleManagerDialog::deleteSelectedSample() {
     SamplePool *pool = SamplePool::GetInstance();
     if (!pool) return;
+    // TREEFROG_U2_38_CHOPPER_CROP_CRASH_FIX: stop any running voice/stream
+    // before PurgeSample frees the shared SoundSource buffer.
+    Player *p=Player::GetInstance();
+    if (p) {
+        if (p->IsRunning()) p->Stop();
+        if (p->IsStreaming()) p->StopStreaming();
+    }
     clampSelection();
     int count = pool->GetNameListSize();
     if (count <= 0 || selected_ < 0 || selected_ >= count) {
@@ -208,6 +220,12 @@ void SampleManagerDialog::forceDeleteSelectedSample() {
     // It clears instrument assignments first, avoiding SampleVariable's delete assert.
     SamplePool *pool = SamplePool::GetInstance();
     if (!pool) return;
+    // TREEFROG_U2_38_CHOPPER_CROP_CRASH_FIX: stop playback before purging.
+    Player *p=Player::GetInstance();
+    if (p) {
+        if (p->IsRunning()) p->Stop();
+        if (p->IsStreaming()) p->StopStreaming();
+    }
     clampSelection();
     int count = pool->GetNameListSize();
     if (count <= 0 || selected_ < 0 || selected_ >= count) {
