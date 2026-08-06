@@ -512,8 +512,21 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 
      if (source_) {
 
-		 if (*rpFinished) return false ;	
-		 
+		 if (*rpFinished) return false ;
+
+		 /* TREEFROG_U2_39_CHOPPER_ZOMBIE_VOICE_GUARD (Bacon 1.2.1): the
+		    chopper's destructive edits (Crop/Delete/Pitch/Normalize/Undo/Redo)
+		    ReplaceBuffer() the shared WAV, freeing the old samples while a
+		    voice may still be reading them. If the buffer our voice cached no
+		    longer matches the source, this voice is a zombie: kill it here
+		    instead of dereferencing freed memory. This is the last line of
+		    defence behind Player::Stop()/StopStreaming() in the chopper. */
+		 if (rp->sampleBuffer_ &&
+		     source_->GetSampleBuffer(rp->midiNote_) != rp->sampleBuffer_) {
+		     *rpFinished = true;
+		     return false;
+		 }
+
 		 // clear the fixed point buffer
 
 		 SYS_MEMSET(buffer,0,size*2*sizeof(fixed)) ;

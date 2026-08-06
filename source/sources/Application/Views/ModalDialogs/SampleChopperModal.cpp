@@ -53,6 +53,11 @@ static short *g_lgptPhysicalUndoSamples = 0;
 static short *g_lgptPhysicalRedoSamples = 0;
 static int g_lgptPhysicalUndoFrames = 0;
 static int g_lgptPhysicalRedoFrames = 0;
+
+/* TREEFROG_U2_39_CHOPPER_ZOMBIE_VOICE_GUARD (Bacon 1.2.1): any destructive
+   edit that will ReplaceBuffer() the shared WAV must halt ALL audio first
+   (pattern voices + streaming preview), same rule as Crop/Delete. */
+static void lgptStopAllAudioBeforeDestructiveEdit();
 static int g_lgptPhysicalUndoChannels = 0;
 static int g_lgptPhysicalRedoChannels = 0;
 static int g_lgptPhysicalUndoRate = 0;
@@ -1000,10 +1005,10 @@ SampleChopperModal::SampleChopperModal(View &view,
       pitchScope_(0),
       selectedChop_(0),
       boundaryCount_(0),
-      splitParts_(4),
       undoHistoryCount_(0),
       redoHistoryCount_(0),
-      sampleName_(sampleName ? sampleName : "") {
+      sampleName_(sampleName ? sampleName : ""),
+      splitParts_(4) {
     statusMessage_[0] = 0;
     operationMessage_[0] = 0;
     if (hasAssignedSample()) {
@@ -2159,6 +2164,7 @@ bool SampleChopperModal::restoreLastDestructiveEdit(bool redo) {
     if (!source || !wav) { setStatus("Undo/redo source fail"); return false; }
 
     stopSamplePreview();
+    lgptStopAllAudioBeforeDestructiveEdit();
     clearLogicalHistory();
     setOperationCombo(redo ? "R1 + X" : "L1 + X");
     showOperationProgress(redo ? "Operacion Redo" : "Operacion Undo", 10);
@@ -2619,6 +2625,7 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     if (originalRangeFrames <= 1) { setStatus("Range too small"); return false; }
 
     stopSamplePreview();
+    lgptStopAllAudioBeforeDestructiveEdit();
     setOperationCombo("A");
     char label[56]; snprintf(label, sizeof(label), "Operacion Pitch %s P%+d", pitchScope_ ? "chop" : "sample", semitones);
     showOperationProgress(label, 0);
@@ -2751,6 +2758,7 @@ bool SampleChopperModal::normalizeSample() {
 
     double gain = 32767.0 / (double)peak;
     stopSamplePreview();
+    lgptStopAllAudioBeforeDestructiveEdit();
     setOperationCombo("R2 + Y");
     char label[56]; snprintf(label, sizeof(label), "Operacion normalizar peak %d", peak);
     showOperationProgress(label, 0);
@@ -3123,6 +3131,18 @@ void SampleChopperModal::exportChopsToPhrase() {
 }
 
 void SampleChopperModal::stopSamplePreview() { if (playbackTriggered_) { Player::GetInstance()->StopStreaming(); playbackTriggered_ = false; } clearPreviewPlaybackRange(); }
+
+/* TREEFROG_U2_39_CHOPPER_ZOMBIE_VOICE_GUARD (Bacon 1.2.1): any destructive
+   edit that will ReplaceBuffer() the shared WAV must halt ALL audio first
+   (pattern voices + streaming preview), same rule as Crop/Delete. */
+static void lgptStopAllAudioBeforeDestructiveEdit() {
+    Player *p = Player::GetInstance();
+    if (p) {
+        if (p->IsRunning()) p->Stop();
+        if (p->IsStreaming()) p->StopStreaming();
+    }
+}
+
 void SampleChopperModal::drawStringAbs(int x, int y, const char *txt, GUITextProperties &props) { View::DrawString(x, y, txt, props); }
 void SampleChopperModal::clearTextScreen() { View::ClearRect(0, 0, SCREEN_W, SCREEN_H); }
 void SampleChopperModal::drawTopBar(GUITextProperties &props) { props.invert_ = true; SetColor(CD_HILITE1); drawStringAbs(0, 0, " P G  SCPI  M TT       CHOPPER       ", props); props.invert_ = false; }

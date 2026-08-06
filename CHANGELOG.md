@@ -1,5 +1,26 @@
 # Changelog
 
+## Release: Bacon 1.2.1 - Chopper UAF Hardening
+
+- **Estado**: release de estabilidad sobre Bacon 1.2 (Mixer Dev). Corrige el
+  crash del chopper (crop/delete/pitch/normalizar/undo/redo con reproducción
+  activa) causado por un use-after-free del buffer de sample compartido.
+- **Guard zombie de voces** (`SampleInstrument::Render`): si el buffer que una
+  voz cacheó al dispararse ya no coincide con el buffer actual de la fuente, la
+  voz termina en silencio en lugar de leer memoria liberada por
+  `WavFile::ReplaceBuffer()`. Última línea de defensa del UAF.
+- **Parada de audio completa en todas las ediciones destructivas del chopper**:
+  Crop y Delete ya la aplicaban; ahora también Undo/Redo (L1+X/R1+X), Pitch/Env
+  Apply (A) y Normalizar (R2+Y) detienen el patrón (`Player::Stop()`) y el
+  stream de preview (`StopStreaming()`) ANTES de reemplazar el buffer.
+- **Build 100% limpio**: corregido el warning `-Wreorder` preexistente del
+  constructor de `SampleChopperModal` (orden de inicialización).
+- **Diagnóstico**: instrumentación temporal (`boot_steps.log`,
+  `chopper_debug.log`) confirmó que el SIG=11 f0 post-crash era un estado
+  residual del launcher/emulador (boot del core íntegro) y que Crop/Pitch/
+  Undo/Redo se ejecutaban con `running=1` durante las ediciones destructivas.
+  La instrumentación fue retirada del release.
+
 ## Release: Bacon 1.2 - Mixer Dev
 
 - **Estado**: release del desarrollo completo del mixer sobre la línea Bacon
