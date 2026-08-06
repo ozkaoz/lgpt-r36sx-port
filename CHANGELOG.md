@@ -1,5 +1,30 @@
 # Changelog
 
+## Release: Bacon 1.2.1 U2.52.6 - Import Fix + Legacy Folder Cleanup
+
+- **Estado**: hotfix de instalación sobre Bacon 1.2.1 (Chopper UAF Hardening).
+  Resuelve el `Import failed` silencioso y limpia las carpetas legacy que ya no
+  se usan en el layout del SD.
+- **Import nunca más falla en silencio** (`SamplePool::ImportSample`): si la
+  carpeta de samples del proyecto está ausente (p. ej. tras borrar el árbol del
+  proyecto externamente), el import la recrea con semántica `mkdir -p`
+  componente a componente y lo registra en `Trace::Log("ImportSample", ...)`.
+  Cuando el `Open(dst, "w")` falla, ahora se emite un
+  `Trace::Error("Failed to open project sample %s for writing ...")` con errno,
+  en lugar de devolver un `-1` mudo que el frontend mostraba como
+  "Import failed" sin ningún rastro.
+- **Eliminadas las carpetas legacy `lgpt/samplelib` y `lgpt/project`**: el
+  launcher (`device/lgpt_launcher_u241.sh` y `sd_root/cubegm/lgpt`) ya no las
+  provisiona en cada boot; el core solo usa `SAMPLELIB` (`/mnt/sdcard/lgpt/
+  samples`, que sí se crea) y las canciones viven en `lgpt/projects`.
+  `SAMPLE_LIB` (fallback del core) y `FxPrinter::impulse_dir` ahora apuntan a
+  `root:samples` en lugar de `root:samplelib`.
+- **Gate de build estricto** (`scripts/build.sh`): falla si GCC emite cualquier
+  `error:`/`warning:`/`note:` en formato real `file:line:col`, sin falsos
+  positivos de nombres como `tinyxmlerror.cpp`.
+- **Build 100% limpio**: `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`. Core
+  `aa188e4eb1dcdc63a3d8b4c4d9532af581011d5669bd7cd627cb0e3825b5ed2d`.
+
 ## Release: Bacon 1.2.1 - Chopper UAF Hardening
 
 - **Estado**: release de estabilidad sobre Bacon 1.2 (Mixer Dev). Corrige el
