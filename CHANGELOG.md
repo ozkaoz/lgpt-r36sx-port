@@ -1,5 +1,111 @@
 # Changelog
 
+## Fix UAC2: mis-binding GOT sfReader.RIFFRead (2026-08-11) - core `ed7f7266` + install SD U2.52.3
+
+- **Motivo**: crash reproducible del port al cargar soundfonts (pc `0xded98`,
+  `sfReader::FillSampleBucket`). El linker bfd mips de la toolchain buildroot
+  enlazó el `R_MIPS_CALL16` de `RIFFRead` al símbolo `RIFFOpen` (slot GOT
+  `0x147eb8` = `0x000db77c` en el build `d22d2f12`/`95852a1b`); el core bueno
+  de referencia (1.2.1) enlaza `RIFFRead` y no había relocs `R_MIPS_JUMP_SLOT`
+  que corregir en carga. Los fuentes eran idénticos entre ambos builds (md5
+  `7d7d76ad`), así que el responsable era la ligazón dinámica, no el loader.
+- **Cocina**: `-Wl,-Bsymbolic-functions` en `LDFLAGS` de
+  `projects/Makefile.TREEFROG` (línea LDFLAGS). Verificado estático: el slot
+  GOT de `FillSampleBucket` queda en `0x147c9c` = `0x000db910` = `RIFFRead`
+  correcto; 24 exports `retro_*` intactas. Rebuild completo limpiando `.o`
+  (el build no es determinista: `95852a1b` ≠ `d22d2f12`, pero la zona de crash
+  era idéntica en ambos; con `-Bsymbolic-functions` el binding es correcto).
+- **Instalación en SD** (G:): core `lgpt_r36sx_port_libretro.so` =
+  `ed7f7266ac0fa6a1f673ab914d91b5fd` en `cubegm\cores`, backup previo en
+  `BACKUPS\LGPT_BEFORE_BSYMBOLIC_20260811_*`. Daemons y scripts OTG de la SD
+  verificados md5-idénticos a `BUILD\U2523` y `device\` (incluye
+  `cubegm\lgpt` = `lgpt_launcher_u241.sh`).
+- **Pendiente en device**: reproducir flujo Windows-host (modo Windows) con
+  reproducción activa y shutdown limpio (flush `LGPT_OTG_LOGS`) para
+  diagnosticar "USB warming" (marker=0) sin flujo de audio; el sampler driver
+  ya funciona OK.
+
+## Ops: Paquete ciclo de vida de SD (2026-08-06) - U2.54b C++ logs a RAM y shutdown visible
+
+- **Motivo**: cerrar el paquete U2.54. Quedaban escritores C/C++ con rutas
+  hardcodeadas a la SD (core, bridge y daemons) y el apagado limpio no era
+  visible en la consola: el usuario salía de LGPT al menú sin saber si la SD
+  estaba sincronizada.
+- **Cocina: migrados a tmpfs los escritores C++** (todos respetan las rutas
+  de destino que `collect_logs.sh` lee del host tras el flush):
+  - `TreeFrogLibretro.cpp` `boot_diag_log()`: `boot_debug.log` →
+    `/tmp/r36sx_lgpt_logs/` (RAM).
+  - `TreeFrogUac2Bridge.cpp`: `kLog` (`uac2_bridge_lgpt.log`),
+    `kRuntimeMirrorDir` (`runtime_state`) y el log de setup del fork → RAM
+    (`/tmp/r36sx_lgpt_logs` y `/tmp/r36sx_lgpt_logs/mirror`); el destino SD
+    final tras el flush es idéntico al anterior. El fallback `/tmp` del setup
+    se conserva para FAT montada RO.
+  - Daemons `r36s_u2523_usb_audio_io.c` / `r36s_sp404_host_audio_io.c`:
+    `mirror_runtime_state()` escribe en
+    `/tmp/r36sx_lgpt_logs/mirror/runtime_state` (antes cada cambio de estado
+    hacía writes+mkdirs en `/mnt/sdcard/lgpt/otg/logs/runtime_state`);
+    `FIFO_DUMP_DIR` (dump diagnóstico del SP404) → RAM.
+  - Se conservan en SD las configuraciones legítimas de baja frecuencia:
+    `LOWLAT_SENTINEL`, `audio_driver_mode`, `CAPTURE_STAGING_DIR` (grabaciones
+    USB del usuario) y volume/branch persistidos del bridge.
+- **Shutdown visible (SHUTDOWN_VISIBLE)**: `AppWindow::ShowShutdownNotice()`
+  (toast público) y máquina de fases en `retro_run`: al salir del juego el
+  core muestra "Syncing SD... don't power off" (~1 s) y luego
+  "SD synced. Power off from the menu" antes de `RETRO_ENVIRONMENT_SHUTDOWN`.
+- **Flush en el launcher**: `lgpt_launcher_u241.sh` ya no hace `exec` de
+  picoarch; al retornar ejecuta `u2414_flush_logs_to_sd()` + `sync` (best-
+  effort: FAT RO no bloquea la vuelta al menú). La SD solo se escribe una vez
+  por ciclo de sesión, en el punto en que el usuario vuelve al menú.
+- **Precaución**: los binarios ARM de los daemons (`sd_root/lgpt/otg/bin/`)
+  deben recompilarse en consola desde `device/*.c` (el binario de la tarjeta
+  empaquetada sigue siendo el antiguo).
+- **Validado**: `sh -n` OK en los 17 scripts, `tests/test_copy_root_launcher.sh`
+  pasa (asserts nuevos: `PICO_EXIT=0` y `LAUNCHER_FLUSH_DONE=1`). El core no
+  se compiló en este host (cruza a ARM), el build se hace en consola.
+
+## Ops: Paquete ciclo de vida de SD (2026-08-06) - U2.54 RAM-first logging
+
+- **Motivo**: tres memorias SD dañadas durante el desarrollo. La causa del
+  desgaste acelerado no es el firmware sino la topología de escrituras: el
+  launcher (`exec picoarch >> $LOG`), los daemons, supervisores y scripts
+  hacían appends continuos byte-a-byte sobre `LGPT_OTG_LOGS` durante toda la
+  sesión, más el desgaste por atime del montaje.
+- **Cambio**: los logs de runtime ahora viven en tmpfs (RAM)
+  (`/tmp/r36sx_lgpt_logs`) en: `lgpt_launcher_u241.sh`, `otg_u241_common.sh`,
+  `otg_u241_setup_once.sh`, `otg_u241_apply_profile_once.sh`,
+  `otg_u241_shutdown.sh`, `otg_h37_host_runtime_supervisor.sh`,
+  `otg_h37_host_device_detect.sh`, `otg_h37_android_runtime_supervisor.sh`.
+- **Flush único al apagado**: `otg_u241_shutdown.sh` llama a
+  `u2414_flush_logs_to_sd()` (en `otg_u241_common.sh`), que copia el árbol RAM
+  a `LGPT_OTG_LOGS` y al mirror `lgpt/otg/logs` (rutas que lee
+  `collect_logs.sh`) en una sola ráfaga contigua + `sync`. El diagnóstico no
+  se pierde en apagado limpio; solo un apagado brusco pierde la última sesión.
+- **noatime**: `lgpt_launcher_u241.sh` remonta el root de la SD con
+  `noatime` best-effort si es un mountpoint real (arkOS ya usa noatime;
+  fallback silencioso en host).
+- **Override preservado**: `LGPT_LOGROOT` sigue permitiendo forzar el destino
+  de logs (tests, instalación). `tests/test_copy_root_launcher.sh` ahora
+  verifica que el default sea tmpfs y usa el override para el run.
+- **Nota**: el core C++ todavía escribe `boot_debug.log`/`uac2_bridge_lgpt.log`
+  en `/mnt/sdcard/LGPT_OTG_LOGS` (path hardcodeado); son archivos discretos,
+  no streams. Reubicarlos exigiría recompilar el core y queda fuera de este
+  paquete.
+- **Validado**: `sh -n` OK en los 17 scripts (device + sd_root + test) y
+  `tests/test_copy_root_launcher.sh` pasa.
+
+## Ops: Incidente de SD (2026-08-06) - Recuperacion y Runbook
+
+- **Incidente**: la SD de la R36SX quedo ilegible tras insertarla en la
+  consola. El controlador empezo a reportar 3,94 GB (antes 29,3 GB),
+  lecturas en bruto `0xFF` y errores CRC a partir de ~4 GB, y no fue
+  posible crear particion ("Not enough available capacity").
+- **Causa raiz**: degradacion del controlador fisico de la tarjeta, no una
+  FAT sucia. No se puede ampliar la capacidad del controlador por software.
+- **Recuperacion**: `clean all` + reinsertado fisico + particion al maximo
+  reportado + FAT32 + restauracion desde `BACKUPS/SD_FULL_BACKUP_*`.
+- **Registrado en**: `docs/RUNBOOK_RECUPERACION_SD_ES.md` (paso a paso,
+  diagnostico, lazy de datos a futura.)
+
 ## Update: Bacon 1.2.1 U2.52.7 - Per-instrument 8-Band EQ + Live Spectrum
 
 - **Estado**: actualización de la pre-release Bacon 1.2.1 (Chopper UAF

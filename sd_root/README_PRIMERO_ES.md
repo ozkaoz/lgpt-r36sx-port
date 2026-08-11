@@ -1,14 +1,25 @@
-# LGPT R36SX Bacon 1.1 — Audio Driver Refact, Sampler Audio Added
+# LGPT R36SX Bacon 1.1 — Audio Driver Refact, Sampler Audio Added (iteración local U2.52.4)
 
-Versión Bacon 1.1, ABI7, cuatro drivers de audio (Local / Windows / Android /
-Sampler), frontend-safe.
+Versión Bacon 1.1 (baseline), ABI7, cuatro drivers de audio (Local / Windows /
+Android / Sampler), frontend-safe, con las modificaciones locales actuales.
 
 ## Alcance
 
-Este release consolida el refactor del driver de audio Sampler (SP404MKII) y
-la estabilización completa de los cuatro drivers de audio USB seleccionables.
-El pitido permanente del Sampler queda eliminado de raíz y el puerto se
-verifica funcionando correctamente en los cuatro modos.
+Este payload mantiene la base de audio estable de Bacon 1.1: el refactor del
+driver de audio Sampler (SP404MKII), el passthrough puro 48 kHz sin pitido
+permanente, y los cuatro drivers de audio USB seleccionables funcionando.
+Sobre esa base añade las modificaciones locales:
+
+- **SIGPIPE harden**: el core ignora SIGPIPE en `retro_init()`, eliminando el
+  crash (exit 141) del modo Sampler/Windows cuando el lector del fifo
+  desaparece durante el switch de modo.
+- **EQ paramétrico y gráfico**: EQ de 8 bandas por instrumento de sample
+  (bell / low shelf / high shelf / low pass / high pass / notch, respuesta
+  RBJ) con máscara de bandas por pad y bypass global, más analizador de
+  espectro en vivo (FFT) sobre el overlay del modal.
+- **Nombre aleatorio de proyecto**: la tecla SELECT en el diálogo New genera
+  un nombre aleatorio (formato adjetivo-verbo, estilo djdiskmachine LGPT) con
+  retry anti-colisión contra proyectos existentes.
 
 ## Contenido
 
@@ -27,9 +38,9 @@ verifica funcionando correctamente en los cuatro modos.
 ## Checksums
 
 ```text
-core   5685150957fbdfcaca9d38afcf5d4753114c48e2b0b40abe34cfee2130f7d1cb
-daemon 53258f2b8b3749c866af248814eb147f0762a1b17cfffb644adb573167b52815
-sp404  924c48436086c2b84897a2bde0547e5e8b9381a60a4845ebcd82fc8aab47961a
+core   e94165012a86d79f3bccd8725aebec40c2350248f28fb64ae526feca989a45d9
+daemon 9537478789115e6a83ef12820f4cf8f8d307b3dc55fb847fd2b13b988268b831
+sp404  fc90e7312b272de6168bd9c7ade3902eebf11ec56f54e43e71416265695395cf
 midi   3f0ea7a23db7390f1fb3b73cbda97f66316c6568d0c7574b838579a014baee80
 ```
 

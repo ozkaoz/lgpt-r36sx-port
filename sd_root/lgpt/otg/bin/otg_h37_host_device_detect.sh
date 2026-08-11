@@ -19,7 +19,7 @@ set -u
 ROOT="${LGPT_SD_ROOT:-/mnt/sdcard}"
 BASE="$ROOT/lgpt/otg"
 RUNTIME="${LGPT_RUNTIME_DIR:-/tmp/r36sx_lgpt_usb}"
-LOGROOT="${LGPT_LOGROOT:-/mnt/sdcard/LGPT_OTG_LOGS}"
+LOGROOT="${LGPT_LOGROOT:-/tmp/r36sx_lgpt_logs}"
 LOG="$LOGROOT/H38_HOST_DEVICE_DETECT.log"
 LOCK="${LGPT_H38_DETECT_LOCK:-/tmp/r36sx_h38_host_detect.lock}"
 mkdir -p "$RUNTIME" "$LOGROOT" 2>/dev/null || true

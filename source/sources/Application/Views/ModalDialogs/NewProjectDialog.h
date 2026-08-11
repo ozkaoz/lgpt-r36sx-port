@@ -17,8 +17,12 @@ public:
   // TREEFROG_PROJECT_RENAME_V1 (H38.5): pre-fills the name editor so the
   // dialog can act as a project renamer instead of a blank name picker.
   void SetInitialName(const std::string &name);
+  // RANDOM_NAME_V1: SELECT generates a random project name (adjective+verb,
+  // djdiskmachine LGPT behaviour) replacing the edited stem.
+  virtual void OnRandomize();
 
 private:
   Path currentPath_;
+  int randomCount_;
 };
 #endif

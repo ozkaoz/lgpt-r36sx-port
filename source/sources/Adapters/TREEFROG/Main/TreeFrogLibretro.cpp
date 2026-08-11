@@ -14,11 +14,13 @@
 #include "Adapters/TREEFROG/System/TreeFrogSystem.h"
 #include "Adapters/TREEFROG/Timer/TreeFrogTimer.h"
 #include "Application/Application.h"
+#include "Application/AppWindow.h"
 #include "System/System/System.h"
 
 extern "C" void TreeFrogAppWindow_SynchronizeInputMask(
     unsigned short mask);
 #include <dirent.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -97,14 +99,29 @@ static uint32_t last_phys_for_combo = 0;
 static unsigned long treefrog_v11_frame_counter = 0;
 
 /*
- * TREEFROG_BOOT_DIAG (Bacon 1.1.1 V17-diagnostico): boot-stage marker log
- * persisted to the SD so a device hang at startup leaves evidence.  The
- * frontend discards /tmp on power-off, so the core writes one line per boot
- * stage to /mnt/sdcard/LGPT_OTG_LOGS/boot_debug.log.  Pure diagnostics: it
- * does not change the audio driver, the input path or any view logic.
+ * SD lifecycle U2.54b SHUTDOWN_VISIBLE: when the game exits, picoarch returns
+ * to TreeFrogUI and the launcher then flushes the RAM log tree to the card.
+ * The core still renders frames between the quit request and
+ * RETRO_ENVIRONMENT_SHUTDOWN, so we hold that transition open for ~1s with
+ * on-screen toasts: users see that the SD is being processed and learn the
+ * safe power-off protocol instead of yanking the switch blindly.
+ */
+#define U254B_QUIT_SYNCING_TICKS 60
+#define U254B_QUIT_DONE_TICKS 45
+static int g_quit_flush_phase = 0;
+static int g_quit_flush_ticks = 0;
+
+/*
+ * TREEFROG_BOOT_DIAG (Bacon 1.1.1 V17-diagnostico): boot-stage marker log.
+ * SD lifecycle U2.54b: written to the RAM log tree (/tmp/r36sx_lgpt_logs)
+ * like every other session log; the launcher flushes that tree to
+ * /mnt/sdcard/LGPT_OTG_LOGS (one contiguous copy + sync) when picoarch
+ * returns, so the SD is never written to while the core is running.  Pure
+ * diagnostics: it does not change the audio driver, the input path or any
+ * view logic.
  */
 static void boot_diag_log(const char *stage) {
-    FILE *f = fopen("/mnt/sdcard/LGPT_OTG_LOGS/boot_debug.log", "a");
+    FILE *f = fopen("/tmp/r36sx_lgpt_logs/boot_debug.log", "a");
     if (!f) return;
     fprintf(f, "%lu BOOTDIAG %s\n", treefrog_v11_frame_counter, stage);
     fclose(f);
@@ -1149,6 +1166,13 @@ static void TreeFrogV51LogProjectRoot(const char *) {}
 
 void retro_init(void) {
     boot_diag_log("retro_init.enter");
+    /* U2.54b FIFO_WRITER_SIGPIPE_HARDEN: the USB bridge opens the audio fifo
+     * O_WRONLY|O_NONBLOCK and the daemon may vanish/restart while a mode
+     * switch is in flight (Sampler/SP404 host-role). A write to a fifo with
+     * no reader then raises SIGPIPE and kills picoarch (exit 141) unless it
+     * is ignored; the bridge already recovers on EPIPE/ENXIO by closing and
+     * re-opening the fifo, so the signal must never reach the process. */
+    signal(SIGPIPE, SIG_IGN);
     memset(framebuffer, 0, sizeof(framebuffer));
     memset(audio_buffer, 0, sizeof(audio_buffer));
     reset_runtime_state(false);
@@ -1287,8 +1311,40 @@ void retro_run(void) {
         TreeFrogSetQuitRequested(true);
     }
 
-    if (TreeFrogQuitRequested() && environ_cb) {
-        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, 0);
+    if (TreeFrogQuitRequested()) {
+        /* SD lifecycle U2.54b: pace the retro shutdown call so the user can
+         * see the SD-sync notice while the core still owns the screen. */
+        switch (g_quit_flush_phase) {
+        case 0:
+            g_quit_flush_phase = 1;
+            g_quit_flush_ticks = 0;
+            if (AppWindow::GetInstance()) {
+                AppWindow::GetInstance()->ShowShutdownNotice(
+                    "Syncing SD... don't power off");
+            }
+            break;
+        case 1:
+            ++g_quit_flush_ticks;
+            if (g_quit_flush_ticks >= U254B_QUIT_SYNCING_TICKS) {
+                g_quit_flush_phase = 2;
+                g_quit_flush_ticks = 0;
+                if (AppWindow::GetInstance()) {
+                    AppWindow::GetInstance()->ShowShutdownNotice(
+                        "SD synced. Power off from the menu");
+                }
+            }
+            break;
+        default:
+            ++g_quit_flush_ticks;
+            if (g_quit_flush_ticks >= U254B_QUIT_DONE_TICKS) {
+                g_quit_flush_phase = 0;
+                g_quit_flush_ticks = 0;
+                if (environ_cb) {
+                    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, 0);
+                }
+            }
+            break;
+        }
     }
 }
 

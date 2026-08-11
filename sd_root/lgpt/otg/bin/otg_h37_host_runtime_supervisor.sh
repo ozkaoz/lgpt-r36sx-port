@@ -7,7 +7,7 @@ set -u
 ROOT="${LGPT_SD_ROOT:-/mnt/sdcard}"
 BASE="$ROOT/lgpt/otg"
 BIN="$BASE/bin"
-LOGROOT="${LGPT_LOGROOT:-/mnt/sdcard/LGPT_OTG_LOGS}"
+LOGROOT="${LGPT_LOGROOT:-/tmp/r36sx_lgpt_logs}"
 RUNTIME="${LGPT_RUNTIME_DIR:-/tmp/r36sx_lgpt_usb}"
 POLICY_FILE="$RUNTIME/audio_driver_policy"
 LOG="$LOGROOT/H38_HOST_RUNTIME_SUPERVISOR.log"

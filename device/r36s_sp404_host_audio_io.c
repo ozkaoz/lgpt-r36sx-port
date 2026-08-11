@@ -55,7 +55,11 @@ static const char *CAPTURE_LEVEL_R = "/tmp/r36sx_lgpt_usb/usb_capture_level_r";
 static const char *CAPTURE_ELAPSED = "/tmp/r36sx_lgpt_usb/usb_capture_elapsed";
 static const char *CAPTURE_MONITOR = "/tmp/r36sx_lgpt_usb/usb_capture_monitor";
 static const char *CAPTURE_MONITOR_FIFO = "/tmp/r36sx_usb_capture_monitor_fifo";
-static const char *RUNTIME_MIRROR_DIR = "/mnt/sdcard/lgpt/otg/logs/runtime_state";
+/* SD lifecycle U2.54b: runtime-state mirror goes to the RAM log tree; the
+ * exit flush posts it to /mnt/sdcard/lgpt/otg/logs/runtime_state (the path
+ * collect_logs.sh reads on the host). The card is never touched while the
+ * daemon runs. */
+static const char *RUNTIME_MIRROR_DIR = "/tmp/r36sx_lgpt_logs/mirror/runtime_state";
 static const char *CAPTURE_STAGING_DIR = "/mnt/sdcard/lgpt/samples/records";
 static const char *AUDIO_PROFILE = "/tmp/r36sx_lgpt_usb/audio_profile";
 static const char *AUDIO_CHANNELS = "/tmp/r36sx_lgpt_usb/audio_channels";
@@ -220,9 +224,7 @@ static void mirror_runtime_state(const char *path, const char *text) {
     const char *base = path ? strrchr(path, '/') : 0;
     base = base ? base + 1 : path;
     if (!base || !base[0]) return;
-    mkdir("/mnt/sdcard/lgpt/otg", 0777);
-    mkdir("/mnt/sdcard/lgpt/otg/logs", 0777);
-    mkdir(RUNTIME_MIRROR_DIR, 0777);
+    mkdir("/tmp/r36sx_lgpt_logs/mirror/runtime_state", 0777);
     char out[256];
     snprintf(out, sizeof(out), "%s/%s", RUNTIME_MIRROR_DIR, base);
     int fd = open(out, O_WRONLY | O_CREAT | O_TRUNC, 0666);
@@ -917,13 +919,14 @@ static void write_wav_header(int fd, uint32_t data_bytes, uint32_t rate, uint16_
 
 /*
  * U2.53.0 FIFO_DUMP diagnostic: on every primed stream, capture the first
- * 2 s of RAW fifo content (pre-gain) to
- * /mnt/sdcard/LGPT_OTG_LOGS/fifo_capture.wav.
+ * 2 s of RAW fifo content (pre-gain) to fifo_capture.wav.
  * This settles whether the permanent full-scale tone is produced by the core
  * (present in the fifo) or injected by the daemon path (absent from the
- * fifo). The WAV is plain 48 kHz stereo S16LE.
+ * fifo). The WAV is plain 48 kHz stereo S16LE.  SD lifecycle U2.54b: the
+ * dump is written to the RAM log tree (read-only diagnostic artifact; the
+ * exit flush posts it to LGPT_OTG_LOGS when present).
  */
-#define FIFO_DUMP_DIR "/mnt/sdcard/LGPT_OTG_LOGS"
+#define FIFO_DUMP_DIR "/tmp/r36sx_lgpt_logs"
 #define FIFO_DUMP_PATH FIFO_DUMP_DIR "/fifo_capture.wav"
 #define FIFO_DUMP_FRAMES 96000
 #define FIFO_DUMP_BUF_FRAMES 32768

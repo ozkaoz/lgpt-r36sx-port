@@ -606,6 +606,13 @@ AppWindow *AppWindow::Create(GUICreateWindowParams &params) {
 // TREEFROG_PROJECT_RENAME_V1 (H38.5): singleton accessor.
 AppWindow *AppWindow::GetInstance() { return AppWindow::instance_; };
 
+// SD lifecycle U2.54b SHUTDOWN_VISIBLE: public toast hook. retro_run calls
+// this while the core still owns the screen at exit, so the user sees the
+// SD-sync notice before picoarch returns to TreeFrogUI.
+void AppWindow::ShowShutdownNotice(const char *msg) {
+    if (_currentView) _currentView->SetNotification(msg);
+};
+
 void AppWindow::SetDirty() { _isDirty = true; };
 
 // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): writes the same export request the

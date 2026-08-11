@@ -48,7 +48,11 @@ static const char *CAPTURE_LEVEL_R = "/tmp/r36sx_lgpt_usb/usb_capture_level_r";
 static const char *CAPTURE_ELAPSED = "/tmp/r36sx_lgpt_usb/usb_capture_elapsed";
 static const char *CAPTURE_MONITOR = "/tmp/r36sx_lgpt_usb/usb_capture_monitor";
 static const char *CAPTURE_MONITOR_FIFO = "/tmp/r36sx_usb_capture_monitor_fifo";
-static const char *RUNTIME_MIRROR_DIR = "/mnt/sdcard/lgpt/otg/logs/runtime_state";
+/* SD lifecycle U2.54b: runtime-state mirror goes to the RAM log tree; the
+ * exit flush posts it to /mnt/sdcard/lgpt/otg/logs/runtime_state (the path
+ * collect_logs.sh reads on the host). The card is never touched while the
+ * daemon runs. */
+static const char *RUNTIME_MIRROR_DIR = "/tmp/r36sx_lgpt_logs/mirror/runtime_state";
 static const char *CAPTURE_STAGING_DIR = "/mnt/sdcard/lgpt/samples/records";
 static const char *AUDIO_PROFILE = "/tmp/r36sx_lgpt_usb/audio_profile";
 static const char *AUDIO_CHANNELS = "/tmp/r36sx_lgpt_usb/audio_channels";
@@ -81,9 +85,7 @@ static void mirror_runtime_state(const char *path, const char *text) {
     const char *base = path ? strrchr(path, '/') : 0;
     base = base ? base + 1 : path;
     if (!base || !base[0]) return;
-    mkdir("/mnt/sdcard/lgpt/otg", 0777);
-    mkdir("/mnt/sdcard/lgpt/otg/logs", 0777);
-    mkdir(RUNTIME_MIRROR_DIR, 0777);
+    mkdir("/tmp/r36sx_lgpt_logs/mirror/runtime_state", 0777);
     char out[256];
     snprintf(out, sizeof(out), "%s/%s", RUNTIME_MIRROR_DIR, base);
     int fd = open(out, O_WRONLY | O_CREAT | O_TRUNC, 0666);

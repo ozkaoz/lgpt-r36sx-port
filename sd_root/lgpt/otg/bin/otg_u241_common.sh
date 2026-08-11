@@ -3,13 +3,41 @@ BASE=/mnt/sdcard/lgpt/otg
 MODBASE=$BASE/modules/4.4.186-release
 AU8DIR=$MODBASE/u2_38au8_sync_uac2
 AU8MODULE=$AU8DIR/usb_f_uac2.ko
-LOGROOT=/mnt/sdcard/LGPT_OTG_LOGS
-INTERNAL_LOG=$BASE/logs
+# SD lifecycle U2.54: LOGROOT lives on tmpfs (RAM) while running; the shutdown
+# script flushes the whole directory to the SD LGPT_OTG_LOGS once. INTERNAL_LOG
+# only mirrors small per-boot artifacts (snapshot/fw state) also in RAM - they
+# are synced by the same flush. Overridable for host tests/install scripts.
+LOGROOT="/tmp/r36sx_lgpt_logs"
+INTERNAL_LOG="/tmp/r36sx_lgpt_logs/mirror"
 RUNTIME=/tmp/r36sx_lgpt_usb
 GADGET=/sys/kernel/config/usb_gadget/r36sx_lgpt_u2414
 UDC_NAME=musb-hdrc.0.auto
 
 mkdir -p "$LOGROOT" "$INTERNAL_LOG" "$RUNTIME" "$AU8DIR" 2>/dev/null || true
+
+# SD lifecycle U2.54: copy the whole RAM log tree to the SD card once. Called
+# from the clean-shutdown script only, so logs that rotate byte-by-byte during
+# the session never touch the SD - a single contiguous flush does.
+u2414_flush_logs_to_sd() {
+    SD_LOGROOT="/mnt/sdcard/LGPT_OTG_LOGS"
+    SD_INTERNAL="/mnt/sdcard/lgpt/otg/logs"
+    mkdir -p "$SD_LOGROOT" "$SD_INTERNAL" 2>/dev/null || return 1
+    # RO-proof: if the FAT is dirty/read-only, do not spin on it; keep the
+    # RAM copy for the current session and report the skip.
+    if ! ( : >> "$SD_LOGROOT/.snapshot_flush_probe" ) 2>/dev/null; then
+        echo "FLUSH_SD_SKIP_READONLY=1 DST=$SD_LOGROOT"
+        return 2
+    fi
+    cp -rf "$LOGROOT/." "$SD_LOGROOT/" 2>/dev/null || true
+    # Mirror the small per-boot artifacts (snapshot/setup/runtime_state) to
+    # the exact paths scripts/collect_logs.sh reads from the host.
+    if [ -d "$INTERNAL_LOG" ]; then
+        cp -rf "$INTERNAL_LOG/." "$SD_INTERNAL/" 2>/dev/null || true
+    fi
+    sync
+    echo "FLUSH_SD_OK=1 DST=$SD_LOGROOT"
+    return 0
+}
 
 u2414_loaded() {
     grep -q "^$1 " /proc/modules 2>/dev/null

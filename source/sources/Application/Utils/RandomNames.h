@@ -2,11 +2,22 @@
 #define _RANDOM_NAMES_H_
 
 #include <string>
-#include <vector>
 #include <cstdlib>
 #include "time.h"
 
-static const std::string adj[] = {
+#ifndef MAX_NAME_LENGTH
+#define MAX_NAME_LENGTH 25
+#endif
+
+/*
+ * RANDOM_NAME_V1:
+ * Load-time safe. Upstream kept global std::string/vector objects here; with
+ * the port's custom CPP_MEMORY allocator those constructors run during
+ * dlopen (before retro_init) and crash the core with a null deref
+ * (SIG=11 f0). All static data is plain pointers (no constructors) and the
+ * name is built lazily inside getRandomName().
+ */
+static const char *const adj[] = {
         "Red", "Swift", "Spoopy", "Gentle", "Fierce",
         "Sparkling", "Magic", "Curious", "Fast", "Hyped",
         "Rizzy", "Radiant", "Soothing", "Weird", "Haunted",
@@ -18,7 +29,7 @@ static const std::string adj[] = {
         "Tough", "Brisk", "Fresh", "Grand", "Lean",
         "Lush", "Mild", "Pale", "Rich", "Ripe"
     };
-static const std::string vrb[] =
+static const char *const vrb[] =
     {
         "Jump", "Explore", "Dance", "Whisper", "Roar",
         "Run", "Climb", "Song", "Sleep", "Laugh",
@@ -32,27 +43,23 @@ static const std::string vrb[] =
         "Sleeper", "Skier", "Smile", "Yell", "Zoomer"
     };
 
-bool noSeed = true;
-//Wonky assignment because < C++11
-std::vector<std::string> adjectives_ (adj, adj + sizeof(adj) / sizeof(adj[0]) );
-std::vector<std::string> verbs_ (vrb, vrb + sizeof(vrb) / sizeof(vrb[0]) );
-
-// Generate a random name made in the format of: "adjective-verb"
-std::string getRandomName() {
-    if (noSeed){
-        srand(uint(time(NULL)));
+// Generate a random name made in the format of: "adjective+verb"
+static std::string getRandomName() {
+    static bool noSeed = true;
+    if (noSeed) {
+        srand((unsigned int)time(NULL));
         noSeed = false;
     }
-
-    std::string adjective = adjectives_[rand() % adjectives_.size()];
-    std::string verb = verbs_[rand() % verbs_.size()];
-
-    while ((adjective + verb).length() > MAX_NAME_LENGTH) {
-        adjective = adjectives_[rand() % adjectives_.size()];
-        verb = verbs_[rand() % verbs_.size()];
+    const unsigned int adjCount = sizeof(adj) / sizeof(adj[0]);
+    const unsigned int vrbCount = sizeof(vrb) / sizeof(vrb[0]);
+    for (int attempt = 0; attempt < 64; attempt++) {
+        const char *a = adj[rand() % adjCount];
+        const char *v = vrb[rand() % vrbCount];
+        std::string name(a);
+        name += v;
+        if ((int)name.length() <= MAX_NAME_LENGTH) return name;
     }
-
-    return (adjective + verb);
+    return "CoolCat";
 }
 
 #endif //_RANDOM_NAMES_H_

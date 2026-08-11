@@ -10,7 +10,9 @@ LOGROOT="${LGPT_LOGROOT:-/tmp/r36sx_lgpt_logs}"
 RUNTIME="${LGPT_RUNTIME_DIR:-/tmp/r36sx_lgpt_usb}"
 POLICY_FILE="$RUNTIME/audio_driver_policy"
 LOG="$LOGROOT/H35_ANDROID_RUNTIME_SUPERVISOR.log"
-SUPLOG="${LGPT_ANDROID_SUP_LOG:-$ROOT/lgpt/otg/logs/android_runtime/H35_ANDROID_RUNTIME_SUPERVISOR.log}"
+# SD lifecycle U2.54: the duplicated supervisor copy also lives on tmpfs; the
+# clean-shutdown flush persists it to LGPT_OTG_LOGS/android_runtime on the SD.
+SUPLOG="${LGPT_ANDROID_SUP_LOG:-/tmp/r36sx_lgpt_logs/android_runtime/H35_ANDROID_RUNTIME_SUPERVISOR.log}"
 LOCK="${LGPT_H35_ANDROID_RUNTIME_LOCK:-/tmp/r36sx_h35_android_runtime.lock}"
 DAEMON="$BIN/r36s_aoa_bulk_audio_io_h36"
 RECEIVER="$BIN/r36s_aoa_bulk_receiver_h36"

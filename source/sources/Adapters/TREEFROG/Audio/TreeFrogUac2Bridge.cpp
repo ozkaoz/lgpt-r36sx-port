@@ -160,11 +160,16 @@ static const char *kNoMute = "/mnt/sdcard/lgpt/otg/disable_mute_local";
 static const char *kU2430BuildMarker =
     "R36SX U2.51.7 MONITOR FIFO HANDSHAKE FILENAME EDITOR CORE";
 static const char *kFifo = "/tmp/r36sx_uac2_bridge_fifo";
-static const char *kLog = "/mnt/sdcard/LGPT_OTG_LOGS/uac2_bridge_lgpt.log";
+/* SD lifecycle U2.54b: session logs live in the RAM log tree; the launcher
+ * flushes /tmp/r36sx_lgpt_logs to /mnt/sdcard/LGPT_OTG_LOGS once when
+ * picoarch returns (the destination path on the card is unchanged). */
+static const char *kLog = "/tmp/r36sx_lgpt_logs/uac2_bridge_lgpt.log";
 static const char *kActiveMarker = "/tmp/r36sx_uac2_usb_active";
 static const char *kRuntimeDir = "/tmp/r36sx_lgpt_usb";
 static const char *kDaemonPid = "/tmp/r36sx_lgpt_usb/daemon_pid";
-static const char *kRuntimeMirrorDir = "/mnt/sdcard/LGPT_OTG_LOGS/runtime_state";
+/* SD lifecycle U2.54b: runtime-state mirror in RAM; the single SD flush at
+ * exit persists it to /mnt/sdcard/LGPT_OTG_LOGS/runtime_state as before. */
+static const char *kRuntimeMirrorDir = "/tmp/r36sx_lgpt_logs/runtime_state";
 static const char *kCaptureCmd = "/tmp/r36sx_lgpt_usb/usb_capture_cmd";
 static const char *kCaptureStatus = "/tmp/r36sx_lgpt_usb/usb_capture_status";
 static const char *kCaptureLastName = "/tmp/r36sx_lgpt_usb/usb_capture_last_name";
@@ -583,8 +588,8 @@ static void au10z_write_text_file(const char *path, const char *text) {
 
 static void au10z_mirror_runtime_file(const char *leaf, const char *text) {
     if (!leaf || !leaf[0]) return;
-    mkdir("/mnt/sdcard/lgpt/otg", 0777);
-    mkdir("/mnt/sdcard/LGPT_OTG_LOGS", 0777);
+    /* SD lifecycle U2.54b: the mirror lives in the RAM log tree only; the
+     * exit flush creates the SD destination directories itself. */
     mkdir(kRuntimeMirrorDir, 0777);
     char p[256];
     snprintf(p, sizeof(p), "%s/%s", kRuntimeMirrorDir, leaf);
@@ -1145,8 +1150,12 @@ static void ensure_setup_started(void) {
 
     const pid_t pid = fork();
     if (pid == 0) {
+        /* SD lifecycle U2.54b: setup log goes to the RAM mirror dir; the
+         * exit flush posts it to /mnt/sdcard/lgpt/otg/logs (the path
+         * collect_logs.sh reads from the host). /tmp fallback kept for
+         * RO-FAT / no-tmpfs safety. */
         int fd = open(
-            "/mnt/sdcard/lgpt/otg/logs/u241_setup_from_lgpt.log",
+            "/tmp/r36sx_lgpt_logs/mirror/u241_setup_from_lgpt.log",
             O_WRONLY | O_CREAT | O_TRUNC,
             0666);
         if (fd < 0)
