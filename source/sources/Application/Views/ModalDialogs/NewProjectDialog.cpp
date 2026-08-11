@@ -25,7 +25,7 @@ void NewProjectDialog::SetInitialName(const std::string &name) {
     setInitialText(name.c_str());
 }
 
-// RANDOM_NAME_V1: SELECT generates a random "adjective+verb" project name
+// RANDOM_NAME_V1: R1+A generates a random "adjective+verb" project name
 // (djdiskmachine LGPT behaviour). If the generated project directory already
 // exists, it keeps regenerating until a free name is found (same loop as the
 // upstream Random button, bounded so a full folder cannot hang the dialog).
@@ -37,6 +37,6 @@ void NewProjectDialog::OnRandomize() {
         if (++attempts >= 12) break;
     } while (currentPath_.Descend(GetName()).Exists());
     ++randomCount_;
-    snprintf(buf, sizeof(buf), "Random name (SELECT again for another)");
+    snprintf(buf, sizeof(buf), "Random name (R1+A again for another)");
     setStatus(buf);
 }

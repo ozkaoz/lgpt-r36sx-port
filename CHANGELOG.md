@@ -1,5 +1,32 @@
 # Changelog
 
+## U2.52.8 - Fix dlopen (revert `-Bsymbolic-functions`) + swap de botones R1+A / SELECT (2026-08-11) - core `ae290ba4` + install SD
+
+- **Motivo**: el core `ed7f7266` (liga con `-Wl,-Bsymbolic-functions`) crashea
+  en dlopen antes de `retro_init` (`SIG=11 f0 addr=0x00000000 pc=0xe0d98` en
+  `LGPT_U2524_COPYROOT_UAC2_LAUNCHER.log`; `boot_debug.log` sin
+  `retro_init.enter`). El build sin el flag (`95852a1b`/`a2eef511`) sí pasaba
+  dlopen, así que el flag era el responsable del crash, no el loader.
+- **Cocina**: revertidas las `LDFLAGS` del Makefile.TREEFROG a las stock. Con
+  el ligado stock el slot GOT de `sfReader::FillSampleBucket` queda bien
+  enlazado sin parches: `lw t9,-26296(gp)` → slot `0x147ea8` = `0x000db914` =
+  `RIFFRead` (y `-27724` → `resetSampleCollector`, `-28256` → `CloseRIFF`).
+  Verificado en el binario final: 24 exports `retro_*`, strings del paquete
+  presentes. Build limpio completo determinista (mismo md5 en rebuild
+  incremental y en rebuild from scratch) con 0 warnings, 0 errores.
+- **Botones** (fuentes): `R1+A` → nombre aleatorio (`OnRandomize()` en
+  `TreeFrogTextEditor.cpp`, status "Random name (R1+A again for another)");
+  `SELECT` en la lista de proyectos → menú `PROJECT ACTIONS`
+  (Rename/Export/Delete) en `SelectProjectDialog.cpp`. Se retiró el combo
+  `R+A` del menú de acciones.
+- **Instalación en SD** (G:): core `lgpt_r36sx_port_libretro.so` =
+  `ae290ba43d4b7452609c9449f3e5c535` en `cubegm\cores`, backups en
+  `lgpt_r36sx_port_libretro.ed7f7266.so.bak` (core crash) y
+  `BACKUPS\LGPT_BEFORE_BSYMBOLIC_20260811_0013\` (a2eef511) y
+  `lgpt_r36sx_port_libretro.d22d2f12.so.bak` (95852a1b).
+- **Pendiente en device**: validar dlopen + los 3 combos (R1+A random,
+  SELECT acciones, R1+LEFT cancelar) y el flujo Windows-host.
+
 ## Fix UAC2: mis-binding GOT sfReader.RIFFRead (2026-08-11) - core `ed7f7266` + install SD U2.52.3
 
 - **Motivo**: crash reproducible del port al cargar soundfonts (pc `0xded98`,

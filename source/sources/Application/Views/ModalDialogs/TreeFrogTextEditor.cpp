@@ -233,10 +233,10 @@ void TreeFrogTextEditor::processPhysicalInput() {
         toggleCase();
         return;
     }
-    /* RANDOM_NAME_V1: SELECT generates a random name in dialogs that
+    /* RANDOM_NAME_V1: R1+A generates a random name in dialogs that
      * support it (NewProjectDialog). Checked before the single-action
      * gate so it works even while other buttons are held. */
-    if (newBits & TFSP_SELECT) {
+    if ((current & TFSP_R1) && (newBits & TFSP_A)) {
         OnRandomize();
         return;
     }
