@@ -160,11 +160,11 @@ static const char *kNoMute = "/mnt/sdcard/lgpt/otg/disable_mute_local";
 static const char *kU2430BuildMarker =
     "R36SX U2.51.7 MONITOR FIFO HANDSHAKE FILENAME EDITOR CORE";
 static const char *kFifo = "/tmp/r36sx_uac2_bridge_fifo";
-static const char *kLog = "/mnt/sdcard/LGPT_OTG_LOGS/uac2_bridge_lgpt.log";
+static const char *kLog = "/tmp/r36sx_lgpt_logs/uac2_bridge_lgpt.log";
 static const char *kActiveMarker = "/tmp/r36sx_uac2_usb_active";
 static const char *kRuntimeDir = "/tmp/r36sx_lgpt_usb";
 static const char *kDaemonPid = "/tmp/r36sx_lgpt_usb/daemon_pid";
-static const char *kRuntimeMirrorDir = "/mnt/sdcard/LGPT_OTG_LOGS/runtime_state";
+static const char *kRuntimeMirrorDir = "/tmp/r36sx_lgpt_logs/runtime_state";
 static const char *kCaptureCmd = "/tmp/r36sx_lgpt_usb/usb_capture_cmd";
 static const char *kCaptureStatus = "/tmp/r36sx_lgpt_usb/usb_capture_status";
 static const char *kCaptureLastName = "/tmp/r36sx_lgpt_usb/usb_capture_last_name";

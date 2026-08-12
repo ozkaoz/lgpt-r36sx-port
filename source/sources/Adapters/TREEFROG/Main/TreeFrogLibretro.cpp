@@ -97,14 +97,15 @@ static uint32_t last_phys_for_combo = 0;
 static unsigned long treefrog_v11_frame_counter = 0;
 
 /*
- * TREEFROG_BOOT_DIAG (Bacon 1.1.1 V17-diagnostico): boot-stage marker log
- * persisted to the SD so a device hang at startup leaves evidence.  The
- * frontend discards /tmp on power-off, so the core writes one line per boot
- * stage to /mnt/sdcard/LGPT_OTG_LOGS/boot_debug.log.  Pure diagnostics: it
- * does not change the audio driver, the input path or any view logic.
+ * TREEFROG_BOOT_DIAG (Bacon 1.1.1 V17-diagnostico): boot-stage marker log.
+ * U2.57: written to tmpfs /tmp/r36sx_lgpt_logs/boot_debug.log so the core
+ * never writes the SD card directly; the shutdown flush moves it to
+ * /mnt/sdcard/LGPT_OTG_LOGS once per power-off.  Pure diagnostics: it does
+ * not change the audio driver, the input path or any view logic.
  */
 static void boot_diag_log(const char *stage) {
-    FILE *f = fopen("/mnt/sdcard/LGPT_OTG_LOGS/boot_debug.log", "a");
+    mkdir("/tmp/r36sx_lgpt_logs", 0777);
+    FILE *f = fopen("/tmp/r36sx_lgpt_logs/boot_debug.log", "a");
     if (!f) return;
     fprintf(f, "%lu BOOTDIAG %s\n", treefrog_v11_frame_counter, stage);
     fclose(f);
