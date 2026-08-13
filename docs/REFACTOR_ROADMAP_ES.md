@@ -56,7 +56,10 @@ terminan ademas con validacion en consola real.
   se abre en la seccion correspondiente a la pantalla en foco (HelpRegistry
   por ViewType; AppWindow elige el modal superior si existe). Primera
   pasada en consola: MIXER abria en CHOPPER (desajuste ordinal
-  kSections_/ViewType, corregido en 0722cb2).
+  kSections_/ViewType, corregido en 0722cb2); TABLE mostraba INSTRUMENT y
+  el submodo Pitch del chopper mostraba CHOPPER (afinado en 69e9f01:
+  VT_TABLE/VT_TABLE2->TABLE, VT_CHOPPITCH->CHOP PITCH segun pitchMode_).
+  [VALIDADO EN CONSOLA salvo recheck del afinado]
 - [IMPLEMENTADO] Correccion del crash de consola "R1 en HelpOverlay"
   (0722cb2): NavigationController trabaja con NavModal* y ModalView
   (View + NavModal) tiene el NavModal a un offset de subobjeto; los casts
