@@ -28,6 +28,24 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+/* ASRC FIR selector: 8-tap Lanczos-4 (default, deployed behavior) or
+ * 16-tap Lanczos-8 (maximum quality) via -DASRC_FIR_TAPS=16. */
+#ifndef ASRC_FIR_TAPS
+#define ASRC_FIR_TAPS 8
+#endif
+#if ASRC_FIR_TAPS == 16
+#include "h36_14_fir16_q14.h"
+#define kASRC_FIR_TABLE kTreeFrogFrontendFir16Q14
+#define ASRC_FIR_HALF 7U
+#define ASRC_FIR_LOOKAHEAD 8U
+#define ASRC_FIR_PRIME 7U
+#else
+#include "h36_14_fir8_q14.h"
+#define kASRC_FIR_TABLE kTreeFrogFrontendFir8Q14
+#define ASRC_FIR_HALF 3U
+#define ASRC_FIR_LOOKAHEAD 4U
+#define ASRC_FIR_PRIME 3U
+#endif
 #include <time.h>
 #include <unistd.h>
 #include <sound/asound.h>
@@ -485,7 +503,7 @@ static int pcm_prepare_common(
     sw.avail_min = period_frames;
     sw.xfer_align = period_frames;
     sw.start_threshold =
-        is_capture ? 1 : period_frames * periods;
+        is_capture ? 1 : period_frames; /* U2.63: ASRC never stops writing */
     sw.stop_threshold =
         period_frames * periods;
     sw.boundary =
@@ -922,6 +940,167 @@ static int ring_pop_frame(unsigned ch, int16_t *frm) {
         if (ring_pop_one_sample(&frm[c]) != 0) return -1;
     }
     return 0;
+}
+
+/* ---- U2.63 ABI7 ASRC engine (ported from H38.1 FIR8, 48 kHz stereo).
+ * Same engine as the r36s_u2523_usb_audio_io ASRC build: PI backlog
+ * controller with dead band, 8-tap 160-phase Lanczos-4 FIR, clock hold
+ * (zero period, no phase advance, no ALSA prepare) on starvation.
+ * Prime 2080 frames = 43 ms; target 1600 = 33 ms steady backlog. ---- */
+#define ASRC_STAGE_FRAMES 8192U
+#define ASRC_TARGET_BACKLOG_FRAMES 3600U
+#define ASRC_PRIME_BACKLOG_FRAMES 2080U
+#define ASRC_MAX_CORRECTION_PPM 10000
+#define ASRC_INTEGRAL_LIMIT_PPM 10000
+#define ASRC_PROPORTIONAL_GAIN 2400
+#define ASRC_INTEGRAL_GAIN 12
+static int16_t asrc_stage[ASRC_STAGE_FRAMES * 2U];
+static unsigned asrc_stage_frames = 0U;
+static uint64_t asrc_phase_q32 = 0ULL;
+static int asrc_stage_primed = 0;
+static int asrc_step_ppm = 0;
+static int asrc_integral_ppm = 0;
+static unsigned asrc_backlog_min = 0xffffffffU;
+static unsigned asrc_backlog_max = 0U;
+static unsigned long long asrc_output_frames = 0ULL;
+static unsigned long long asrc_clock_hold_periods = 0ULL;
+static unsigned long long asrc_clock_hold_frames = 0ULL;
+static unsigned long long asrc_periods_rendered = 0ULL;
+
+static void asrc_source_reset(void) {
+    asrc_stage_frames = 0U;
+    asrc_phase_q32 = 0ULL;
+    asrc_stage_primed = 0;
+    asrc_step_ppm = 0;
+    asrc_integral_ppm = 0;
+    asrc_backlog_min = 0xffffffffU;
+    asrc_backlog_max = 0U;
+}
+static unsigned asrc_total_backlog(void) {
+    unsigned stage_available;
+    unsigned idx = (unsigned)(asrc_phase_q32 >> 32);
+    unsigned source_frames = g_audio_channels ? rfill / g_audio_channels : 0U;
+    if (asrc_stage_frames > idx) stage_available = asrc_stage_frames - idx;
+    else stage_available = 0U;
+    return source_frames + stage_available;
+}
+static unsigned asrc_stage_append(void) {
+    int16_t tmp[2048U * 2U];
+    unsigned room = ASRC_STAGE_FRAMES - asrc_stage_frames;
+    unsigned want = room < 2048U ? room : 2048U;
+    unsigned got = 0U;
+    unsigned n;
+    while (got < want && rfill >= 2U) {
+        if (ring_pop_frame(2, tmp + got * 2U) != 0) break;
+        ++got;
+    }
+    if (got == 0U) return 0U;
+    if (!asrc_stage_primed) {
+        for (n = 0U; n < ASRC_FIR_PRIME; ++n) {
+            asrc_stage[n * 2U] = tmp[0];
+            asrc_stage[n * 2U + 1U] = tmp[1];
+        }
+        asrc_stage_frames = ASRC_FIR_PRIME;
+        asrc_phase_q32 = (uint64_t)ASRC_FIR_PRIME << 32;
+        asrc_stage_primed = 1;
+    }
+    memcpy(asrc_stage + asrc_stage_frames * 2U,
+           tmp, (size_t)got * 2U * sizeof(int16_t));
+    asrc_stage_frames += got;
+    return got;
+}
+static uint64_t asrc_nominal_step_q32(void) {
+    return ((uint64_t)g_audio_rate << 32) / 48000U;
+}
+static void asrc_update_step(void) {
+    const unsigned target = ASRC_TARGET_BACKLOG_FRAMES;
+    const unsigned backlog = asrc_total_backlog();
+    const int error = (int)backlog - (int)target;
+    const int dead = (int)(target / 8U);
+    int proportional;
+    int desired;
+    proportional = (error * ASRC_PROPORTIONAL_GAIN) / (int)target;
+    if (error > dead || error < -dead) {
+        asrc_integral_ppm += (error * ASRC_INTEGRAL_GAIN) / (int)target;
+        if (asrc_integral_ppm > ASRC_INTEGRAL_LIMIT_PPM) asrc_integral_ppm = ASRC_INTEGRAL_LIMIT_PPM;
+        if (asrc_integral_ppm < -ASRC_INTEGRAL_LIMIT_PPM) asrc_integral_ppm = -ASRC_INTEGRAL_LIMIT_PPM;
+    }
+    desired = proportional + asrc_integral_ppm;
+    if (desired > ASRC_MAX_CORRECTION_PPM) desired = ASRC_MAX_CORRECTION_PPM;
+    if (desired < -ASRC_MAX_CORRECTION_PPM) desired = -ASRC_MAX_CORRECTION_PPM;
+    asrc_step_ppm = (asrc_step_ppm * 7 + desired) / 8;
+    if (backlog < asrc_backlog_min) asrc_backlog_min = backlog;
+    if (backlog > asrc_backlog_max) asrc_backlog_max = backlog;
+}
+static uint64_t asrc_step_q32(void) {
+    const uint64_t nominal = asrc_nominal_step_q32();
+    int64_t delta = ((int64_t)nominal * (int64_t)asrc_step_ppm) / 1000000LL;
+    return (uint64_t)((int64_t)nominal + delta);
+}
+static void asrc_filter_stereo(unsigned idx, unsigned phase,
+                               int16_t *out_l, int16_t *out_r) {
+    int64_t acc_l = 0, acc_r = 0;
+    const int16_t *coef = kASRC_FIR_TABLE[phase];
+    unsigned t;
+    for (t = 0U; t < ASRC_FIR_TAPS; ++t) {
+        unsigned fi = idx - ASRC_FIR_HALF + t;
+        acc_l += (int64_t)asrc_stage[fi * 2U] * (int64_t)coef[t];
+        acc_r += (int64_t)asrc_stage[fi * 2U + 1U] * (int64_t)coef[t];
+    }
+    acc_l = (acc_l + (acc_l >= 0 ? 8192 : -8192)) / 16384;
+    acc_r = (acc_r + (acc_r >= 0 ? 8192 : -8192)) / 16384;
+    if (acc_l > 32767) acc_l = 32767;
+    if (acc_l < -32768) acc_l = -32768;
+    if (acc_r > 32767) acc_r = 32767;
+    if (acc_r < -32768) acc_r = -32768;
+    *out_l = (int16_t)acc_l;
+    *out_r = (int16_t)acc_r;
+}
+static int asrc_prepare_period(unsigned out_frames, uint64_t *step_out) {
+    uint64_t step, final_phase;
+    unsigned required_index;
+    if (!step_out || out_frames == 0U) return 0;
+
+    if (!asrc_stage_primed) {
+        if (asrc_stage_append() == 0U || asrc_stage_frames <= ASRC_FIR_LOOKAHEAD)
+            return 0;
+    }
+    asrc_update_step();
+    step = asrc_step_q32();
+    final_phase = asrc_phase_q32 + step * (uint64_t)(out_frames - 1U);
+    required_index = (unsigned)(final_phase >> 32) + ASRC_FIR_LOOKAHEAD;
+    while (asrc_stage_frames <= required_index) {
+        if (asrc_stage_append() == 0U) return 0;
+    }
+    *step_out = step;
+    return 1;
+}
+static void asrc_render_exact(int16_t *out, unsigned out_frames, uint64_t step) {
+    unsigned produced;
+
+    for (produced = 0U; produced < out_frames; ++produced) {
+        unsigned idx = (unsigned)(asrc_phase_q32 >> 32);
+        uint32_t frac = (uint32_t)asrc_phase_q32;
+        unsigned phase = (unsigned)(((uint64_t)frac * 160ULL) >> 32);
+        int16_t l = 0, r = 0;
+        asrc_filter_stereo(idx, phase, &l, &r);
+        out[produced * 2U] = l;
+        out[produced * 2U + 1U] = r;
+        asrc_phase_q32 += step;
+    }
+    {
+        unsigned idx = (unsigned)(asrc_phase_q32 >> 32);
+        if (idx > ASRC_FIR_HALF) {
+            unsigned drop = idx - ASRC_FIR_HALF;
+            if (drop > asrc_stage_frames) drop = asrc_stage_frames;
+            memmove(asrc_stage, asrc_stage + drop * 2U,
+                    (size_t)(asrc_stage_frames - drop) * 2U * sizeof(int16_t));
+            asrc_stage_frames -= drop;
+            asrc_phase_q32 -= (uint64_t)drop << 32;
+        }
+    }
+    asrc_output_frames += out_frames;
+    ++asrc_periods_rendered;
 }
 
 static void write_wav_header(int fd, uint32_t data_bytes, uint32_t rate, uint16_t channels) {
@@ -2608,6 +2787,8 @@ int main(int argc, char **argv) {
     int stream_primed = 0;
     unsigned long long starvation_since_ms = 0;
     long fifo_samples_last = 0;
+    unsigned sustained_overflow_periods = 0;
+    unsigned long long asrc_resync_events = 0;
 
     for (;;) {
         if (g_sp404_stop_requested) {
@@ -2676,6 +2857,7 @@ int main(int argc, char **argv) {
                         "U2517_PCM_PLAY_FORCE_REOPEN_AFTER_USB_REC_EXIT\n");
             }
             ring_reset();
+            asrc_source_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             good_write_streak = 0;
@@ -2695,6 +2877,7 @@ int main(int argc, char **argv) {
             write_text_file(PLAYBACK_PCM_STATUS, "waiting-for-usb\n");
             mark_inactive();
             ring_reset();
+            asrc_source_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             sleep_ms(20);
@@ -2822,26 +3005,45 @@ int main(int argc, char **argv) {
 
         const unsigned required_samples =
             (unsigned)active_period_frames * 2u;
-        const unsigned hardware_buffer_samples =
-            required_samples * (unsigned)periods;
-        /* Fill exactly the hardware buffer before auto-start. Once ALSA
-         * starts, POLLOUT is the consumer clock and the 24 ms grace window
-         * bridges the 16.67 ms libretro producer cadence. */
-        const unsigned prime_target = hardware_buffer_samples;
+        const unsigned hw_period_frames = (unsigned)active_period_frames;
 
+        /* ---- U2.63 ASRC clocked write path ---- */
         if (!stream_primed) {
-            if (rfill < prime_target) {
+            if (asrc_total_backlog() < ASRC_PRIME_BACKLOG_FRAMES) {
+                asrc_stage_append();
                 sleep_ms(1);
                 continue;
             }
             stream_primed = 1;
             starvation_since_ms = 0;
             fprintf(stderr,
-                    "PLAYBACK_CLOCKED_PRIMED ring_fill=%u target=%u hw_buffer_samples=%u period_frames=%d channels=2 gain=%.2f\n",
-                    rfill, prime_target, hardware_buffer_samples,
-                    active_period_frames, g_playback_gain);
+                    "PLAYBACK_ASRC_PRIMED backlog=%u target=%u prime=%u "
+                    "period=%u gain=%.2f\n",
+                    asrc_total_backlog(), ASRC_TARGET_BACKLOG_FRAMES,
+                    ASRC_PRIME_BACKLOG_FRAMES, hw_period_frames,
+                    g_playback_gain);
             fifo_dump_start();
             load_playback_gain();
+        }
+
+        /* U2.63.1 parity with the u2523 Windows daemon: if the producer
+         * outpaced us beyond 4x target for a full second, force a clean
+         * re-prime instead of limping with multi-hundred-ms latency. */
+        if (asrc_total_backlog() > 3U * ASRC_STAGE_FRAMES) {
+            if (++sustained_overflow_periods >= 8) {
+                ++asrc_resync_events;
+                ring_reset();
+                asrc_source_reset();
+                stream_primed = 0;
+                sustained_overflow_periods = 0;
+                fprintf(stderr,
+                        "SP404_ASRC_BACKLOG_RESYNC event=%llu backlog=%u target=%u\n",
+                        asrc_resync_events, asrc_total_backlog(),
+                        ASRC_TARGET_BACKLOG_FRAMES);
+                continue;
+            }
+        } else {
+            sustained_overflow_periods = 0;
         }
 
         int playback_poll_timeout_ms =
@@ -2860,6 +3062,7 @@ int main(int argc, char **argv) {
             close(pcm);
             pcm = -1;
             ring_reset();
+            asrc_source_reset();
             stream_primed = 0;
             starvation_since_ms = 0;
             good_write_streak = 0;
@@ -2875,47 +3078,36 @@ int main(int argc, char **argv) {
         /* Capture data may have arrived while poll waited. */
         drain_fifo(in, &dropped);
 
+        uint64_t period_step = 0ULL;
         int used_starvation_silence = 0;
-        if (rfill < required_samples) {
-            unsigned long long now_ms = monotonic_milliseconds();
-            if (starvation_since_ms == 0)
-                starvation_since_ms = now_ms;
-            if (now_ms >= starvation_since_ms &&
-                (now_ms - starvation_since_ms) <
-                    (unsigned long long)starvation_grace_ms) {
-                sleep_ms(1);
-                continue;
+        if (asrc_prepare_period(hw_period_frames, &period_step)) {
+            asrc_render_exact(out, hw_period_frames, period_step);
+            if (g_playback_gain != 1.0f) {
+                unsigned g;
+                for (g = 0U; g < required_samples; ++g)
+                    out[g] = (int16_t)((float)out[g] * g_playback_gain);
             }
+            /* FIFO dump: capture the rendered (post-ASRC) source. */
+            {
+                unsigned pd;
+                for (pd = 0U; pd < hw_period_frames; ++pd)
+                    fifo_dump_write(out + pd * 2U);
+            }
+            starvation_since_ms = 0;
+        } else {
             memset(out, 0, required_samples * sizeof(int16_t));
             used_starvation_silence = 1;
             ++starvation_events;
-            ++starvation_silence_periods;
+            ++asrc_clock_hold_periods;
+            asrc_clock_hold_frames += hw_period_frames;
             starvation_since_ms = 0;
             if (starvation_events <= 4 ||
                 (starvation_events % 100) == 0) {
                 fprintf(stderr,
-                        "PLAYBACK_SOURCE_STARVATION event=%ld ring_fill=%u required=%u grace_ms=%d action=passthrough-silence\n",
-                        starvation_events, rfill,
-                        required_samples, starvation_grace_ms);
-            }
-        } else {
-            unsigned produced = 0;
-            int16_t frm[2];
-            while (produced < required_samples) {
-                if (ring_pop_frame(2, frm) != 0) break;
-                out[produced++] = (int16_t)(frm[0] * g_playback_gain);
-                out[produced++] = (int16_t)(frm[1] * g_playback_gain);
-                fifo_dump_write(frm);
-            }
-            if (produced < required_samples) {
-                for (; produced < required_samples; ++produced)
-                    out[produced] = 0;
-                used_starvation_silence = 1;
-                ++starvation_events;
-                ++starvation_silence_periods;
-                starvation_since_ms = 0;
-            } else {
-                starvation_since_ms = 0;
+                        "PLAYBACK_ASRC_CLOCK_HOLD event=%ld backlog=%u "
+                        "stage=%u action=zero-period-no-phase-advance-no-prepare\n",
+                        starvation_events, asrc_total_backlog(),
+                        asrc_stage_frames);
             }
         }
 
