@@ -87,6 +87,17 @@ terminan ademas con validacion en consola real.
   (tests/test_f3_chopper_baseline.py: API publica, strings de estado,
   miembros raw fuera del header) + audit. Core 402cba10 desplegado
   (backup .pre_f3_1_20260813). [PENDIENTE VALIDACION CONSOLA]
+- [VALIDADO EN CONSOLA] F3-1: chop/split/undo-redo OK. Incidente unico
+  (crash L1+R1 en chopper, no reproducible tras reentrar): sin traza en
+  /mnt/g/LGPT_OTG_LOGS (crash duro); causa raiz en el orden del pitch
+  preview: `previewPitchSetting` reescribia el WAV compartido
+  `samples:__u2_pitch_env_preview.wav` (ReplaceBuffer) mientras el stream
+  anterior del mismo archivo podia seguir activo en el hilo de audio (el
+  streamer mantiene su propio WavFile abierto sobre ese path); el Stop()+
+  Sleep(80) iba DESPUES del rewrite, dejando una ventana de truncado en
+  lectura -> un solo crash de timing. Fix 6114766 (U2.52.0): Stop+Sleep
+  antes del rewrite (mismo stream audible). Core f72e346f desplegado
+  (backup .pre_u2520_stream_order_20260813). [PENDIENTE VALIDACION CONSOLA]
 - [PENDIENTE] F3-2: SampleEditHistory (stacks con capture/restore por
   callbacks) y PitchEnvelopeTool (parametros pitch/env + buffer builder).
 - [PENDIENTE] F3-3: ChopperView (dibujo) + PreviewService; queda
