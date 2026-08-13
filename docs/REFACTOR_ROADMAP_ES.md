@@ -32,8 +32,11 @@ terminan ademas con validacion en consola real.
   (1538 mascaras); wiring de processNormalButtonMask despachado via
   ChordResolver con colas multi-fire; build MIPS OK; auditoria
   AUDIT_CLEAN_MAIN_U2523_OK; consola: protocolo 7 pasos MIX/FX todo OK).
-  Pendiente F1b: migrar AppWindow (CTX_GLOBAL, regla V16 L1+R1+X con
-  historia de hombros) para cerrar F1b.
+  F1b AppWindow cerrado (commit 023eb1d: help/audio resueltos contra
+  CTX_GLOBAL via ChordResolver_Matches/ChordAbsent; la regla V16
+  L1+R1+X con historia de hombros y los latches siguen en el adapter
+  como documenta la tabla; build MIPS OK; auditoria OK; core 6d87c7ba
+  en SD; validacion en consola pendiente). F1b completo.
 
 ## F2 - Politica de menus formal + NavigationController
 - Documentar el lenguaje de menus vigente (titulo centrado + bloque
