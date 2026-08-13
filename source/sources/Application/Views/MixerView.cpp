@@ -2,6 +2,7 @@
 #include "MixerView.h"
 #include "Application/Model/Mixer.h"
 #include "Application/Mixer/MixerService.h"
+#include "Application/Mixer/MixerMenu.h"
 #include "Application/Model/Project.h"
 #include "Application/Model/ProjectDatas.h"
 #include "Application/Instruments/SampleInstrument.h"
@@ -63,7 +64,9 @@ void MixerActionMenuApplyCallback(View &view, ModalView &dialog) ;
 void MixerActionMenuModal::DrawView() {
     GUITextProperties props ;
     props.invert_ = false ;
-    int rowCount = masterMenu_ ? 6 : 5 ;
+    // F3-4c: la estructura del menu (filas, etiquetas, clamps, accion) vive
+    // en Application/Mixer/MixerMenu.h; aqui solo se dibuja.
+    int rowCount = mixerMenuRowCount(masterMenu_) ;
     SetWindow(26, rowCount + 3) ;
 
     char title[32] ;
@@ -79,7 +82,6 @@ void MixerActionMenuModal::DrawView() {
     DrawString(tx, 0, title, props) ;
 
     Project *project = mixer_.viewData_->project_ ;
-    int channel = mixer_.viewData_->mixerCol_ ;
     const int labelX = 1 ;
     const int valueX = 14 ;
     for (int i = 0; i < rowCount; i++) {
@@ -88,39 +90,32 @@ void MixerActionMenuModal::DrawView() {
         char label[16] ;
         char value[16] ;
         if (masterMenu_) {
+            snprintf(label, sizeof(label), "%s",
+                     mixerMenuLabel(true, i)) ;
             switch (i) {
             case 0:
-                snprintf(label, sizeof(label), "LIMITER") ;
                 if (project) {
-                    int idx = project->GetSoftclip() ;
-                    if (idx < 0) idx = 0 ;
-                    if (idx > 4) idx = 4 ;
-                    snprintf(value, sizeof(value), "%s", softclipStates[idx]) ;
+                    int idx = mixerMenuClampSoftclip(
+                        project->GetSoftclip()) ;
+                    snprintf(value, sizeof(value), "%s",
+                             softclipStates[idx]) ;
                 } else snprintf(value, sizeof(value), "-") ;
                 break ;
             case 1:
-                snprintf(label, sizeof(label), "CLIP GAIN") ;
                 if (project) {
-                    int idx = project->GetSoftclipGain() ;
-                    if (idx < 0) idx = 0 ;
-                    if (idx > 1) idx = 1 ;
+                    int idx = mixerMenuClampSoftclipGain(
+                        project->GetSoftclipGain()) ;
                     snprintf(value, sizeof(value), "%s",
                              softclipGainStates[idx]) ;
                 } else snprintf(value, sizeof(value), "-") ;
                 break ;
             default:
-                snprintf(label, sizeof(label), "FX %s",
-                         i == 2 ? "DELAY" :
-                         i == 3 ? "REVERB" :
-                         i == 4 ? "EQ" : "COMP") ;
                 snprintf(value, sizeof(value), "A: open") ;
                 break ;
             }
         } else {
-            static const char *sections[5] = {
-                "FILTER", "BITCRUSHER", "PLAYBACK", "FX SENDS",
-                "AUTOMATION" } ;
-            snprintf(label, sizeof(label), "%s", sections[i]) ;
+            snprintf(label, sizeof(label), "%s",
+                     mixerMenuLabel(false, i)) ;
             snprintf(value, sizeof(value), "A: open") ;
         }
         SetColor(CD_NORMAL) ;
@@ -133,7 +128,6 @@ void MixerActionMenuModal::DrawView() {
         SetColor(CD_NORMAL) ;
     }
 
-    (void)channel ;
     SetColor(CD_NORMAL) ;
     props.invert_ = false ;
     DrawString(1, rowCount + 1, "UP/DN move  A open", props) ;
@@ -148,7 +142,7 @@ void MixerActionMenuModal::ProcessButtonMask(unsigned short mask,
         EndModal(0) ;
         return ;
     }
-    int rowCount = masterMenu_ ? 6 : 5 ;
+    int rowCount = mixerMenuRowCount(masterMenu_) ;
     if (mask & EPBM_UP) {
         item_-- ;
         if (item_ < 0) item_ = rowCount - 1 ;
@@ -167,9 +161,7 @@ void MixerActionMenuModal::ProcessButtonMask(unsigned short mask,
         if (!project) return ;
         int delta = (mask & EPBM_RIGHT) ? 1 : -1 ;
         if (item_ == 0) {
-            int idx = project->GetSoftclip() + delta ;
-            if (idx < 0) idx = 0 ;
-            if (idx > 4) idx = 4 ;
+            int idx = mixerMenuClampSoftclip(project->GetSoftclip() + delta) ;
             if (idx == project->GetSoftclip()) return ;
             mixer_.pushMixUndo(ME_SOFTCLIP, -1,
                                (float)project->GetSoftclip(),
@@ -179,9 +171,8 @@ void MixerActionMenuModal::ProcessButtonMask(unsigned short mask,
             MixerService::GetInstance()->SetSoftclip(
                 idx, project->GetSoftclipGain()) ;
         } else {
-            int idx = project->GetSoftclipGain() + delta ;
-            if (idx < 0) idx = 0 ;
-            if (idx > 1) idx = 1 ;
+            int idx = mixerMenuClampSoftclipGain(
+                project->GetSoftclipGain() + delta) ;
             if (idx == project->GetSoftclipGain()) return ;
             mixer_.pushMixUndo(ME_SOFTCLIPGAIN, -1,
                                (float)project->GetSoftclipGain(),
@@ -196,11 +187,8 @@ void MixerActionMenuModal::ProcessButtonMask(unsigned short mask,
     }
     if (mask & EPBM_A) {
         // 1..4 = master FX pages (DELAY..COMP); 101+ = track sections.
-        if (masterMenu_ && item_ >= 2) {
-            pendingAction_ = item_ - 1 ;
-        } else if (!masterMenu_) {
-            pendingAction_ = 101 + item_ ;
-        }
+        pendingAction_ = mixerMenuActionForRow(masterMenu_, item_) ;
+        if (pendingAction_ == 0) return ;
         EndModal(pendingAction_) ;
         return ;
     }
@@ -229,13 +217,12 @@ void MixerActionMenuApplyCallback(View &view, ModalView &dialog) {
         // FX SENDS/AUTOMATION).
         int section = action - 101 ;
         if (section < 0 || section > 4) return ;
-        static const unsigned int hintIds[5] = {
-            SIP_FILTMIX, SIP_CRUSH, SIP_INTERPOLATION, SIP_DRY,
-            SIP_TABLEAUTO } ;
+        // F3-4c: los hints FourCC de seccion vienen de MixerMenu.h.
+        unsigned int hintId = mixerMenuSectionHint(section) ;
         int channel = mixer.viewData_->mixerCol_ ;
         if (channel >= 0 && channel < SONG_CHANNEL_COUNT) {
             mixer.viewData_->currentInstrument_ = channel ;
-            mixer.viewData_->instrumentFocusHint_ = hintIds[section] ;
+            mixer.viewData_->instrumentFocusHint_ = hintId ;
             ViewType vt = VT_INSTRUMENT ;
             ViewEvent ve(VET_SWITCH_VIEW, &vt) ;
             mixer.SetChanged() ;

@@ -174,7 +174,25 @@ terminan ademas con validacion en consola real.
   pre-existente de device/*.c). Desplegado en SD (backup
   LGPT_BEFORE_U2523_20260813_174058; core en consola = build SHA
   a97a77e8). [VALIDADO EN CONSOLA]
-- [PENDIENTE] F3-4c: Mixer - menu L1+A / accion del Mixer declarado.
+- [IMPLEMENTADO] F3-4c: MixerMenu - menu L1+A del Mixer declarado como
+  datos puros (Application/Mixer/MixerMenu.h): filas (6 MASTER / 5 TRACK),
+  etiquetas en orden exacto, clamps golden (softclip 0..4, clip gain
+  0..1), codificado de accion (fila master >= 2 -> pagina FX 1..4 =
+  DELAY..COMP; fila track -> seccion 101..105) y hints FourCC de seccion
+  (SIP_FILTMIX/SIP_CRUSH/SIP_INTERPOLATION/SIP_DRY/SIP_TABLEAUTO,
+  MAKE_FOURCC puro).  MixerActionMenuModal (DrawView/ProcessButtonMask) y
+  MixerActionMenuApplyCallback migrados a delegados de la capa (dibujo,
+  Project y MixerService siguen en la vista).  Evidencia:
+  tests/host/mixer_menu_host_test.cpp (40 checks golden con ASAN/UBSAN,
+  runner tests/run_host_mixer_menu.sh en audit.sh) + test_f3_4c_baseline.py
+  (capa pura sin GUI/audio, sin labels/hintIds inline en la vista).  Audit
+  completo verde (AUDIT_CLEAN_MAIN_U2523_OK).  Build MIPS del core OK sin
+  diagnosticos en MixerView/MixerMenu (gate solo con deuda F7
+  pre-existente de device/*.c).  Desplegado en SD (backup
+  LGPT_BEFORE_U2523_20260813_182741; core en consola = build SHA
+  e176da18).
+- [PENDIENTE] F3-4: Mixer (baseline en docs/F3_ARCHITECTURE_ES.md):
+  MixerService, MixerMeters, FxNavigator.
 - [IMPLEMENTADO] F3-4b: MixerMeters - capa pura de los medidores VU del
   Mixer (Application/Mixer/MixerMeters.h): smoothing golden
   (ataque instantaneo, release *0.6 por frame con piso 0.001, muestreo a 0
