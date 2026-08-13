@@ -103,6 +103,11 @@ enum ActionId {
     ACTION_OPEN_MENU,           /* L1+A puro: menu de accion (MixerActionMenuModal) */
     ACTION_OPEN_INSTRUMENT_FX,  /* R2+A: menu FX del instrumento */
     ACTION_CYCLE_FX_EDIT_TARGET,/* R2 puro en pagina MIX: VOL -> DLY RET -> RVB RET */
+    ACTION_CYCLE_FX_PAGE,       /* SELECT: MIX -> DELAY -> REVERB -> MASTER -> MIX */
+    ACTION_TOGGLE_MUTE,         /* R1+B */
+    ACTION_TOGGLE_SOLO,         /* R1+A */
+    ACTION_SWITCH_VIEW_SONG,    /* R1+UP en MixerView (cola: +START onStop) */
+    ACTION_STOP,                /* R1+START: onStop (cola de R1+UP+START) */
     ACTION_PAN_NUDGE_LEFT,
     ACTION_PAN_NUDGE_RIGHT,
     ACTION_PAN_NUDGE_LEFT_COARSE,  /* con A */

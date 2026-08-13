@@ -56,162 +56,234 @@ static const Binding kGlobalBindings[] = {
 };
 
 /* ------------------------------------------------------------------ */
-/* CTX_MIXER -- MixerView.cpp ProcessButtonMask, pagina MIX.          */
+/* CTX_MIXER -- MixerView.cpp processNormalButtonMask, pagina MIX.    */
+/* Orden = orden del golden (bloques que retornan primero van antes). */
+/* Multi-fire: los bloques A/L/base disparan VARIAS acciones bajo una  */
+/* misma prensa (p.ej. START+flechas = onStart + nudge). El resolver   */
+/* devuelve la PRIMERA accion (orden U,D,L,R del golden); la cola se   */
+/* documenta en cada binding y el dispatch F1b la replaya.             */
 /* ------------------------------------------------------------------ */
 static const Binding kMixerBindings[] = {
 
-    /* R2: bloque que retorna; el unico R2 puro con accion es el ciclo de
-     * objetivo de edicion en la pagina MIX. R2+B/L1/L2+... tambien ciclan
-     * (el codigo no comprueba nada mas que la ausencia de A). */
+    /* SELECT: cicla pagina (todas las paginas; bloque antes de R1). */
+    BIND(ACTION_CYCLE_FX_PAGE,
+         KEY_SELECT, 0,
+         "MixerView.cpp:540, SELECT cycleFxPage"),
+
+    /* Bloque R1: B > A > UP > START (prioridad por orden del golden). */
+    BIND(ACTION_TOGGLE_MUTE,
+         KEY_R1 | KEY_B, 0,
+         "MixerView.cpp:550-552, R1+B toggleMute (B gana al resto)"),
+    BIND(ACTION_TOGGLE_SOLO,
+         KEY_R1 | KEY_A, KEY_B,
+         "MixerView.cpp:554-556, R1+A switchSoloMode"),
+    BIND(ACTION_SWITCH_VIEW_SONG,
+         KEY_R1 | KEY_UP, KEY_A | KEY_B,
+         "MixerView.cpp:558-563, R1+UP VT_SONG; cola: +START onStop"),
+    BIND(ACTION_STOP,
+         KEY_R1 | KEY_START, KEY_A | KEY_B | KEY_UP,
+         "MixerView.cpp:564-566, R1+START onStop"),
+
+    /* Bloque R2: A primero, luego R2 puro con ciclo solo en MIX.
+     * R1 retorna antes (bloque R1) -> se prohibe. */
     BIND(ACTION_OPEN_INSTRUMENT_FX,
          KEY_R2 | KEY_A, 0,
-         "MixerView.cpp:578-582, R2+A showInstrumentFxMenu"),
+         "MixerView.cpp:573-576, R2+A showInstrumentFxMenu"),
     BIND(ACTION_CYCLE_FX_EDIT_TARGET,
-         KEY_R2, KEY_A,
-         "MixerView.cpp:585-590, R2 sin A en FX_PAGE_MIX (VOL->DLY->RVB)"),
+         KEY_R2, KEY_A | KEY_R1,
+         "MixerView.cpp:579-583, R2 sin A en FX_PAGE_MIX (VOL->DLY->RVB)"),
 
-    /* L2: bloque que retorna. L2+A+B puro resetea pan; L2(+A)+L/R nudgea
-     * pan; cualquier otro L2 sin L/R -> nada. */
+    /* Bloque L2: masterSelected_ es estado runtime (precondicion del
+     * dispatch, la tabla no la modela). L2+A+B puro resetea pan.
+     * R1/R2/SELECT retornan antes (bloques R1/R2/SELECT) -> se prohiben. */
     BIND(ACTION_RESET_PAN,
          KEY_L2 | KEY_A | KEY_B,
          KEY_LEFT | KEY_RIGHT | KEY_UP | KEY_DOWN | KEY_L1 | KEY_R1 |
          KEY_X | KEY_Y | KEY_SELECT | KEY_START,
-         "MixerView.cpp:589-601, L2+A+B pure chord -> pan 0"),
-
+         "MixerView.cpp:595-601, L2+A+B pure chord -> pan 0"),
     BIND(ACTION_PAN_NUDGE_LEFT_COARSE,
-         KEY_L2 | KEY_A | KEY_LEFT, KEY_RIGHT,
-         "MixerView.cpp:604-616, L2+A+LEFT step 10"),
+         KEY_L2 | KEY_A | KEY_LEFT, KEY_R1 | KEY_R2,
+         "MixerView.cpp:607-616, L2+A+LEFT step 10 (LEFT gana a RIGHT por orden)"),
     BIND(ACTION_PAN_NUDGE_RIGHT_COARSE,
-         KEY_L2 | KEY_A | KEY_RIGHT, KEY_LEFT,
-         "MixerView.cpp:604-616, L2+A+RIGHT step 10"),
+         KEY_L2 | KEY_A | KEY_RIGHT, KEY_LEFT | KEY_R1 | KEY_R2,
+         "MixerView.cpp:618-626, L2+A+RIGHT step 10"),
     BIND(ACTION_PAN_NUDGE_LEFT,
-         KEY_L2 | KEY_LEFT, KEY_A | KEY_RIGHT,
-         "MixerView.cpp:604-616, L2+LEFT step 1"),
+         KEY_L2 | KEY_LEFT, KEY_A | KEY_R1 | KEY_R2,
+         "MixerView.cpp:608-616, L2+LEFT step 1 (LEFT gana a RIGHT por orden)"),
     BIND(ACTION_PAN_NUDGE_RIGHT,
-         KEY_L2 | KEY_RIGHT, KEY_A | KEY_LEFT,
-         "MixerView.cpp:604-616, L2+RIGHT step 1"),
+         KEY_L2 | KEY_RIGHT, KEY_A | KEY_LEFT | KEY_R1 | KEY_R2,
+         "MixerView.cpp:618-626, L2+RIGHT step 1"),
 
     /* L1+A puro: menu de accion (master/limiter o canal). */
     BIND(ACTION_OPEN_MENU,
          KEY_L1 | KEY_A,
          KEY_LEFT | KEY_RIGHT | KEY_UP | KEY_DOWN | KEY_R1 | KEY_L2 |
          KEY_R2 | KEY_X | KEY_Y | KEY_SELECT | KEY_START,
-         "MixerView.cpp:630-641, L1+A pure chord MixerActionMenuModal"),
+         "MixerView.cpp:635-641, L1+A pure chord MixerActionMenuModal"),
 
-    /* Bloque A (edicion gruesa/fina). El bloque R2/L2 retorna antes, asi
-     * que A+... con R2/L2 nunca llega aqui: se prohiben en estas bindings.
-     * B/X/Y/SELECT/START NO se prohiben (el codigo no los comprueba). */
+    /* Bloque A (edicion gruesa/fina; multi-fire U,D,L,R: el golden
+     * evalua UP, DOWN, LEFT, RIGHT en ese orden y cada flecha dispara;
+     * el resolver devuelve la primera y la cola queda documentada.
+     * R2/L2/R1 retornan antes, se prohiben. */
     BIND(ACTION_VOLUME_COARSE_UP,
          KEY_A | KEY_UP,
-         KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_L2 | KEY_R2,
-         "MixerView.cpp:670-674, A+UP updateVolume(10)"),
+         KEY_L2 | KEY_R2,
+         "MixerView.cpp:672-673, A+UP updateVolume(10); cola D/L/R"),
     BIND(ACTION_VOLUME_COARSE_DOWN,
          KEY_A | KEY_DOWN,
-         KEY_UP | KEY_LEFT | KEY_RIGHT | KEY_L2 | KEY_R2,
-         "MixerView.cpp:670-674, A+DOWN updateVolume(-10)"),
+         KEY_L2 | KEY_R2,
+         "MixerView.cpp:674-675, A+DOWN updateVolume(-10); cola U/L/R"),
     BIND(ACTION_VOLUME_FINE_DECREASE,
          KEY_A | KEY_LEFT,
-         KEY_UP | KEY_DOWN | KEY_RIGHT | KEY_L2 | KEY_R2,
-         "MixerView.cpp:675-678, A+LEFT updateVolume(-1)"),
+         KEY_L2 | KEY_R2,
+         "MixerView.cpp:675-676, A+LEFT updateVolume(-1); cola U/D/R"),
     BIND(ACTION_VOLUME_FINE_INCREASE,
          KEY_A | KEY_RIGHT,
-         KEY_UP | KEY_DOWN | KEY_LEFT | KEY_L2 | KEY_R2,
-         "MixerView.cpp:675-678, A+RIGHT updateVolume(1)"),
+         KEY_L2 | KEY_R2,
+         "MixerView.cpp:676-677, A+RIGHT updateVolume(1); cola U/D/L"),
 
-    /* Bloque L1 (camino grueso secundario; requiere A ausente: el bloque A
-     * retorna antes). */
+    /* Bloque L1 (camino grueso secundario; multi-fire U,D,L,R; requiere
+     * A ausente: el bloque A retorna antes; R1 retorna antes tambien). */
     BIND(ACTION_VOLUME_COARSE_UP,
          KEY_L1 | KEY_UP,
-         KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_L2 | KEY_R2,
-         "MixerView.cpp:681-686, L1+UP updateVolume(10)"),
+         KEY_A | KEY_L2 | KEY_R2 | KEY_R1,
+         "MixerView.cpp:681-682, L1+UP updateVolume(10); cola D/L/R"),
     BIND(ACTION_VOLUME_COARSE_DOWN,
          KEY_L1 | KEY_DOWN,
-         KEY_UP | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_L2 | KEY_R2,
-         "MixerView.cpp:681-686, L1+DOWN updateVolume(-10)"),
+         KEY_A | KEY_L2 | KEY_R2 | KEY_R1,
+         "MixerView.cpp:683-684, L1+DOWN updateVolume(-10); cola U/L/R"),
     BIND(ACTION_MIX_CURSOR_LEFT,
-         KEY_L1 | KEY_LEFT, KEY_RIGHT | KEY_A | KEY_L2 | KEY_R2,
-         "MixerView.cpp:687-689, L1+LEFT updateCursor(-1,0)"),
+         KEY_L1 | KEY_LEFT, KEY_A | KEY_L2 | KEY_R2 | KEY_R1,
+         "MixerView.cpp:684-685, L1+LEFT updateCursor(-1,0); cola U/D/R"),
     BIND(ACTION_MIX_CURSOR_RIGHT,
-         KEY_L1 | KEY_RIGHT, KEY_LEFT | KEY_A | KEY_L2 | KEY_R2,
-         "MixerView.cpp:687-689, L1+RIGHT updateCursor(1,0)"),
+         KEY_L1 | KEY_RIGHT, KEY_A | KEY_L2 | KEY_R2 | KEY_R1,
+         "MixerView.cpp:685-686, L1+RIGHT updateCursor(1,0); cola U/D/L"),
 
-    /* Sin modificador. START+flecha dispara las DOS cosas en el golden;
-     * aqui gana PLAY_STOP y la segunda (nudge de volumen/cursor) queda
-     * documentada para el adapter F1b (entrega secuencial). */
+    /* Bloque base (sin modificador; multi-fire START,L,R,U,D en el orden
+     * del golden; las flechas NO se excluyen entre si: LEFT gana a RIGHT
+     * y UP a DOWN por orden de tabla, igual que el golden). R1/R2/L2/SELECT
+     * retornan antes SIEMPRE (aunque no disparen accion) -> se prohiben.
+     * A y L1 retornan antes (bloques A/L1) -> se prohiben. START se
+     * permite: START+flecha dispara onStart Y los nudges (cola). */
     BIND(ACTION_PLAY_STOP,
-         KEY_START, 0,
-         "MixerView.cpp:691, START onStart() (START+flecha: dual-fire)"),
-
+         KEY_START, KEY_A | KEY_L1 | KEY_L2 | KEY_R2,
+         "MixerView.cpp:690, START onStart(); cola flechas L,R,U,D"),
     BIND(ACTION_MIX_CURSOR_LEFT,
          KEY_LEFT,
-         KEY_RIGHT | KEY_L1 | KEY_L2 | KEY_R2 | KEY_A | KEY_START,
-         "MixerView.cpp:692, LEFT updateCursor(-1,0)"),
+         KEY_L1 | KEY_R1 | KEY_L2 | KEY_R2 | KEY_A | KEY_SELECT,
+         "MixerView.cpp:693, LEFT updateCursor(-1,0); cola R,U,D"),
     BIND(ACTION_MIX_CURSOR_RIGHT,
          KEY_RIGHT,
-         KEY_LEFT | KEY_L1 | KEY_L2 | KEY_R2 | KEY_A | KEY_START,
-         "MixerView.cpp:693, RIGHT updateCursor(1,0)"),
+         KEY_L1 | KEY_R1 | KEY_L2 | KEY_R2 | KEY_A | KEY_SELECT,
+         "MixerView.cpp:694, RIGHT updateCursor(1,0); cola U,D"),
     BIND(ACTION_VOLUME_FINE_UP,
          KEY_UP,
-         KEY_DOWN | KEY_L1 | KEY_L2 | KEY_R2 | KEY_A | KEY_START,
-         "MixerView.cpp:694, UP updateVolume(1)"),
+         KEY_L1 | KEY_R1 | KEY_L2 | KEY_R2 | KEY_A | KEY_SELECT,
+         "MixerView.cpp:695, UP updateVolume(1); cola D"),
     BIND(ACTION_VOLUME_FINE_DOWN,
          KEY_DOWN,
-         KEY_UP | KEY_L1 | KEY_L2 | KEY_R2 | KEY_A | KEY_START,
-         "MixerView.cpp:695, DOWN updateVolume(-1)"),
+         KEY_L1 | KEY_R1 | KEY_L2 | KEY_R2 | KEY_A | KEY_SELECT,
+         "MixerView.cpp:696, DOWN updateVolume(-1)"),
 };
 
 /* ------------------------------------------------------------------ */
 /* CTX_MIXER_FX -- paginas DELAY/REVERB/EQ/COMP.                      */
+/* Los bloques SELECT/R1/R2/L2/L1+A del golden estan ANTES del split   */
+/* de pagina, asi que se repiten aqui con los mismos binds.            */
 /* ------------------------------------------------------------------ */
 static const Binding kMixerFxBindings[] = {
 
-    /* R2+A abre el menu FX del instrumento en cualquier pagina. R2 puro en
-     * paginas FX no tiene accion (el ciclo exige pagina MIX) y la rama
-     * consume el boton. */
+    BIND(ACTION_CYCLE_FX_PAGE,
+         KEY_SELECT, 0,
+         "MixerView.cpp:540, SELECT cycleFxPage (todas las paginas)"),
+
+    BIND(ACTION_TOGGLE_MUTE,
+         KEY_R1 | KEY_B, 0,
+         "MixerView.cpp:550-552, R1+B toggleMute"),
+    BIND(ACTION_TOGGLE_SOLO,
+         KEY_R1 | KEY_A, KEY_B,
+         "MixerView.cpp:554-556, R1+A switchSoloMode"),
+    BIND(ACTION_SWITCH_VIEW_SONG,
+         KEY_R1 | KEY_UP, KEY_A | KEY_B,
+         "MixerView.cpp:558-563, R1+UP VT_SONG; cola: +START onStop"),
+    BIND(ACTION_STOP,
+         KEY_R1 | KEY_START, KEY_A | KEY_B | KEY_UP,
+         "MixerView.cpp:564-566, R1+START onStop"),
+
     BIND(ACTION_OPEN_INSTRUMENT_FX,
          KEY_R2 | KEY_A, 0,
-         "MixerView.cpp:578-582, R2+A showInstrumentFxMenu"),
-    /* nota: R2 solo en FX pages -> NONE (return del bloque R2, sin ciclo). */
+         "MixerView.cpp:573-576, R2+A showInstrumentFxMenu"),
+    /* R2 puro en paginas FX -> NONE (el ciclo exige pagina MIX). */
+
+    BIND(ACTION_RESET_PAN,
+         KEY_L2 | KEY_A | KEY_B,
+         KEY_LEFT | KEY_RIGHT | KEY_UP | KEY_DOWN | KEY_L1 | KEY_R1 |
+         KEY_X | KEY_Y | KEY_SELECT | KEY_START,
+         "MixerView.cpp:595-601, L2+A+B pure chord -> pan 0"),
+    BIND(ACTION_PAN_NUDGE_LEFT_COARSE,
+         KEY_L2 | KEY_A | KEY_LEFT, KEY_R1 | KEY_R2,
+         "MixerView.cpp:607-616, L2+A+LEFT step 10 (LEFT gana a RIGHT por orden)"),
+    BIND(ACTION_PAN_NUDGE_RIGHT_COARSE,
+         KEY_L2 | KEY_A | KEY_RIGHT, KEY_LEFT | KEY_R1 | KEY_R2,
+         "MixerView.cpp:618-626, L2+A+RIGHT step 10"),
+    BIND(ACTION_PAN_NUDGE_LEFT,
+         KEY_L2 | KEY_LEFT, KEY_A | KEY_R1 | KEY_R2,
+         "MixerView.cpp:608-616, L2+LEFT step 1 (LEFT gana a RIGHT por orden)"),
+    BIND(ACTION_PAN_NUDGE_RIGHT,
+         KEY_L2 | KEY_RIGHT, KEY_A | KEY_LEFT | KEY_R1 | KEY_R2,
+         "MixerView.cpp:618-626, L2+RIGHT step 1"),
+
+    BIND(ACTION_OPEN_MENU,
+         KEY_L1 | KEY_A,
+         KEY_LEFT | KEY_RIGHT | KEY_UP | KEY_DOWN | KEY_R1 | KEY_L2 |
+         KEY_R2 | KEY_X | KEY_Y | KEY_SELECT | KEY_START,
+         "MixerView.cpp:635-641, L1+A pure chord MixerActionMenuModal"),
 
     /* A+B puro: restaura el parametro en foco al default legacy. */
     BIND(ACTION_RESET_PARAMETER,
          KEY_A | KEY_B,
          KEY_LEFT | KEY_RIGHT | KEY_UP | KEY_DOWN | KEY_L1 | KEY_R1 |
          KEY_L2 | KEY_R2 | KEY_X | KEY_Y | KEY_SELECT | KEY_START,
-         "MixerView.cpp:649-658, A+B pure chord fxResetRow"),
+         "MixerView.cpp:648-653, A+B pure chord fxResetRow"),
 
-    /* A+flechas editan el parametro (sin comprobaciones extra del codigo;
-     * R2/L2 retornan antes y se prohiben). */
+    /* A+flechas editan el parametro (multi-fire U,D,L,R: orden del
+     * golden UP, DOWN, LEFT, RIGHT). */
     BIND(ACTION_EDIT_PARAM_UP,
-         KEY_A | KEY_UP, KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_L2 | KEY_R2,
-         "MixerView.cpp:659-662, A+UP fxEditRow(1,true)"),
+         KEY_A | KEY_UP, KEY_L2 | KEY_R2,
+         "MixerView.cpp:655-656, A+UP fxEditRow(1,true); cola D/L/R"),
     BIND(ACTION_EDIT_PARAM_DOWN,
-         KEY_A | KEY_DOWN, KEY_UP | KEY_LEFT | KEY_RIGHT | KEY_L2 | KEY_R2,
-         "MixerView.cpp:659-662, A+DOWN fxEditRow(-1,true)"),
+         KEY_A | KEY_DOWN, KEY_L2 | KEY_R2,
+         "MixerView.cpp:656-657, A+DOWN fxEditRow(-1,true); cola U/L/R"),
     BIND(ACTION_EDIT_PARAM_LEFT,
-         KEY_A | KEY_LEFT, KEY_UP | KEY_DOWN | KEY_RIGHT | KEY_L2 | KEY_R2,
-         "MixerView.cpp:663-665, A+LEFT fxEditRow(-1,false)"),
+         KEY_A | KEY_LEFT, KEY_L2 | KEY_R2,
+         "MixerView.cpp:658-659, A+LEFT fxEditRow(-1,false); cola U/D/R"),
     BIND(ACTION_EDIT_PARAM_RIGHT,
-         KEY_A | KEY_RIGHT, KEY_UP | KEY_DOWN | KEY_LEFT | KEY_L2 | KEY_R2,
-         "MixerView.cpp:663-665, A+RIGHT fxEditRow(1,false)"),
+         KEY_A | KEY_RIGHT, KEY_L2 | KEY_R2,
+         "MixerView.cpp:659-660, A+RIGHT fxEditRow(1,false); cola U/D/L"),
 
-    /* Flechas solas: UP/DOWN mueven fila, LEFT/RIGHT editan. */
+    /* Flechas solas: UP/DOWN mueven fila, LEFT/RIGHT editan. Single-fire:
+     * cada rama RETORNA, asi que solo dispara la primera en orden
+     * U > D > L > R (el binding debe seguirlas en ese orden). START NO se
+     * prohibe: en paginas FX las flechas retornan ANTES que START.
+     * R1/R2/L2/SELECT retornan antes SIEMPRE -> se prohiben. */
     BIND(ACTION_ROW_UP,
-         KEY_UP, KEY_DOWN | KEY_A | KEY_L2 | KEY_R2 | KEY_START,
-         "MixerView.cpp:666-668, UP fxMoveRow(-1); START+flecha dual-fire"),
+         KEY_UP, KEY_A | KEY_L2 | KEY_R2 | KEY_R1 | KEY_SELECT,
+         "MixerView.cpp:662, UP fxMoveRow(-1) (single-fire, UP gana)"),
     BIND(ACTION_ROW_DOWN,
-         KEY_DOWN, KEY_UP | KEY_A | KEY_L2 | KEY_R2 | KEY_START,
-         "MixerView.cpp:666-668, DOWN fxMoveRow(1)"),
+         KEY_DOWN, KEY_A | KEY_L2 | KEY_R2 | KEY_R1 | KEY_SELECT,
+         "MixerView.cpp:663, DOWN fxMoveRow(1) (single-fire)"),
     BIND(ACTION_EDIT_PARAM_LEFT,
-         KEY_LEFT, KEY_RIGHT | KEY_A | KEY_L2 | KEY_R2 | KEY_START,
-         "MixerView.cpp:669, LEFT fxEditRow(-1,false)"),
+         KEY_LEFT, KEY_A | KEY_L2 | KEY_R2 | KEY_R1 | KEY_SELECT,
+         "MixerView.cpp:664, LEFT fxEditRow(-1,false) (single-fire)"),
     BIND(ACTION_EDIT_PARAM_RIGHT,
-         KEY_RIGHT, KEY_LEFT | KEY_A | KEY_L2 | KEY_R2 | KEY_START,
-         "MixerView.cpp:670, RIGHT fxEditRow(1,false)"),
-
+         KEY_RIGHT, KEY_A | KEY_L2 | KEY_R2 | KEY_R1 | KEY_SELECT,
+         "MixerView.cpp:665, RIGHT fxEditRow(1,false) (single-fire)"),
+    /* START puro (o con B/L1/X/Y que no abortan): onStart. A prohibido:
+     * el bloque A retorna antes y consumiria START sin accion (con o sin
+     * B). R1/R2/L2/SELECT retornan antes -> prohibidos. */
     BIND(ACTION_PLAY_STOP,
-         KEY_START, 0,
-         "MixerView.cpp:671, START onStart()"),
+         KEY_START, KEY_A | KEY_R1 | KEY_R2 | KEY_L2 | KEY_SELECT,
+         "MixerView.cpp:671, START onStart() (solo cuando no hay flechas)"),
 };
 
 /* ------------------------------------------------------------------ */

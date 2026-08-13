@@ -24,8 +24,16 @@ terminan ademas con validacion en consola real.
   MIPS OK; consola: MAIN/TRIM/PITCH OK; crash/freeze one-shot del primer
   edit destructivo en frio NO es regresion F1b: mismos callsites que el
   golden, solo el 1er intento tras arranque, sospecha de contencion
-  daemon/SD en frio; A/B contra golden pendiente de confirmar). Pendiente
-  F1b: migrar MixerView y AppWindow con la misma equivalencia.
+  daemon/SD en frio; A/B contra golden pendiente de confirmar). F1b Mixer
+  cerrado (commit pendiente: catalogo CTX_MIXER/CTX_MIXER_FX ampliado con
+  SELECT/R1(B>A>UP>START)/R2/L2/L1+A y filas FX single-fire; enumerador
+  exhaustivo mixer_golden_enum: 32768 combos, 0 mismatches contra el modelo
+  golden de MixerView.cpp:534-697; gateway masterSelected_ verificado
+  (1538 mascaras); wiring de processNormalButtonMask despachado via
+  ChordResolver con colas multi-fire; build MIPS OK; auditoria
+  AUDIT_CLEAN_MAIN_U2523_OK; consola: protocolo 7 pasos MIX/FX todo OK).
+  Pendiente F1b: migrar AppWindow (CTX_GLOBAL, regla V16 L1+R1+X con
+  historia de hombros) para cerrar F1b.
 
 ## F2 - Politica de menus formal + NavigationController
 - Documentar el lenguaje de menus vigente (titulo centrado + bloque

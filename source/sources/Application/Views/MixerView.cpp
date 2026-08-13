@@ -12,6 +12,7 @@
 #include "Application/Utils/fixed.h"
 #include "Application/Utils/char.h"
 #include "Application/AppWindow.h"
+#include "Application/UI/Input/ChordResolver.h"
 #if defined(PLATFORM_TREEFROG)
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
 #endif
@@ -533,167 +534,219 @@ void MixerView::ProcessButtonMask(unsigned short mask,bool pressed) {
 
 void MixerView::processNormalButtonMask(unsigned int mask) {
 
-	// TREEFROG_FX_PAGES_V1 (Fase 4.3):
-	// SELECT cycles MIX -> DELAY -> REVERB -> MASTER -> MIX.  On the
-	// parameter pages UP/DOWN moves the row cursor and LEFT/RIGHT edits the
-	// value; on the MIX page the classic channel/master behaviour applies.
-	if (mask&EPBM_SELECT) {
-		cycleFxPage() ;
-		return ;
-	}
+	// F1b input policy (REFACTOR_ROADMAP_ES.md): el input se resuelve contra
+	// el catalogo dorado (ActionMap.cpp) con el contexto de la pagina actual
+	// (MIX vs DELAY/REVERB/EQ/COMP). La tabla transcribe 1:1 el orden y las
+	// condiciones de esta funcion en Bacon 1.2.1 (MixerView.cpp:534-697;
+	// p.ej. la rama `mask&EPBM_SELECT` del golden es el binding
+	// ACTION_CYCLE_FX_PAGE); el dispatch llama a los mismos metodos y
+	// respeta las colas multi-fire.
+	using namespace UI::Input ;
+	const PadMask pad=(PadMask)mask ;  /* los bits EPBM_* espejan PhysicalKey */
+	const ContextId ctx=(fxPage_==FX_PAGE_MIX)?CTX_MIXER:CTX_MIXER_FX ;
+	const ActionId action=ChordResolver_Resolve(pad,ctx) ;
 
-	// R1 modifier: keep the port-wide convention.
-	// R1+B toggles mute on the selected channel.
-	// R1+A toggles Solo on the selected channel
-	// (TREEFROG_MIXER_SOLO_V1: solo follows the hovered channel bar).
-	if (mask&EPBM_R) {
-		if (mask&EPBM_B) {
+	switch (action) {
+		case ACTION_CYCLE_FX_PAGE:
+			cycleFxPage() ;
+			return ;
+		case ACTION_TOGGLE_MUTE:
 			toggleMute() ;
 			return ;
-		}
-		if (mask&EPBM_A) {
+		case ACTION_TOGGLE_SOLO:
 			switchSoloMode() ;
 			return ;
-		}
-		if (mask&EPBM_UP) {
-			ViewType vt=VT_SONG;
-			ViewEvent ve(VET_SWITCH_VIEW,&vt) ;
-			SetChanged();
-			NotifyObservers(&ve) ;
-		}
-		if (mask&EPBM_START) {
+		case ACTION_SWITCH_VIEW_SONG:
+			/* MixerView.cpp:558-563, R1+UP VT_SONG; cola +START onStop. */
+			{
+				ViewType vt=VT_SONG;
+				ViewEvent ve(VET_SWITCH_VIEW,&vt) ;
+				SetChanged();
+				NotifyObservers(&ve) ;
+			}
+			if (pad&KEY_START) onStop() ;
+			return ;
+		case ACTION_STOP:
 			onStop() ;
-		}
-		return ;
-	}
-
-	// R2 modifier: opens the instrument FX menu for the hovered channel bar
-	// (TREEFROG_MIXER_FX_MENU_V2: FX apply to the whole instrument).
-	if (mask&EPBM_R2) {
-		if (mask&EPBM_A) {
+			return ;
+		case ACTION_OPEN_INSTRUMENT_FX:
 			showInstrumentFxMenu() ;
 			return ;
-		}
-		// R2 alone cycles the MIX-page edit target:
-		// VOL -> DLY RET -> RVB RET (TREEFROG_FX_PAGES_V3, Fase 9).
-		if (fxPage_==FX_PAGE_MIX) {
+		case ACTION_CYCLE_FX_EDIT_TARGET:
+			/* MixerView.cpp:579-583: ciclo VOL -> DLY RET -> RVB RET. */
 			fxEditTarget_=(fxEditTarget_+1)%3 ;
 			isDirty_=true ;
 			((AppWindow &)w_).SetDirty() ;
-		}
-		return ;
-	}
-
-	// TREEFROG_MIXER_PAN_V1 (Bacon 1.1.1):
-	// L2+LEFT/RIGHT pans the selected channel (L2+A adds the A coarse-step
-	// convention, so L2+A+LEFT/RIGHT moves by 10).  The master bar has no
-	// pan; L2 alone does nothing.
-	// TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1):
-	// L2+A+B (pure chord) resets the pan to center (C) in one press.
-	if (mask&EPBM_L2) {
-		if (masterSelected_) return ;
-		if ((mask&EPBM_A) && (mask&EPBM_B) &&
-		    !(mask & (EPBM_LEFT | EPBM_RIGHT | EPBM_UP | EPBM_DOWN |
-		              EPBM_L | EPBM_R | EPBM_X | EPBM_Y |
-		              EPBM_SELECT | EPBM_START))) {
-			Mixer *mixer=Mixer::GetInstance() ;
-			int channel=viewData_->mixerCol_ ;
-			pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel),0.0f) ;
-			mixer->SetChannelPan(channel,0) ;
-			isDirty_=true ;
-			((AppWindow &)w_).SetDirty() ;
 			return ;
-		}
-		int step=(mask&EPBM_A)?10:1 ;
-		if (mask&EPBM_LEFT) {
+		case ACTION_RESET_PAN:
+			/* Bloque L2 del golden: masterSelected_ aborta ANTES de todo.
+			 * (MixerView.cpp:594; el enumerador mixer_golden_enum verifica
+			 * que todas las mascaras L2 resuelvan acciones de pan.) */
+			if (masterSelected_) return ;
+			{
+				Mixer *mixer=Mixer::GetInstance() ;
+				int channel=viewData_->mixerCol_ ;
+				pushMixUndo(ME_PAN,channel,(float)mixer->GetChannelPan(channel),0.0f) ;
+				mixer->SetChannelPan(channel,0) ;
+				isDirty_=true ;
+				((AppWindow &)w_).SetDirty() ;
+			}
+			return ;
+		case ACTION_PAN_NUDGE_LEFT:
+		case ACTION_PAN_NUDGE_LEFT_COARSE: {
+			if (masterSelected_) return ;
 			Mixer *mixer=Mixer::GetInstance() ;
 			int channel=viewData_->mixerCol_ ;
 			int oldPan=mixer->GetChannelPan(channel) ;
+			int step=(action==ACTION_PAN_NUDGE_LEFT_COARSE)?10:1 ;
 			mixer->NudgeChannelPan(channel,-step) ;
 			pushMixUndo(ME_PAN,channel,(float)oldPan,
 			            (float)mixer->GetChannelPan(channel)) ;
 			isDirty_=true ;
 			return ;
 		}
-		if (mask&EPBM_RIGHT) {
+		case ACTION_PAN_NUDGE_RIGHT:
+		case ACTION_PAN_NUDGE_RIGHT_COARSE: {
+			if (masterSelected_) return ;
 			Mixer *mixer=Mixer::GetInstance() ;
 			int channel=viewData_->mixerCol_ ;
 			int oldPan=mixer->GetChannelPan(channel) ;
+			int step=(action==ACTION_PAN_NUDGE_RIGHT_COARSE)?10:1 ;
 			mixer->NudgeChannelPan(channel,step) ;
 			pushMixUndo(ME_PAN,channel,(float)oldPan,
 			            (float)mixer->GetChannelPan(channel)) ;
 			isDirty_=true ;
 			return ;
 		}
-		return ;
-	}
-
-	// TREEFROG_MIXER_ACTION_MENU_V1 (Bacon 1.1.1 V13): L1+A (pure chord)
-	// opens the master/track action menu.  Master bar: limiter (softclip),
-	// clip gain, FX page jumps.  Channel bar: instrument section jumps
-	// (FILTER/BITCRUSHER/PLAYBACK/FX SENDS/AUTOMATION).
-	if ((mask&EPBM_L) && (mask&EPBM_A) &&
-	    !(mask & (EPBM_LEFT | EPBM_RIGHT | EPBM_UP | EPBM_DOWN |
-	              EPBM_R | EPBM_L2 | EPBM_R2 | EPBM_X | EPBM_Y |
-	              EPBM_SELECT | EPBM_START))) {
-		DoModal(new MixerActionMenuModal(*this),
-		        MixerActionMenuApplyCallback) ;
-		return ;
-	}
-
-	// Parameter pages (DELAY/REVERB/EQ/COMP): UP/DOWN row, LEFT/RIGHT edit.
-	if (fxPage_!=FX_PAGE_MIX) {
-		// TREEFROG_FX_NAV_A_B_DEFAULT_V1: A+B restores the hovered row to its
-		// legacy default (checked before the arrow edits so it wins the mask).
-		if ((mask&EPBM_A) && (mask&EPBM_B) &&
-		    !(mask & (EPBM_LEFT | EPBM_RIGHT | EPBM_UP | EPBM_DOWN |
-		              EPBM_L | EPBM_R | EPBM_L2 | EPBM_R2 |
-		              EPBM_X | EPBM_Y | EPBM_SELECT | EPBM_START))) {
+		case ACTION_OPEN_MENU:
+			DoModal(new MixerActionMenuModal(*this),
+			        MixerActionMenuApplyCallback) ;
+			return ;
+		case ACTION_RESET_PARAMETER:
 			fxResetRow() ;
 			return ;
-		}
-		if (mask&EPBM_A) {
-			if (mask&EPBM_UP) fxEditRow(1,true) ;
-			if (mask&EPBM_DOWN) fxEditRow(-1,true) ;
-			if (mask&EPBM_LEFT) fxEditRow(-1,false) ;
-			if (mask&EPBM_RIGHT) fxEditRow(1,false) ;
+		/* Bloque A de paginas FX (multi-fire U,D,L,R: cuando se resuelve
+		 * EDIT_PARAM_* con cola, ni UP/DOWN anteriores estan presentes:
+		 * el orden de la tabla U>D>L>R ya los resolvio). */
+		case ACTION_EDIT_PARAM_UP:
+			fxEditRow(1,true) ;
+			if (pad&KEY_DOWN) fxEditRow(-1,true) ;
+			if (pad&KEY_LEFT) fxEditRow(-1,false) ;
+			if (pad&KEY_RIGHT) fxEditRow(1,false) ;
+			return ;
+		case ACTION_EDIT_PARAM_DOWN:
+			fxEditRow(-1,true) ;
+			if (pad&KEY_LEFT) fxEditRow(-1,false) ;
+			if (pad&KEY_RIGHT) fxEditRow(1,false) ;
+			return ;
+		case ACTION_EDIT_PARAM_LEFT:
+			if (pad&KEY_A) {
+				fxEditRow(-1,false) ;
+				if (pad&KEY_RIGHT) fxEditRow(1,false) ;
+				return ;
+			}
+			fxEditRow(-1,false) ;
+			return ;
+		case ACTION_EDIT_PARAM_RIGHT:
+			if (pad&KEY_A) {
+				fxEditRow(1,false) ;
+				return ;
+			}
+			fxEditRow(1,false) ;
+			return ;
+		/* Filas de paginas FX: single-fire (la primera flecha en orden
+		 * U>D>L>R retorna; las demas nunca disparan). */
+		case ACTION_ROW_UP:
+			fxMoveRow(-1) ; return ;
+		case ACTION_ROW_DOWN:
+			fxMoveRow(1) ; return ;
+		case ACTION_PLAY_STOP:
+			/* Pagina MIX: START del bloque base (cola L,R,U,D multi-fire).
+			 * Paginas FX: START puro (las flechas ya se resolvieron antes,
+			 * nunca llegan aqui). */
+			onStart() ;
+			if (pad&KEY_LEFT) updateCursor(-1,0) ;
+			if (pad&KEY_RIGHT) updateCursor(1,0) ;
+			if (pad&KEY_UP) updateVolume(1) ;
+			if (pad&KEY_DOWN) updateVolume(-1) ;
+			return ;
+		/* Bloques A y L1 de la pagina MIX (multi-fire U,D,L,R; A gana a
+		 * L1: cuando la tabla resuelve VOLUME_COARSE_* con A presente la
+		 * rama es la A, si no es la L1). */
+		case ACTION_VOLUME_COARSE_UP: {
+			updateVolume(10) ;
+			if (pad&KEY_DOWN) updateVolume(-10) ;
+			if (pad&KEY_A) {
+				if (pad&KEY_LEFT) updateVolume(-1) ;
+				if (pad&KEY_RIGHT) updateVolume(1) ;
+			} else {
+				if (pad&KEY_LEFT) updateCursor(-1,0) ;
+				if (pad&KEY_RIGHT) updateCursor(1,0) ;
+			}
 			return ;
 		}
-		if (mask&EPBM_UP) { fxMoveRow(-1) ; return ; }
-		if (mask&EPBM_DOWN) { fxMoveRow(1) ; return ; }
-		if (mask&EPBM_LEFT) { fxEditRow(-1,false) ; return ; }
-		if (mask&EPBM_RIGHT) { fxEditRow(1,false) ; return ; }
-		if (mask&EPBM_START) onStart() ;
-		return ;
-	}
-
-	// A modifier: value edits, matching the port editing convention.
-	// A+UP/DOWN changes by 10, A+LEFT/RIGHT changes by 1.
-	if (mask&EPBM_A) {
-		if (mask&EPBM_UP) updateVolume(10) ;
-		if (mask&EPBM_DOWN) updateVolume(-10) ;
-		if (mask&EPBM_LEFT) updateVolume(-1) ;
-		if (mask&EPBM_RIGHT) updateVolume(1) ;
-		return ;
-	}
-
-	// L modifier remains a secondary coarse edit path for compatibility.
-	if (mask&EPBM_L) {
-		if (mask&EPBM_UP) updateVolume(10) ;
-		if (mask&EPBM_DOWN) updateVolume(-10) ;
-		if (mask&EPBM_LEFT) updateCursor(-1,0) ;
-		if (mask&EPBM_RIGHT) updateCursor(1,0) ;
-		return ;
-	}
-
-	// No modifier.
-	if (mask&EPBM_START) {
-		onStart() ;
-	}
-	if (mask&EPBM_LEFT) updateCursor(-1,0) ;
-	if (mask&EPBM_RIGHT) updateCursor(1,0) ;
-	if (mask&EPBM_UP) updateVolume(1) ;
-	if (mask&EPBM_DOWN) updateVolume(-1) ;
+		case ACTION_VOLUME_COARSE_DOWN: {
+			updateVolume(-10) ;
+			if (pad&KEY_A) {
+				if (pad&KEY_LEFT) updateVolume(-1) ;
+				if (pad&KEY_RIGHT) updateVolume(1) ;
+			} else {
+				if (pad&KEY_LEFT) updateCursor(-1,0) ;
+				if (pad&KEY_RIGHT) updateCursor(1,0) ;
+			}
+			return ;
+		}
+		/* A+LEFT/RIGHT: cola LEFT->RIGHT para FINE_DECREASE (el orden de
+		 * la tabla U>D>L>R garantiza que ni UP ni DOWN estan presentes). */
+		case ACTION_VOLUME_FINE_DECREASE:
+			updateVolume(-1) ;
+			if (pad&KEY_RIGHT) updateVolume(1) ;
+			return ;
+		case ACTION_VOLUME_FINE_INCREASE:
+			updateVolume(1) ;
+			return ;
+		/* Bloque base (sin modificador). MIX_CURSOR_* llega de la rama L1
+		 * (L1+flecha, cola U/D grueso + R/L) o de la base (flecha sola,
+		 * cola R/U/D fino); se distingue por la mascara. */
+		case ACTION_MIX_CURSOR_LEFT: {
+			if (pad&KEY_L1) {
+				if (pad&KEY_UP) updateVolume(10) ;
+				if (pad&KEY_DOWN) updateVolume(-10) ;
+				updateCursor(-1,0) ;
+				if (pad&KEY_RIGHT) updateCursor(1,0) ;
+			} else {
+				updateCursor(-1,0) ;
+				if (pad&KEY_RIGHT) updateCursor(1,0) ;
+				if (pad&KEY_UP) updateVolume(1) ;
+				if (pad&KEY_DOWN) updateVolume(-1) ;
+			}
+			return ;
+		}
+		case ACTION_MIX_CURSOR_RIGHT: {
+			if (pad&KEY_L1) {
+				if (pad&KEY_UP) updateVolume(10) ;
+				if (pad&KEY_DOWN) updateVolume(-10) ;
+				if (pad&KEY_LEFT) updateCursor(-1,0) ;
+				updateCursor(1,0) ;
+			} else {
+				if (pad&KEY_LEFT) updateCursor(-1,0) ;
+				updateCursor(1,0) ;
+				if (pad&KEY_UP) updateVolume(1) ;
+				if (pad&KEY_DOWN) updateVolume(-1) ;
+			}
+			return ;
+		}
+		case ACTION_VOLUME_FINE_UP:
+			updateVolume(1) ;
+			if (pad&KEY_DOWN) updateVolume(-1) ;
+			return ;
+		case ACTION_VOLUME_FINE_DOWN:
+			if (pad&KEY_UP) updateVolume(1) ;
+			updateVolume(-1) ;
+			return ;
+		case ACTION_NONE:
+			return ;
+	} ;
 } ;
 
 // TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1):
