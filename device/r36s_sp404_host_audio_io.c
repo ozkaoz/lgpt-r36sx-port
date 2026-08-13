@@ -942,16 +942,32 @@ static int ring_pop_frame(unsigned ch, int16_t *frm) {
 #define ASRC_STAGE_FRAMES 8192U
 #define ASRC_TARGET_BACKLOG_FRAMES 3600U
 #define ASRC_PRIME_BACKLOG_FRAMES 3600U
-#define ASRC_MAX_CORRECTION_PPM 30000
+/* H43: the audible Sampler pitch shift came from the control step swinging
+ * up to +/-1% (30000 ppm clamped) while the producer bursts were shoveled
+ * through the ring every ~2 s.  1200 ppm = 0.12% = ~2 cents, inaudible, and
+ * still three times the observed steady-state ratio offset (~-311 ppm). */
+#define ASRC_MAX_CORRECTION_PPM 1200
 #define ASRC_INTEGRAL_LIMIT_PPM 30000
 #define ASRC_PROPORTIONAL_GAIN 6000
 #define ASRC_INTEGRAL_GAIN 120
+/* H43: hold floor.  Never render the ring below this backlog; the pre-H43
+ * loop drained source_frames to zero at the device's pace, so the SP404's
+ * ADAPTIVE input underran every ~2 s and the device stalled after ~60 s
+ * (SP404_REENUM_ATTEMPT treadmill).  With the floor the stream idles at
+ * ~2400-3600 frames instead of starving to empty. */
+#define ASRC_HOLD_FLOOR_FRAMES 2400U
 static int16_t asrc_stage[ASRC_STAGE_FRAMES * 2U];
 static unsigned asrc_stage_frames = 0U;
 static uint64_t asrc_phase_q32 = 0ULL;
 static int asrc_stage_primed = 0;
 static int asrc_step_ppm = 0;
 static int asrc_integral_ppm = 0;
+/* H43: EMA of the measured backlog used by the PI controller.  The raw
+ * backlog swings by thousands of frames every ~2 s because the core pushes
+ * its H40 pending buffer in large bursts; feeding that into P kept the
+ * control loop slamming between the +/-limits instead of locking the real
+ * ratio (~-311 ppm).  15/16 blend = ~160 ms time constant. */
+static int asrc_ctrl_ema = 0;
 static unsigned asrc_backlog_min = 0xffffffffU;
 static unsigned asrc_backlog_max = 0U;
 static unsigned long long asrc_output_frames = 0ULL;
@@ -965,6 +981,7 @@ static void asrc_source_reset(void) {
     asrc_stage_primed = 0;
     asrc_step_ppm = 0;
     asrc_integral_ppm = 0;
+    asrc_ctrl_ema = 0;
     asrc_backlog_min = 0xffffffffU;
     asrc_backlog_max = 0U;
 }
@@ -1007,7 +1024,11 @@ static uint64_t asrc_nominal_step_q32(void) {
 static void asrc_update_step(void) {
     const unsigned target = ASRC_TARGET_BACKLOG_FRAMES;
     const unsigned backlog = asrc_total_backlog();
-    const int error = (int)backlog - (int)target;
+    /* H43: feed the smoothed backlog to the controller.  The plain backlog
+     * also keeps the min/max diagnostics honest. */
+    if (asrc_ctrl_ema == 0) asrc_ctrl_ema = (int)target;
+    asrc_ctrl_ema = (asrc_ctrl_ema * 15 + (int)backlog) / 16;
+    const int error = asrc_ctrl_ema - (int)target;
     const int dead = (int)(target / 8U);
     int proportional;
     int desired;
@@ -1056,6 +1077,14 @@ static int asrc_prepare_period(unsigned out_frames, uint64_t *step_out) {
     if (!asrc_stage_primed) {
         if (asrc_stage_append() == 0U || asrc_stage_frames <= ASRC_FIR_LOOKAHEAD)
             return 0;
+    } else if (asrc_total_backlog() < ASRC_HOLD_FLOOR_FRAMES) {
+        /* H43 HOLD FLOOR: never render below the floor.  The pre-H43 loop
+         * starved to zero on every producer burst trough and the SP404's
+         * ADAPTIVE endpoint underran until the device stalled at ~60 s.
+         * Holding here forwards a zero period (the caller zero-fills and
+         * skips phase advance), which the device tolerates far longer than
+         * running dry. */
+        return 0;
     }
     asrc_update_step();
     step = asrc_step_q32();
@@ -2916,6 +2945,32 @@ int main(int argc, char **argv) {
                     fprintf(stderr,
                             "SP404_REENUM_ATTEMPT rc=%d stalled_ms=%llu count=%d\n",
                             rc, now_ms - g_eio_storm_start_ms, g_reenum_count);
+                    /* H43 STALL RELEASE: gate and bookkeeping live in the
+                     * caller.  On a stalled device the attempted helpers were
+                     * observed to bail out before touching g_last_reenum_ms /
+                     * g_reenum_count, so the retry loop fired roughly every
+                     * 1.2 s forever with count=0, keeping the musb host role
+                     * locked and preventing any switch away from Sampler.
+                     * After 8 attempts the daemon exits; the SD supervisor
+                     * retries on its normal backoff and the host role is
+                     * released immediately, so Android/Windows accepts the
+                     * mode switch without the manual detour. */
+                    g_last_reenum_ms = monotonic_milliseconds();
+                    ++g_reenum_count;
+                    if (g_reenum_count >= 8) {
+                        fprintf(stderr,
+                                "SP404_REENUM_EXHAUSTED attempts=%d stalled_ms=%llu exiting daemon for supervisor backoff\n",
+                                g_reenum_count,
+                                now_ms - g_eio_storm_start_ms);
+                        write_text_file(PLAYBACK_PCM_STATUS,
+                                        "sp404-stall-exhausted\n");
+                        if (cap.active) stop_capture("daemon-stop");
+                        mark_inactive();
+                        fifo_dump_finish("stall-exhausted");
+                        if (in >= 0) close(in);
+                        if (keep >= 0) close(keep);
+                        return 3;
+                    }
                     sleep_ms(1200);
                     continue;
                 }

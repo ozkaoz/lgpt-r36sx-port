@@ -97,6 +97,11 @@ enum {
 };
 
 static int g_fifo_fd = -1;
+/* H43: path of the FIFO currently held by g_fifo_fd (device_out_fifo result).
+ * Used to reject a "fast apply" when the open FIFO belongs to a different
+ * device than the newly selected mode (e.g. SP404 FIFO still open while the
+ * user selects Windows).  Device FIFO path strings are static literals. */
+static const char *g_fifo_open_path = 0;
 static int g_setup_started = 0;
 static int g_setup_attempts = 0;
 static long long g_last_setup_attempt_ms = -1000000;
@@ -1192,6 +1197,7 @@ static void close_fifo_if_open(const char *why) {
     if (g_fifo_fd >= 0) {
         close(g_fifo_fd);
         g_fifo_fd = -1;
+        g_fifo_open_path = 0;
         g_resample_phase_160 = 0;
         g_resample_input_fill_frames = 0;
         g_fifo_pending_samples = 0;
@@ -1229,6 +1235,7 @@ static void ensure_fifo_open_nonblocking(void) {
         return;
     }
     g_android_fifo_miss_start_ms = 0;
+    g_fifo_open_path = out_fifo;
     log_msg("fifo opened");
 }
 
@@ -2024,6 +2031,24 @@ const char *TreeFrogUac2Bridge_GetDriverModeName(void) {
 #endif
 }
 
+/*
+ * H43 FIFO_MODE_COMPAT:
+ * A "fast apply" (pure core-routing switch) is only legal when the FIFO that
+ * is currently open belongs to the newly selected mode.  The Windows gadget
+ * contract can report ready while an open SP404 host FIFO is still active
+ * (SP404 daemon alive), and in the pre-H43 code the Windows fast-apply left
+ * the SP404 FIFO open, kept the SP404 daemon running and never ran the
+ * profile script -- the "Sampler -> Windows does not switch" report.
+ * Any mismatch forces the full apply path (profile script + supervisor
+ * handover), which tears the host role down and starts the target backend.
+ */
+static int fifo_compatible_with_mode(int mode) {
+    if (g_fifo_fd < 0) return 1;
+    if (mode == U241_LOCAL_CONSOLE) return 1;
+    if (g_fifo_open_path == 0) return 0;
+    return strcmp(g_fifo_open_path, kFifo) == 0;
+}
+
 const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
 #if TREEFROG_UAC2_BRIDGE
     if (!selectable_mode(mode)) return mode_name(mode);
@@ -2072,11 +2097,12 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
         close_fifo_if_open("fifo closed host-role apply");
         launch_apply_profile_once(effective);
         log_msg("driver mode host-role apply requested");
-    } else if (runtime_ready_fast()) {
+    } else if (runtime_ready_fast() && fifo_compatible_with_mode(g_driver_mode)) {
         if (g_driver_mode == U241_LOCAL_CONSOLE)
             close_fifo_if_open("fifo closed fast local-console switch");
         log_msg("driver mode fast apply runtime-ready");
     } else {
+        close_fifo_if_open("fifo closed full apply");
         launch_apply_profile_once(effective);
         log_msg("driver mode setup apply requested");
     }

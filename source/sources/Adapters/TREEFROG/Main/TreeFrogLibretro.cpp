@@ -19,6 +19,7 @@
 extern "C" void TreeFrogAppWindow_SynchronizeInputMask(
     unsigned short mask);
 #include <dirent.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -1150,6 +1151,16 @@ static void TreeFrogV51LogProjectRoot(const char *) {}
 
 void retro_init(void) {
     boot_diag_log("retro_init.enter");
+    /*
+     * H43 CRASH FIX: the USB bridge writes to the SP404/UAC2 FIFOs with a
+     * plain O_WRONLY fd.  Whenever the owning daemon is torn down between
+     * reads (mode switch, supervisor handover, device re-enumeration) the
+     * first write to a reader-less FIFO raises SIGPIPE and kills the core
+     * unless the signal is ignored.  The write() error paths already handle
+     * EPIPE/ENXIO/EBADF; disabling the signal turns the fatal race into a
+     * handled error, matching the daemons (which ignore SIGPIPE).
+     */
+    signal(SIGPIPE, SIG_IGN);
     memset(framebuffer, 0, sizeof(framebuffer));
     memset(audio_buffer, 0, sizeof(audio_buffer));
     reset_runtime_state(false);
