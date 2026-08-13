@@ -98,7 +98,10 @@ Ver tercer tramo F3 (no se toca en este commit; inventario completo alla).
   pitch/env + buffer builder).
 - F3-3 Chopper: `ChopperView` (dibujo) y `PreviewService` (playback),
   dejando `ChopperController` con la logica.
-- F3-4 Mixer: inventario, `MixerService` (paginas FX parametrizadas),
+- F3-4 Mixer: inventario, `FxPages` (paginas FX parametrizadas; el diseno
+  original la llamaba "MixerService" pero ese nombre ya lo ocupa el servicio
+  de audio DAW existente en Application/Mixer/MixerService.h, asi que la
+  capa pura se llama FxPages y vive en Application/Mixer/FxPages.h),
   `MixerMeters`, `FxNavigator`.
 - F3-5 Phrase: separar logica de grid/edicion del dibujo.
 - Cada tramo: host test + test estatico + audit + build + deploy + commit

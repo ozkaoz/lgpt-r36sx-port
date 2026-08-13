@@ -174,8 +174,29 @@ terminan ademas con validacion en consola real.
   pre-existente de device/*.c). Desplegado en SD (backup
   LGPT_BEFORE_U2523_20260813_174058; core en consola = build SHA
   a97a77e8). [VALIDADO EN CONSOLA]
+- [PENDIENTE] F3-4b: Mixer - MixerMeters (VU smoothing golden OnFrameUpdate,
+  half-cell records L/R) capa pura + F3-4c (menu L1+A / accion del Mixer
+  declarado).
 - [PENDIENTE] F3-4: Mixer (baseline en docs/F3_ARCHITECTURE_ES.md):
   MixerService, MixerMeters, FxNavigator.
+- [IMPLEMENTADO] F3-4a: FxPages - capa pura de las paginas FX parametrizadas
+  del Mixer (Application/Mixer/FxPages.h).  Los enums FxPage/FxParamId, la
+  tabla kFxParams_ (36 filas byte-identicas: DELAY 7, REVERB 7, EQ 13,
+  COMP 9), y los helpers puros fxBypassId/fxCountOnPage/fxRowForId/
+  fxIdForRow/fxIdOnPage/fxUsesCurve/fxEditCurveValue/mixVULevel/
+  fxReturnPercent/fxReturnFromPercent se extrajeron de MixerView.{h,cpp}
+  sin cambios de comportamiento; MixerView conserva su superficie publica
+  como delegados one-line.  Naming: el diseno original proponia "MixerService"
+  pero ese nombre ya lo usa el servicio de audio DAW
+  (Application/Mixer/MixerService.h), asi que la capa se llama FxPages.
+  Evidencia: tests/host/fx_pages_host_test.cpp (191 checks golden con
+  ASAN/UBSAN, runner tests/run_host_fx_pages.sh en audit.sh), MixerView.cpp
+  anadido al host_syntax_check, baselines FX (phase4/6/10/12/13/14/rc3/
+  ui_centered) actualizados al layout por capas + test_f3_4a_baseline.py.
+  Audit completo verde (AUDIT_CLEAN_MAIN_U2523_OK).  Build MIPS del core OK
+  sin diagnosticos en MixerView/FxPages (gate solo con deuda F7 pre-existente
+  de device/*.c).  Desplegado en SD (backup LGPT_BEFORE_U2523_20260813_180608;
+  core en consola = build SHA b17d07bd).
 - [PENDIENTE] F3-5: Phrase (baseline en docs/F3_ARCHITECTURE_ES.md):
   grid/edicion separados del dibujo.
 

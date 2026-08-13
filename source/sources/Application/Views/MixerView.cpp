@@ -206,6 +206,10 @@ void MixerActionMenuModal::ProcessButtonMask(unsigned short mask,
     }
 }
 
+// F3-4a: la tabla de parametros (kFxParams_), FxParamSpec, mixVULevel,
+// fxReturnPercent/fxReturnFromPercent y los helpers de navegacion/edicion
+// viven en Application/Mixer/FxPages.h (capa pura, sin GUI/audio).
+
 void MixerView::JumpToFxPage(FxPage page) {
     if (page < FX_PAGE_MIX || page >= FX_PAGE_COUNT) return ;
     fxPage_ = page ;
@@ -243,107 +247,11 @@ void MixerActionMenuApplyCallback(View &view, ModalView &dialog) {
 }
 
 // TREEFROG_FX_PAGES_PARAMS_V2 (PLAN_FX_REDESIGN_ES.md, Fase 6):
-// Parameter table for the DELAY / REVERB / EQ / COMP pages.  Each row exposes
-// a master-bus parameter as a float in natural units (ms, %, dB, Hz, s,
-// ratio).  The UI edits the float and the setter clamps to the documented
-// range; the DSP modules clamp again, so the page is always consistent.
-// Fase 6: the global SEND/RET rows were removed (sends are per-track /
-// per-instrument; returns are fixed 0.5 helpers), and the old MASTER page
-// was split into EQ and COMP so each fits the 8-line mixer screen.
-struct FxParamSpec {
-    const char *label ;        // short name shown on the page
-    FxPage page ;              // which page owns this row
-    float vmin ;               // minimum (natural units)
-    float vmax ;               // maximum (natural units)
-    float vdef ;               // legacy default (natural units), A+B restores
-    const char *fmt ;          // printf format for the value
-} ;
-
-static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
-    // DELAY page
-    { "DLY TIM", FX_PAGE_DELAY,   10.0f, 2000.0f,   0.0f,   "%5.0f" },  // FX_P_DLY_TIME (ms)
-    { "DLY FBK", FX_PAGE_DELAY,    0.0f,   0.98f,   0.0f,   "%5.2f" },  // FX_P_DLY_FBK
-    { "DLY MIX", FX_PAGE_DELAY,    0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_DLY_MIX
-    { "DLY WID", FX_PAGE_DELAY,    0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_DLY_WID
-    { "DLY P/P", FX_PAGE_DELAY,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_DLY_PP (0/1)
-    { "DLY SAT", FX_PAGE_DELAY,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_DLY_SAT (0/1)
-    { "DLY BYP", FX_PAGE_DELAY,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_DLY_BYP (0/1)
-    // REVERB page
-    // RC2 (point 3.1): the RVB MIX row was removed.  The reverb is wet-only
-    // (no dry/wet crossfade); the audible level is the instrument send + the
-    // Mixer REVERB RETURN (MIX page FX RETURNS), not an internal mix.
-    { "RVB PRE", FX_PAGE_REVERB,   0.0f, 100.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_PRE (ms)
-    { "RVB DEC", FX_PAGE_REVERB,   0.2f,   8.0f,    1.0f,   "%5.2f" },  // FX_P_RVB_DEC (s)
-    { "RVB SIZ", FX_PAGE_REVERB,   0.5f,   1.5f,    1.0f,   "%5.2f" },  // FX_P_RVB_SIZ
-    { "RVB DMP", FX_PAGE_REVERB,   0.0f,   1.0f,    0.5f,   "%5.2f" },  // FX_P_RVB_DMP
-    { "RVB WID", FX_PAGE_REVERB,   0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_RVB_WID
-    { "RVB MOD", FX_PAGE_REVERB,   0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_MODE (0/1)
-    { "RVB BYP", FX_PAGE_REVERB,   0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_RVB_BYP (0/1)
-    // EQ page (3 bands, dedicated banded menu - Fase 12).  Per band the rows
-    // are EN / FRQ / GAI / Q so UP/DOWN walks the band in the same visual
-    // order drawEqPage() renders.  Frequencies default to 100/1000/10000 Hz.
-    { "EQ  BYP", FX_PAGE_EQ,       0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_EQ_BYP
-    { "LO  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_LOW_EN
-    { "LO  FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,100.0f,  "%5.0f" },  // FX_P_EQ_LOW_FRQ
-    { "LO  GAI", FX_PAGE_EQ,      -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_LOW_GAI
-    { "LO  Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_LOW_Q
-    { "MID EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_MID_EN
-    { "MID FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,1000.0f, "%5.0f" },  // FX_P_EQ_MID_FRQ
-    { "MID GAI", FX_PAGE_EQ,      -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_MID_GAI
-    { "MID Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_MID_Q
-    { "HI  EN",  FX_PAGE_EQ,       0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQ_HI_EN
-    { "HI  FRQ", FX_PAGE_EQ,      20.0f, 20000.0f,10000.0f,"%5.0f" },  // FX_P_EQ_HI_FRQ
-    { "HI  GAI", FX_PAGE_EQ,      -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQ_HI_GAI
-    { "HI  Q",   FX_PAGE_EQ,       0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQ_HI_Q
-    // COMP page (dedicated menu - Fase 13: BYP first so it is never
-    // off-screen, then THR/RAT/KNE/ATK/REL/MKU/LNK/SC in the order
-    // drawCompPage() renders; the GR meter sits below the parameters).
-    { "CMP BYP", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_BYP
-    { "CMP THR", FX_PAGE_COMP,   -60.0f,   0.0f,  -24.0f,  "%5.1f" },  // FX_P_CMP_THR (dB)
-    { "CMP RAT", FX_PAGE_COMP,     1.0f,  20.0f,    4.0f,   "%5.1f" },  // FX_P_CMP_RAT
-    { "CMP KNE", FX_PAGE_COMP,     0.0f,  12.0f,    6.0f,   "%5.1f" },  // FX_P_CMP_KNE (dB)
-    { "CMP ATK", FX_PAGE_COMP,     0.1f, 500.0f,   15.0f,   "%5.1f" },  // FX_P_CMP_ATK (ms)
-    { "CMP REL", FX_PAGE_COMP,     1.0f, 2000.0f, 200.0f,   "%5.0f" },  // FX_P_CMP_REL (ms)
-    { "CMP MKU", FX_PAGE_COMP,     0.0f,  24.0f,    0.0f,   "%5.1f" },  // FX_P_CMP_MKU (dB)
-    { "CMP LNK", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_LINK
-    { "CMP SCL", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_SC (softclip)
-} ;
-
-// TREEFROG_MIXER_VU_DB_SCALE_V5 (Bacon 1.1.1):
-// DAW/VU-style rebased scale.  The displayed 0 dB row corresponds to the
-// typical loud output at volume 100 (measured ~-12 dBFS real peaks for loud
-// material on the normalized 0..1 peaks), so at volume 100 the bar genuinely
-// reaches the 0 dB row and strong material pushes into the red +3 dB zone
-// above it -- 0 dB is reachable, red means over 0 dB.  Displayed dB = real
-// dB + 12 on a -36..+3 span (39 dB): level = (db+36)/39 maps 0 dB to cell
-// 11 of 12 and +3 dB to the top cell, which is exactly where the fill turns
-// red (filledCells >= totalCells).  The V3 -50..0 scale was honest but made
-// red unreachable: loud material read 9/12 cells at volume 100 and the +3
-// zone did not exist.
-static float mixVULevel(float peak) {
-	if (peak <= 0.0f) return 0.0f ;
-	float db = 20.0f * log10f(peak) + 12.0f ;
-	float level = (db + 36.0f) / 39.0f ;
-	if (level < 0.0f) level = 0.0f ;
-	if (level > 1.0f) level = 1.0f ;
-	return level ;
-}
+// The parameter table, FxParamSpec, mixVULevel and the return converters
+// moved to FxPages.h in F3-4a (byte-identical golden; see
+// docs/REFACTOR_ROADMAP_ES.md F3-4a).
 
 // TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9):
-// Master FX returns are stored as fixed (Q15) 0..1 levels in FxEngine.
-// These helpers convert to/from the integer percent (0..100) the MIX page
-// edits, clamped so the value always round-trips.
-static int fxReturnPercent(fixed ret) {
-	float f=fp2fl(ret) ;
-	if (f<0.0f) f=0.0f ;
-	if (f>1.0f) f=1.0f ;
-	return (int)(f*100.0f+0.5f) ;
-}
-static fixed fxReturnFromPercent(int p) {
-	if (p<0) p=0 ;
-	if (p>100) p=100 ;
-	return fl2fp((float)p*0.01f) ;
-}
 void MixerView::nudgeDelayReturn(int delta) {
 	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
 	fx.SetDelayReturn(fxReturnFromPercent(fxReturnPercent(fx.GetDelayReturn())+delta)) ;
@@ -1206,57 +1114,35 @@ void MixerView::cycleFxPage() {
 	((AppWindow &)w_).SetDirty() ;
 }
 
+// F3-4a: fxIdOnPage/fxBypassId/fxCountOnPage/fxRowForId/fxIdForRow/
+// fxUsesCurve/fxEditCurveValue now live in FxPages.h (pure layer); the
+// mapping functions below delegate to it so MixerView keeps its exact
+// public surface.  TREEFROG_MASTER_BYPASS_FIRST_V1 (PLAN_RC3... point 7)
+// and TREEFROG_FX_EDIT_CURVE_V1 (Fase 12+14) comments moved with them.
 bool MixerView::fxIdOnPage(int id,FxPage page) const {
-	return kFxParams_[id].page==page ;
+	return ::fxIdOnPage(id,page) ;
 }
 
-// TREEFROG_MASTER_BYPASS_FIRST_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, point 7):
-// On DELAY/REVERB/EQ/COMP the BYPASS parameter is the FIRST visual and logical
-// row.  These helpers put the page Bypass at row 0 for navigation and drawing.
-// The underlying kFxParams_ table and FxParam enum stay byte-identical
-// (bit-identical persistence); only the row order changes.
 int MixerView::fxBypassId(FxPage page) const {
-	switch (page) {
-	case FX_PAGE_DELAY:  return FX_P_DLY_BYP ;
-	case FX_PAGE_REVERB: return FX_P_RVB_BYP ;
-	case FX_PAGE_EQ:     return FX_P_EQ_BYP ;
-	case FX_PAGE_COMP:   return FX_P_CMP_BYP ;
-	default:             return -1 ;
-	}
+	return ::fxBypassId(page) ;
 }
 
 int MixerView::fxCountOnPage(FxPage page) const {
-	int count=0 ;
-	for (int i=0;i<FX_PARAM_COUNT;i++) {
-		if (kFxParams_[i].page==page) count++ ;
-	}
-	return count ;
+	return ::fxCountOnPage(page) ;
 }
 
-// Ordered row position of a param on its page, with the page Bypass first.
 int MixerView::fxRowForId(int id) const {
-	FxPage page=kFxParams_[id].page ;
-	int byp=fxBypassId(page) ;
-	if (id==byp) return 0 ;
-	int row=1 ;
-	for (int i=0;i<id;i++) {
-		if (kFxParams_[i].page==page && i!=byp) row++ ;
-	}
-	return row ;
+	return ::fxRowForId(id) ;
 }
 
-// Inverse of fxRowForId: given a logical row (0 = bypass), return the param id.
 int MixerView::fxIdForRow(int row) const {
-	FxPage page=(FxPage)fxPage_ ;
-	int byp=fxBypassId(page) ;
-	if (byp>=0 && row==0) return byp ;
-	int seen=1 ;
-	for (int i=0;i<FX_PARAM_COUNT;i++) {
-		if (kFxParams_[i].page!=page || i==byp) continue ;
-		if (seen==row) return i ;
-		seen++ ;
-	}
-	return -1 ;
+	return ::fxIdForRow((FxPage)fxPage_,row) ;
+}
+
+void MixerView::fxEditCurve(int id,int delta,bool coarse) {
+	const FxParamSpec &spec=kFxParams_[id] ;
+	float v=fxGet(id) ;
+	fxSet(id,fxEditCurveValue(spec,v,delta,coarse)) ;
 }
 
 void MixerView::fxMoveRow(int delta) {
@@ -1270,51 +1156,14 @@ void MixerView::fxMoveRow(int delta) {
 }
 
 // TREEFROG_FX_EDIT_CURVE_V1 (PLAN_FX_REDESIGN_ES.md, Fase 12 + Fase 14):
-// Wide-range proportional parameters are edited on a musical/log curve, never
-// with a linear 1/10 step: fine (L/R) steps by one semitone (x2^(1/12)),
+// Wide-range proportional parameters are edited on a musical/log curve,
+// never with a linear 1/10 step: fine (L/R) steps by one semitone (x2^(1/12)),
 // coarse (A+UP/DOWN) by one octave (x2).  The relative error is constant, so
 // the whole range is traversable in a bounded number of presses and editing
 // stays musically meaningful.  Applies to EQ frequencies and to every other
 // wide-range time/ratio parameter (delay time, reverb pre-delay/decay,
-// compressor attack/release/ratio).
-static bool fxUsesCurve(int id) {
-	switch (id) {
-	case FX_P_EQ_LOW_FRQ:
-	case FX_P_EQ_MID_FRQ:
-	case FX_P_EQ_HI_FRQ:
-	case FX_P_DLY_TIME:
-	case FX_P_RVB_PRE:
-	case FX_P_RVB_DEC:
-	case FX_P_CMP_ATK:
-	case FX_P_CMP_REL:
-	case FX_P_CMP_RAT:
-		return true ;
-	default:
-		return false ;
-	}
-}
-void MixerView::fxEditCurve(int id,int delta,bool coarse) {
-	const FxParamSpec &spec=kFxParams_[id] ;
-	float v=fxGet(id) ;
-	// Values below the floor snap to it so proportional editing never
-	// multiplies zero (e.g. DLY TIM defaults to 0 while vmin is 10).  If the
-	// floor itself is 0 (e.g. RVB PRE), the first upward edit starts from 1%
-	// of the range instead of being stuck at 0.
-	if (delta>0) {
-		if (v<spec.vmin) v=spec.vmin ;
-		else if (v<=0.0f) v=(spec.vmax-spec.vmin)*0.01f ;
-	} else if (delta<0 && v>spec.vmax) {
-		v=spec.vmax ;
-	}
-	float factor=coarse?2.0f:1.05946309436f ;  // octave / semitone
-	if (delta<0) factor=1.0f/factor ;
-	int steps=delta<0?-delta:delta ;
-	for (int s=0;s<steps;s++) v*=factor ;
-	if (v<spec.vmin) v=spec.vmin ;
-	if (v>spec.vmax) v=spec.vmax ;
-	fxSet(id,v) ;
-}
-
+// compressor attack/release/ratio).  F3-4a: fxUsesCurve/fxEditCurveValue
+// moved to FxPages.h.
 void MixerView::fxEditRow(int delta,bool coarse) {
 	int targetId=fxIdForRow(fxRow_) ;
 	if (targetId<0) return ;

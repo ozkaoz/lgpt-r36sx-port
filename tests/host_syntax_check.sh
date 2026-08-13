@@ -30,6 +30,7 @@ FILES=(
   "$SOURCE/Application/Instruments/SamplePool.cpp"
   "$SOURCE/Application/Instruments/SampleVariable.cpp"
   "$SOURCE/Application/Views/ModalDialogs/SampleChopperModal.cpp"
+  "$SOURCE/Application/Views/MixerView.cpp"
   "$SOURCE/Application/Audio/AudioFileStreamer.cpp"
   "$SOURCE/Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.cpp"
 )

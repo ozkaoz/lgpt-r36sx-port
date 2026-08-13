@@ -326,6 +326,8 @@ def check_bypass_columns():
 # 11. DSP ranges / defaults / enum unchanged by the layout refactor
 # ---------------------------------------------------------------------------
 def check_dsp_table_unchanged():
+    # F3-4a: the FxParamSpec table + enums moved to FxPages.h.
+    FXP = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
     # The FxParamSpec table keeps every range/default (layout only changed).
     specs = [
         ("{ \"DLY TIM\"", "10.0f, 2000.0f"),
@@ -341,18 +343,18 @@ def check_dsp_table_unchanged():
         ("{ \"CMP REL\"", "1.0f, 2000.0f, 200.0f"),
     ]
     for label, rest in specs:
-        idx = MIX_CPP.index(label)
-        assert rest in MIX_CPP[idx:idx + 90], (label, rest)
+        idx = FXP.index(label)
+        assert rest in FXP[idx:idx + 90], (label, rest)
     # FxParamId enum order is unchanged (bypass last per page, band EN first).
-    e = MIX_H.index("enum FxParamId")
-    assert MIX_H.index("FX_P_DLY_BYP", e) > MIX_H.index("FX_P_DLY_TIME", e)
-    assert MIX_H.index("FX_P_RVB_BYP", e) > MIX_H.index("FX_P_RVB_PRE", e)
-    assert MIX_H.index("FX_P_EQ_LOW_EN", e) > MIX_H.index("FX_P_EQ_BYP", e)
-    assert MIX_H.index("FX_P_CMP_BYP", e) > MIX_H.index("FX_P_EQ_HI_Q", e)
-    assert MIX_H.index("FX_P_CMP_SC", e) > MIX_H.index("FX_P_CMP_BYP", e)
+    e = FXP.index("enum FxParamId")
+    assert FXP.index("FX_P_DLY_BYP", e) > FXP.index("FX_P_DLY_TIME", e)
+    assert FXP.index("FX_P_RVB_BYP", e) > FXP.index("FX_P_RVB_PRE", e)
+    assert FXP.index("FX_P_EQ_LOW_EN", e) > FXP.index("FX_P_EQ_BYP", e)
+    assert FXP.index("FX_P_CMP_BYP", e) > FXP.index("FX_P_EQ_HI_Q", e)
+    assert FXP.index("FX_P_CMP_SC", e) > FXP.index("FX_P_CMP_BYP", e)
     # Mixer FxPage order untouched.
-    assert MIX_H.index("FX_PAGE_MIX") < MIX_H.index("FX_PAGE_DELAY")
-    assert MIX_H.index("FX_PAGE_COMP") < MIX_H.index("FX_PAGE_COUNT")
+    assert FXP.index("FX_PAGE_MIX") < FXP.index("FX_PAGE_DELAY")
+    assert FXP.index("FX_PAGE_COMP") < FXP.index("FX_PAGE_COUNT")
     print("11. DSP ranges/defaults and FxParamId/FxPage enums unchanged OK")
 
 

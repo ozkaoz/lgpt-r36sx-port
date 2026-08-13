@@ -4,85 +4,11 @@
 #include "BaseClasses/View.h"
 #include "ViewData.h"
 #include "Application/Model/Song.h"
-
-// TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9):
-// MixerView page system for the master FX engine.  SELECT cycles
-// MIX -> DELAY -> REVERB -> EQ -> COMP -> MIX.  MIX keeps the per-channel
-// bars plus an FX RETURNS readout (master DLY/RVB return levels).  The
-// per-track DLY/RVB send readouts were removed in Fase 9: sends are
-// per-instrument now (edited in InstrumentView), and the per-track sends
-// survive only as the Fase 7 inheritance/compatibility layer.  R2 alone
-// cycles the MIX-page edit target VOL -> DLY RET -> RVB RET.  DELAY/REVERB/
-// EQ/COMP are parameter pages: UP/DOWN moves the row cursor, LEFT/RIGHT
-// edits the value, A+UP/DOWN coarse.  EQ exposes the 3-band parametric EQ,
-// COMP the compressor (Fase 6 splits the old single MASTER page in two so
-// each page fits the 8-line mixer screen without scrolling).
-enum FxPage {
-    FX_PAGE_MIX = 0,
-    FX_PAGE_DELAY,
-    FX_PAGE_REVERB,
-    FX_PAGE_EQ,
-    FX_PAGE_COMP,
-    FX_PAGE_COUNT
-};
-
-// Parameter rows available on the DELAY/REVERB/EQ/COMP pages (see
-// MixerView.cpp kFxParams_ and fxGet/fxSet).  Also used to size the cursor.
-// Fase 6: the global SEND/RET rows were removed from the DELAY/REVERB pages
-// (sends are now per-track / per-instrument; returns are fixed 0.5 helpers).
-enum FxParamId {
-    // DELAY
-    FX_P_DLY_TIME = 0,
-    FX_P_DLY_FBK,
-    FX_P_DLY_MIX,
-    FX_P_DLY_WID,
-    FX_P_DLY_PP,
-    FX_P_DLY_SAT,
-    FX_P_DLY_BYP,
-    // REVERB
-    // RC2 (point 3.1): the legacy RVB MIX row was removed from the UI.  The
-    // reverb is a true wet-only send/return processor now: RVB MIX no longer
-    // acts as a dry/wet control (the engine keeps reading/persisting it but it
-    // is inert), and the audible level is set by the instrument send + the
-    // Mixer REVERB RETURN.  The page shows PRE/DEC/SIZ/DMP/WID/MODE/BYP.
-    FX_P_RVB_PRE,
-    FX_P_RVB_DEC,
-    FX_P_RVB_SIZ,
-    FX_P_RVB_DMP,
-    FX_P_RVB_WID,
-    FX_P_RVB_MODE,
-    FX_P_RVB_BYP,
-    // EQ (3 bands, dedicated banded menu - Fase 12: bypass + enable/freq/
-    // gain/Q each; EN is first so UP/DOWN walks the band in the same visual
-    // order the EQ menu draws)
-    FX_P_EQ_BYP,
-    FX_P_EQ_LOW_EN,
-    FX_P_EQ_LOW_FRQ,
-    FX_P_EQ_LOW_GAI,
-    FX_P_EQ_LOW_Q,
-    FX_P_EQ_MID_EN,
-    FX_P_EQ_MID_FRQ,
-    FX_P_EQ_MID_GAI,
-    FX_P_EQ_MID_Q,
-    FX_P_EQ_HI_EN,
-    FX_P_EQ_HI_FRQ,
-    FX_P_EQ_HI_GAI,
-    FX_P_EQ_HI_Q,
-    // COMP
-    // COMP (dedicated menu - Fase 13: BYP first so it is never off-screen;
-    // THR/RAT/KNE/ATK/REL/MKU/LNK/SC follow in the same order the COMP menu
-    // draws them, with the GR meter below)
-    FX_P_CMP_BYP,
-    FX_P_CMP_THR,
-    FX_P_CMP_RAT,
-    FX_P_CMP_KNE,
-    FX_P_CMP_ATK,
-    FX_P_CMP_REL,
-    FX_P_CMP_MKU,
-    FX_P_CMP_LINK,
-    FX_P_CMP_SC,
-    FX_PARAM_COUNT
-};
+// F3-4a: capa pura de las paginas FX parametrizadas del Mixer.  Los enums
+// FxPage/FxParamId, la tabla kFxParams_ y los helpers de navegacion/edicion
+// viven en Application/Mixer/FxPages.h (sin dependencias de GUI/audio);
+// MixerView los consume directamente.
+#include "Application/Mixer/FxPages.h"
 
 class MixerView: public View {
 public:

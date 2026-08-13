@@ -76,12 +76,14 @@ def check_source_guards():
     # Window allows for the RC2 DELAY/REVERB dedicated-page dispatches that
     # now precede the COMP dispatch inside drawFxParamPage.
     assert "drawCompPage(pageTitle)" in MIX[idx:idx + 2400]
+    # F3-4a: the table rows and enums moved to FxPages.h.
+    fxp = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
     # BYP is the first COMP table row (never off-screen).
-    byp = MIX.index("{ \"CMP BYP\"")
-    thr = MIX.index("{ \"CMP THR\"")
+    byp = fxp.index("{ \"CMP BYP\"")
+    thr = fxp.index("{ \"CMP THR\"")
     assert byp < thr
     # BYP is the first COMP enum entry.
-    assert MIX_H.index("FX_P_CMP_BYP") < MIX_H.index("FX_P_CMP_THR")
+    assert fxp.index("FX_P_CMP_BYP") < fxp.index("FX_P_CMP_THR")
     # Centered labels + value column; the BYP row is at the top of the menu.
     assert "Bypass" in MIX and "Threshold" in MIX and "Ratio" in MIX
     assert "Stereo Link" in MIX and "Soft Clip" in MIX

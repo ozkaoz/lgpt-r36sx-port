@@ -121,7 +121,10 @@ def check_zero_floor_not_stuck():
 def check_source_guards():
     assert "void MixerView::fxEditCurve" in MIX
     assert "fxEditCurve" in MIX_H
-    assert "static bool fxUsesCurve" in MIX
+    # F3-4a: fxUsesCurve/fxEditCurveValue moved to FxPages.h.
+    fxp = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
+    assert "bool fxUsesCurve" in fxp
+    assert "fxEditCurveValue" in fxp
     # fxEditRow routes curve params through the curve editor.
     idx = MIX.index("void MixerView::fxEditRow")
     block = MIX[idx:idx + 1200]

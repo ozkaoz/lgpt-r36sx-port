@@ -43,16 +43,19 @@ APPW_H = (ROOT / "source/sources/Application/AppWindow.h").read_text()
 # Point 7: unified bypass on the four master pages
 # ---------------------------------------------------------------------------
 def check_bypass_first():
-    # Row helper: the page Bypass must resolve to logical row 0.
+    # F3-4a: row helpers + param table live in FxPages.h now.
+    FXP = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
     assert "fxBypassId" in MIX_H
     assert "fxIdForRow" in MIX_H
     assert "fxCountOnPage" in MIX_H
-    idx = MIX_CPP.index("int MixerView::fxBypassId")
-    assert "if (id==byp) return 0" in MIX_CPP[idx:idx + 900]
-    assert "FX_P_DLY_BYP" in MIX_CPP[idx:idx + 900]
-    assert "FX_P_RVB_BYP" in MIX_CPP[idx:idx + 900]
-    assert "FX_P_EQ_BYP" in MIX_CPP[idx:idx + 900]
-    assert "FX_P_CMP_BYP" in MIX_CPP[idx:idx + 900]
+    idx = FXP.index("inline int fxBypassId")
+    assert "FX_P_DLY_BYP" in FXP[idx:idx + 900]
+    assert "FX_P_RVB_BYP" in FXP[idx:idx + 900]
+    assert "FX_P_EQ_BYP" in FXP[idx:idx + 900]
+    assert "FX_P_CMP_BYP" in FXP[idx:idx + 900]
+    # fxRowForId keeps the bypass-first rule in the layer.
+    rowidx = FXP.index("fxRowForId")
+    assert "if (id==byp) return 0" in FXP[rowidx:rowidx + 500]
     # DELAY page label table starts with BYPASS.
     dl = MIX_CPP[MIX_CPP.index("void MixerView::drawDelayPage"):
                  MIX_CPP.index("void MixerView::drawReverbPage")]
@@ -64,8 +67,8 @@ def check_bypass_first():
     assert "\"BYPASS\",\"PREDELAY\"" in rv.replace("\n", "").replace(" ", "")
     assert "FX_P_RVB_BYP,FX_P_RVB_PRE" in rv.replace("\n", "").replace(" ", "")
     # EQ/COMP keep BYP first (already in the param table).
-    assert MIX_CPP.index("{ \"EQ  BYP\"") < MIX_CPP.index("{ \"LO  EN\"")
-    assert MIX_CPP.index("{ \"CMP BYP\"") < MIX_CPP.index("{ \"CMP THR\"")
+    assert FXP.index("{ \"EQ  BYP\"") < FXP.index("{ \"LO  EN\"")
+    assert FXP.index("{ \"CMP BYP\"") < FXP.index("{ \"CMP THR\"")
     print("bypass unified as first row on all four master pages OK")
 
 
@@ -95,16 +98,18 @@ def check_bypass_uidraw():
 
 
 def check_bypass_row_model():
+    # F3-4a: fxRowForId/fxIdForRow moved to FxPages.h.
+    FXP = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
     # Model: the row order puts bypass at 0 and preserves every other row.
     delay_ids = ["FX_P_DLY_TIME", "FX_P_DLY_FBK", "FX_P_DLY_MIX",
                  "FX_P_DLY_WID", "FX_P_DLY_PP", "FX_P_DLY_SAT"]
     reverb_ids = ["FX_P_RVB_PRE", "FX_P_RVB_DEC", "FX_P_RVB_SIZ",
                   "FX_P_RVB_DMP", "FX_P_RVB_WID", "FX_P_RVB_MODE"]
     # fxRowForId gives bypass row 0 and each later param row 1..n in order.
-    assert "return 0" in MIX_CPP[MIX_CPP.index("fxRowForId"):][:800]
-    assert "row=1" in MIX_CPP[MIX_CPP.index("fxRowForId"):][:800]
+    assert "return 0" in FXP[FXP.index("fxRowForId"):][:800]
+    assert "row=1" in FXP[FXP.index("fxRowForId"):][:800]
     # fxIdForRow maps row 0 back to the bypass id.
-    fh = MIX_CPP[MIX_CPP.index("int MixerView::fxIdForRow"):][:900]
+    fh = FXP[FXP.index("fxIdForRow"):][:900]
     assert "row==0) return byp" in fh
     print("bypass row model OK")
 
