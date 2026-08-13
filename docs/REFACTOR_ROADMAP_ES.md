@@ -108,9 +108,72 @@ terminan ademas con validacion en consola real.
   (tests/test_f3_2_baseline.py) + test_u2510_global_chop_history
   actualizado a la capa + audit. Build MIPS del core OK sin diagnosticos
   (el gate estricto solo reporta warnings pre-existentes de device/*.c,
-  deuda F7). [PENDIENTE VALIDACION CONSOLA]
-- [PENDIENTE] F3-3: ChopperView (dibujo) + PreviewService; queda
-  ChopperController con la logica.
+  deuda F7). [VALIDADO EN CONSOLA: undo/redo, pitch/env y destructivos OK
+  dentro de la validacion del build F3-3 completo]
+- [IMPLEMENTADO 1a1e641] F3-3a: PreviewService (rango de preview y
+  play/trim/playback-range golden) + ChopperView (geometria zoom/cursor/
+  waveform golden) extraidos del SampleChopperModal como capas puras
+  header-only. La vista conserva audio (Player::*Streaming), mensajes de
+  estado, overlay (g_chopper*) y API publica; los algoritmos golden viven
+  en las capas. Deactivate() anadido por el golden del pitch preview
+  (solo apaga active, conserva start/end). Evidencia: host tests de
+  equivalencia golden bajo ASAN/UBSAN (tests/host/preview_service_
+  host_test.cpp 740 checks + chopper_view_host_test.cpp 452503 checks),
+  baseline estatico (tests/test_f3_3a_baseline.py) + audit. [VALIDADO EN
+  CONSOLA]
+- [IMPLEMENTADO 096fbef] F3-3b: el dibujo textual del chopper (grilla
+  40x30 de celdas con invert/color) se extrae a ChopperView (capa pura):
+  ChopperGrid (Clear/SetText con recorte/SetInvert), DrawTopBar, DrawFrame
+  (marco solid celda CD_BORDER, sin ASCII), DrawEmptyWaveformText,
+  DrawControls (main/trim), DrawPitchHints y los compositors golden
+  (pitch header/labels/valores, sample info, name/frame, operation
+  status/percent). La vista conserva posiciones reales (MenuLayout),
+  colores, titulo PITCH/ENV, audio, estado y overlay; solo drena la grilla
+  (drainChopperGrid: SetColor/DrawString reales, 1 celda por llamada con
+  misma semantica de invert/color que el golden). Evidencia: host test de
+  equivalencia golden (tests/host/chopper_draw_host_test.cpp, 5222 checks
+  ASAN/UBSAN, oraculos snprintf y grids campo a campo), baseline estatico
+  (tests/test_f3_3b_baseline.py: literales sin duplicar en la vista),
+  test_rc3 actualizados al layout por capas (placeholder y marco viven en
+  la capa pura) + audit. Build MIPS del core OK sin diagnosticos (gate
+  solo con deuda F7 pre-existente de device/*.c). [VALIDADO EN CONSOLA]
+- Bug reportado (mismo tratamiento que el crash del chopper): lag del
+  driver Windows USB Audio durante la prueba en consola del build F3-3
+  (core 62cdc6ba desplegado en SD, backup
+  LGPT_BEFORE_U2523_20260813_171423). Sintoma: lag pequeno/intermitente en
+  el modo Windows UAC2 (daemon r36s_u241_usb_audio_io), no reproducible
+  en modo local ni en los otros modos; el resto de la prueba (chopper
+  completo, pitch/env, undo/redo, overlay de operacion, preview) OK.
+  Pendiente: reproduccion con perfil Windows, log del daemon
+  (/mnt/g/LGPT_OTG_LOGS) y backpressure/ASRC como primera hipotesis.
+- [IMPLEMENTADO e08d6d7] F3-3c: la logica de edicion del chopper (12 flujos
+  golden: initialize, add (con live cut por streaming), delete, select,
+  toggleTrim, nudge start/end, crop logico U2.14, split, clearAll, cycle,
+  snap a zero-cross; y helpers hasUserChops/hasActiveSliceRange/
+  selectedChopStart/EndFrame) se extrae a ChopperController (capa pura
+  header-only) con un Host interface para los efectos de vista
+  (SetStatus/SetOperationCombo/PushLogicalUndo/SaveChopState/
+  EnsureCursorVisible/PrepareWaveformPreview/PublishOverlayState/MarkDirty/
+  SampleLoaded/QuerySnapBuffer/LiveStreamingPosition). Los action labels
+  ("Add cut", "Merge cuts", "Move cut start/end", "Keep logical range",
+  "Split sample", "Clear chops", "Snap start/end") y los mensajes golden
+  viven en la capa. La vista conserva audio, destructivos, undo/redo
+  fisico+logico, persistencia por sample, preview, overlay y dibujo; el
+  controller se vincula por refs a chopModel_/preview_/sourceSize_/
+  cursorFrame_/trimMode_/pitchMode_/splitParts_/chopsInitialized_ y el
+  adapter ChopperHostAdapter (por valor en el header) traduce los efectos.
+  Evidencia: host test de equivalencia golden
+  (tests/host/chopper_controller_host_test.cpp, ALL OK 128 checks
+  ASAN/UBSAN, oraculos con FakeHost: mensajes, estado final de boundaries/
+  selected/cursor/trim/split y orden de escrituras), baseline estatico
+  (tests/test_f3_3c_baseline.py: capa pura sin dependencias, strings en la
+  capa y fuera de la vista, delegados one-line, adapter) + baselines
+  F3-1/F3-2/F3-3a u2510 actualizados al layout por capas + audit
+  (AUDIT_CLEAN_MAIN_U2523_OK). Build MIPS del core OK sin diagnosticos
+  (0 warnings/errores en SampleChopperModal; gate solo con deuda F7
+  pre-existente de device/*.c). Desplegado en SD (backup
+  LGPT_BEFORE_U2523_20260813_174058; core en consola = build SHA
+  a97a77e8). [VALIDADO EN CONSOLA]
 - [PENDIENTE] F3-4: Mixer (baseline en docs/F3_ARCHITECTURE_ES.md):
   MixerService, MixerMeters, FxNavigator.
 - [PENDIENTE] F3-5: Phrase (baseline en docs/F3_ARCHITECTURE_ES.md):
