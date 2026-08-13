@@ -18,6 +18,14 @@ terminan ademas con validacion en consola real.
   los views se migran a las acciones semanticas sin cambiar mascaras enviadas.
 - Evidencia: misma accion por cada mascara/acorde que hoy (catalogo de
   bindings documentado lado a lado).
+- ESTADO: F1a cerrado (commit 8931f65: capa UI/Input + catalogo dorado
+  transcrito del golden, 238 checks OK). F1b Chopper cerrado (commit c836118:
+  ProcessButtonMask despacha via ChordResolver con contexto por modo; build
+  MIPS OK; consola: MAIN/TRIM/PITCH OK; crash/freeze one-shot del primer
+  edit destructivo en frio NO es regresion F1b: mismos callsites que el
+  golden, solo el 1er intento tras arranque, sospecha de contencion
+  daemon/SD en frio; A/B contra golden pendiente de confirmar). Pendiente
+  F1b: migrar MixerView y AppWindow con la misma equivalencia.
 
 ## F2 - Politica de menus formal + NavigationController
 - Documentar el lenguaje de menus vigente (titulo centrado + bloque
