@@ -35,6 +35,7 @@ COMMONDIRS := \
 	../sources/UIFramework/SimpleBaseClasses \
 	../sources/UIFramework/Interfaces \
 	../sources/Application \
+	../sources/Application/UI/Input \
 	../sources/Application/Controllers \
 	../sources/Application/Commands \
 	../sources/Application/Audio \
@@ -224,6 +225,7 @@ W32DIRS     :=  .\
 #---------------------------------------------------------------------------------
 
 COMMONFILES := \
+	ChordResolver.o ActionMap.o \
 	Logger.o Trace.o Result.o Status.o Config.o \
 	Timer.o FileSystem.o FontConfig.o \
 	SysMutex.o TimeService.o \

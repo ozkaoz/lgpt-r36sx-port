@@ -1,4 +1,5 @@
 #include "SampleChopperModal.h"
+#include "Application/UI/Input/ChordResolver.h"
 #include "Application/Instruments/SamplePool.h"
 #include "Application/Instruments/SoundSource.h"
 #include "Application/Instruments/WavFile.h"
@@ -3291,161 +3292,164 @@ void SampleChopperModal::DrawView() {
 void SampleChopperModal::ProcessButtonMask(unsigned short mask, bool pressed) {
     if (!pressed) return;
 
-    bool left = (mask & EPBM_LEFT) != 0;
-    bool right = (mask & EPBM_RIGHT) != 0;
-    bool up = (mask & EPBM_UP) != 0;
-    bool down = (mask & EPBM_DOWN) != 0;
-    bool l1 = (mask & EPBM_L) != 0;
-    bool r1 = (mask & EPBM_R) != 0;
-    bool l2 = (mask & EPBM_L2) != 0;
-    bool r2 = (mask & EPBM_R2) != 0;
-    bool y = (mask & EPBM_Y) != 0;
-    bool x = (mask & EPBM_X) != 0;
-    bool select = (mask & EPBM_SELECT) != 0;
-    bool a = (mask & EPBM_A) != 0;
-    bool b = (mask & EPBM_B) != 0;
+    /* F1 input policy (REFACTOR_ROADMAP_ES.md, fase 1): el input fisico se
+     * resuelve contra el catalogo dorado (ActionMap.cpp) usando el contexto
+     * actual del chopper. La tabla transcribe 1:1 el orden y las condiciones
+     * de esta funcion en Bacon 1.2.1; el dispatch llama a los mismos metodos
+     * (y los mismos messages de status) que la implementacion original. */
+    using namespace UI::Input;
+    const PadMask pad = (PadMask)mask;  /* los bits EPBM_* espejan PhysicalKey */
+    const ContextId ctx = pitchMode_ ? CTX_CHOPPER_PITCH
+                        : (trimMode_ ? CTX_CHOPPER_TRIM : CTX_CHOPPER);
+    const ActionId action = ChordResolver_Resolve(pad, ctx);
 
-    const bool undoChord =
-        l1 && x &&
-        !(left || right || up || down || a || b || y || r1 || l2 || r2 || select);
-    const bool redoChord =
-        r1 && x &&
-        !(left || right || up || down || a || b || y || l1 || l2 || r2 || select);
-
-    /* U2.51.0: completion overlays must not swallow undo/redo. */
+    /* U2.51.0: completion overlays must not swallow undo/redo. (Equivalente
+     * exacto del golden: L1+X / R1+X puros curan el overlay, A puro
+     * lo cierra, cualquier otra tecla se consume durante el overlay.) */
     if (operationActive_ && operationPercent_ >= 100) {
-        if (undoChord || redoChord) {
-            clearOperationProgress();
-            redoChord ? redoLastChopperEdit() : undoLastChopperEdit();
-            return;
+        if (pad == (KEY_L1 | KEY_X)) {
+            clearOperationProgress(); undoLastChopperEdit(); return;
         }
-        bool plainA = a && !(left || right || up || down || l1 || r1 || l2 || r2 || b || x || y || select);
-        if (plainA) { clearOperationProgress(); DrawView(); publishOverlayState(); }
+        if (pad == (KEY_R1 | KEY_X)) {
+            clearOperationProgress(); redoLastChopperEdit(); return;
+        }
+        if (pad == KEY_A) { clearOperationProgress(); DrawView(); publishOverlayState(); }
         return;
     }
 
-    if (undoChord) { undoLastChopperEdit(); return; }
-    if (redoChord) { redoLastChopperEdit(); return; }
+    switch (action) {
+        case ACTION_UNDO: undoLastChopperEdit(); return;
+        case ACTION_REDO: redoLastChopperEdit(); return;
 
-    if (l1 && r1 && !(left || right || up || down || a || b || x || y || l2 || r2 || select)) {
-        togglePitchMode(); return;
-    }
+        /* L1+R1 puro: entra/sale del modo Pitch. */
+        case ACTION_TOGGLE_PITCH_MODE: togglePitchMode(); return;
 
-    // TREEFROG_U2_39_CHOPPER_SPLIT_ZERO (Bacon 1.1.1):
-    // L1+B (no other keys): split the whole sample into 4/8/16/32 equal
-    // parts, cycling on each press. In trim mode L1+A/L1+B snap the selected
-    // chop start/end to the nearest zero-cross instead.
-    if (l1 && b && !(left || right || up || down || a || x || y || r1 || l2 || r2 || select)) {
-        if (trimMode_) { snapSelectedBoundaryToZeroCross(false); return; }
-        cycleSplitParts(); return;
-    }
-    if (trimMode_ && l1 && a && !(left || right || up || down || b || x || y || r1 || l2 || r2 || select)) {
-        snapSelectedBoundaryToZeroCross(true); return;
-    }
+        /* L1+B: en trim snap del fin al zero-cross; en main cicla el split
+         * (la rama original es trim-condicional y anterior al bloque pitch). */
+        case ACTION_SPLIT_PARTS:
+            if (trimMode_) { snapSelectedBoundaryToZeroCross(false); return; }
+            cycleSplitParts(); return;
+        case ACTION_SNAP_BOUNDARY_END: snapSelectedBoundaryToZeroCross(false); return;
+        case ACTION_SNAP_BOUNDARY_START: snapSelectedBoundaryToZeroCross(true); return;
+        case ACTION_NORMALIZE: normalizeSample(); return;
 
-    /* Bacon 1.1.1 V17: R2+Y normalize is trim-mode only. */
-    if (trimMode_ && r2 && y && !(left || right || up || down || a || b || x || l1 || r1 || l2 || select)) {
-        normalizeSample(); return;
-    }
+        case ACTION_STOP_PREVIEW:
+            stopSamplePreview();
+            setStatus(ctx == CTX_CHOPPER_PITCH ? "Stop preview" : "Stop playback");
+            return;
 
-    if (pitchMode_) {
-        if (l2 && b && !(left || right || up || down || a || x || y || l1 || r1 || r2 || select)) {
-            stopSamplePreview(); setStatus("Stop preview"); return;
-        }
-        if (r2 && (left || right) && !(up || down || a || b || x || y || l1 || r1 || l2 || select)) {
+        case ACTION_PITCH_SCOPE_NEXT:
+        case ACTION_PITCH_SCOPE_PREV: {
             if (pitchScope_) {
-                selectChop(right ? 1 : -1);
-                char msg[64]; snprintf(msg, sizeof(msg), "Pitch chop %02d/%02d", selectedChop_ + 1, (boundaryCount_ > 1 ? boundaryCount_ - 1 : 1));
+                selectChop(action == ACTION_PITCH_SCOPE_NEXT ? 1 : -1);
+                char msg[64];
+                snprintf(msg, sizeof(msg), "Pitch chop %02d/%02d",
+                         selectedChop_ + 1,
+                         (boundaryCount_ > 1 ? boundaryCount_ - 1 : 1));
                 setStatus(msg);
             } else {
                 setStatus("Set Scope Chop first");
             }
             return;
         }
-        if ((up || down) && !(left || right || a || b || x || y || l1 || r1 || l2 || r2 || select)) {
-            selectPitchEditParam(down ? 1 : -1);
+
+        /* R1+B: cierra el modal (EndModal) y para el preview. */
+        case ACTION_CLOSE:
+            stopSamplePreview(); EndModal(0); isDirty_ = true; return;
+
+        /* SELECT puro: alterna trim mode. */
+        case ACTION_TOGGLE_TRIM_MODE: toggleTrimMode(); return;
+
+        case ACTION_CROP: destructiveCropToSelectedRange(); return;
+        case ACTION_DELETE_RANGE: destructiveDeleteSelectedRange(); return;
+
+        /* Trim: A/B+flechas nudgean inicio/fin (L1 x10). */
+        case ACTION_NUDGE_START_LEFT:
+            nudgeSelectedStart(-getFrameStepForEdit()); return;
+        case ACTION_NUDGE_START_RIGHT:
+            nudgeSelectedStart(getFrameStepForEdit()); return;
+        case ACTION_NUDGE_START_LEFT_COARSE:
+            nudgeSelectedStart(-getFrameStepForEdit() * 10); return;
+        case ACTION_NUDGE_START_RIGHT_COARSE:
+            nudgeSelectedStart(getFrameStepForEdit() * 10); return;
+        case ACTION_NUDGE_END_LEFT:
+            nudgeSelectedEnd(-getFrameStepForEdit()); return;
+        case ACTION_NUDGE_END_RIGHT:
+            nudgeSelectedEnd(getFrameStepForEdit()); return;
+        case ACTION_NUDGE_END_LEFT_COARSE:
+            nudgeSelectedEnd(-getFrameStepForEdit() * 10); return;
+        case ACTION_NUDGE_END_RIGHT_COARSE:
+            nudgeSelectedEnd(getFrameStepForEdit() * 10); return;
+
+        case ACTION_TRIM_PREVIEW_START: previewTrimStart(); return;
+        case ACTION_TRIM_PREVIEW_END: previewTrimEnd(); return;
+
+        /* R1+A fuera de trim: auto-save + status. (En trim solo alcanza
+         * cuando la rama crop no lo captura, igual que el golden.) */
+        case ACTION_AUTOSAVE_CHOPS:
+            saveChopStateForCurrentSample();
+            setStatus("Auto-save on: assign Sxx in Phrase");
             return;
-        }
-        if ((left || right) && !(up || down || a || b || x || y || l1 || r1 || l2 || r2 || select)) {
-            nudgePitchEnvelopeValue(right ? 1 : -1);
+
+        case ACTION_SELECT_PREV_SAMPLE: selectSample(-1); return;
+        case ACTION_SELECT_NEXT_SAMPLE: selectSample(1); return;
+        case ACTION_PLAY_FULL: playFullSample(); return;
+        case ACTION_SELECT_PREV_CHOP: selectChop(-1); return;
+        case ACTION_SELECT_NEXT_CHOP: selectChop(1); return;
+
+        case ACTION_DELETE_CHOP: deleteSelectedChop(); return;
+        case ACTION_PLAY_CHOP_PREVIEW: playSelectedChop(); return;
+        case ACTION_ADD_CHOP: addChopAtCursor(); return;
+
+        /* Cursor y zoom, con L1 grueso (misma rama, L1 multiplica). */
+        case ACTION_NUDGE_CURSOR_LEFT: nudgeCursorPixels(-2); return;
+        case ACTION_NUDGE_CURSOR_RIGHT: nudgeCursorPixels(2); return;
+        case ACTION_NUDGE_CURSOR_LEFT_COARSE: nudgeCursorPixels(-24); return;
+        case ACTION_NUDGE_CURSOR_RIGHT_COARSE: nudgeCursorPixels(24); return;
+        case ACTION_ZOOM_IN: nudgeZoomPercent(5); return;
+        case ACTION_ZOOM_OUT: nudgeZoomPercent(-5); return;
+        case ACTION_ZOOM_IN_COARSE: nudgeZoomPercent(10); return;
+        case ACTION_ZOOM_OUT_COARSE: nudgeZoomPercent(-10); return;
+
+        /* Pitch: U/D parametro, L/R valor, B preview, A apply. */
+        case ACTION_PITCH_PARAM_NEXT: selectPitchEditParam(1); return;
+        case ACTION_PITCH_PARAM_PREV: selectPitchEditParam(-1); return;
+        case ACTION_PITCH_VALUE_UP: nudgePitchEnvelopeValue(1); return;
+        case ACTION_PITCH_VALUE_DOWN: nudgePitchEnvelopeValue(-1); return;
+        case ACTION_PITCH_PREVIEW: previewPitchSetting(); return;
+        case ACTION_PITCH_APPLY: destructivePitchSample(pitchSemitones_); return;
+
+        /* Nada resuelto. El bloque pitch del golden consume por defecto con
+         * status; los hints de trim tambien son consumidos con status. */
+        case ACTION_NONE:
+            if (ctx == CTX_CHOPPER_PITCH) {
+                /* Gates trim anteriores al bloque pitch (pitch+trim):
+                 * L1+A snap del inicio, R2+Y normalizar. */
+                if (trimMode_ && pad == (KEY_L1 | KEY_A)) {
+                    snapSelectedBoundaryToZeroCross(true); return;
+                }
+                if (trimMode_ && pad == (KEY_R2 | KEY_Y)) {
+                    normalizeSample(); return;
+                }
+                if (pad == KEY_SELECT) {
+                    setStatus("Pitch/env: L1+R1 exit"); return;
+                }
+                setStatus("Pitch/env: UD item LR value");
+                return;
+            }
+            if (ctx == CTX_CHOPPER_TRIM) {
+                if ((pad & (KEY_A | KEY_B)) && !(pad & (KEY_LEFT | KEY_RIGHT))) {
+                    setStatus((pad & KEY_A) ? "Crop: A+LEFT/RIGHT"
+                                            : "Crop: B+LEFT/RIGHT");
+                    return;
+                }
+                if ((pad & KEY_L2) && (pad & KEY_Y)) {
+                    setStatus("Delete: L2+Y"); return;
+                }
+            }
             return;
-        }
-        if (b && !(left || right || up || down || a || x || y || l1 || r1 || l2 || r2 || select)) {
-            previewPitchSetting(); return;
-        }
-        if (a && !(left || right || up || down || b || x || y || l1 || r1 || l2 || r2 || select)) {
-            destructivePitchSample(pitchSemitones_); return;
-        }
-        if (select && !(left || right || up || down || a || b || x || y || l1 || r1 || l2 || r2)) {
-            setStatus("Pitch/env: L1+R1 exit"); return;
-        }
-        setStatus("Pitch/env: UD item LR value");
-        return;
-    }
-
-    if (r1 && b && !(left || right || up || down || a || x || y)) {
-        stopSamplePreview(); EndModal(0); isDirty_ = true; return;
-    }
-
-    if (l2 && b && !(left || right || up || down || a || x || y)) {
-        stopSamplePreview(); setStatus("Stop playback"); return;
-    }
-
-    if (select && !(left || right || up || down || a || b || x || y || l1 || r1 || l2 || r2)) {
-        toggleTrimMode(); return;
-    }
-
-    if (trimMode_) {
-        if (r1 && a && !(left || right || up || down || b || x || y || l2 || r2)) {
-            destructiveCropToSelectedRange(); return;
-        }
-        if (l2 && y && !(left || right || up || down || a || b || x || r1 || r2)) {
-            destructiveDeleteSelectedRange(); return;
-        }
-        if ((left || right) && (a || b) && !(r1 || r2 || l2 || x || y)) {
-            int delta = getFrameStepForEdit();
-            if (!right) delta = -delta;
-            if (l1) delta *= 10;
-            if (a) nudgeSelectedStart(delta); else if (b) nudgeSelectedEnd(delta);
+        default:
             return;
-        }
-        if (y && !x && !l1 && !r1 && !l2 && !r2 && !(left || right || up || down || a || b)) {
-            previewTrimStart(); return;
-        }
-        if (x && !y && !l1 && !r1 && !l2 && !r2 && !(left || right || up || down || a || b)) {
-            previewTrimEnd(); return;
-        }
-        if ((a || b) && !(left || right)) {
-            setStatus(a ? "Crop: A+LEFT/RIGHT" : "Crop: B+LEFT/RIGHT"); return;
-        }
-        if (l2 && y) { setStatus("Delete: L2+Y"); return; }
-    }
-
-    if (r1 && a) {
-        saveChopStateForCurrentSample();
-        setStatus("Auto-save on: assign Sxx in Phrase");
-        return;
-    }
-    if (!trimMode_ && r1 && (left || right)) {
-        selectSample(right ? 1 : -1); return;
-    }
-    if (r2 && a) { playFullSample(); return; }
-    if (r2 && (left || right)) { selectChop(right ? 1 : -1); return; }
-
-    if (!trimMode_) {
-        if (y && !l1 && !r1 && !l2 && !r2) { deleteSelectedChop(); return; }
-        if (b && !l1 && !r1 && !l2 && !r2) { playSelectedChop(); return; }
-        if (a && !l1 && !r1 && !l2 && !r2) { addChopAtCursor(); return; }
-    }
-    if (left || right) {
-        int deltaPx = right ? 2 : -2;
-        if (l1) deltaPx = right ? 24 : -24;
-        nudgeCursorPixels(deltaPx); return;
-    }
-    if (up || down) {
-        int deltaPercent = up ? 5 : -5;
-        if (l1) deltaPercent = up ? 10 : -10;
-        nudgeZoomPercent(deltaPercent); return;
     }
 }
 
