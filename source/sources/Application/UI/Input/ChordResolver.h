@@ -49,6 +49,19 @@ ActionId ChordResolver_Resolve(PadMask mask, ContextId ctx);
 /* Variante sobre tabla explicita (tests, F8 harness). */
 ActionId ChordResolver_ResolveIn(PadMask mask, const Binding *table, int count);
 
+/* Comprueba si la mascara lleva el acorde COMPLETO de una accion concreta
+ * (require presente, forbid ausente), sin atender al primer match. AppWindow
+ * lo usa para sus latches de help/audio: en el golden SELECT+R1+R2 mantiene
+ * AMBOS latches (cada rama comprueba solo su propio combo), asi que aqui
+ * cada accion se evalúa contra su propio binding. */
+bool ChordResolver_Matches(PadMask mask, ContextId ctx, ActionId action);
+
+/* Comprueba si el acorde de la accion esta COMPLETAMENTE ausente (ningun bit
+ * del require presente). Es la condicion de liberacion de los latches del
+ * golden (EPBM_SELECT | EPBM_R == 0 en AppWindow.cpp): el latch no se suelta
+ * hasta que ambos bits del combo se han soltado. */
+bool ChordResolver_ChordAbsent(PadMask mask, ContextId ctx, ActionId action);
+
 }  /* namespace Input */
 }  /* namespace UI */
 

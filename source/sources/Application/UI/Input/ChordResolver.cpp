@@ -26,5 +26,28 @@ ActionId ChordResolver_Resolve(PadMask mask, ContextId ctx) {
     return ChordResolver_ResolveIn(mask, table, count);
 }
 
+bool ChordResolver_Matches(PadMask mask, ContextId ctx, ActionId action) {
+    const Binding *table = 0;
+    const int count = ActionMap_GetBindings(ctx, &table);
+    for (int i = 0; i < count; ++i) {
+        if (table[i].action == action) {
+            return (mask & table[i].require) == table[i].require &&
+                   (mask & table[i].forbid) == 0;
+        }
+    }
+    return false;
+}
+
+bool ChordResolver_ChordAbsent(PadMask mask, ContextId ctx, ActionId action) {
+    const Binding *table = 0;
+    const int count = ActionMap_GetBindings(ctx, &table);
+    for (int i = 0; i < count; ++i) {
+        if (table[i].action == action) {
+            return (mask & table[i].require) == 0;
+        }
+    }
+    return false;
+}
+
 }  /* namespace Input */
 }  /* namespace UI */

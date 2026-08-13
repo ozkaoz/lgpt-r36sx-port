@@ -44,7 +44,35 @@ static void test_global(void) {
     EXPECT_ACTION(KEY_L1 | KEY_R1 | KEY_X, CTX_GLOBAL, ACTION_NONE);
     EXPECT_ACTION(KEY_L1, CTX_GLOBAL, ACTION_NONE);
     EXPECT_ACTION(KEY_A | KEY_B, CTX_GLOBAL, ACTION_NONE);
-    printf("global: help/audio/undo/redo OK\n");
+
+    /* ChordResolver_Matches/ChordAbsent: predicados de latcheo de
+     * AppWindow (SynchronizeInputMask/onEvent F1b). SELECT+R1+R2 mantiene
+     * AMBOS latches en el golden (cada rama comprueba su propio combo). */
+    CHECK(ChordResolver_Matches(KEY_SELECT | KEY_R1, CTX_GLOBAL, ACTION_OPEN_HELP));
+    CHECK(ChordResolver_Matches(KEY_SELECT | KEY_R1 | KEY_A, CTX_GLOBAL, ACTION_OPEN_HELP));
+    CHECK(!ChordResolver_Matches(KEY_SELECT | KEY_A, CTX_GLOBAL, ACTION_OPEN_HELP));
+    CHECK(ChordResolver_Matches(KEY_SELECT | KEY_R1 | KEY_R2, CTX_GLOBAL, ACTION_OPEN_HELP));
+    CHECK(ChordResolver_Matches(KEY_SELECT | KEY_R1 | KEY_R2, CTX_GLOBAL, ACTION_OPEN_AUDIO_DRIVER));
+    CHECK(ChordResolver_Matches(KEY_SELECT | KEY_R2, CTX_GLOBAL, ACTION_OPEN_AUDIO_DRIVER));
+    CHECK(!ChordResolver_Matches(KEY_SELECT | KEY_R1, CTX_GLOBAL, ACTION_OPEN_AUDIO_DRIVER));
+    CHECK(ChordResolver_Matches(KEY_L1 | KEY_X, CTX_GLOBAL, ACTION_UNDO));
+    CHECK(!ChordResolver_Matches(KEY_L1 | KEY_R1 | KEY_X, CTX_GLOBAL, ACTION_UNDO));
+    CHECK(ChordResolver_Matches(KEY_R1 | KEY_X, CTX_GLOBAL, ACTION_REDO));
+    CHECK(!ChordResolver_Matches(KEY_L1 | KEY_R1 | KEY_X, CTX_GLOBAL, ACTION_REDO));
+    /* ChordAbsent: el latch solo se suelta cuando los DOS bits del combo
+     * estan fuera de la mascara (EPBM_SELECT|EPBM_R == 0 en el golden);
+     * SELECT a solas o R2 a solas NO liberan. */
+    CHECK(ChordResolver_ChordAbsent(0, CTX_GLOBAL, ACTION_OPEN_HELP));
+    CHECK(ChordResolver_ChordAbsent(0, CTX_GLOBAL, ACTION_OPEN_AUDIO_DRIVER));
+    CHECK(!ChordResolver_ChordAbsent(KEY_SELECT, CTX_GLOBAL, ACTION_OPEN_HELP));
+    CHECK(!ChordResolver_ChordAbsent(KEY_SELECT, CTX_GLOBAL, ACTION_OPEN_AUDIO_DRIVER));
+    CHECK(!ChordResolver_ChordAbsent(KEY_R2, CTX_GLOBAL, ACTION_OPEN_AUDIO_DRIVER));
+    CHECK(!ChordResolver_ChordAbsent(KEY_R1, CTX_GLOBAL, ACTION_OPEN_HELP));
+    CHECK(!ChordResolver_ChordAbsent(KEY_SELECT | KEY_R1, CTX_GLOBAL, ACTION_OPEN_HELP));
+    CHECK(!ChordResolver_ChordAbsent(KEY_SELECT, CTX_GLOBAL, ACTION_OPEN_HELP));
+    CHECK(!ChordResolver_ChordAbsent(KEY_R2, CTX_GLOBAL, ACTION_OPEN_AUDIO_DRIVER));
+    CHECK(!ChordResolver_ChordAbsent(KEY_SELECT | KEY_R1 | KEY_R2, CTX_GLOBAL, ACTION_OPEN_HELP));
+    printf("global: help/audio/undo/redo + latch predicates OK\n");
 }
 
 static void test_mixer(void) {
