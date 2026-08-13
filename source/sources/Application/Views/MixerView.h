@@ -4,11 +4,14 @@
 #include "BaseClasses/View.h"
 #include "ViewData.h"
 #include "Application/Model/Song.h"
-// F3-4a: capa pura de las paginas FX parametrizadas del Mixer.  Los enums
-// FxPage/FxParamId, la tabla kFxParams_ y los helpers de navegacion/edicion
-// viven en Application/Mixer/FxPages.h (sin dependencias de GUI/audio);
-// MixerView los consume directamente.
-#include "Application/Mixer/FxPages.h"
+	// F3-4a: capa pura de las paginas FX parametrizadas del Mixer.  Los enums
+	// FxPage/FxParamId, la tabla kFxParams_ y los helpers de navegacion/edicion
+	// viven en Application/Mixer/FxPages.h (sin dependencias de GUI/audio);
+	// MixerView los consume directamente.
+	#include "Application/Mixer/FxPages.h"
+	// F3-4b: medidores VU del Mixer (smoothing golden, nivel de barra y
+	// metrica half-cell L/R) en Application/Mixer/MixerMeters.h (capa pura).
+	#include "Application/Mixer/MixerMeters.h"
 
 class MixerView: public View {
 public:
@@ -162,15 +165,9 @@ private:
 	bool soloMode_ ;
 	bool masterSelected_ ;
 	int frameRefreshDivider_ ;
-	// TREEFROG_MIXER_VU_SMOOTH_V1 (H38.7):
-	// Per-channel display level that attacks instantly on a note and falls
-	// with a smooth per-frame exponential release, so the bars never jump
-	// from full to empty in a single frame (which looked like screen flicker).
-	float vuDisplay_[SONG_CHANNEL_COUNT] ;
-	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): per-side display levels
-	// (L/R), smoothed the same way as vuDisplay_.
-	float vuDisplayL_[SONG_CHANNEL_COUNT] ;
-	float vuDisplayR_[SONG_CHANNEL_COUNT] ;
+	// F3-4b: per-channel display levels (L/R smoothed) live in the pure
+	// MixerMeters layer (TREEFROG_MIXER_VU_SMOOTH_V1 / TREEFROG_MIXER_VU_STOP_RESET_V1).
+	MixerMeters meters_ ;
 	// TREEFROG_FX_PAGES_V1 (Fase 4.3)
 	int fxPage_ ;                 // current FxPage
 	int fxRow_ ;                  // row cursor within the current page

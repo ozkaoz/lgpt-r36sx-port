@@ -249,8 +249,9 @@ def check_mixer_meters():
                   MIX_CPP.index("void MixerView::drawMasterBar")]
     mbar = MIX_CPP[MIX_CPP.index("void MixerView::drawMasterBar"):
                    MIX_CPP.index("void MixerView::cycleFxPage")]
-    assert "drawMeterBar(x,y,height,vuDisplayL_[channel]" in bar
-    assert "drawMeterBar(x,y,height,vuDisplayR_[channel]" in bar
+    # F3-4b: the L/R levels come from the MixerMeters layer.
+    assert "drawMeterBar(x,y,height,meters_.LevelL(channel)" in bar
+    assert "drawMeterBar(x,y,height,meters_.LevelR(channel)" in bar
     assert "DrawString(x-1,y,hex,props)" in bar
     assert "DrawString(x-1,y+height+2" in bar
     assert "DrawString(x-1,y,\"MST\",props)" in mbar

@@ -270,11 +270,8 @@ MixerView::MixerView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
 	fxPage_=FX_PAGE_MIX ;
 	fxRow_=0 ;
 	fxEditTarget_=0 ;
-	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
-		vuDisplay_[i]=0.0f ;
-		vuDisplayL_[i]=0.0f ;
-		vuDisplayR_[i]=0.0f ;
-	}
+	// F3-4b: meters_ (MixerMeters) se autoceroiza en su constructor; las
+	// barras VU arrancan en 0.
 	// TREEFROG_MIXER_HALF_CELL_BARS_V1 + TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1)
 	for (int i=0;i<=SONG_CHANNEL_COUNT;i++) {
 		meterRecords_[i].valid=false ;
@@ -899,8 +896,8 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// +2.1 dB) the fill can push past 0 dB and reach the red zone.  Side 0
 	// records L and paints the cell track; side 1 records R at the same x;
 	// the pixels are drawn by PostFlushDraw() after the char flush.
-	drawMeterBar(x,y,height,vuDisplayL_[channel],volume,selected,muted,props,CD_NORMAL,0,meterRecords_[channel]) ;
-	drawMeterBar(x,y,height,vuDisplayR_[channel],volume,selected,muted,props,CD_NORMAL,1,meterRecords_[channel]) ;
+	drawMeterBar(x,y,height,meters_.LevelL(channel),volume,selected,muted,props,CD_NORMAL,0,meterRecords_[channel]) ;
+	drawMeterBar(x,y,height,meters_.LevelR(channel),volume,selected,muted,props,CD_NORMAL,1,meterRecords_[channel]) ;
 
 	SetColor(selected?CD_HILITE2:(muted?CD_BORDER:CD_NORMAL)) ;
 	props.invert_=selected ;
@@ -997,10 +994,8 @@ void MixerView::drawMeterBar(int x,int y,int height,float peak,int volume,
 	rec.onColor=onColor ;
 	// TREEFROG_MIXER_COMPACT_BARS_V1 (Bacon 1.1.1 V13): the record carries
 	// the normalized post-volume level; PostFlushDraw renders the compact
-	// 2-px-step meter from it.
-	float level=mixVULevel(peak)*float(volume)*0.01f ;
-	if (level<0.0f) level=0.0f ;
-	if (level>1.0f) level=1.0f ;
+	// 2-px-step meter from it.  F3-4b: derived in MixerMeters::BarLevel.
+	float level=MixerMeters::BarLevel(peak,volume) ;
 	if (side==0) {
 		rec.levelL=level ;
 	} else {
@@ -1041,35 +1036,18 @@ void MixerView::PostFlushDraw() {
 	unsigned short seamC=app->ResolveColor565(CD_BACKGROUND) ;
 	unsigned short borderC=app->ResolveColor565(CD_BORDER) ;
 	unsigned short redC=app->ResolveColor565(CD_ERROR) ;
-	const int LEVEL_H=3 ;
 	for (int m=0;m<=SONG_CHANNEL_COUNT;m++) {
 		MeterRecord &r=meterRecords_[m] ;
 		if (!r.valid) continue ;
 		int px=r.xCell*8 ;
 		int py=r.yCell*8 ;
-		int totalPx=r.height*8 ;
-		int totalLevels=totalPx/LEVEL_H ;
-		if (totalLevels<1) continue ;
-		// 0 dB+ zone: the top of the bar above the 0 dB row on the shared
-		// -36..+3 scale (mixVULevel(0 dB) = 36/39), rendered solid red.  The
-		// zone starts right above 0 dB (the "0" CUE mark) and covers the +3
-		// top cell, matching the CUE scale's +3/0 markers.  TREEFROG_MIXER_RED_BAND_TOP_V1
-		// (Bacon 1.1.1 V15): with the bottom-up bars the band must sit at the
-		// top of the bar (row 0 = top of screen), not at the bottom as the
-		// pre-V14 top-down row test left it.
-		const float zeroDbLevel=36.0f/39.0f ;
-		int redBandLevels=totalLevels-(int)(zeroDbLevel*(float)totalLevels+0.5f) ;
-		if (redBandLevels<1) redBandLevels=1 ;
-		int redBandPx=redBandLevels*LEVEL_H ;
-		int filledL=(int)(r.levelL*(float)totalLevels+0.5f)*LEVEL_H ;
-		int filledR=(int)(r.levelR*(float)totalLevels+0.5f)*LEVEL_H ;
-		if (filledL>totalPx) filledL=totalPx ;
-		if (filledR>totalPx) filledR=totalPx ;
-		// TREEFROG_MIXER_BARS_BOTTOM_UP_V1 (Bacon 1.1.1 V14): bars grow from
-		// the bottom up, aligned with the Cue meter (previously they filled
-		// from the top and read inverted next to the Cue bar).
-		int filledLLevels=filledL/LEVEL_H ;
-		int filledRLevels=filledR/LEVEL_H ;
+		// F3-4b: la metrica de la barra (totalPx/totalLevels, banda roja
+		// 0 dB+, fill L/R en niveles de 2 px) la calcula MixerMeters::GeometryFor
+		// (TREEFROG_MIXER_RED_BAND_TOP_V1 + TREEFROG_MIXER_BARS_BOTTOM_UP_V1);
+		// aqui solo se resuelven colores y se escriben los pixels.
+		MixerMeters::Geometry g=MixerMeters::GeometryFor(r.height,r.levelL,r.levelR) ;
+		if (g.totalLevels<1) continue ;
+		int totalPx=g.totalPx ;
 		unsigned short fillC ;
 		if (r.selected) {
 			fillC=app->ResolveColor565(CD_HILITE2) ;
@@ -1080,17 +1058,14 @@ void MixerView::PostFlushDraw() {
 		}
 		int iBase=py*TREEFROG_LGPT_WIDTH+px ;
 		for (int row=0;row<totalPx;row++) {
-			bool inBand=(row<redBandPx) ;
-			int levelIdx=(totalPx-1-row)/LEVEL_H ;
-			bool fillL=(levelIdx<filledLLevels) ;
-			bool fillR=(levelIdx<filledRLevels) ;
 			// 1-px gap between levels (bottom row of each 3-px group); the
-			// red band is solid.
-			bool gapRow=((row%LEVEL_H)==0)&&!inBand ;
-			unsigned short lC=(fillL&&inBand)?redC:
-			                  ((fillL&&!gapRow)?fillC:seamC) ;
-			unsigned short rC=(fillR&&inBand)?redC:
-			                  ((fillR&&!gapRow)?fillC:seamC) ;
+			// red band is solid.  F3-4b: decision logica en
+			// MixerMeters::RowStateFor.
+			MixerMeters::RowState s=MixerMeters::RowStateFor(row,totalPx,g.redBandPx,g.filledLLevels,g.filledRLevels) ;
+			unsigned short lC=(s.fillL&&s.inBand)?redC:
+			                  ((s.fillL&&!s.gapRow)?fillC:seamC) ;
+			unsigned short rC=(s.fillR&&s.inBand)?redC:
+			                  ((s.fillR&&!s.gapRow)?fillC:seamC) ;
 			fb[iBase+0]=lC ;
 			fb[iBase+1]=lC ;
 			fb[iBase+2]=lC ;
@@ -1759,7 +1734,10 @@ void MixerView::OnFrameUpdate(unsigned long frameClock) {
 	// smooth per-frame exponential fall (~0.6^12 empties a full bar in about
 	// 12 frames) so the bars never jump full->empty in one frame. This runs
 	// every frame regardless of transport, so the fall is also smooth when
-	// the player is stopped.
+	// the player is stopped.  F3-4b: el smoothing golden (ataque instantaneo,
+	// release *0.6 con piso 0.001, muestreo a 0 al parar el transporte) vive
+	// en MixerMeters::SmoothFrame; aqui solo se muestrean los picos del
+	// Player y se pasa el flag de running.
 	{
 		Player *player=Player::GetInstance() ;
 		// TREEFROG_MIXER_VU_STOP_RESET_V1 (Bacon 1.1.1 V14): the player keeps
@@ -1767,24 +1745,15 @@ void MixerView::OnFrameUpdate(unsigned long frameClock) {
 		// freeze at the last position.  Sample 0 while stopped; the release
 		// decay then pulls every bar back to 0.
 		bool running=player->IsRunning() ;
+		float peakL[SONG_CHANNEL_COUNT] ;
+		float peakR[SONG_CHANNEL_COUNT] ;
 		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 			// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1): each side of a
 			// channel is smoothed independently from its own post-pan peak.
-			float measuredL=running?player->GetChannelPeakL(i):0.0f ;
-			if (measuredL>vuDisplayL_[i]) {
-				vuDisplayL_[i]=measuredL ;
-			} else {
-				vuDisplayL_[i]*=0.6f ;
-				if (vuDisplayL_[i]<0.001f) vuDisplayL_[i]=0.0f ;
-			}
-			float measuredR=running?player->GetChannelPeakR(i):0.0f ;
-			if (measuredR>vuDisplayR_[i]) {
-				vuDisplayR_[i]=measuredR ;
-			} else {
-				vuDisplayR_[i]*=0.6f ;
-				if (vuDisplayR_[i]<0.001f) vuDisplayR_[i]=0.0f ;
-			}
+			peakL[i]=running?player->GetChannelPeakL(i):0.0f ;
+			peakR[i]=running?player->GetChannelPeakR(i):0.0f ;
 		}
+		meters_.SmoothFrame(running,SONG_CHANNEL_COUNT,peakL,peakR) ;
 	}
 
 	// TREEFROG_MIXER_LIVE_VU_V2 (H38.7):

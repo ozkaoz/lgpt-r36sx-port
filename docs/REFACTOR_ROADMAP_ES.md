@@ -174,9 +174,24 @@ terminan ademas con validacion en consola real.
   pre-existente de device/*.c). Desplegado en SD (backup
   LGPT_BEFORE_U2523_20260813_174058; core en consola = build SHA
   a97a77e8). [VALIDADO EN CONSOLA]
-- [PENDIENTE] F3-4b: Mixer - MixerMeters (VU smoothing golden OnFrameUpdate,
-  half-cell records L/R) capa pura + F3-4c (menu L1+A / accion del Mixer
-  declarado).
+- [PENDIENTE] F3-4c: Mixer - menu L1+A / accion del Mixer declarado.
+- [IMPLEMENTADO] F3-4b: MixerMeters - capa pura de los medidores VU del
+  Mixer (Application/Mixer/MixerMeters.h): smoothing golden
+  (ataque instantaneo, release *0.6 por frame con piso 0.001, muestreo a 0
+  al parar el transporte), BarLevel (mixVULevel*vol/100 clamp 0..1) y la
+  metrica half-cell L/R (GeometryFor/RowStateFor: LEVEL_H 3, banda roja
+  0 dB+ = 36/39, fill en pasos de 2 px, gap de 1 px).  MixerView migrado:
+  miembro MixerMeters meters_, SmoothFrame en OnFrameUpdate (solo se
+  muestrean los picos del Player), BarLevel en drawMeterBar, geometria en
+  PostFlushDraw (la vista solo resuelve colores y escribe pixels);
+  eliminados los arrays vuDisplay_/vuDisplayL_/vuDisplayR_ y el smoothing
+  inline.  Evidencia: tests/host/mixer_meters_host_test.cpp (71 checks
+  golden con ASAN/UBSAN, runner tests/run_host_mixer_meters.sh en audit.sh),
+  test_f3_4b_baseline.py + test_ui_centered_layout actualizado.  Audit
+  completo verde (AUDIT_CLEAN_MAIN_U2523_OK).  Build MIPS del core OK sin
+  diagnosticos en MixerView/MixerMeters (gate solo con deuda F7
+  pre-existente de device/*.c).  Desplegado en SD (backup
+  LGPT_BEFORE_U2523_20260813_181756; core en consola = build SHA bfb0fa97).
 - [PENDIENTE] F3-4: Mixer (baseline en docs/F3_ARCHITECTURE_ES.md):
   MixerService, MixerMeters, FxNavigator.
 - [IMPLEMENTADO] F3-4a: FxPages - capa pura de las paginas FX parametrizadas
