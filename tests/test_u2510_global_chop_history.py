@@ -5,6 +5,10 @@ root = Path(__file__).resolve().parents[1]
 hdr = (root / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.h").read_text()
 cpp = (root / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
 layer = (root / "source/sources/Application/Views/ModalDialogs/SampleEditHistory.h").read_text()
+# F3-3c: los action labels de los flujos de edicion viven en la capa
+# ChopperController (host_.PushLogicalUndo); los de pitch en la vista.
+cc = (root / "source/sources/Application/Views/ModalDialogs/ChopperController.h").read_text()
+bundle = hdr + cpp + cc
 
 for marker in [
     "MAX_LOGICAL_HISTORY = 24",
@@ -12,11 +16,11 @@ for marker in [
     "SampleEditHistory<LogicalHistoryState> editHistory_",
     "undoLastChopperEdit",
     "redoLastChopperEdit",
-    "pushLogicalUndo(\"Add cut\")",
-    "pushLogicalUndo(\"Merge cuts\")",
-    "pushLogicalUndo(\"Move cut start\")",
-    "pushLogicalUndo(\"Move cut end\")",
-    "pushLogicalUndo(\"Keep logical range\")",
+    "PushLogicalUndo(\"Add cut\")",
+    "PushLogicalUndo(\"Merge cuts\")",
+    "PushLogicalUndo(\"Move cut start\")",
+    "PushLogicalUndo(\"Move cut end\")",
+    "PushLogicalUndo(\"Keep logical range\")",
     "pushLogicalUndo(\"Pitch setting\")",
     "pushLogicalUndo(\"Attack setting\")",
     "pushLogicalUndo(\"Sustain setting\")",
@@ -24,7 +28,7 @@ for marker in [
     "pushLogicalUndo(\"Pitch scope\")",
     "U2510_GLOBAL_CHOPPER_HISTORY_24_OVERLAY_SAFE",
 ]:
-    assert marker in hdr or marker in cpp, marker
+    assert marker in bundle, marker
 
 # F3-2: los stacks undo/redo viven en la capa pura SampleEditHistory;
 # el modal delega (Push/Undo/Redo/Peek) y mantiene los match de sample.

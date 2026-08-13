@@ -997,7 +997,11 @@ SampleChopperModal::SampleChopperModal(View &view,
       suspended_(false),
 
       sampleName_(sampleName ? sampleName : ""),
-      splitParts_(4) {
+      splitParts_(4),
+      chopperHost_(*this),
+      chopperController_(chopperHost_, chopModel_, preview_, sourceSize_,
+                         cursorFrame_, trimMode_, pitchMode_, splitParts_,
+                         chopsInitialized_) {
     statusMessage_[0] = 0;
     operationMessage_[0] = 0;
     if (hasAssignedSample()) {
@@ -1020,6 +1024,69 @@ bool SampleChopperModal::hasAssignedSample() const { return (sampleIndex_ >= 0) 
 void SampleChopperModal::OnFocus() { publishOverlayState(); isDirty_ = true; }
 void SampleChopperModal::OnPlayerUpdate(PlayerEventType, unsigned int) {}
 int SampleChopperModal::clampInt(int value, int minValue, int maxValue) const { if (value < minValue) return minValue; if (value > maxValue) return maxValue; return value; }
+
+// F3-3c: adapter del ChopperController (capa pura).  Los efectos de vista
+// se traducen a los metodos golden de este modal; el acceso a audio real
+// (Player streaming / SamplePool para zero-cross) vive aqui, no en la capa.
+SampleChopperModal::ChopperHostAdapter::ChopperHostAdapter(
+    SampleChopperModal &owner)
+    : owner_(owner) {}
+
+void SampleChopperModal::ChopperHostAdapter::SetStatus(const char *message) {
+    owner_.setStatus(message);
+}
+
+void SampleChopperModal::ChopperHostAdapter::SetOperationCombo(
+    const char *combo) {
+    owner_.setOperationCombo(combo);
+}
+
+void SampleChopperModal::ChopperHostAdapter::PushLogicalUndo(
+    const char *action) {
+    owner_.pushLogicalUndo(action);
+}
+
+void SampleChopperModal::ChopperHostAdapter::SaveChopState() {
+    owner_.saveChopStateForCurrentSample();
+}
+
+void SampleChopperModal::ChopperHostAdapter::EnsureCursorVisible() {
+    owner_.ensureCursorVisible();
+}
+
+void SampleChopperModal::ChopperHostAdapter::PrepareWaveformPreview() {
+    owner_.prepareWaveformPreview();
+}
+
+void SampleChopperModal::ChopperHostAdapter::PublishOverlayState() {
+    owner_.publishOverlayState();
+}
+
+void SampleChopperModal::ChopperHostAdapter::MarkDirty() {
+    owner_.isDirty_ = true;
+}
+
+bool SampleChopperModal::ChopperHostAdapter::SampleLoaded() {
+    return owner_.hasAssignedSample();
+}
+
+int SampleChopperModal::ChopperHostAdapter::QuerySnapBuffer(
+    short **samples, int *channels) {
+    SoundSource *source =
+        SamplePool::GetInstance()->GetSource(owner_.sampleIndex_);
+    if (!source) return 1;
+    *samples = (short *)source->GetSampleBuffer(-1);
+    *channels = source->GetChannelCount(-1);
+    if (!*samples || *channels <= 0) return 2;
+    return 0;
+}
+
+bool SampleChopperModal::ChopperHostAdapter::LiveStreamingPosition(
+    int *frame) {
+    if (!Player::GetInstance()->IsStreaming()) return false;
+    *frame = Player::GetInstance()->GetStreamingPosition();
+    return true;
+}
 
 // TREEFROG_U2_25_PITCH_ENV_SCOPE_UNDO_PROGRESS
 // U2.51.0: explicit L1+X undo and R1+X redo, accepted even on the 100% completion overlay.
@@ -1287,10 +1354,9 @@ int SampleChopperModal::findBoundaryIndex(int frame) const {
 }
 
 void SampleChopperModal::initializeChopsIfNeeded() {
-    if (chopsInitialized_ || sourceSize_ <= 1) return;
-    // F3-1: estado en ChopModel (algoritmo golden identico).
-    chopModel_.InitRange(sourceSize_);
-    chopsInitialized_ = true;
+    // F3-3c: delegado a ChopperController (estado en ChopModel, flujo
+    // golden identico).
+    chopperController_.InitializeChopsIfNeeded();
 }
 
 void SampleChopperModal::captureLogicalState(
@@ -1511,90 +1577,41 @@ bool SampleChopperModal::redoLastChopperEdit() {
 }
 
 void SampleChopperModal::addChopAtCursor() {
-    if (sourceSize_ <= 1) { setStatus("No sample to chop"); return; }
-    initializeChopsIfNeeded();
-    if (chopModel_.boundaryCount >= MAX_CHOP_BOUNDARIES) { setStatus("Max 100 chops reached"); return; }
-    int frame = getCursorFrame();
-    bool liveCut = false;
-    if (preview_.Active() && Player::GetInstance()->IsStreaming()) {
-        int liveFrame = Player::GetInstance()->GetStreamingPosition();
-        if (liveFrame >= preview_.StartFrame() && liveFrame <= preview_.EndFrame()) {
-            frame = clampInt(liveFrame, 0, sourceSize_ - 1);
-            cursorFrame_ = frame;
-            liveCut = true;
-        }
-    }
-    int minEdge = (chopModel_.boundaryCount >= 2) ? chopModel_.boundaries[0] : 0;
-    int maxEdge = (chopModel_.boundaryCount >= 2) ? chopModel_.boundaries[chopModel_.boundaryCount - 1] : (sourceSize_ - 1);
-    if (frame <= minEdge || frame >= maxEdge) { setStatus("Cannot chop at edge"); return; }
-    for (int i = 0; i < chopModel_.boundaryCount; i++) {
-        if (abs(chopModel_.boundaries[i] - frame) <= 1) { setStatus("Chop already exists"); return; }
-    }
-    pushLogicalUndo("Add cut");
-    // F3-1: append + sort golden en ChopModel.
-    chopModel_.Append(frame);
-    sortBoundaries();
-    int idx = findBoundaryIndex(frame);
-    if (idx > 0) chopModel_.selected = idx - 1;
-    chopModel_.ClampSelectedToChops();
-    saveChopStateForCurrentSample();
-    publishOverlayState();
-    char msg[64]; snprintf(msg, sizeof(msg), liveCut ? "Live chop %02d at %d" : "Chop %02d at %d", chopModel_.selected, frame); setStatus(msg);
+    // F3-3c: delegado a ChopperController (flujo golden identico; audio
+    // streaming via host adapter).
+    chopperController_.AddChopAtCursor();
 }
 
 void SampleChopperModal::deleteSelectedChop() {
-    initializeChopsIfNeeded();
-    if (!hasUserChops()) { setStatus("No chop to delete"); return; }
-
-    /* Chops are stored as boundaries. Deleting a chop removes one internal boundary
-       and merges the selected region with a neighbor. Edge boundaries 0/end are never removed. */
-    int removeIdx = (chopModel_.selected > 0) ? chopModel_.selected : 1;
-    if (removeIdx <= 0 || removeIdx >= chopModel_.boundaryCount - 1) { setStatus("Cannot delete edge"); return; }
-
-    pushLogicalUndo("Merge cuts");
-    // F3-1: shift-remove golden + reinit minimo en ChopModel.
-    chopModel_.RemoveChop(removeIdx, sourceSize_);
-    chopModel_.ClampSelectedToChops();
-    trimMode_ = false;
-    cursorFrame_ = selectedChopStartFrame();
-    saveChopStateForCurrentSample();
-    ensureCursorVisible();
-    prepareWaveformPreview();
-    publishOverlayState();
-    setStatus("Deleted cut");
+    // F3-3c: delegado a ChopperController (flujo golden identico).
+    chopperController_.DeleteSelectedChop();
 }
 
 void SampleChopperModal::selectChop(int delta) {
-    initializeChopsIfNeeded();
-    if (!hasUserChops()) { setStatus("No user chops"); return; }
-    int maxChop = chopModel_.boundaryCount - 2;
-    chopModel_.selected = clampInt(chopModel_.selected + delta, 0, maxChop);
-    cursorFrame_ = chopModel_.boundaries[chopModel_.selected];
-    saveChopStateForCurrentSample();
-    ensureCursorVisible();
-    prepareWaveformPreview();
-    publishOverlayState();
-    char msg[64]; snprintf(msg, sizeof(msg), "Selected chop %02d", chopModel_.selected); setStatus(msg);
+    // F3-3c: delegado a ChopperController (flujo golden identico).
+    chopperController_.SelectChop(delta);
 }
 
 bool SampleChopperModal::hasUserChops() const {
-    return (chopModel_.boundaryCount > 2);
+    // F3-3c: delegado a ChopperController (estado golden en ChopModel).
+    return chopperController_.HasUserChops();
 }
 
 bool SampleChopperModal::hasActiveSliceRange() const {
-    if (chopModel_.boundaryCount < 2 || sourceSize_ <= 1) return false;
-    if (chopModel_.boundaryCount > 2) return true;
-    return (chopModel_.boundaries[0] > 0 || chopModel_.boundaries[1] < sourceSize_ - 1);
+    // F3-3c: delegado a ChopperController (estado golden en ChopModel).
+    return chopperController_.HasActiveSliceRange();
 }
 
 int SampleChopperModal::selectedChopStartFrame() const {
+    // F3-3c: delegado a ChopperController.
     // F3-1: delegado a ChopModel (clamps golden identicos).
-    return chopModel_.StartFrameForSelected();
+    return chopperController_.SelectedChopStartFrame();
 }
 
 int SampleChopperModal::selectedChopEndFrame() const {
+    // F3-3c: delegado a ChopperController.
     // F3-1: delegado a ChopModel (clamps golden identicos).
-    return chopModel_.EndFrameForSelected(sourceSize_);
+    return chopperController_.SelectedChopEndFrame();
 }
 
 int SampleChopperModal::getFrameStepForEdit() const {
@@ -1605,116 +1622,30 @@ int SampleChopperModal::getFrameStepForEdit() const {
 }
 
 void SampleChopperModal::toggleTrimMode() {
-    if (pitchMode_) pitchMode_ = false;
-    initializeChopsIfNeeded();
-    trimMode_ = !trimMode_;
-    if (trimMode_) {
-        cursorFrame_ = selectedChopStartFrame();
-        setStatus("CROP SAMPLE");
-    } else {
-        setStatus("Crop mode off");
-    }
-    saveChopStateForCurrentSample();
-    ensureCursorVisible();
-    prepareWaveformPreview();
-    publishOverlayState();
-    isDirty_ = true;
+    // F3-3c: delegado a ChopperController (flujo golden identico).
+    chopperController_.ToggleTrimMode();
 }
 
 void SampleChopperModal::nudgeSelectedStart(int deltaFrames) {
-    initializeChopsIfNeeded();
-    if (chopModel_.boundaryCount < 2) { setStatus("No range to trim"); return; }
-    int idx = chopModel_.selected;
-    int minFrame = (idx == 0) ? 0 : chopModel_.boundaries[idx - 1] + 1;
-    int maxFrame = chopModel_.boundaries[idx + 1] - 1;
-    int nextFrame =
-        clampInt(
-            chopModel_.boundaries[idx] + deltaFrames,
-            minFrame,
-            maxFrame);
-    if (nextFrame == chopModel_.boundaries[idx]) return;
-    pushLogicalUndo("Move cut start");
-    chopModel_.boundaries[idx] = nextFrame;
-    cursorFrame_ = chopModel_.boundaries[idx];
-    saveChopStateForCurrentSample();
-    ensureCursorVisible();
-    prepareWaveformPreview();
-    publishOverlayState();
-    setStatus("Adjusted chop start");
+    // F3-3c: delegado a ChopperController (flujo golden identico).
+    chopperController_.NudgeSelectedStart(deltaFrames);
 }
 
 void SampleChopperModal::nudgeSelectedEnd(int deltaFrames) {
-    initializeChopsIfNeeded();
-    if (chopModel_.boundaryCount < 2) { setStatus("No range to trim"); return; }
-    int idx = chopModel_.selected + 1;
-    int minFrame = chopModel_.boundaries[idx - 1] + 1;
-    int maxFrame = (idx == chopModel_.boundaryCount - 1) ? (sourceSize_ - 1) : (chopModel_.boundaries[idx + 1] - 1);
-    int nextFrame =
-        clampInt(
-            chopModel_.boundaries[idx] + deltaFrames,
-            minFrame,
-            maxFrame);
-    if (nextFrame == chopModel_.boundaries[idx]) return;
-    pushLogicalUndo("Move cut end");
-    chopModel_.boundaries[idx] = nextFrame;
-    cursorFrame_ = chopModel_.boundaries[idx];
-    saveChopStateForCurrentSample();
-    ensureCursorVisible();
-    prepareWaveformPreview();
-    publishOverlayState();
-    setStatus("Adjusted chop end");
+    // F3-3c: delegado a ChopperController (flujo golden identico).
+    chopperController_.NudgeSelectedEnd(deltaFrames);
 }
 
-
 void SampleChopperModal::cropToSelectedRange() {
-    if (sourceSize_ <= 1) { setStatus("No sample to crop"); return; }
-    initializeChopsIfNeeded();
-    if (chopModel_.boundaryCount < 2) { setStatus("No range to crop"); return; }
-
-    chopModel_.selected = clampInt(chopModel_.selected, 0, chopModel_.boundaryCount - 2);
-    int start = selectedChopStartFrame();
-    int end = selectedChopEndFrame();
-    if (end <= start) { setStatus("Bad crop range"); return; }
-
-    /* U2.14: safe logical crop. We keep the chosen/trimmed range as a single S01 slice
-       and ignore material outside it at playback time. We do not rewrite the WAV file here. */
-    pushLogicalUndo("Keep logical range");
-    chopModel_.boundaryCount = 2;
-    chopModel_.boundaries[0] = start;
-    chopModel_.boundaries[1] = end;
-    for (int i = 2; i < MAX_CHOP_BOUNDARIES; i++) chopModel_.boundaries[i] = 0;
-    chopModel_.selected = 0;
-    trimMode_ = false;
-    cursorFrame_ = start;
-    saveChopStateForCurrentSample();
-    ensureCursorVisible();
-    prepareWaveformPreview();
-    publishOverlayState();
-    char msg[64];
-    snprintf(msg, sizeof(msg), "Keep range %d-%d", start, end);
-    setStatus(msg);
+    // F3-3c: delegado a ChopperController (crop logico U2.14 golden; el
+    // destructivo destructiveCropToSelectedRange queda en la vista).
+    chopperController_.CropToSelectedRange();
 }
 
 void SampleChopperModal::splitSampleIntoEqualParts(int parts) {
-    initializeChopsIfNeeded();
-    if (sourceSize_ <= 1) { setStatus("No sample to split"); return; }
-    setOperationCombo("L1 + B");
-    if (parts < 2 || parts > 32) parts = 4;
-    int step = sourceSize_ / parts;
-    if (step < 1) { setStatus("Sample too small"); return; }
-    pushLogicalUndo("Split sample");
-    // F3-1: rebuild de boundaryes golden en ChopModel (el guard de
-    // step<1 y el status se evaluaron arriba, igual que el golden).
-    chopModel_.SplitIntoEqualParts(parts, sourceSize_);
-    trimMode_ = false;
-    cursorFrame_ = 0;
-    saveChopStateForCurrentSample();
-    ensureCursorVisible();
-    prepareWaveformPreview();
-    publishOverlayState();
-    char m[64];
-    snprintf(m, sizeof(m), "Split sample in %d parts", parts);
-    setStatus(m);
+    // F3-3c: delegado a ChopperController (flujo golden identico; combo y
+    // mensajes via host adapter).
+    chopperController_.SplitSampleIntoEqualParts(parts);
 }
 
 void SampleChopperModal::setOperationCombo(const char *combo) {
@@ -1727,77 +1658,19 @@ void SampleChopperModal::setOperationCombo(const char *combo) {
    every cut (whole sample shows as a single region, no visible cut lines)
    and the next L1+B starts the cycle again at 4. */
 void SampleChopperModal::clearAllChops() {
-    initializeChopsIfNeeded();
-    if (sourceSize_ <= 1) { setStatus("No sample to clear"); return; }
-    pushLogicalUndo("Clear chops");
-    // F3-1: estado en ChopModel (rango minimo + cero del resto).
-    chopModel_.ClearAll(sourceSize_);
-    trimMode_ = false;
-    cursorFrame_ = 0;
-    saveChopStateForCurrentSample();
-    ensureCursorVisible();
-    prepareWaveformPreview();
-    publishOverlayState();
-    setStatus("No cuts (L1+B to split again)");
+    // F3-3c: delegado a ChopperController (flujo golden identico).
+    chopperController_.ClearAllChops();
 }
 
 void SampleChopperModal::cycleSplitParts() {
-    static const int kSplitCycle[] = {4, 8, 16, 32, 0, 4};
-    int next = 1;
-    for (int i = 0; i < 4; i++) {
-        if (splitParts_ == kSplitCycle[i]) { next = i + 1; break; }
-    }
-    splitParts_ = kSplitCycle[next];
-    if (splitParts_ == 0) {
-        clearAllChops();
-        return;
-    }
-    splitSampleIntoEqualParts(splitParts_);
+    // F3-3c: delegado a ChopperController (ciclo golden identico).
+    chopperController_.CycleSplitParts();
 }
 
 void SampleChopperModal::snapSelectedBoundaryToZeroCross(bool isStart) {
-    if (!hasAssignedSample() || sourceSize_ <= 1) { setStatus("No sample loaded"); return; }
-    initializeChopsIfNeeded();
-    if (chopModel_.boundaryCount < 2) { setStatus("No chops to snap"); return; }
-    SoundSource *source = SamplePool::GetInstance()->GetSource(sampleIndex_);
-    if (!source) { setStatus("No WAV source"); return; }
-    short *samples = (short *)source->GetSampleBuffer(-1);
-    int channels = source->GetChannelCount(-1);
-    if (!samples || channels <= 0) { setStatus("Bad sample buffer"); return; }
-
-    int idx = chopModel_.selected;
-    if (!isStart) idx = clampInt(idx + 1, 1, chopModel_.boundaryCount - 1);
-    if (idx < 0 || idx >= chopModel_.boundaryCount) { setStatus("Invalid boundary"); return; }
-    int frame = chopModel_.boundaries[idx];
-    int minFrame = (idx == 0) ? 0 : chopModel_.boundaries[idx - 1] + 1;
-    int maxFrame = (idx == chopModel_.boundaryCount - 1) ? (sourceSize_ - 1) : (chopModel_.boundaries[idx + 1] - 1);
-    int lo = frame - 64; if (lo < minFrame) lo = minFrame;
-    int hi = frame + 64; if (hi > maxFrame) hi = maxFrame;
-    int best = frame;
-    long bestScore = -1;
-    for (int f = lo; f <= hi; f++) {
-        long score = 0;
-        for (int c = 0; c < channels; c++) {
-            int s = samples[f * channels + c];
-            score += (s < 0) ? -s : s;
-        }
-        if (bestScore < 0 || score < bestScore) { bestScore = score; best = f; }
-    }
-    if (best != frame) {
-        pushLogicalUndo(isStart ? "Snap start" : "Snap end");
-        chopModel_.boundaries[idx] = best;
-        cursorFrame_ = best;
-        sortBoundaries();
-        saveChopStateForCurrentSample();
-        ensureCursorVisible();
-        prepareWaveformPreview();
-        publishOverlayState();
-        char m[64];
-        snprintf(m, sizeof(m), "Zero-cross %s %d", isStart ? "start" : "end", best);
-        setStatus(m);
-    } else {
-        setStatus("Already at zero-cross");
-    }
+    // F3-3c: delegado a ChopperController (flujo golden identico; buffer
+    // WAV via host adapter).
+    chopperController_.SnapSelectedBoundaryToZeroCross(isStart);
 }
 
 bool SampleChopperModal::destructiveCropToSelectedRange() {

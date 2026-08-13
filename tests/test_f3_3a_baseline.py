@@ -35,6 +35,7 @@ SCM_H = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModa
 SCM_CPP = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
 PS_H = (ROOT / "source/sources/Application/Views/ModalDialogs/PreviewService.h").read_text()
 CV_H = (ROOT / "source/sources/Application/Views/ModalDialogs/ChopperView.h").read_text()
+CC_H = (ROOT / "source/sources/Application/Views/ModalDialogs/ChopperController.h").read_text()
 AUDIT = (ROOT / "scripts/audit.sh").read_text()
 
 
@@ -85,6 +86,7 @@ def check_public_api():
 
 # ---------------------------------------------------------------------------
 # 2. Mensajes de estado golden (play/zoom/preview + historial)
+#    F3-3c: los de edicion (chop/split/delete) viven en ChopperController.
 # ---------------------------------------------------------------------------
 def check_status_strings():
     for s in [
@@ -94,6 +96,13 @@ def check_status_strings():
         '"Zoom %d%%"',
         '"%s %d"',
         '"%s %d-%d"',
+        '"Undo: %.46s"',
+        '"Redo: %.46s"',
+        '"Pitch/Env sample"',
+        '"Scope %s"',
+    ]:
+        assert s in SCM_CPP, f"Mensaje golden perdido: {s}"
+    for s in [
         '"Cannot chop at edge"',
         '"Chop already exists"',
         '"Max 100 chops reached"',
@@ -103,12 +112,8 @@ def check_status_strings():
         '"Cannot delete edge"',
         '"Selected chop %02d"',
         '"Split sample in %d parts"',
-        '"Undo: %.46s"',
-        '"Redo: %.46s"',
-        '"Pitch/Env sample"',
-        '"Scope %s"',
     ]:
-        assert s in SCM_CPP, f"Mensaje golden perdido: {s}"
+        assert s in CC_H, f"Mensaje golden de edicion perdido de la capa: {s}"
 
 
 # ---------------------------------------------------------------------------

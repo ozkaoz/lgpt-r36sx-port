@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCM_H = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.h").read_text()
 SCM_CPP = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
 CHOP_H = (ROOT / "source/sources/Application/Views/ModalDialogs/ChopModel.h").read_text()
+CC_H = (ROOT / "source/sources/Application/Views/ModalDialogs/ChopperController.h").read_text()
 AUDIT = (ROOT / "scripts/audit.sh").read_text()
 
 
@@ -59,7 +60,8 @@ def check_public_api():
 
 
 # ---------------------------------------------------------------------------
-# 2. Mensajes de estado golden intactos
+# 2. Mensajes de estado golden intactos (F3-3c: viven en ChopperController,
+#    la capa pura de los flujos de edicion)
 # ---------------------------------------------------------------------------
 def check_status_strings():
     for s in [
@@ -86,7 +88,7 @@ def check_status_strings():
         '"No sample to clear"',
         '"Sample too small"',
     ]:
-        assert s in SCM_CPP, f"Mensaje golden perdido: {s}"
+        assert s in CC_H, f"Mensaje golden perdido de la capa: {s}"
 
 
 # ---------------------------------------------------------------------------
@@ -99,12 +101,16 @@ def check_state_extraction():
     for raw in ["int selectedChop_;\n", "int boundaryCount_;\n",
                 "int boundaries_[MAX_CHOP_BOUNDARIES];"]:
         assert raw not in SCM_H, f"Miembro raw aun en header: {raw!r}"
-    # Algoritmos delegan: la vista ya no tiene el bubble inline
-    # (sortBoundaries delega a ChopModel::Sort).
-    assert "chopModel_.Sort();" in SCM_CPP
-    assert "chopModel_.InitRange(sourceSize_);" in SCM_CPP
-    assert "chopModel_.SplitIntoEqualParts(parts, sourceSize_);" in SCM_CPP
-    assert "chopModel_.RemoveChop(removeIdx, sourceSize_);" in SCM_CPP
+    # F3-3c: los flujos de edicion delegan a ChopperController; los
+    # algoritmos golden (Sort/InitRange/Split/Remove) viven en la capa.
+    assert "chopperController_.InitializeChopsIfNeeded();" in SCM_CPP
+    assert "chopperController_.AddChopAtCursor();" in SCM_CPP
+    assert "chopperController_.DeleteSelectedChop();" in SCM_CPP
+    assert "chopperController_.SplitSampleIntoEqualParts(parts);" in SCM_CPP
+    assert "chopModel_.Sort();" in SCM_CPP  # sortBoundaries sigue en la vista
+    assert "model_.InitRange(sourceSize_);" in CC_H
+    assert "model_.SplitIntoEqualParts(parts, sourceSize_);" in CC_H
+    assert "model_.RemoveChop(removeIdx, sourceSize_);" in CC_H
 
 
 # ---------------------------------------------------------------------------

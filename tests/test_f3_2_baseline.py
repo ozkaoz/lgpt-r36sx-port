@@ -33,6 +33,7 @@ SCM_H = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModa
 SCM_CPP = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
 HIST_H = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleEditHistory.h").read_text()
 PET_H = (ROOT / "source/sources/Application/Views/ModalDialogs/PitchEnvelopeTool.h").read_text()
+CC_H = (ROOT / "source/sources/Application/Views/ModalDialogs/ChopperController.h").read_text()
 AUDIT = (ROOT / "scripts/audit.sh").read_text()
 
 
@@ -73,29 +74,10 @@ def check_public_api():
 
 # ---------------------------------------------------------------------------
 # 2. Mensajes de estado golden intactos (historia + pitch)
+#    F3-3c: los de edicion (chop/split/delete) viven en ChopperController.
 # ---------------------------------------------------------------------------
 def check_status_strings():
     for s in [
-        '"Cannot chop at edge"',
-        '"Chop already exists"',
-        '"Max 100 chops reached"',
-        '"No sample to chop"',
-        '"Deleted cut"',
-        '"Merge cuts"',
-        '"No chop to delete"',
-        '"Cannot delete edge"',
-        '"Selected chop %02d"',
-        '"Move cut start"',
-        '"Move cut end"',
-        '"Adjusted chop start"',
-        '"Adjusted chop end"',
-        '"Split sample in %d parts"',
-        '"No cuts (L1+B to split again)"',
-        '"Zero-cross %s %d"',
-        '"Already at zero-cross"',
-        '"Live chop %02d at %d"',
-        '"Chop %02d at %d"',
-        '"No user chops"',
         '"Undo: %.46s"',
         '"Redo: %.46s"',
         '"Undo history does not match sample"',
@@ -117,6 +99,29 @@ def check_status_strings():
         '"Pitch/env unchanged"',
     ]:
         assert s in SCM_CPP, f"Mensaje golden perdido: {s}"
+    for s in [
+        '"Cannot chop at edge"',
+        '"Chop already exists"',
+        '"Max 100 chops reached"',
+        '"No sample to chop"',
+        '"Deleted cut"',
+        '"Merge cuts"',
+        '"No chop to delete"',
+        '"Cannot delete edge"',
+        '"Selected chop %02d"',
+        '"Move cut start"',
+        '"Move cut end"',
+        '"Adjusted chop start"',
+        '"Adjusted chop end"',
+        '"Split sample in %d parts"',
+        '"No cuts (L1+B to split again)"',
+        '"Zero-cross %s %d"',
+        '"Already at zero-cross"',
+        '"Live chop %02d at %d"',
+        '"Chop %02d at %d"',
+        '"No user chops"',
+    ]:
+        assert s in CC_H, f"Mensaje golden de edicion perdido de la capa: {s}"
 
 
 # ---------------------------------------------------------------------------

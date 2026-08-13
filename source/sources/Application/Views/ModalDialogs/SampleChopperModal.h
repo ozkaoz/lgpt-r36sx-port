@@ -7,6 +7,7 @@
 #include "Application/Views/ModalDialogs/PitchEnvelopeTool.h"
 #include "Application/Views/ModalDialogs/PreviewService.h"
 #include "Application/Views/ModalDialogs/ChopperView.h"
+#include "Application/Views/ModalDialogs/ChopperController.h"
 #include "UIFramework/Framework/GUITextProperties.h"
 #include <string>
 
@@ -265,6 +266,29 @@ private:
     void clearAllChops();
     void setOperationCombo(const char *combo);
     int splitParts_;
+    // F3-3c (docs/F3_ARCHITECTURE_ES.md): logica de edicion (12 flujos
+    // golden) extraida a ChopperController (capa pura header-only).  El
+    // adapter ChopperHostAdapter traduce los efectos de vista; la vista
+    // conserva audio, destructivos, undo/redo fisico y logico, persistencia
+    // por sample, preview y overlay (los metodos delegados siguen aqui con
+    // la API publica intacta).
+    struct ChopperHostAdapter : public ChopperController::Host {
+        explicit ChopperHostAdapter(SampleChopperModal &owner);
+        void SetStatus(const char *message);
+        void SetOperationCombo(const char *combo);
+        void PushLogicalUndo(const char *action);
+        void SaveChopState();
+        void EnsureCursorVisible();
+        void PrepareWaveformPreview();
+        void PublishOverlayState();
+        void MarkDirty();
+        bool SampleLoaded();
+        int QuerySnapBuffer(short **samples, int *channels);
+        bool LiveStreamingPosition(int *frame);
+        SampleChopperModal &owner_;
+    };
+    ChopperHostAdapter chopperHost_;
+    ChopperController chopperController_;
 };
 
 #endif
