@@ -93,6 +93,7 @@ TREEFROGDIRS := \
 
 TREEFROGFILES := \
 	TreeFrogLibretro.o \
+	CrashTrap.o \
 	TreeFrogSystem.o \
 	TreeFrogGUIFactory.o \
 	TreeFrogGUIWindowImp.o \

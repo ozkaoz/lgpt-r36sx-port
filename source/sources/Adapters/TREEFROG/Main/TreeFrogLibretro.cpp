@@ -11,6 +11,7 @@
 #include "Adapters/TREEFROG/GUI/TreeFrogEventManager.h"
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
 #include "Adapters/TREEFROG/Main/TreeFrogSamplerInput.h"
+#include "Adapters/TREEFROG/Main/CrashTrap.h"
 #include "Adapters/TREEFROG/System/TreeFrogSystem.h"
 #include "Adapters/TREEFROG/Timer/TreeFrogTimer.h"
 #include "Application/Application.h"
@@ -1161,6 +1162,9 @@ void retro_init(void) {
      * handled error, matching the daemons (which ignore SIGPIPE).
      */
     signal(SIGPIPE, SIG_IGN);
+    /* U2.53.0: diagnostic crash trap (dumps registers to tmpfs, then
+     * re-raises).  Pure diagnostics; normal operation is unchanged. */
+    LgptCrashTrapInstall();
     memset(framebuffer, 0, sizeof(framebuffer));
     memset(audio_buffer, 0, sizeof(audio_buffer));
     reset_runtime_state(false);

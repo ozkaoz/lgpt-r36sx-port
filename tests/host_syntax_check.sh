@@ -21,6 +21,7 @@ BASE=(
 )
 FILES=(
   "$SOURCE/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp"
+  "$SOURCE/Adapters/TREEFROG/Main/CrashTrap.cpp"
   "$SOURCE/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp"
   "$SOURCE/Application/AppWindow.cpp"
   "$SOURCE/Application/Views/InstrumentView.cpp"
