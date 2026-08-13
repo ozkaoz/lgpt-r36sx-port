@@ -74,7 +74,6 @@ static const char *CAPTURE_ELAPSED = "/tmp/r36sx_lgpt_usb/usb_capture_elapsed";
 static const char *CAPTURE_MONITOR = "/tmp/r36sx_lgpt_usb/usb_capture_monitor";
 static const char *CAPTURE_MONITOR_FIFO = "/tmp/r36sx_usb_capture_monitor_fifo";
 static const char *RUNTIME_MIRROR_DIR = "/mnt/sdcard/lgpt/otg/logs/runtime_state";
-static const char *CAPTURE_STAGING_DIR = "/mnt/sdcard/lgpt/samples/records";
 static const char *AUDIO_PROFILE = "/tmp/r36sx_lgpt_usb/audio_profile";
 static const char *AUDIO_CHANNELS = "/tmp/r36sx_lgpt_usb/audio_channels";
 static const char *AUDIO_RATE = "/tmp/r36sx_lgpt_usb/audio_rate";
@@ -234,7 +233,14 @@ static unsigned long long monotonic_milliseconds(void) {
            ((unsigned long long)ts.tv_nsec / 1000000ULL);
 }
 
+/* H42: runtime_state mirroring to SD is compiled out by default: the daemon
+ * must perform zero SD writes during normal operation (tmpfs-only runtime).
+ * Re-enable with -DLGPT_SD_RUNTIME_MIRROR=1 for field debugging. */
+#ifndef LGPT_SD_RUNTIME_MIRROR
+#define LGPT_SD_RUNTIME_MIRROR 0
+#endif
 static void mirror_runtime_state(const char *path, const char *text) {
+#if LGPT_SD_RUNTIME_MIRROR
     const char *base = path ? strrchr(path, '/') : 0;
     base = base ? base + 1 : path;
     if (!base || !base[0]) return;
@@ -245,6 +251,10 @@ static void mirror_runtime_state(const char *path, const char *text) {
     snprintf(out, sizeof(out), "%s/%s", RUNTIME_MIRROR_DIR, base);
     int fd = open(out, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) { if (text) write(fd, text, strlen(text)); close(fd); }
+#else
+    (void)path;
+    (void)text;
+#endif
 }
 
 static int file_contains(const char *p, const char *needle) {
@@ -290,7 +300,8 @@ static void write_text_file(const char *path, const char *text) {
      * Meter values are consumed live from tmpfs by the core. Mirroring L/R,
      * aggregate level and elapsed time to the SD on every 480-frame read caused
      * dozens of synchronous writes per second while Record was open. Keep those
-     * values volatile; status, metadata, ABI and profile state remain mirrored.
+     * values volatile; since H42 the SD mirror itself is compiled out (zero
+     * SD writes at runtime) unless LGPT_SD_RUNTIME_MIRROR=1.
      */
     if (path &&
         strstr(path, RUNTIME_DIR) == path &&
@@ -301,24 +312,13 @@ static void write_text_file(const char *path, const char *text) {
 static void mark_active(void) { char b[64]; snprintf(b, sizeof(b), "%ld\n", (long)time(NULL)); write_text_file(ACTIVE_MARKER, b); }
 static void mark_inactive(void) { unlink(ACTIVE_MARKER); }
 
-static void ensure_capture_staging_dir(void) {
-    mkdir("/mnt/sdcard", 0777);
-    mkdir("/mnt/sdcard/lgpt", 0777);
-    mkdir("/mnt/sdcard/lgpt/samples", 0777);
-    mkdir(CAPTURE_STAGING_DIR, 0777);
-}
-
-static void basename_from_path(const char *path, char *dst, int len) {
-    const char *b = path ? strrchr(path, '/') : 0;
-    b = b ? b + 1 : path;
-    if (!b || !b[0]) b = "USBREC.wav";
-    snprintf(dst, len, "%s", b);
-}
-
+/* H42: the capture WAV is always written to the tmpfs path requested by the
+ * core (/tmp/r36sx_lgpt_record/). The old fallback to the SD staging dir is
+ * removed: a failed tmpfs open is a clean, logged error (the core surfaces
+ * it in the Record modal) instead of a silent SD write. */
 static int open_capture_wav_with_fallback(const char *requested, const char *name, char *actual, int actual_len) {
-    ensure_capture_staging_dir();
     if (requested && requested[0]) snprintf(actual, actual_len, "%s", requested);
-    else snprintf(actual, actual_len, "%s/%s", CAPTURE_STAGING_DIR, name && name[0] ? name : "USBREC.wav");
+    else snprintf(actual, actual_len, "%s/%s", "/tmp/r36sx_lgpt_record", name && name[0] ? name : "USBREC.wav");
     int fd = open(actual, O_WRONLY | O_CREAT | O_EXCL, 0666);
     if (fd >= 0) return fd;
     int first_errno = errno;
@@ -327,14 +327,6 @@ static int open_capture_wav_with_fallback(const char *requested, const char *nam
         return -1;
     }
     fprintf(stderr, "CAPTURE_OPEN_REQUESTED_FAILED path=%s errno=%d (%s)\n", actual, first_errno, strerror(first_errno));
-    char safe_name[128]; basename_from_path(name && name[0] ? name : requested, safe_name, sizeof(safe_name));
-    snprintf(actual, actual_len, "%s/%s", CAPTURE_STAGING_DIR, safe_name);
-    fd = open(actual, O_WRONLY | O_CREAT | O_EXCL, 0666);
-    if (fd >= 0) {
-        fprintf(stderr, "CAPTURE_OPEN_FALLBACK_OK path=%s from_errno=%d\n", actual, first_errno);
-        return fd;
-    }
-    fprintf(stderr, "CAPTURE_OPEN_FALLBACK_FAILED path=%s errno=%d (%s)\n", actual, errno, strerror(errno));
     return -1;
 }
 
@@ -949,11 +941,11 @@ static int ring_pop_frame(unsigned ch, int16_t *frm) {
  * Prime 2080 frames = 43 ms; target 1600 = 33 ms steady backlog. ---- */
 #define ASRC_STAGE_FRAMES 8192U
 #define ASRC_TARGET_BACKLOG_FRAMES 3600U
-#define ASRC_PRIME_BACKLOG_FRAMES 2080U
-#define ASRC_MAX_CORRECTION_PPM 10000
-#define ASRC_INTEGRAL_LIMIT_PPM 10000
-#define ASRC_PROPORTIONAL_GAIN 2400
-#define ASRC_INTEGRAL_GAIN 12
+#define ASRC_PRIME_BACKLOG_FRAMES 3600U
+#define ASRC_MAX_CORRECTION_PPM 30000
+#define ASRC_INTEGRAL_LIMIT_PPM 30000
+#define ASRC_PROPORTIONAL_GAIN 6000
+#define ASRC_INTEGRAL_GAIN 120
 static int16_t asrc_stage[ASRC_STAGE_FRAMES * 2U];
 static unsigned asrc_stage_frames = 0U;
 static uint64_t asrc_phase_q32 = 0ULL;

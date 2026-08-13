@@ -1269,15 +1269,30 @@ void retro_run(void) {
     int frames = (int)audio_accum;
     audio_accum -= frames;
     if (frames < 0) frames = 0;
-    if (frames > 2048) frames = 2048;
+    /* U2.71 H39: never discard wall-clock audio budget. The single-shot
+       2048-frame cap threw away ~2.3% of the stream whenever the frontend
+       stalled longer than a 2048-frame render (retro_run gap > ~43 ms);
+       the SP-404 host ASRC then had to stretch that deficit, which is the
+       residual lag/aliasing. Render the full budget in <=2048-frame chunks;
+       the UAC2 fifo and the host ring absorb the burst. Cap at 1 s so a
+       pathological stall cannot dump an unbounded backlog (the host ASRC
+       resync already handles multi-second floods). */
+    if (frames > 48000) frames = 48000;
 
     if ((treefrog_v11_frame_counter % 60) == 0) v11_log_retro("retro.audio.render.enter");
-    TreeFrogAudioDriver *drv = TreeFrogGetAudioDriver();
-    if (drv) drv->Render(audio_buffer, frames);
-    else memset(audio_buffer, 0, frames * 2 * sizeof(int16_t));
+    {
+        int remaining = frames;
+        while (remaining > 0) {
+            int chunk = remaining > 2048 ? 2048 : remaining;
+            TreeFrogAudioDriver *drv = TreeFrogGetAudioDriver();
+            if (drv) drv->Render(audio_buffer, chunk);
+            else memset(audio_buffer, 0, chunk * 2 * sizeof(int16_t));
+            if (audio_batch_cb) audio_batch_cb(audio_buffer, chunk);
+            remaining -= chunk;
+        }
+    }
 
     if ((treefrog_v11_frame_counter % 60) == 0) v11_log_retro("retro.audio.render.leave");
-    if (audio_batch_cb && frames > 0) audio_batch_cb(audio_buffer, frames);
     if (video_cb) {
         unsigned vw, vh; size_t vp;
         uint16_t *vf = make_video_output(TreeFrogGetFramebuffer(), &vw, &vh, &vp);

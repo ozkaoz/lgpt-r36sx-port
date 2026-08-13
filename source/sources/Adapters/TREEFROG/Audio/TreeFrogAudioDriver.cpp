@@ -256,7 +256,7 @@ void TreeFrogAudioDriver::Render(int16_t *dst, int frames) {
          * can be monitored in real time inside USB-C RECORD.
          */
         memset(dst, 0, frames * 2 * sizeof(int16_t));
-        TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo44100(dst, frames);
+        TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo48000(dst, frames);
         rendering_ = false;
         return;
     }
@@ -265,11 +265,11 @@ void TreeFrogAudioDriver::Render(int16_t *dst, int frames) {
         consumeOneFrame(dst + i * 2);
     }
 
-    TreeFrogUac2Bridge_SubmitStereo44100(dst, frames);
+    TreeFrogUac2Bridge_SubmitStereo48000(dst, frames);
     if (TreeFrogUac2Bridge_ShouldMuteLocal()) {
         memset(dst, 0, frames * 2 * sizeof(int16_t));
     }
-    TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo44100(dst, frames);
+    TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo48000(dst, frames);
 
     rendering_ = false;
 }

@@ -120,6 +120,18 @@ static unsigned g_resample_phase_160 = 0;
 enum { U2514_RESAMPLE_INPUT_CAPACITY_FRAMES = 8192 };
 static int16_t g_resample_input[U2514_RESAMPLE_INPUT_CAPACITY_FRAMES * 2];
 static unsigned g_resample_input_fill_frames = 0;
+/* H40: bounded staging for partial fifo writes. The fifo is O_NONBLOCK;
+ * when the daemon is momentarily behind, write() can accept a fraction of
+ * the block (or nothing). Previously the remainder was silently dropped,
+ * which clipped ~20-40 ms of audio on every backpressure event. The staged
+ * buffer keeps the remaining samples and retries from the front on the
+ * next submit; the cap bounds worst-case added latency (~341 ms at
+ * 48 kHz stereo) and overflow drops the OLDEST samples, never the newest. */
+enum { H40_FIFO_PENDING_CAP_SAMPLES = 16384 };
+static int16_t g_fifo_pending[H40_FIFO_PENDING_CAP_SAMPLES];
+static unsigned g_fifo_pending_samples = 0;
+static unsigned long g_fifo_pending_drop_frames = 0;
+static unsigned long g_fifo_pending_stage_events = 0;
 static int g_usb_channels = 1;
 static int g_usb_rate = 48000;
 static int g_engine_rate = 48000;
@@ -583,8 +595,9 @@ static void au10z_write_text_file(const char *path, const char *text) {
 
 static void au10z_mirror_runtime_file(const char *leaf, const char *text) {
     if (!leaf || !leaf[0]) return;
-    mkdir("/mnt/sdcard/lgpt/otg", 0777);
-    mkdir("/mnt/sdcard/LGPT_OTG_LOGS", 0777);
+    /* H42: the mirror target is tmpfs (kRuntimeMirrorDir). The SD mkdirs
+     * below used to create FAT directory entries on every capture command;
+     * removed for the zero-runtime-SD-writes mandate. */
     mkdir(kRuntimeMirrorDir, 0777);
     char p[256];
     snprintf(p, sizeof(p), "%s/%s", kRuntimeMirrorDir, leaf);
@@ -1012,14 +1025,14 @@ static int should_mute_now(void) {
      * U2.41.5.1 LOCAL_MIX_ISOLATION:
      * The project is always sent to Windows in USB_DUPLEX, including while
      * prelisten is active.  Mute only the local project mix; the PC monitor is
-     * added afterwards by MixUsbCaptureMonitorStereo44100().
+     * added afterwards by MixUsbCaptureMonitorStereo48000().
      */
     /*
      * U2.51.4 USB_EXCLUSIVE_RECORD_MONITOR:
      * When the OTG gadget is configured, the tracker project is routed to the
      * USB host and removed from the local mix.  The Record modal may still add
      * PC->console monitor audio afterwards through
-     * MixUsbCaptureMonitorStereo44100().  Therefore normal OTG playback is
+     * MixUsbCaptureMonitorStereo48000().  Therefore normal OTG playback is
      * heard only in Windows, while prelisten exists only inside Record.
      *
      * disable_mute_local is retained only as an explicit diagnostic override.
@@ -1181,6 +1194,7 @@ static void close_fifo_if_open(const char *why) {
         g_fifo_fd = -1;
         g_resample_phase_160 = 0;
         g_resample_input_fill_frames = 0;
+        g_fifo_pending_samples = 0;
         log_msg(why ? why : "fifo closed");
     }
 }
@@ -1612,7 +1626,7 @@ static int capture_recording_active(void) {
     return strstr(g_capture_status, "recording") != 0 || strstr(g_capture_status, "rec start") != 0;
 }
 
-void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
+void TreeFrogUac2Bridge_SubmitStereo48000(const int16_t *stereo, int frames) {
 #if TREEFROG_UAC2_BRIDGE
     ++g_submit_count;
     if (!g_au11i2_build_marker_logged) {
@@ -1756,18 +1770,88 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
     }
 
     if (out_frames <= 0) return;
-    const size_t sample_count =
-        (size_t)out_frames * (size_t)g_usb_channels;
-    ssize_t written = write(
-        g_fifo_fd,
-        out,
-        sample_count * sizeof(int16_t));
-    if (written < 0) {
-        if (errno == EPIPE || errno == ENXIO || errno == EBADF)
-            close_fifo_if_open(
-                "fifo closed after hard write error");
-        else if ((g_submit_count % 240) == 0)
-            log_msg("fifo write nonfatal error");
+
+    /* H40: first drain any remainder of a previous partial write, so older
+     * audio is never overtaken by newer blocks. */
+    if (g_fifo_pending_samples > 0) {
+        const size_t pend_bytes =
+            (size_t)g_fifo_pending_samples * sizeof(int16_t);
+        const ssize_t n = write(g_fifo_fd, g_fifo_pending, pend_bytes);
+        if (n < 0) {
+            if (errno == EPIPE || errno == ENXIO || errno == EBADF) {
+                close_fifo_if_open(
+                    "fifo closed after hard write error (pending)");
+                return;
+            }
+            /* EAGAIN (or other nonfatal): keep staged, retry next submit. */
+        } else if (n > 0) {
+            const size_t consumed = (size_t)n / sizeof(int16_t);
+            if (consumed >= g_fifo_pending_samples) {
+                g_fifo_pending_samples = 0;
+            } else {
+                memmove(
+                    g_fifo_pending,
+                    g_fifo_pending + consumed,
+                    (size_t)(g_fifo_pending_samples - consumed) *
+                        sizeof(int16_t));
+                g_fifo_pending_samples -=
+                    (unsigned)(consumed);
+            }
+        }
+    }
+
+    {
+        const size_t sample_count =
+            (size_t)out_frames * (size_t)g_usb_channels;
+        ssize_t written = write(
+            g_fifo_fd,
+            out,
+            sample_count * sizeof(int16_t));
+        if (written < 0) {
+            if (errno == EPIPE || errno == ENXIO || errno == EBADF) {
+                close_fifo_if_open(
+                    "fifo closed after hard write error");
+                return;
+            }
+            written = 0; /* EAGAIN: stage the whole block below. */
+        }
+        const size_t w_samples =
+            (size_t)written / sizeof(int16_t);
+        if (w_samples < sample_count) {
+            size_t rem = sample_count - w_samples;
+            const int16_t *src = out + w_samples;
+            ++g_fifo_pending_stage_events;
+            if (rem > H40_FIFO_PENDING_CAP_SAMPLES) {
+                /* Pathological: even the newest block does not fit. Keep the
+                 * most recent tail, drop the rest (counted). */
+                src += rem - H40_FIFO_PENDING_CAP_SAMPLES;
+                g_fifo_pending_drop_frames +=
+                    (unsigned long)((rem - H40_FIFO_PENDING_CAP_SAMPLES) /
+                                    2u);
+                rem = H40_FIFO_PENDING_CAP_SAMPLES;
+            }
+            if ((size_t)g_fifo_pending_samples + rem >
+                H40_FIFO_PENDING_CAP_SAMPLES) {
+                const size_t excess =
+                    (size_t)g_fifo_pending_samples + rem -
+                    H40_FIFO_PENDING_CAP_SAMPLES;
+                memmove(
+                    g_fifo_pending,
+                    g_fifo_pending + excess,
+                    (size_t)(g_fifo_pending_samples - excess) *
+                        sizeof(int16_t));
+                g_fifo_pending_samples -= (unsigned)(excess);
+                g_fifo_pending_drop_frames +=
+                    (unsigned long)(excess / 2u);
+            }
+            memcpy(
+                g_fifo_pending + g_fifo_pending_samples,
+                src,
+                rem * sizeof(int16_t));
+            g_fifo_pending_samples += (unsigned)(rem);
+            if ((g_submit_count % 240) == 0)
+                log_msg("fifo backpressure: staged frames pending");
+        }
     }
 #else
     (void)stereo;
@@ -1775,7 +1859,7 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
 #endif
 }
 
-void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo44100(
+void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo48000(
     int16_t *stereo,
     int frames) {
 #if TREEFROG_UAC2_BRIDGE
