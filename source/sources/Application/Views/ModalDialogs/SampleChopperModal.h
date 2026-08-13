@@ -43,7 +43,9 @@ public:
     // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): the chopper reports its
     // own view type so SELECT+R1 opens the CHOPPER help section instead of
     // the Instrument section of the view underneath.
-    virtual ViewType GetViewType() const { return VT_CHOPPER; }
+    virtual ViewType GetViewType() const {
+        return pitchMode_ ? VT_CHOPPITCH : VT_CHOPPER;
+    }
     // TREEFROG_CHOPPER_HELP_V1: while Help (or another modal) is pushed on
     // top, the waveform pixel overlay must not draw over it; it is cleared on
     // suspend and re-published when the chopper regains focus.  TREEFROG_CHOPPER_HELP_V2

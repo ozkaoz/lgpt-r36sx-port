@@ -205,7 +205,7 @@ const HelpSection *HelpRegistry::GetSection(ViewType vt) {
             return &kSections_[4];
         case VT_TABLE:
         case VT_TABLE2:
-            return &kSections_[4];
+            return &kSections_[5];
         case VT_GROOVE:
             return &kSections_[6];
         case VT_MIXER:
@@ -214,6 +214,8 @@ const HelpSection *HelpRegistry::GetSection(ViewType vt) {
         // modal, not a regular view type; map it to its help section.
         case VT_CHOPPER:
             return &kSections_[8];
+        case VT_CHOPPITCH:
+            return &kSections_[9];
         default:
             return 0;
     }

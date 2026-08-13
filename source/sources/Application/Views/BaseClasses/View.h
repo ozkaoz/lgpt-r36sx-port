@@ -54,7 +54,10 @@ enum ViewType {
     // sample chopper, so HelpOverlay can open on the CHOPPER help section.
     // Kept at the end of the enum so existing VT_* ordinal values (used by
     // HelpRegistry and focus switching) are unaffected.
-    VT_CHOPPER
+    VT_CHOPPER,
+    // F2 (0722cb2 validacion consola): submodo Pitch/Env del chopper; su
+    // HelpOverlay debe abrir en la seccion CHOP PITCH.
+    VT_CHOPPITCH
 };
 
 enum ViewMode {

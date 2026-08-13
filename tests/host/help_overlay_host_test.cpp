@@ -163,16 +163,24 @@ static void runScenario(const char *name, View *cv, bool withSuspended) {
 
 int main() {
     /* F2: alineacion GetSection/ViewType (el help de MIXER abria en
-     * CHOPPER por el desajuste de ordinales). */
+     * CHOPPER por el desajuste de ordinales; TABLE mapea a TABLE, y el
+     * submodo pitch del chopper a CHOP PITCH). */
     CHECK(HelpRegistry::GetSection(VT_MIXER) ==
           HelpRegistry::GetSectionAt(7));
     CHECK(HelpRegistry::GetSection(VT_GROOVE) ==
           HelpRegistry::GetSectionAt(6));
+    CHECK(HelpRegistry::GetSection(VT_TABLE) ==
+          HelpRegistry::GetSectionAt(5));
     CHECK(HelpRegistry::GetSection(VT_TABLE2) ==
-          HelpRegistry::GetSectionAt(4));
+          HelpRegistry::GetSectionAt(5));
     CHECK(HelpRegistry::GetSection(VT_CHOPPER) ==
           HelpRegistry::GetSectionAt(8));
+    CHECK(HelpRegistry::GetSection(VT_CHOPPITCH) ==
+          HelpRegistry::GetSectionAt(9));
     CHECK(strcmp(HelpRegistry::GetSection(VT_MIXER)->title, "MIXER") == 0);
+    CHECK(strcmp(HelpRegistry::GetSection(VT_TABLE)->title, "TABLE") == 0);
+    CHECK(strcmp(HelpRegistry::GetSection(VT_CHOPPITCH)->title,
+                 "CHOP PITCH") == 0);
 
     FakeImp imp;
     FakeWindow win(imp);
