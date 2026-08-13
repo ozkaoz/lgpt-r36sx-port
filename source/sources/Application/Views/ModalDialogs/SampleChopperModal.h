@@ -5,6 +5,8 @@
 #include "Application/Views/ModalDialogs/ChopModel.h"
 #include "Application/Views/ModalDialogs/SampleEditHistory.h"
 #include "Application/Views/ModalDialogs/PitchEnvelopeTool.h"
+#include "Application/Views/ModalDialogs/PreviewService.h"
+#include "Application/Views/ModalDialogs/ChopperView.h"
 #include "UIFramework/Framework/GUITextProperties.h"
 #include <string>
 
@@ -129,9 +131,12 @@ private:
     int zoomPercent_;
     bool hasWaveform_;
     bool playbackTriggered_;
-    bool previewActive_;
-    int previewStartFrame_;
-    int previewEndFrame_;
+    // F3-3a (docs/F3_ARCHITECTURE_ES.md): rango de playback (active /
+    // start / end) extraido a PreviewService (capa pura); la vista
+    // conserva audio, mensajes y overlay via los adapters delegados
+    // (setPreviewPlaybackRange / clearPreviewPlaybackRange /
+    // stopSamplePreview / play* siguen aqui).
+    PreviewService preview_;
     bool operationActive_;
     int operationPercent_;
     char operationMessage_[64];

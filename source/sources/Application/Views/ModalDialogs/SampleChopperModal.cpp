@@ -989,9 +989,6 @@ SampleChopperModal::SampleChopperModal(View &view,
       zoomPercent_(MIN_ZOOM_PERCENT),
       hasWaveform_(false),
       playbackTriggered_(false),
-      previewActive_(false),
-      previewStartFrame_(0),
-      previewEndFrame_(0),
       operationActive_(false),
       operationPercent_(0),
       chopsInitialized_(false),
@@ -1048,9 +1045,8 @@ void SampleChopperModal::resetPitchEnvelopeSettings() {
 }
 
 int SampleChopperModal::getZoomFactor() const {
-    int z = zoomPercent_ / 5;
-    if (z < 1) z = 1;
-    return z;
+    // F3-3a: geometria golden extraida a ChopperView.
+    return ChopperView::GetZoomFactor(zoomPercent_);
 }
 
 void SampleChopperModal::setStatus(const char *message) {
@@ -1060,69 +1056,40 @@ void SampleChopperModal::setStatus(const char *message) {
 }
 
 int SampleChopperModal::getViewFrameCount() const {
-    if (sourceSize_ <= 0) return 0;
-    int frames = sourceSize_ / getZoomFactor();
-    if (frames < WAVE_W) frames = WAVE_W;
-    if (frames > sourceSize_) frames = sourceSize_;
-    return frames;
+    return ChopperView::GetViewFrameCount(sourceSize_, zoomPercent_);
 }
 
 void SampleChopperModal::clampViewStart() {
-    if (sourceSize_ <= 0) { viewStartFrame_ = 0; return; }
-    int viewFrames = getViewFrameCount();
-    int maxStart = sourceSize_ - viewFrames;
-    if (maxStart < 0) maxStart = 0;
-    viewStartFrame_ = clampInt(viewStartFrame_, 0, maxStart);
+    viewStartFrame_ =
+        ChopperView::ClampViewStart(viewStartFrame_, sourceSize_, zoomPercent_);
 }
 
 void SampleChopperModal::centerViewOnCursor() {
-    if (sourceSize_ <= 0) { viewStartFrame_ = 0; return; }
-    int viewFrames = getViewFrameCount();
-    viewStartFrame_ = cursorFrame_ - viewFrames / 2;
-    clampViewStart();
+    viewStartFrame_ = ChopperView::CenterOnCursor(cursorFrame_, sourceSize_,
+                                                  zoomPercent_);
 }
 
 void SampleChopperModal::ensureCursorVisible() {
-    if (sourceSize_ <= 0) return;
-    int viewFrames = getViewFrameCount();
-    if (cursorFrame_ < viewStartFrame_) viewStartFrame_ = cursorFrame_;
-    if (cursorFrame_ >= viewStartFrame_ + viewFrames) viewStartFrame_ = cursorFrame_ - viewFrames + 1;
-    clampViewStart();
+    viewStartFrame_ = ChopperView::EnsureCursorVisible(
+        viewStartFrame_, cursorFrame_, sourceSize_, zoomPercent_);
 }
 
 int SampleChopperModal::getCursorFrame() const { return cursorFrame_; }
 
 int SampleChopperModal::frameToPixel(int frame) const {
-    int viewFrames = getViewFrameCount();
-    if (viewFrames <= 1) return -1;
-    if (frame < viewStartFrame_) return -1;
-    if (frame > viewStartFrame_ + viewFrames - 1) return -1;
-    long long rel = (long long)(frame - viewStartFrame_) * (long long)(WAVE_W - 1);
-    rel /= (long long)(viewFrames - 1);
-    return clampInt((int)rel, 0, WAVE_W - 1);
+    return ChopperView::FrameToPixel(frame, viewStartFrame_, sourceSize_,
+                                     zoomPercent_);
 }
 
 int SampleChopperModal::pixelToFrame(int px) const {
-    if (sourceSize_ <= 0) return 0;
-    int viewFrames = getViewFrameCount();
-    if (viewFrames <= 1) return viewStartFrame_;
-    px = clampInt(px, 0, WAVE_W - 1);
-    long long frame = (long long)viewStartFrame_ + ((long long)px * (long long)(viewFrames - 1)) / (long long)(WAVE_W - 1);
-    if (frame < 0) frame = 0;
-    if (frame >= sourceSize_) frame = sourceSize_ - 1;
-    return (int)frame;
+    return ChopperView::PixelToFrame(px, viewStartFrame_, sourceSize_,
+                                     zoomPercent_);
 }
 
 void SampleChopperModal::nudgeCursorPixels(int deltaPx) {
     if (sourceSize_ <= 0) return;
-    int viewFrames = getViewFrameCount();
-    int step = viewFrames / WAVE_W;
-    if (step < 1) step = 1;
-    long long deltaFrames = (long long)step * (long long)deltaPx;
-    long long next = (long long)cursorFrame_ + deltaFrames;
-    if (next < 0) next = 0;
-    if (next >= sourceSize_) next = sourceSize_ - 1;
-    cursorFrame_ = (int)next;
+    cursorFrame_ = ChopperView::NudgeCursorPixels(cursorFrame_, deltaPx,
+                                                  sourceSize_, zoomPercent_);
     ensureCursorVisible();
     prepareWaveformPreview();
     publishOverlayState();
@@ -1131,7 +1098,8 @@ void SampleChopperModal::nudgeCursorPixels(int deltaPx) {
 
 void SampleChopperModal::nudgeZoomPercent(int deltaPercent) {
     int oldZoom = zoomPercent_;
-    zoomPercent_ = clampInt(zoomPercent_ + deltaPercent, MIN_ZOOM_PERCENT, MAX_ZOOM_PERCENT);
+    zoomPercent_ = ChopperView::NudgeZoom(zoomPercent_, deltaPercent,
+                                          MIN_ZOOM_PERCENT, MAX_ZOOM_PERCENT);
     if (zoomPercent_ != oldZoom) {
         centerViewOnCursor();
         prepareWaveformPreview();
@@ -1548,9 +1516,9 @@ void SampleChopperModal::addChopAtCursor() {
     if (chopModel_.boundaryCount >= MAX_CHOP_BOUNDARIES) { setStatus("Max 100 chops reached"); return; }
     int frame = getCursorFrame();
     bool liveCut = false;
-    if (previewActive_ && Player::GetInstance()->IsStreaming()) {
+    if (preview_.Active() && Player::GetInstance()->IsStreaming()) {
         int liveFrame = Player::GetInstance()->GetStreamingPosition();
-        if (liveFrame >= previewStartFrame_ && liveFrame <= previewEndFrame_) {
+        if (liveFrame >= preview_.StartFrame() && liveFrame <= preview_.EndFrame()) {
             frame = clampInt(liveFrame, 0, sourceSize_ - 1);
             cursorFrame_ = frame;
             liveCut = true;
@@ -2469,7 +2437,9 @@ void SampleChopperModal::previewPitchSetting() {
     Path path(logical.c_str());
     Player::GetInstance()->StartStreamingRangeAt(path, 0, frames > 0 ? frames - 1 : 0);
     playbackTriggered_ = true;
-    previewActive_ = false;
+    // F3-3a: desactivar el rango de preview del chopper sin borrar
+    // start/end (golden 2472: solo previewActive_=false).
+    preview_.Deactivate();
 #if defined(PLATFORM_TREEFROG)
     g_chopperPreviewActive = 0;
 #endif
@@ -2712,9 +2682,9 @@ void SampleChopperModal::previewTrimStart() {
     initializeChopsIfNeeded();
     int start = selectedChopStartFrame();
     int end = selectedChopEndFrame();
-    int previewEnd = start + (sourceRate_ > 0 ? sourceRate_ * 5 : 220500);
-    if (previewEnd > end) previewEnd = end;
-    playFrameRange(start, previewEnd, "Preview start");
+    // F3-3a: ventana golden de 5s extraida a PreviewService.
+    PreviewService::Range r = preview_.TrimStart(start, end, sourceRate_);
+    playFrameRange(r.start, r.end, "Preview start");
 }
 
 void SampleChopperModal::previewTrimEnd() {
@@ -2722,9 +2692,9 @@ void SampleChopperModal::previewTrimEnd() {
     initializeChopsIfNeeded();
     int start = selectedChopStartFrame();
     int end = selectedChopEndFrame();
-    int previewStart = end - (sourceRate_ > 0 ? sourceRate_ * 1 : 44100);
-    if (previewStart < start) previewStart = start;
-    playFrameRange(previewStart, end, "Preview end");
+    // F3-3a: ventana golden de 1s extraida a PreviewService.
+    PreviewService::Range r = preview_.TrimEnd(start, end, sourceRate_);
+    playFrameRange(r.start, r.end, "Preview end");
 }
 
 void SampleChopperModal::prepareWaveformPreview() {
@@ -2749,18 +2719,10 @@ void SampleChopperModal::prepareWaveformPreview() {
     int viewFrames = getViewFrameCount();
     if (viewFrames <= 0) return;
     if (viewStartFrame_ + viewFrames > sourceSize_) viewFrames = sourceSize_ - viewStartFrame_;
-    for (int col = 0; col < WAVE_W; col++) {
-        int start = viewStartFrame_ + (col * viewFrames) / WAVE_W;
-        int end = viewStartFrame_ + ((col + 1) * viewFrames) / WAVE_W;
-        if (end <= start) end = start + 1;
-        if (start < 0) start = 0;
-        if (end > size) end = size;
-        int minValue = 32767;
-        int maxValue = -32768;
-        for (int i = start; i < end; i++) { int value = samples[i * channels]; if (value < minValue) minValue = value; if (value > maxValue) maxValue = value; }
-        if (minValue == 32767 && maxValue == -32768) { minValue = 0; maxValue = 0; }
-        minColumn_[col] = minValue; maxColumn_[col] = maxValue;
-    }
+    // F3-3a: columnas min/max golden extraidas a ChopperView.
+    ChopperView::BuildWaveformColumns(samples, size, channels, viewStartFrame_,
+                                      viewFrames, WAVE_W, minColumn_,
+                                      maxColumn_);
     hasWaveform_ = true;
 }
 
@@ -2785,9 +2747,9 @@ void SampleChopperModal::publishOverlayState() {
     g_chopperTrimMode = trimMode_ ? 1 : 0;
     g_chopperViewStartFrame = viewStartFrame_;
     g_chopperViewFrameCount = getViewFrameCount();
-    g_chopperPreviewActive = previewActive_ ? 1 : 0;
-    g_chopperPreviewStartFrame = previewStartFrame_;
-    g_chopperPreviewEndFrame = previewEndFrame_;
+    g_chopperPreviewActive = preview_.Active() ? 1 : 0;
+    g_chopperPreviewStartFrame = preview_.StartFrame();
+    g_chopperPreviewEndFrame = preview_.EndFrame();
     if (hasActiveSliceRange() && chopModel_.selected >= 0 && chopModel_.selected <= chopModel_.boundaryCount - 2) {
         int startFrame = chopModel_.boundaries[chopModel_.selected];
         int endFrame = chopModel_.boundaries[chopModel_.selected + 1];
@@ -2816,21 +2778,19 @@ void SampleChopperModal::clearOverlayState() {
 }
 
 void SampleChopperModal::setPreviewPlaybackRange(int startFrame, int endFrame) {
-    previewActive_ = true;
-    previewStartFrame_ = clampInt(startFrame, 0, sourceSize_ > 0 ? sourceSize_ - 1 : 0);
-    previewEndFrame_ = clampInt(endFrame, previewStartFrame_, sourceSize_ > 0 ? sourceSize_ - 1 : previewStartFrame_);
+    // F3-3a: clamps golden (start, luego end contra start clampeado) en
+    // PreviewService; audio y overlay quedan aqui.
+    preview_.SetRange(startFrame, endFrame, sourceSize_);
 #if defined(PLATFORM_TREEFROG)
-    g_chopperPreviewActive = 1;
-    g_chopperPreviewStartFrame = previewStartFrame_;
-    g_chopperPreviewEndFrame = previewEndFrame_;
+    g_chopperPreviewActive = preview_.Active() ? 1 : 0;
+    g_chopperPreviewStartFrame = preview_.StartFrame();
+    g_chopperPreviewEndFrame = preview_.EndFrame();
 #endif
     publishOverlayState();
 }
 
 void SampleChopperModal::clearPreviewPlaybackRange() {
-    previewActive_ = false;
-    previewStartFrame_ = 0;
-    previewEndFrame_ = 0;
+    preview_.ClearRange();
 #if defined(PLATFORM_TREEFROG)
     g_chopperPreviewActive = 0;
     g_chopperPreviewStartFrame = 0;
@@ -2867,8 +2827,8 @@ void SampleChopperModal::assignSelectedChopToPhrase() {
 
 void SampleChopperModal::playFromFrame(int frame, const char *label) {
     if (!hasAssignedSample() || samplePath_.empty()) { setStatus("No sample to play"); return; }
-    if (sourceSize_ > 0) frame = clampInt(frame, 0, sourceSize_ - 1);
-    else frame = 0;
+    // F3-3a: clamp golden extraido a PreviewService.
+    frame = preview_.ClampPlayFrame(frame, sourceSize_);
     Path path(samplePath_.c_str());
     Player::GetInstance()->StopStreaming();
     Player::GetInstance()->StartStreamingAt(path, frame);
@@ -2879,13 +2839,12 @@ void SampleChopperModal::playFromFrame(int frame, const char *label) {
 
 void SampleChopperModal::playFrameRange(int startFrame, int endFrame, const char *label) {
     if (!hasAssignedSample() || samplePath_.empty()) { setStatus("No sample to play"); return; }
-    if (sourceSize_ > 0) {
-        startFrame = clampInt(startFrame, 0, sourceSize_ - 1);
-        endFrame = clampInt(endFrame, 0, sourceSize_ - 1);
-    } else {
-        startFrame = 0;
-        endFrame = 0;
-    }
+    // F3-3a: clamps golden ([0,size-1], end>=start despues) en
+    // PreviewService.
+    PreviewService::Range r = preview_.ClampPlayRange(startFrame, endFrame,
+                                                      sourceSize_);
+    startFrame = r.start;
+    endFrame = r.end;
     if (endFrame < startFrame) endFrame = startFrame;
     Path path(samplePath_.c_str());
     Player::GetInstance()->StopStreaming();
