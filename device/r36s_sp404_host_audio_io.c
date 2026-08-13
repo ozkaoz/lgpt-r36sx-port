@@ -883,9 +883,30 @@ static void drain_fifo(int in, long *dropped) { int16_t inbuf[4096]; for (;;) { 
  *
  * PLAYBACK_GAIN keeps constant headroom so the SP-404MKII's USB input stage
  * (~+9 dB) does not saturate during USB-REC.
+ * U2.56: the playback gain is runtime-tunable via RUNTIME_DIR/sp404_gain
+ * (0.00-2.00, default 1.00) so console and SP404 output levels can be
+ * matched without a rebuild. Refreshed on every primed stream start.
  */
-#define PLAYBACK_GAIN 0.65f
+#define PLAYBACK_GAIN 1.0f
 #define CAPTURE_GAIN 0.85f
+
+static float g_playback_gain = PLAYBACK_GAIN;
+
+static void load_playback_gain(void) {
+    char buf[32] = "";
+    char path[96];
+    snprintf(path, sizeof(path), "%s/sp404_gain", RUNTIME_DIR);
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        g_playback_gain = PLAYBACK_GAIN;
+        return;
+    }
+    if (fgets(buf, sizeof(buf), f)) {
+        float v = (float)atof(buf);
+        if (v >= 0.0f && v <= 2.0f) g_playback_gain = v;
+    }
+    fclose(f);
+}
 
 static int ring_pop_one_sample(int16_t *s) {
     if (rfill == 0) return -1;
@@ -918,12 +939,13 @@ static void write_wav_header(int fd, uint32_t data_bytes, uint32_t rate, uint16_
 /*
  * U2.53.0 FIFO_DUMP diagnostic: on every primed stream, capture the first
  * 2 s of RAW fifo content (pre-gain) to
- * /mnt/sdcard/LGPT_OTG_LOGS/fifo_capture.wav.
+ * /tmp/r36sx_lgpt_logs/fifo_capture.wav (tmpfs: never writes the SD card;
+ * the shutdown flush moves it to SD LGPT_OTG_LOGS).
  * This settles whether the permanent full-scale tone is produced by the core
  * (present in the fifo) or injected by the daemon path (absent from the
  * fifo). The WAV is plain 48 kHz stereo S16LE.
  */
-#define FIFO_DUMP_DIR "/mnt/sdcard/LGPT_OTG_LOGS"
+#define FIFO_DUMP_DIR "/tmp/r36sx_lgpt_logs"
 #define FIFO_DUMP_PATH FIFO_DUMP_DIR "/fifo_capture.wav"
 #define FIFO_DUMP_FRAMES 96000
 #define FIFO_DUMP_BUF_FRAMES 32768
@@ -2815,10 +2837,11 @@ int main(int argc, char **argv) {
             stream_primed = 1;
             starvation_since_ms = 0;
             fprintf(stderr,
-                    "PLAYBACK_CLOCKED_PRIMED ring_fill=%u target=%u hw_buffer_samples=%u period_frames=%d channels=2\n",
+                    "PLAYBACK_CLOCKED_PRIMED ring_fill=%u target=%u hw_buffer_samples=%u period_frames=%d channels=2 gain=%.2f\n",
                     rfill, prime_target, hardware_buffer_samples,
-                    active_period_frames);
+                    active_period_frames, g_playback_gain);
             fifo_dump_start();
+            load_playback_gain();
         }
 
         int playback_poll_timeout_ms =
@@ -2880,8 +2903,8 @@ int main(int argc, char **argv) {
             int16_t frm[2];
             while (produced < required_samples) {
                 if (ring_pop_frame(2, frm) != 0) break;
-                out[produced++] = (int16_t)(frm[0] * PLAYBACK_GAIN);
-                out[produced++] = (int16_t)(frm[1] * PLAYBACK_GAIN);
+                out[produced++] = (int16_t)(frm[0] * g_playback_gain);
+                out[produced++] = (int16_t)(frm[1] * g_playback_gain);
                 fifo_dump_write(frm);
             }
             if (produced < required_samples) {

@@ -3,8 +3,9 @@ set -u
 
 BASE=/mnt/sdcard/lgpt/otg
 BIN=$BASE/bin
-LOGROOT=/mnt/sdcard/LGPT_OTG_LOGS
-INTERNAL_LOG=$BASE/logs
+# SD lifecycle U2.54: all runtime logs on tmpfs; clean shutdown flushes them.
+LOGROOT="/tmp/r36sx_lgpt_logs"
+INTERNAL_LOG="/tmp/r36sx_lgpt_logs/mirror"
 RUNTIME=/tmp/r36sx_lgpt_usb
 FIFO=/tmp/r36sx_uac2_bridge_fifo
 MONITOR_FIFO=/tmp/r36sx_usb_capture_monitor_fifo

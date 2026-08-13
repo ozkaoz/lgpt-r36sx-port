@@ -7,7 +7,7 @@ set -u
 ROOT="${LGPT_SD_ROOT:-/mnt/sdcard}"
 BASE="$ROOT/lgpt/otg"
 BIN="$BASE/bin"
-LOGROOT="${LGPT_LOGROOT:-/mnt/sdcard/LGPT_OTG_LOGS}"
+LOGROOT="${LGPT_LOGROOT:-/tmp/r36sx_lgpt_logs}"
 RUNTIME="${LGPT_RUNTIME_DIR:-/tmp/r36sx_lgpt_usb}"
 POLICY_FILE="$RUNTIME/audio_driver_policy"
 LOG="$LOGROOT/H38_HOST_RUNTIME_SUPERVISOR.log"
@@ -37,9 +37,53 @@ pick_log_path(){ p="$1"; if ( : >> "$p" ) 2>/dev/null; then printf '%s' "$p"; el
 # v14.3: stop daemons gracefully - SIGUSR1 (drain + clean PCM close) before
 # SIGTERM/SIGKILL. Killing a live musb URB stream abruptly wedges the
 # controller on the Sampler bounce.
+# U2.68 LIVE_LOG_FLUSH: the console shutdown path can be skipped (hard
+# power-off, daemon holding the card), which used to lose the SP404 daemon
+# and supervisor logs. Every 5 ticks this copies the RAM log tree to the SD
+# (cp -f: the console has no RTC, so tmpfs mtime 1970 vs FAT mtime 1980
+# made cp -u believe the SD copy was always newer and never overwrite it),
+# so the host-side evidence survives even if the clean shutdown never
+# flushes. RO-proof: probe the SD once per call; if it is not writable,
+# skip quietly.
+flush_tick=0
+live_flush(){
+  SD_LOGS="/mnt/sdcard/LGPT_OTG_LOGS"
+  mkdir -p "$SD_LOGS" 2>/dev/null || return 0
+  if ! ( : >> "$SD_LOGS/.live_flush_probe" ) 2>/dev/null; then return 0; fi
+  for f in "$LOGROOT"/* "$LOGROOT"/mirror/*; do
+    [ -f "$f" ] || continue
+    cp -f "$f" "$SD_LOGS/" 2>/dev/null || true
+  done
+}
 terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill -USR1 "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 40 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" || { wait "$p" 2>/dev/null || true; return 0; }; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
+# U2.55b FIFO-GUARDIAN v2: while Sampler/USB_OUT is active the core writes
+# /tmp/r36sx_sp404_pcm_fifo. If the SP404 daemon dies, the fifo must still
+# have a live reader or the core's write() returns EPIPE and SIGPIPE kills
+# the port (PICO_EXIT=141 seen in the 2026-08-11 field test). v1 kept a
+# discard-reader whenever the card marker looked non-real, but the detector
+# often labels a REAL SP404 via the fallback path (sp404_usb_id=auto:C*D*),
+# so the guard stole half the stream (sub-second audio fragments on the
+# SP404). v2 guards ONLY while the daemon is dead: a live daemon owns the
+# fifo read side, so a second reader is never started (zero steal risk), and
+# EPIPE is only possible with no reader at all (dead daemon).
+SP404_GUARD_PID=""
+guard_start(){
+  if [ -n "$SP404_GUARD_PID" ] && pid_alive "$SP404_GUARD_PID"; then return 0; fi
+  [ -p "$SP404_FIFO" ] || { rm -f "$SP404_FIFO" 2>/dev/null || true; mkfifo "$SP404_FIFO" 2>/dev/null || true; }
+  ( while :; do cat "$SP404_FIFO" >/dev/null 2>/dev/null || { sleep 0.1; continue; }; sleep 0.1; done ) >/dev/null 2>&1 &
+  SP404_GUARD_PID=$!
+  log "GUARD_START fifo=$SP404_FIFO pid=$SP404_GUARD_PID"
+}
+guard_stop(){
+  if [ -n "$SP404_GUARD_PID" ]; then
+    if pid_alive "$SP404_GUARD_PID"; then kill "$SP404_GUARD_PID" 2>/dev/null || true; wait "$SP404_GUARD_PID" 2>/dev/null || true; fi
+    log "GUARD_STOP pid=$SP404_GUARD_PID"
+  fi
+  SP404_GUARD_PID=""
+}
 cleanup(){
   STOP=1
+  guard_stop
   for p in "$RUNTIME/sp404_daemon_pid" "$RUNTIME/midi_daemon_pid"; do
     dp="$(cat "$p" 2>/dev/null || true)"
     terminate_pid "$dp" "$(basename "$p")"
@@ -58,9 +102,37 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 atomic_write "$SUP_PID" "$$" || true
 log "START supervisor=$$"
+# U2.56: seed the SP404 playback gain from the SD config if present
+# (/mnt/sdcard/lgpt/otg/sp404_gain, range 0.00-2.00). The daemon reads
+# /tmp/r36sx_lgpt_usb/sp404_gain on every primed stream, so console and
+# SP404 levels can be matched by editing one file on the SD card.
+if [ -r "$BASE/sp404_gain" ]; then
+  cp -f "$BASE/sp404_gain" "$RUNTIME/sp404_gain" 2>/dev/null \
+    && log "SP404_GAIN_SEED src=$BASE/sp404_gain val=$(cat "$RUNTIME/sp404_gain" 2>/dev/null || echo unknown)"
+fi
 # Run the host-side device probe so SP404/MIDI markers are current.
 detect_now(){ /bin/sh "$BIN/otg_h37_host_device_detect.sh" >>"$LOG" 2>&1 || true; }
 [ -r "$BIN/otg_h37_host_device_detect.sh" ] && detect_now
+# H38.6 GADGET_TEARDOWN: if the console's own UAC2 gadget is still armed in
+# host role (leftover from a racing WINDOWS setup during the mode switch -
+# seen alive and RUNNING after the role flip in the 2026-08-12 field test),
+# unbind it now. A live gadget card would sit beside the real SP404 card and
+# shadow the PCM index, and a later WINDOWS bounce would race this loop.
+for g in /sys/kernel/config/usb_gadget/r36sx_lgpt_* \
+         /sys/kernel/config/usb_gadget/r36sx_uac2_*; do
+  [ -d "$g" ] || continue
+  if [ -n "$(cat "$g/UDC" 2>/dev/null || true)" ]; then
+    log "GADGET_TEARDOWN $g udc=$(cat "$g/UDC" 2>/dev/null || echo none)"
+    echo "" > "$g/UDC" 2>/dev/null || true
+    sleep 1
+    # A WINDOWS uac2 daemon may hold the gadget PCM open; stop it so the
+    # ALSA card actually goes away instead of lingering RUNNING.
+    for p in r36s_u241_usb_audio_io r36s_u240_usb_audio_io r36s_au11_usb_audio_io; do
+      pidof "$p" >/dev/null 2>&1 && { log "GADGET_DAEMON_STOP name=$p"; pkill -USR1 -x "$p" 2>/dev/null || pkill -USR1 "$p" 2>/dev/null || killall "$p" 2>/dev/null || true; sleep 0.5; }
+    done
+    detect_now
+  fi
+done
 sp_pid=0
 mi_pid=0
 backoff=1
@@ -99,6 +171,18 @@ while [ "$STOP" -eq 0 ] && policy_host; do
         [ "$backoff" -lt 4 ] && backoff=$((backoff+1))
         continue
       fi
+      # H38.6 GADGET_GUARD: never stream into the console's own UAC2 gadget
+      # PCM. After a WINDOWS session the gadget card (idx 0) can still be
+      # armed with its /dev/snd/pcmC0D0p+c nodes present in host role; a
+      # stale marker pointing there would make the daemon fight the local
+      # uac2 daemon for the console's OWN PCM (2026-08-12 crash).
+      g_idx="$(echo "$sp_play" | sed -n 's#^/dev/snd/pcmC\([0-9]*\)D.*#\1#p')"
+      if [ -n "$g_idx" ] && grep -q "^[[:space:]]*$g_idx \[UAC2Gadget" /proc/asound/cards 2>/dev/null; then
+        log "SP404_GADGET_GUARD idx=$g_idx play=$sp_play wait=$backoff"
+        sleep "$backoff"
+        [ "$backoff" -lt 4 ] && backoff=$((backoff+1))
+        continue
+      fi
       # U2.52.5 NO_PROBE_ALL: the first-start --probe-all sequence played
       # ~20-30 s of 1 kHz square waves on the SP404 ("pitido inicial"). The
       # daemon configures the PCM itself (constraint picking), so the probe is
@@ -114,6 +198,14 @@ while [ "$STOP" -eq 0 ] && policy_host; do
     fi
   else
     if pid_alive "$sp_pid"; then terminate_pid "$sp_pid" sp404; sp_pid=0; fi
+  fi
+  # U2.55b: FIFO-GUARDIAN decision - guard ONLY while the SP404 daemon is
+  # dead (no reader at all -> EPIPE risk). A live daemon must be the sole
+  # reader or the stream is split (chop artifacts).
+  if [ "$run_sp404" -eq 1 ] && ! pid_alive "$sp_pid"; then
+    guard_start
+  else
+    guard_stop
   fi
 
   if [ "$run_midi" -eq 1 ]; then
@@ -133,6 +225,8 @@ while [ "$STOP" -eq 0 ] && policy_host; do
     if pid_alive "$mi_pid"; then terminate_pid "$mi_pid" midi; mi_pid=0; fi
   fi
 
+  flush_tick=$((flush_tick+1))
+  if [ "$flush_tick" -ge 5 ]; then flush_tick=0; live_flush; fi
   sleep 1
   backoff=1
 done

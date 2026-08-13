@@ -1,5 +1,27 @@
 # Changelog
 
+## Update: Bacon 1.2 U2.69 - ASRC drift fix (Sampler / SP404MKII)
+
+- **Estado**: actualización de la pre-release Bacon 1.2 (Mixer Dev).
+  Elimina los tirones audibles (~2/s) que producía el daemon
+  `r36s_sp404_host_audio_io` en el modo Sampler con SP404MKII.
+- **Causa raíz**: el ASRC usaba un bypass passthrough 1:1 cuando ambas tasas
+  eran 48 kHz (`ASRC_PASSTHROUGH_NOW`), con step fijo = 1.0. El reloj real del
+  fifo del core (~47.784 f/s) difiere del device (48.000 f/s) en ~4.500 ppm;
+  sin corrección el backlog se drenaba y el daemon insertaba períodos de 480
+  frames en cero (10 ms de silencio) cada ~2.2 s.
+- **Fix**: el lazo ASRC P/I (FIR8 160 fases + control proporcional/integral de
+  backlog) ahora se ejecuta SIEMPRE, sin bypass. Límites ampliados de ±1.200
+  ppm a ±10.000 ppm (cubren la deriva real), ganancia integral 3->12
+  (convergencia ~3-4 s), backlog objetivo 2.400->3.600 frames. Los tirones
+  desaparecen y la corrección resultante (~0,45 % de resampleo) es inaudible.
+- **Fuente/daemon**: `device/r36s_sp404_host_audio_io.c` - SP404 daemon
+  `810bdc53b6f712193285d490db15fffabb28ddffaeaf992e1d8949be01d85844`.
+- **Supervisor**: `otg_h37_host_runtime_supervisor.sh` ahora usa `cp -f` en el
+  flush de logs (antes `cp -u` nunca sobrescribía por el mtime 1970 vs 1980 de
+  FAT sin RTC) - logs frescos llegan siempre a `LGPT_OTG_LOGS/`.
+- **Core 2CH FIFO FIX U2.68**: `c1ffe58977bcf48a643b2938b59c0c247812ae4f4a96ab9bb6c493c370ed17cd`.
+- **Label**: `H38.7_ABI7_BACON12_MIXER_DEV_2CH_FIFO_FIX_U2.69_ASRC_DRIFT_FIX`.
 ## Update: Bacon 1.2.1 U2.52.7 - Per-instrument 8-Band EQ + Live Spectrum
 
 - **Estado**: actualización de la pre-release Bacon 1.2.1 (Chopper UAF

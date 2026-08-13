@@ -6,7 +6,9 @@
 set -u
 BASE=/mnt/sdcard/lgpt/otg
 BIN=$BASE/bin
-LOGROOT=/mnt/sdcard/LGPT_OTG_LOGS
+# SD lifecycle U2.54: runtime log churn goes to tmpfs while running; only the
+# clean-shutdown flush writes LGPT_OTG_LOGS on the card.
+LOGROOT=/tmp/r36sx_lgpt_logs
 RUNTIME=/tmp/r36sx_lgpt_usb
 mkdir -p "$LOGROOT" "$RUNTIME" 2>/dev/null || true
 
@@ -58,7 +60,14 @@ load_host_usb_module() {
             echo "HOST_LOAD_${filename}_INSMOD=YES FROM=$p"
             return 0
         }
-        echo "insmod $p -> rc=$?" >>"$LOGROOT/H38_HOST_MODULE_LOAD.err" 2>/dev/null || true
+        rc=$?
+        # rc=17 (EEXIST / "File exists"): module already built-in or loaded
+        # on this kernel. Treat as success so the host stack is not aborted.
+        if [ "$rc" -eq 17 ]; then
+            echo "HOST_LOAD_${filename}_ALREADY_RC17=YES FROM=$p"
+            return 0
+        fi
+        echo "insmod $p -> rc=$rc" >>"$LOGROOT/H38_HOST_MODULE_LOAD.err" 2>/dev/null || true
     done
     echo "HOST_LOAD_${filename}_FAILED=YES"
     return 1
@@ -157,8 +166,14 @@ echo "$NORM" > "$RUNTIME/audio_driver_mode" 2>/dev/null || true
 echo "$POLICY" > "$BASE/audio_driver_policy" 2>/dev/null || true
 echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
 
+# Log MODE_APPLY synchronously to LOGROOT so it appears even if the async block hangs
+if ( : >> "$LOGROOT/H38_2_APPLY_MODE.log" ) 2>/dev/null; then
+    echo "MODE_APPLY=$MODE normalized=$NORM DATE=$(date)" >> "$LOGROOT/H38_2_APPLY_MODE.log"
+else
+    echo "MODE_APPLY=$MODE normalized=$NORM DATE=$(date)" >> /tmp/h38_2_apply_mode.sd_mirror.log
+fi
+
 {
-    echo "MODE_APPLY=$MODE normalized=$NORM DATE=$(date)"
     case "$NORM" in
         ANDROID)
             # v12: reuse a healthy Android runtime instead of destroying it.
@@ -215,14 +230,29 @@ echo "$POLICY" > "$RUNTIME/audio_driver_policy" 2>/dev/null || true
             dp="$(cat "$RUNTIME/sp404_daemon_pid" 2>/dev/null || true)"
             pol="$(cat "$RUNTIME/audio_driver_policy" 2>/dev/null || echo NONE)"
             card="$(cat "$RUNTIME/sp404_playback_pcm" 2>/dev/null || echo none)"
+            # H38.6 GADGET_GUARD: never reuse a runtime whose daemon targets
+            # the console's own UAC2 gadget PCM. After a WINDOWS session the
+            # gadget card can linger in host role with pcmC0D0p alive; a
+            # reused daemon then streams the core into the LOCAL PCM instead
+            # of the SP404 (2026-08-12 field test crash).
+            reuse_card=""
+            case "$card" in /dev/snd/pcmC[0-9]*D*)
+              rc_idx="$(echo "$card" | sed -n 's#^/dev/snd/pcmC\([0-9]*\)D.*#\1#p')"
+              if [ -n "$rc_idx" ] && grep -q "^[[:space:]]*$rc_idx \[UAC2Gadget" /proc/asound/cards 2>/dev/null; then
+                echo "SP404_REUSE_SKIPPED reason=local_gadget card=$card"
+              else
+                reuse_card="$card"
+              fi
+              ;;
+            esac
             if [ "$pol" = "USB_OUT_OTG" ] &&
+               [ -n "$reuse_card" ] && [ "$reuse_card" != "none" ] && [ -e "$reuse_card" ] &&
                [ -n "$sup" ] && kill -0 "$sup" 2>/dev/null &&
-               [ -n "$dp" ] && kill -0 "$dp" 2>/dev/null &&
-               [ -n "$card" ] && [ "$card" != "none" ] && [ -e "$card" ]; then
+               [ -n "$dp" ] && kill -0 "$dp" 2>/dev/null; then
                 reuse=1
             fi
             if [ "$reuse" -eq 1 ]; then
-                echo "SP404_RUNTIME_REUSED supervisor=$sup daemon=$dp card=$card fifo=$([ -p /tmp/r36sx_sp404_pcm_fifo ] && echo present || echo missing)"
+                echo "SP404_RUNTIME_REUSED supervisor=$sup daemon=$dp card=$reuse_card fifo=$([ -p /tmp/r36sx_sp404_pcm_fifo ] && echo present || echo missing)"
             else
                 [ -x "$BIN/otg_u241_shutdown.sh" ] && /bin/sh "$BIN/otg_u241_shutdown.sh"
                 for p in r36s_aoa_bulk_audio_io_h36 r36s_aoa_bulk_receiver_h36 \

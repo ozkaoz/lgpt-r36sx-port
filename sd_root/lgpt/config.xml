@@ -5,7 +5,7 @@
  <AUDIOAPI value="libretro" />
  <AUDIODEVICE value="picoarch" />
  <AUDIOBUFFERSIZE value="1024" />
- <AUDIOPREBUFFERCOUNT value="4" />
+ <AUDIOPREBUFFERCOUNT value="8" />
  <AUTO_LOAD_LAST value="NO" />
  <BACKGROUND value="0A0A18" />
  <FOREGROUND value="E8E4F8" />

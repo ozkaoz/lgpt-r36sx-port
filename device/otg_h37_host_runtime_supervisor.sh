@@ -7,7 +7,7 @@ set -u
 ROOT="${LGPT_SD_ROOT:-/mnt/sdcard}"
 BASE="$ROOT/lgpt/otg"
 BIN="$BASE/bin"
-LOGROOT="${LGPT_LOGROOT:-/mnt/sdcard/LGPT_OTG_LOGS}"
+LOGROOT="${LGPT_LOGROOT:-/tmp/r36sx_lgpt_logs}"
 RUNTIME="${LGPT_RUNTIME_DIR:-/tmp/r36sx_lgpt_usb}"
 POLICY_FILE="$RUNTIME/audio_driver_policy"
 LOG="$LOGROOT/H38_HOST_RUNTIME_SUPERVISOR.log"
@@ -38,8 +38,34 @@ pick_log_path(){ p="$1"; if ( : >> "$p" ) 2>/dev/null; then printf '%s' "$p"; el
 # SIGTERM/SIGKILL. Killing a live musb URB stream abruptly wedges the
 # controller on the Sampler bounce.
 terminate_pid(){ p="$1"; name="$2"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; log "STOP name=$name pid=$p"; kill -USR1 "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 40 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" || { wait "$p" 2>/dev/null || true; return 0; }; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; }
+# U2.55b FIFO-GUARDIAN v2: while Sampler/USB_OUT is active the core writes
+# /tmp/r36sx_sp404_pcm_fifo. If the SP404 daemon dies, the fifo must still
+# have a live reader or the core's write() returns EPIPE and SIGPIPE kills
+# the port (PICO_EXIT=141 seen in the 2026-08-11 field test). v1 kept a
+# discard-reader whenever the card marker looked non-real, but the detector
+# often labels a REAL SP404 via the fallback path (sp404_usb_id=auto:C*D*),
+# so the guard stole half the stream (sub-second audio fragments on the
+# SP404). v2 guards ONLY while the daemon is dead: a live daemon owns the
+# fifo read side, so a second reader is never started (zero steal risk), and
+# EPIPE is only possible with no reader at all (dead daemon).
+SP404_GUARD_PID=""
+guard_start(){
+  if [ -n "$SP404_GUARD_PID" ] && pid_alive "$SP404_GUARD_PID"; then return 0; fi
+  [ -p "$SP404_FIFO" ] || { rm -f "$SP404_FIFO" 2>/dev/null || true; mkfifo "$SP404_FIFO" 2>/dev/null || true; }
+  ( while :; do cat "$SP404_FIFO" >/dev/null 2>/dev/null || { sleep 0.1; continue; }; sleep 0.1; done ) >/dev/null 2>&1 &
+  SP404_GUARD_PID=$!
+  log "GUARD_START fifo=$SP404_FIFO pid=$SP404_GUARD_PID"
+}
+guard_stop(){
+  if [ -n "$SP404_GUARD_PID" ]; then
+    if pid_alive "$SP404_GUARD_PID"; then kill "$SP404_GUARD_PID" 2>/dev/null || true; wait "$SP404_GUARD_PID" 2>/dev/null || true; fi
+    log "GUARD_STOP pid=$SP404_GUARD_PID"
+  fi
+  SP404_GUARD_PID=""
+}
 cleanup(){
   STOP=1
+  guard_stop
   for p in "$RUNTIME/sp404_daemon_pid" "$RUNTIME/midi_daemon_pid"; do
     dp="$(cat "$p" 2>/dev/null || true)"
     terminate_pid "$dp" "$(basename "$p")"
@@ -58,6 +84,14 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 atomic_write "$SUP_PID" "$$" || true
 log "START supervisor=$$"
+# U2.56: seed the SP404 playback gain from the SD config if present
+# (/mnt/sdcard/lgpt/otg/sp404_gain, range 0.00-2.00). The daemon reads
+# /tmp/r36sx_lgpt_usb/sp404_gain on every primed stream, so console and
+# SP404 levels can be matched by editing one file on the SD card.
+if [ -r "$BASE/sp404_gain" ]; then
+  cp -f "$BASE/sp404_gain" "$RUNTIME/sp404_gain" 2>/dev/null \
+    && log "SP404_GAIN_SEED src=$BASE/sp404_gain val=$(cat "$RUNTIME/sp404_gain" 2>/dev/null || echo unknown)"
+fi
 # Run the host-side device probe so SP404/MIDI markers are current.
 detect_now(){ /bin/sh "$BIN/otg_h37_host_device_detect.sh" >>"$LOG" 2>&1 || true; }
 [ -r "$BIN/otg_h37_host_device_detect.sh" ] && detect_now
@@ -114,6 +148,14 @@ while [ "$STOP" -eq 0 ] && policy_host; do
     fi
   else
     if pid_alive "$sp_pid"; then terminate_pid "$sp_pid" sp404; sp_pid=0; fi
+  fi
+  # U2.55b: FIFO-GUARDIAN decision - guard ONLY while the SP404 daemon is
+  # dead (no reader at all -> EPIPE risk). A live daemon must be the sole
+  # reader or the stream is split (chop artifacts).
+  if [ "$run_sp404" -eq 1 ] && ! pid_alive "$sp_pid"; then
+    guard_start
+  else
+    guard_stop
   fi
 
   if [ "$run_midi" -eq 1 ]; then

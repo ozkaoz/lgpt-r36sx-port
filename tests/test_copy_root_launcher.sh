@@ -37,7 +37,7 @@ chmod +x "$SD/cubegm/picoarch"
 printf 'mock arm core for host layout test\n' > "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so"
 
 sh -n "$SD/cubegm/lgpt"
-LGPT_SD_ROOT="$SD" "$SD/cubegm/lgpt"
+LGPT_SD_ROOT="$SD" LGPT_LOGROOT="$SD/LGPT_OTG_LOGS" "$SD/cubegm/lgpt"
 
 for rel in \
     lgpt/samples \

@@ -1,5 +1,14 @@
 # LGPT R36SX — Bacon 1.2 — Mixer Dev
 
+## Actualización U2.69: fix de tirones en Sampler (SP404MKII)
+
+El daemon `r36s_sp404_host_audio_io` ya no produce los cortes de 10 ms
+(~2/s) que se oían en el Sampler: el ASRC corrige ahora la deriva real del
+reloj del core (~0,45 %) aplicando siempre el lazo P/I de backlog en vez del
+passthrough fijo 1:1. Limpia también el flush de logs a la SD (`cp -f`).
+
+# LGPT R36SX — Bacon 1.2 — Mixer Dev
+
 Release de desarrollo del mixer del port LGPT R36SX (consolida las
 iteraciones V6-V16 de Bacon 1.1.1).
 
