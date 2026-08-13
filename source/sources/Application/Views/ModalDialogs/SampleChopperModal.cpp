@@ -2545,13 +2545,22 @@ void SampleChopperModal::previewPitchSetting() {
     if (!preparePitchEnvelopePreviewBuffer(&pitched, &frames, &channels, &rate)) { clearOperationProgress(); setStatus("Pitch preview fail"); return; }
     showOperationProgress("Operacion Preview", 65);
     std::string logical;
+
+    /* U2.52.0: stop any live stream BEFORE rewriting the shared preview WAV.
+       Preview #1 may still be streaming this exact file while preview #2
+       ReplaceBuffer()s it on disk; the audio-thread streamer holds its own
+       WavFile open over that path, so a mid-read truncate can yield a corrupt
+       read and crash the port. Prior order (rewrite, then Stop+Sleep) made the
+       crash timing-dependent (reported once over many previews). */
+    if (Player::GetInstance()->IsStreaming()) {
+        Player::GetInstance()->StopStreaming();
+        TimeService::GetInstance()->Sleep(80);
+    }
     bool ok = writePreviewPitchWav(pitched, frames, channels, rate, logical);
     free(pitched);
     if (!ok) { clearOperationProgress(); setStatus("Pitch preview write fail"); return; }
     showOperationProgress("Operacion Preview", 90);
     Path path(logical.c_str());
-    Player::GetInstance()->StopStreaming();
-    TimeService::GetInstance()->Sleep(80);
     Player::GetInstance()->StartStreamingRangeAt(path, 0, frames > 0 ? frames - 1 : 0);
     playbackTriggered_ = true;
     previewActive_ = false;
