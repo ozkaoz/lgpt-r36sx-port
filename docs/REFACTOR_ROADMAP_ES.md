@@ -36,7 +36,9 @@ terminan ademas con validacion en consola real.
   CTX_GLOBAL via ChordResolver_Matches/ChordAbsent; la regla V16
   L1+R1+X con historia de hombros y los latches siguen en el adapter
   como documenta la tabla; build MIPS OK; auditoria OK; core 6d87c7ba
-  en SD; validacion en consola pendiente). F1b completo.
+  en SD; validacion en consola OK: help contextual, audio driver, undo/redo
+  y nav dentro del help correctos; constatar por vista que el help abierto
+  corresponde a la pantalla mostrada). F1b completo.
 
 ## F2 - Politica de menus formal + NavigationController
 - Documentar el lenguaje de menus vigente (titulo centrado + bloque
