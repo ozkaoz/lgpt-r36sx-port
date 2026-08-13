@@ -3,14 +3,22 @@
 #define _MODAL_VIEW_H_
 
 #include "View.h"
+#include "Application/UI/Navigation/NavigationController.h"
 
-class ModalView : public View {
+class ModalView : public View, public UI::Navigation::NavModal {
   public:
     ModalView(View &);
     virtual ~ModalView();
 
     bool IsFinished();
     int GetReturnCode();
+
+    // Interfaz NavModal (F2 NavigationController): puente hacia el ciclo
+    // de vida del golden (OnFocus/OnSuspend/OnRestore/IsFinished).
+    virtual void NavOnFocus() { OnFocus(); }
+    virtual void NavOnSuspend() { OnSuspend(); }
+    virtual void NavOnRestore() { OnRestore(); }
+    virtual bool NavIsFinished() { return IsFinished(); }
 
     // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): a modal pushed on top of
     // this one (e.g. Help over the chopper) suspends it.  Subclasses can

@@ -5,6 +5,7 @@
 #include "Application/Model/Config.h"
 #include "Application/Model/Project.h"
 #include "Application/Player/Player.h"
+#include "Application/UI/Navigation/NavigationController.h"
 #include "Foundation/T_SimpleList.h"
 #include "I_Action.h"
 #include "UIFramework/Interfaces/I_GUIGraphics.h"
@@ -172,7 +173,7 @@ class View : public Observable {
     // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): returns the active modal,
     // so AppWindow can show Help for the modal that actually has focus (the
     // chopper) instead of the base view underneath it.
-    ModalView *GetModal() const { return modalView_; }
+    ModalView *GetModal() const { return (ModalView *)nav_.Active(); }
     // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): made virtual so the
     // chopper modal can report VT_CHOPPER and Help opens on its section.
     virtual ViewType GetViewType() const { return viewType_; }
@@ -227,11 +228,12 @@ class View : public Observable {
     std::string displayNotification_;
     int notiDistY_;
     static bool initPrivate_;
-    ModalView *modalView_;
+    // F2 (REFACTOR_ROADMAP_ES.md): el stack de modales (activo + suspendido:
+    // golden modalView_ / suspendedModal_) vive en el NavigationController.
+    // Los callbacks tipados (ModalViewCallback) son glue de la vista y se
+    // mantienen aqui, en sincronia con los push/pop del controller.
+    UI::Navigation::NavigationController nav_;
     ModalViewCallback modalViewCallback_;
-    // RC4 P1 (PLAN_RC4 section 11.3): modal suspended while another modal is
-    // pushed on top (used to show Help over an active dialog).
-    ModalView *suspendedModal_;
     ModalViewCallback suspendedModalCallback_;
     // Restores the suspended modal after the pushed one finishes.
     void RestoreSuspendedModal();

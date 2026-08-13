@@ -17,9 +17,7 @@ int View::altRowNumber_ = 4;
 View::View(GUIWindow &w,ViewData *viewData):
 	w_(w),
 	hasFocus_(false),
-	modalView_(0),
 	modalViewCallback_(0),
-	suspendedModal_(0),
 	suspendedModalCallback_(0)
 {
   if (!initPrivate_) 
@@ -209,24 +207,21 @@ void View::drawNotes() {
 }
 
 void View::DoModal(ModalView *view,ModalViewCallback cb) {
-	modalView_=view ;
-	modalView_->OnFocus() ;
+	// F2: golden modalView_ = view; modalView_->OnFocus() -- el
+	// NavigationController actualiza el tope del stack y da el foco.
+	nav_.Open(view) ;
 	modalViewCallback_=cb ;
 	isDirty_=true ;
 } ;
 
 void View::ReplaceModal(ModalView *view,ModalViewCallback cb) {
-    if (modalView_) {
-        SAFE_DELETE(modalView_);
-    }
-    modalView_ = view;
-    modalViewCallback_ = cb;
-    if (modalView_) modalView_->OnFocus();
-    isDirty_ = true;
+	nav_.Replace(view);
+	modalViewCallback_ = cb;
+	isDirty_ = true;
 };
 
 bool View::HasModal() const {
-    return modalView_ != 0;
+    return nav_.HasModal();
 };
 
 // RC4 P1 (PLAN_RC4 section 11.3): push a modal on top of the current one.
@@ -234,39 +229,31 @@ bool View::HasModal() const {
 // RestoreSuspendedModal when the pushed modal finishes.  Returns true if a
 // modal was actually suspended (i.e. Help opened over an open dialog).
 bool View::PushModal(ModalView *view, ModalViewCallback cb) {
-    bool hadModal = (modalView_ != 0);
-    if (hadModal) {
-        suspendedModal_ = modalView_;
-        suspendedModalCallback_ = modalViewCallback_;
-        // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): let the suspended
-        // modal stop drawing its private overlay (chopper waveform) while
-        // the pushed window is shown on top.
-        if (suspendedModal_) suspendedModal_->OnSuspend();
-    }
-    modalView_ = view;
-    modalViewCallback_ = cb;
-    if (modalView_) modalView_->OnFocus();
-    isDirty_ = true;
-    return hadModal;
+	// F2: golden suspendedModal_ = modalView_; -- el NavigationController
+	// apila el activo como suspendido, le avisa (OnSuspend) y da el foco al
+	// nuevo (OnFocus). El callback tipado acompaña al modal aqui.
+	bool hadModal = nav_.Push(view);
+	if (hadModal) {
+		suspendedModalCallback_ = modalViewCallback_;
+	}
+	modalViewCallback_ = cb;
+	isDirty_ = true;
+	return hadModal;
 };
 
 void View::RestoreSuspendedModal() {
-    if (suspendedModal_) {
-        modalView_ = suspendedModal_;
-        modalViewCallback_ = suspendedModalCallback_;
-        suspendedModal_ = 0;
-        suspendedModalCallback_ = 0;
-        if (modalView_) {
-            modalView_->OnRestore();
-            modalView_->OnFocus();
-        }
-        isDirty_ = true;
-    }
+	if (!nav_.Suspended()) return;
+	// F2: golden modalView_ = suspendedModal_; -- el controller restaura el
+	// tope (OnRestore + OnFocus) y aqui se recupera el callback suspendido.
+	nav_.RestoreSuspended() ;
+	modalViewCallback_ = suspendedModalCallback_;
+	suspendedModalCallback_ = 0;
+	isDirty_ = true;
 }
 
 
 void View::Redraw() {
-	if (modalView_) {
+	if (nav_.HasModal()) {
 		// TREEFROG_HELP_OVER_SUSPENDED_MODAL_V1 (Bacon 1.1.1 V15): draw the
 		// suspended modal (the chopper) under the pushed overlay (Help) so
 		// the user still sees the screen they left instead of the bare base
@@ -276,8 +263,8 @@ void View::Redraw() {
 		if (isDirty_) {
 			DrawView() ;
 		}
-		if (suspendedModal_) suspendedModal_->Redraw() ;
-		modalView_->Redraw() ;
+		if (nav_.Suspended()) ((ModalView *)nav_.Suspended())->Redraw() ;
+		((ModalView *)nav_.Active())->Redraw() ;
 	} else {
 		DrawView() ;
 	}
@@ -291,19 +278,21 @@ void View::SetDirty(bool isDirty) {
 void View::ProcessButton(unsigned short mask, bool pressed, long eventWhen) {
 	inputEventWhen_=eventWhen ;
 	isDirty_=false ;
-	if (modalView_) {
-		modalView_->ProcessButton(mask,pressed,eventWhen);
-		if (modalView_->isDirty_) {
+	if (nav_.HasModal()) {
+		ModalView *mv = (ModalView *)nav_.Active();
+		mv->ProcessButton(mask,pressed,eventWhen);
+		if (mv->isDirty_) {
 			isDirty_=true;
 		}
-		if (modalView_->IsFinished()) {
+		if (mv->IsFinished()) {
 			// process callback sending the modal dialog
 			if (modalViewCallback_) {
-				modalViewCallback_(*this,*modalView_) ;
+				modalViewCallback_(*this,*mv) ;
 			}
-			SAFE_DELETE(modalView_) ;
-			// RC4 P1 (PLAN_RC4 section 11.3): if Help was pushed over a
-			// dialog, restore the suspended modal now that Help is done.
+			// F2: golden SAFE_DELETE(modalView_) + RestoreSuspendedModal()
+			// (RC4 P1: si Help fue empujado sobre un dialogo, restaurar el
+			// suspendido ahora que Help termino).
+			nav_.CloseActive() ;
 			RestoreSuspendedModal() ;
 			isDirty_=true ;
 		}
@@ -352,22 +341,24 @@ void View::ProcessButton(unsigned short mask, bool pressed, long eventWhen) {
 
 void View::UpdateActiveModal(PlayerEventType type,
                              unsigned int currentTick) {
-    if (!modalView_) return;
+    if (!nav_.HasModal()) return;
 
-    modalView_->OnPlayerUpdate(type, currentTick);
+    ModalView *mv = (ModalView *)nav_.Active();
+    mv->OnPlayerUpdate(type, currentTick);
 
-    if (modalView_->isDirty_) {
+    if (mv->isDirty_) {
         isDirty_ = true;
         ((AppWindow &)w_).SetDirty();
     }
 }
 
 void View::UpdateActiveModalFrame(unsigned long frameClock) {
-    if (!modalView_) return;
+    if (!nav_.HasModal()) return;
 
-    modalView_->OnFrameUpdate(frameClock);
+    ModalView *mv = (ModalView *)nav_.Active();
+    mv->OnFrameUpdate(frameClock);
 
-    if (modalView_->isDirty_) {
+    if (mv->isDirty_) {
         isDirty_ = true;
         ((AppWindow &)w_).SetDirty();
     }
@@ -377,13 +368,13 @@ void View::UpdateActiveModalFrame(unsigned long frameClock) {
      * outside ProcessButton(). Finalize the modal through the same callback
      * path used by ordinary queued events.
      */
-    if (modalView_->IsFinished()) {
+    if (mv->IsFinished()) {
         if (modalViewCallback_)
-            modalViewCallback_(*this, *modalView_);
+            modalViewCallback_(*this, *mv);
 
-        SAFE_DELETE(modalView_);
-        // RC4 P1 (PLAN_RC4 section 11.3): restore the modal suspended under
-        // a pushed Help overlay.
+        // F2: golden SAFE_DELETE(modalView_) + RestoreSuspendedModal()
+        // (RC4 P1: restore the modal suspended under a pushed Help overlay).
+        nav_.CloseActive();
         RestoreSuspendedModal();
         isDirty_ = true;
         ((AppWindow &)w_).SetDirty();

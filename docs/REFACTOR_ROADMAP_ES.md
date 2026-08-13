@@ -43,9 +43,18 @@ terminan ademas con validacion en consola real.
 ## F2 - Politica de menus formal + NavigationController
 - Documentar el lenguaje de menus vigente (titulo centrado + bloque
   label/value + help contextual) y el ciclo push/suspend/restore de modales.
-- NavigationController: stack de modales/views, transiciones identicas
-  (DoModal, PushModal, HelpOverlay), sin cambios de orden de dibujado.
-- Test host del stack (push/suspend/restore/pop; exclusividad de prensas).
+- [IMPLEMENTADO EN CURSO] NavigationController (capa pura
+  Application/UI/Navigation): stack de modales con las transiciones del
+  golden (Open/Replace/Push/CloseActive/RestoreSuspended + NavModal con
+  OnFocus/OnSuspend/OnRestore/IsFinished). View conserva la API publica y
+  los callbacks tipados (ModalViewCallback) como glue; el stack es una sola
+  fuente. Sin cambios de orden de dibujado ni de exclusividad de prensas.
+- [IMPLEMENTADO] Test host del stack (tests/host/navigation_host_test.cpp,
+  tests/run_host_navigation.sh): push/suspend/restore/pop, machacado de
+  suspendido con stack lleno, finalizacion del activo. Verde.
+- [PENDIENTE VALIDACION CONSOLA] Help por vista: constatar que el menu help
+  se abre en la seccion correspondiente a la pantalla en foco (HelpRegistry
+  por ViewType; AppWindow elige el modal superior si existe).
 
 ## F3 - Division de clases grandes (Chopper, Mixer, Phrase)
 - SampleChopperModal: extraer estado de operacion, dibujo de panel y logica
