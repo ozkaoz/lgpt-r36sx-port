@@ -2280,30 +2280,28 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
     MenuLayout ml = UiDraw::MakeCenteredMenuLayout(7, 11, 10, 2);
     UiDraw::DrawCenteredTitleAt(*this, ml.startY - 1, "PITCH/ENV");
 
-    snprintf(buffer, sizeof(buffer), "I%02X S%02X C%02d/%02d",
-             instrumentIndex_, sampleIndex_,
-             chopModel_.selected + 1,
-             (chopModel_.boundaryCount > 1 ? chopModel_.boundaryCount - 1 : 1));
+    // F3-3b: composicion de celdas del pitch (header, labels, valores)
+    // en ChopperView (capa pura); posiciones y colores reales aqui.
+    ChopperView::ComposeHeaderLine(buffer, sizeof(buffer), instrumentIndex_,
+                                   sampleIndex_, chopModel_.selected + 1,
+                                   (chopModel_.boundaryCount > 1 ? chopModel_.boundaryCount - 1 : 1));
     SetColor(CD_NORMAL);
     props.invert_ = false;
     DrawString(ml.labelX, ml.startY, buffer, props);
 
-    static const char *labels[6] = {"Pitch", "Attack", "Sustain",
-                                    "Release", "Scope", "Sample"};
     for (int i = 0; i < 6; i++) {
         bool selected = (pitchEnvTool_.EditParam() == i);
         char value[16];
-        switch (i) {
-        case 0: snprintf(value, sizeof(value), "%+3d st", pitchEnvTool_.Params().semitones); break;
-        case 1: snprintf(value, sizeof(value), "%4d ms", pitchEnvTool_.Params().attackMs); break;
-        case 2: snprintf(value, sizeof(value), "%3d %%", pitchEnvTool_.Params().sustainPercent); break;
-        case 3: snprintf(value, sizeof(value), "%4d ms", pitchEnvTool_.Params().releaseMs); break;
-        case 4: snprintf(value, sizeof(value), "%s", pitchEnvTool_.Params().scope ? "Chop" : "Sample"); break;
-        default: snprintf(value, sizeof(value), "%02X", sampleIndex_); break;
-        }
+        ChopperView::ComposePitchValue(value, sizeof(value), i,
+                                       pitchEnvTool_.Params().semitones,
+                                       pitchEnvTool_.Params().attackMs,
+                                       pitchEnvTool_.Params().sustainPercent,
+                                       pitchEnvTool_.Params().releaseMs,
+                                       pitchEnvTool_.Params().scope,
+                                       sampleIndex_);
         SetColor(CD_NORMAL);
         props.invert_ = false;
-        DrawString(ml.labelX, ml.startY + 1 + i, labels[i], props);
+        DrawString(ml.labelX, ml.startY + 1 + i, ChopperView::PitchLabel(i), props);
         SetColor(selected ? CD_HILITE2 : CD_HILITE1);
         props.invert_ = selected;
         DrawString(ml.valueX, ml.startY + 1 + i, value, props);
@@ -2314,8 +2312,9 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
     SetColor(CD_NORMAL);
     /* Bacon 1.1.1 V13: compact pipe-separated hint lines matching the
        chopper main screen; full list in the CHOP PITCH help section. */
-    drawStringAbs(1, 24, "UP/DN Item | L/R Value | B Preview", props);
-    drawStringAbs(1, 25, "A Apply | L1+R1 Exit | R2+LR Target", props);
+    ChopperGrid hints; hints.Clear();
+    ChopperView::DrawPitchHints(hints);
+    drainChopperGrid(hints, props);
 }
 
 void SampleChopperModal::applyEnvelopeToBuffer(short *samples, int frames, int channels, int rate, int attackMs, int sustainPercent, int releaseMs) {
@@ -2998,44 +2997,59 @@ static void lgptStopAllAudioBeforeDestructiveEdit() {
 
 void SampleChopperModal::drawStringAbs(int x, int y, const char *txt, GUITextProperties &props) { View::DrawString(x, y, txt, props); }
 void SampleChopperModal::clearTextScreen() { View::ClearRect(0, 0, SCREEN_W, SCREEN_H); }
-void SampleChopperModal::drawTopBar(GUITextProperties &props) { props.invert_ = true; SetColor(CD_HILITE1); drawStringAbs(0, 0, " P G  SCPI  M TT       CHOPPER       ", props); props.invert_ = false; }
+
+void SampleChopperModal::drainChopperGrid(const ChopperGrid &grid, GUITextProperties &props) {
+    for (int y = 0; y < LGPT_CHOPPER_SCREEN_H; y++) {
+        for (int x = 0; x < LGPT_CHOPPER_SCREEN_W; x++) {
+            if (!grid.invert[y][x] && grid.cell[y][x] == ' ') continue;
+            switch (grid.color[y][x]) {
+            case CHOP_COLOR_HILITE1: SetColor(CD_HILITE1); break;
+            case CHOP_COLOR_HILITE2: SetColor(CD_HILITE2); break;
+            case CHOP_COLOR_BORDER: SetColor(CD_BORDER); break;
+            default: SetColor(CD_NORMAL); break;
+            }
+            props.invert_ = grid.invert[y][x];
+            char cell[2] = {grid.cell[y][x], 0};
+            drawStringAbs(x, y, cell, props);
+        }
+    }
+    props.invert_ = false;
+    SetColor(CD_NORMAL);
+}
+
+void SampleChopperModal::drawTopBar(GUITextProperties &props) {
+    ChopperGrid grid; grid.Clear();
+    ChopperView::DrawTopBar(grid);
+    drainChopperGrid(grid, props);
+}
 
 void SampleChopperModal::drawFrame(GUITextProperties &props) {
     /* RC4 P6 (PLAN_RC4 11.7): solid-border frame, no ASCII box-drawing.
        Same 40-cell geometry (rows 1..22, columns 0/39) so the waveform
-       overlay and the char-screen text stay aligned. */
-    SetColor(CD_BORDER);
-    for (int x = 0; x < 40; x++) {
-        char cell[2] = {' ', 0};
-        props.invert_ = true;
-        drawStringAbs(x, 1, cell, props);
-        drawStringAbs(x, 22, cell, props);
-    }
-    for (int y = 2; y < 22; y++) {
-        char cell[2] = {' ', 0};
-        props.invert_ = true;
-        drawStringAbs(0, y, cell, props);
-        drawStringAbs(39, y, cell, props);
-    }
-    props.invert_ = false;
-    SetColor(CD_HILITE2);
-    drawStringAbs(2, 2, "Graphical Chopper", props);
+       overlay and the char-screen text stay aligned.  F3-3b: la geometria
+       y el titulo viven en ChopperView (capa pura). */
+    ChopperGrid grid; grid.Clear();
+    ChopperView::DrawFrame(grid);
+    drainChopperGrid(grid, props);
 }
 
 void SampleChopperModal::drawSampleInfo(GUITextProperties &props) {
     char buffer[96];
     SetColor(CD_NORMAL);
-    snprintf(buffer, sizeof(buffer), "Inst:%02X Smpl:%02X Zoom:%03d%%", instrumentIndex_, sampleIndex_ < 0 ? 0 : sampleIndex_, zoomPercent_);
+    ChopperView::ComposeSampleInfoLine(buffer, sizeof(buffer), instrumentIndex_, sampleIndex_, zoomPercent_);
     buffer[37] = 0; drawStringAbs(2, 4, buffer, props);
     if (!hasAssignedSample()) { drawStringAbs(2, 5, "No sample assigned", props); drawStringAbs(2, 6, "No chop actions", props); }
-    else { std::string name = sampleName_; if (name.size() > 31) name = name.substr(0, 31); snprintf(buffer, sizeof(buffer), "Name:%s", name.c_str()); buffer[37] = 0; drawStringAbs(2, 5, buffer, props); snprintf(buffer, sizeof(buffer), "Frame:%d/%d Chop:%02d/%02d%s", cursorFrame_, sourceSize_ > 0 ? sourceSize_ - 1 : 0, hasActiveSliceRange() ? chopModel_.selected : 0, hasActiveSliceRange() ? (chopModel_.boundaryCount - 1) : 0, trimMode_ ? " ADJ" : ""); buffer[37] = 0; drawStringAbs(2, 6, buffer, props); }
+    else { std::string name = sampleName_; if (name.size() > 31) name = name.substr(0, 31); ChopperView::ComposeNameLine(buffer, sizeof(buffer), name.c_str()); buffer[37] = 0; drawStringAbs(2, 5, buffer, props); ChopperView::ComposeFrameLine(buffer, sizeof(buffer), cursorFrame_, sourceSize_ > 0 ? sourceSize_ - 1 : 0, hasActiveSliceRange() ? chopModel_.selected : 0, hasActiveSliceRange() ? (chopModel_.boundaryCount - 1) : 0, trimMode_); buffer[37] = 0; drawStringAbs(2, 6, buffer, props); }
     if (statusMessage_[0]) { SetColor(CD_HILITE1); drawStringAbs(2, 23, statusMessage_, props); }
 }
 
-void SampleChopperModal::drawEmptyWaveformText(GUITextProperties &props) { SetColor(CD_HILITE1); drawStringAbs(2, 13, "            no sample loaded            ", props); }
+void SampleChopperModal::drawEmptyWaveformText(GUITextProperties &props) {
+    ChopperGrid grid; grid.Clear();
+    ChopperView::DrawEmptyWaveformText(grid);
+    drainChopperGrid(grid, props);
+}
 
 void SampleChopperModal::drawControls(GUITextProperties &props) {
-    SetColor(CD_NORMAL);
     if (pitchMode_) {
         /* U2.27: the compact Pitch/Env panel carries its own controls.
            Avoid duplicating help lines at the bottom of the 320x240 screen. */
@@ -3043,11 +3057,10 @@ void SampleChopperModal::drawControls(GUITextProperties &props) {
     }
     /* Bacon 1.1.1 V13: single hint line on the chopper; the full combo list
        lives in the CHOPPER help section (SELECT+R1).  Trim mode swaps the
-       line for the crop actions. */
-    drawStringAbs(0, 24,
-                  trimMode_ ? "R1+A Keep  L2+Y Del  A+B Nudge  R1+B Back"
-                            : "Select: Crop | L1+R1: Pitch | R1+B: Back",
-                  props);
+       line for the crop actions.  F3-3b: celdas en ChopperView (pura). */
+    ChopperGrid grid; grid.Clear();
+    ChopperView::DrawControls(grid, trimMode_);
+    drainChopperGrid(grid, props);
 }
 
 void SampleChopperModal::showOperationProgress(const char *message, int percent) {
@@ -3062,13 +3075,11 @@ void SampleChopperModal::showOperationProgress(const char *message, int percent)
     char status[64];
     /* Bacon 1.1.1 V17: progress overlays name the operation AND the trigger
        combo, e.g. "R2 + Y Operacion normalizar 45%" / "R1 + X Operacion
-       Redo OK" (helper: setOperationCombo() before the operation). */
-    if (operationPercent_ >= 100)
-        snprintf(status, sizeof(status), "%s %s OK A/L1+X/R1+X",
-                 operationComboLabel_, operationMessage_);
-    else
-        snprintf(status, sizeof(status), "%s %s %d%%",
-                 operationComboLabel_, operationMessage_, operationPercent_);
+       Redo OK" (helper: setOperationCombo() before the operation).  F3-3b:
+       composicion golden en ChopperView (capa pura). */
+    ChopperView::ComposeOperationStatus(status, sizeof(status),
+                                        operationComboLabel_,
+                                        operationMessage_, operationPercent_);
     setStatus(status);
     DrawView();
     publishOverlayState();
@@ -3117,7 +3128,8 @@ void SampleChopperModal::drawOperationOverlay(GUITextProperties &props) {
     DrawString(ml.valueX, ml.startY, msg, props);
     SetColor(CD_HILITE1);
     props.invert_ = true;
-    snprintf(msg, sizeof(msg), "%3d%%", operationPercent_);
+    // F3-3b: fila de porcentaje golden en ChopperView (capa pura).
+    ChopperView::ComposeOperationPercent(msg, sizeof(msg), operationPercent_);
     DrawString(ml.labelX, ml.startY + 1, msg, props);
     props.invert_ = false;
     SetColor(CD_NORMAL);

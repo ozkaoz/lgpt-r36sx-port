@@ -252,6 +252,10 @@ private:
     void drawSampleInfo(GUITextProperties &props);
     void drawEmptyWaveformText(GUITextProperties &props);
     void drawControls(GUITextProperties &props);
+    // F3-3b (docs/F3_ARCHITECTURE_ES.md): el dibujo textual (celdas,
+    // invert, color) vive en ChopperView (capa pura); aqui solo el drenado
+    // a la pantalla (SetColor/DrawString reales).
+    void drainChopperGrid(const ChopperGrid &grid, GUITextProperties &props);
     // TREEFROG_U2_39_CHOPPER_SPLIT_ZERO (Bacon 1.1.1): split whole sample in
     // N equal parts (L1+B cycles 4/8/16/32) and zero-cross snapping for the
     // selected chop start/end (L1+A / L1+B in trim mode).

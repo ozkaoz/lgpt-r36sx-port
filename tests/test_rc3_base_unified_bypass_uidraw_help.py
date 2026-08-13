@@ -297,7 +297,11 @@ def check_p6_chopper_modernization():
     frame = chopper[frameStart:frameEnd]
     assert '"+-' not in frame
     assert '"|"' not in frame
-    assert "CD_BORDER" in frame
+    # F3-3b: el marco (celdas solidas CD_BORDER) vive en la capa pura
+    # ChopperView; la vista drena CHOP_COLOR_BORDER -> CD_BORDER.
+    assert "ChopperView::DrawFrame(grid)" in frame
+    assert "CHOP_COLOR_BORDER" in (ROOT / "source/sources/Application/Views/ModalDialogs/ChopperView.h").read_text()
+    assert "SetColor(CD_BORDER)" in chopper
     print("RC4 P6 chopper solid frame (no ASCII) OK")
 
 

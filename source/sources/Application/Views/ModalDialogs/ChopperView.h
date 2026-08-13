@@ -16,6 +16,54 @@
 #define LGPT_CHOPPER_MIN_ZOOM_PERCENT (5)
 #define LGPT_CHOPPER_MAX_ZOOM_PERCENT (100)
 #define LGPT_CHOPPER_MAX_COLUMNS (288)
+#define LGPT_CHOPPER_SCREEN_W (40)
+#define LGPT_CHOPPER_SCREEN_H (30)
+
+/* F3-3b: colores de celda del golden (mapeados a CD_* por el dueno al
+   drenar la grilla; la capa pura no referencia tipos de la UI). */
+enum ChopperCellColor {
+    CHOP_COLOR_NORMAL = 0,
+    CHOP_COLOR_HILITE1,
+    CHOP_COLOR_HILITE2,
+    CHOP_COLOR_BORDER
+};
+
+/* F3-3b: grilla de texto 40x30 (celdas del golden: char, invert, color). */
+struct ChopperGrid {
+    char cell[LGPT_CHOPPER_SCREEN_H][LGPT_CHOPPER_SCREEN_W];
+    bool invert[LGPT_CHOPPER_SCREEN_H][LGPT_CHOPPER_SCREEN_W];
+    ChopperCellColor color[LGPT_CHOPPER_SCREEN_H][LGPT_CHOPPER_SCREEN_W];
+
+    void Clear() {
+        for (int y = 0; y < LGPT_CHOPPER_SCREEN_H; y++)
+            for (int x = 0; x < LGPT_CHOPPER_SCREEN_W; x++) {
+                cell[y][x] = ' ';
+                invert[y][x] = false;
+                color[y][x] = CHOP_COLOR_NORMAL;
+            }
+    }
+
+    /* Escribe texto con recorte a los 40 chars; las celdas fuera de rango
+       se descartan (el golden las recorta en el borde de pantalla). */
+    void SetText(int x, int y, const char *text, ChopperCellColor col,
+                 bool inv) {
+        if (y < 0 || y >= LGPT_CHOPPER_SCREEN_H) return;
+        for (int i = 0; text && text[i] && (x + i) < LGPT_CHOPPER_SCREEN_W;
+             i++) {
+            if (x + i < 0) continue;
+            cell[y][x + i] = text[i];
+            invert[y][x + i] = inv;
+            color[y][x + i] = col;
+        }
+    }
+
+    void SetInvert(int x, int y, ChopperCellColor col) {
+        if (y < 0 || y >= LGPT_CHOPPER_SCREEN_H) return;
+        if (x < 0 || x >= LGPT_CHOPPER_SCREEN_W) return;
+        invert[y][x] = true;
+        color[y][x] = col;
+    }
+};
 
 class ChopperView {
 public:
@@ -145,6 +193,130 @@ public:
             maxColumn[col] = maxValue;
         }
         return true;
+    }
+
+/* ============================ F3-3b: dibujo ========================== */
+    /* Golden drawTopBar: fila 0 completa (invert, CD_HILITE1). */
+    static void DrawTopBar(ChopperGrid &g) {
+        for (int x = 0; x < LGPT_CHOPPER_SCREEN_W; x++)
+            g.SetInvert(x, 0, CHOP_COLOR_HILITE1);
+        g.SetText(0, 0, " P G  SCPI  M TT       CHOPPER       ",
+                  CHOP_COLOR_HILITE1, true);
+    }
+
+    /* Golden drawFrame (RC4 P6): borde de celdas solidas filas 1/22,
+       columnas 0/39 filas 2..21 (CD_BORDER invert) y titulo (2,2)
+       CD_HILITE2. */
+    static void DrawFrame(ChopperGrid &g) {
+        for (int x = 0; x < LGPT_CHOPPER_SCREEN_W; x++) {
+            g.SetInvert(x, 1, CHOP_COLOR_BORDER);
+            g.SetInvert(x, 22, CHOP_COLOR_BORDER);
+        }
+        for (int y = 2; y < 22; y++) {
+            g.SetInvert(0, y, CHOP_COLOR_BORDER);
+            g.SetInvert(39, y, CHOP_COLOR_BORDER);
+        }
+        g.SetText(2, 2, "Graphical Chopper", CHOP_COLOR_HILITE2, false);
+    }
+
+    /* Golden drawEmptyWaveformText: placeholder 40 chars en (2,13)
+       CD_HILITE1 (recorte incluido). */
+    static void DrawEmptyWaveformText(ChopperGrid &g) {
+        g.SetText(2, 13, "            no sample loaded            ",
+                  CHOP_COLOR_HILITE1, false);
+    }
+
+    /* Golden drawControls: fila 24, CD_NORMAL; trim mode swap. */
+    static void DrawControls(ChopperGrid &g, bool trimMode) {
+        g.SetText(0, 24,
+                  trimMode ? "R1+A Keep  L2+Y Del  A+B Nudge  R1+B Back"
+                           : "Select: Crop | L1+R1: Pitch | R1+B: Back",
+                  CHOP_COLOR_NORMAL, false);
+    }
+
+    /* Golden drawPitchScreen hint lines (CD_NORMAL). */
+    static void DrawPitchHints(ChopperGrid &g) {
+        g.SetText(1, 24, "UP/DN Item | L/R Value | B Preview",
+                  CHOP_COLOR_NORMAL, false);
+        g.SetText(1, 25, "A Apply | L1+R1 Exit | R2+LR Target",
+                  CHOP_COLOR_NORMAL, false);
+    }
+
+    /* Golden header pitch: "I%02X S%02X C%02d/%02d". */
+    static int ComposeHeaderLine(char *buf, int bufLen, int instrumentIndex,
+                                 int sampleIndex, int selectedChop,
+                                 int boundaryCount) {
+        return snprintf(buf, bufLen, "I%02X S%02X C%02d/%02d",
+                        instrumentIndex, sampleIndex, selectedChop,
+                        boundaryCount);
+    }
+
+    /* Golden labels[6] del pitch screen. */
+    static const char *PitchLabel(int param) {
+        static const char *labels[6] = {"Pitch", "Attack", "Sustain",
+                                        "Release", "Scope", "Sample"};
+        if (param < 0 || param > 5) param = 5;
+        return labels[param];
+    }
+
+    /* Golden value[16] del pitch screen (mismos formatos snprintf). */
+    static int ComposePitchValue(char *buf, int bufLen, int param,
+                                 int semitones, int attackMs,
+                                 int sustainPercent, int releaseMs,
+                                 bool scope, int pitchSampleIndex) {
+        switch (param) {
+        case 0: return snprintf(buf, bufLen, "%+3d st", semitones);
+        case 1: return snprintf(buf, bufLen, "%4d ms", attackMs);
+        case 2: return snprintf(buf, bufLen, "%3d %%", sustainPercent);
+        case 3: return snprintf(buf, bufLen, "%4d ms", releaseMs);
+        case 4: return snprintf(buf, bufLen, "%s", scope ? "Chop" : "Sample");
+        default: return snprintf(buf, bufLen, "%02X", pitchSampleIndex);
+        }
+    }
+
+    /* Golden fila de info de sample (drawSampleInfo): "Inst:%02X Smpl:%02X
+       Zoom:%03d%%". */
+    static int ComposeSampleInfoLine(char *buf, int bufLen,
+                                     int instrumentIndex, int sampleIndex,
+                                     int zoomPercent) {
+        return snprintf(buf, bufLen, "Inst:%02X Smpl:%02X Zoom:%03d%%",
+                        instrumentIndex, sampleIndex < 0 ? 0 : sampleIndex,
+                        zoomPercent);
+    }
+
+    /* Golden fila de nombre (drawSampleInfo): "Name:%s" (el dueno recorta
+       el nombre a 31 y la linea a 37, como el golden). */
+    static int ComposeNameLine(char *buf, int bufLen, const char *name) {
+        return snprintf(buf, bufLen, "Name:%s", name ? name : "");
+    }
+
+    /* Golden fila de frame (drawSampleInfo): "Frame:%d/%d Chop:%02d/%02d%s"
+       (trailing " ADJ" en trim). */
+    static int ComposeFrameLine(char *buf, int bufLen, int cursorFrame,
+                                int maxFrame, int chopIndex, int chopCount,
+                                bool trimMode) {
+        return snprintf(buf, bufLen, "Frame:%d/%d Chop:%02d/%02d%s",
+                        cursorFrame, maxFrame, chopIndex, chopCount,
+                        trimMode ? " ADJ" : "");
+    }
+
+    /* Golden status del progress (showOperationProgress): OK o porcentaje. */
+    static int ComposeOperationStatus(char *buf, int bufLen,
+                                      const char *comboLabel,
+                                      const char *message, int percent) {
+        if (percent >= 100)
+            return snprintf(buf, bufLen, "%s %s OK A/L1+X/R1+X",
+                            comboLabel ? comboLabel : "",
+                            message ? message : "");
+        return snprintf(buf, bufLen, "%s %s %d%%",
+                        comboLabel ? comboLabel : "",
+                        message ? message : "", percent);
+    }
+
+    /* Golden fila de porcentaje del overlay (drawOperationOverlay):
+       "%3d%%". */
+    static int ComposeOperationPercent(char *buf, int bufLen, int percent) {
+        return snprintf(buf, bufLen, "%3d%%", percent);
     }
 
 private:

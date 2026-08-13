@@ -76,7 +76,10 @@ def check_ascii_widget_allowlist():
     # space-padded line (not dashes).
     frames = CHO.count("+------")
     assert frames == 0, frames
-    assert "no sample loaded" in CHO  # placeholder text
+    # F3-3b: el placeholder vive en la capa pura ChopperView (dibujo 40x30);
+    # la vista lo pinta drenando la grilla.
+    assert "no sample loaded" in (SRC / "Views/ModalDialogs/ChopperView.h").read_text()
+    assert "ChopperView::DrawEmptyWaveformText(grid)" in CHO
     for view in (MV, IV):
         assert "=====" not in view and "+-----" not in view
         assert not __import__("re").search(r'"[^"]*\*{3}[^"]*"', view)
