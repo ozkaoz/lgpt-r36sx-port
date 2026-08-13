@@ -77,6 +77,24 @@ terminan ademas con validacion en consola real.
   (MixerService); PhraseView: logica de grid/edicion separada del dibujo.
 - Sin cambios en el orden de dibujado ni en los mensajes de estado.
 - Evidencia: tests estaticos de existencia de metodos/simbolos + audit.
+- [IMPLEMENTADO 4db54bf] F3-1 Chopper: estado de cortes (boundaries,
+  count, seleccion) extraido a ChopModel (header-only, algoritmos golden
+  identicos: bubble sort, remove+reinit, split con cierre last, clamps de
+  nudge, kMaxBoundaries=101). La vista delega y conserva mensajes,
+  preview, historia, cursor y dibujo. Evidencia: host test de equivalencia
+  golden contra el algoritmo original (tests/host/chop_model_host_test.cpp
+  + tests/run_host_chop_model.sh) + test estatico de baseline
+  (tests/test_f3_chopper_baseline.py: API publica, strings de estado,
+  miembros raw fuera del header) + audit. Core 402cba10 desplegado
+  (backup .pre_f3_1_20260813). [PENDIENTE VALIDACION CONSOLA]
+- [PENDIENTE] F3-2: SampleEditHistory (stacks con capture/restore por
+  callbacks) y PitchEnvelopeTool (parametros pitch/env + buffer builder).
+- [PENDIENTE] F3-3: ChopperView (dibujo) + PreviewService; queda
+  ChopperController con la logica.
+- [PENDIENTE] F3-4: Mixer (baseline en docs/F3_ARCHITECTURE_ES.md):
+  MixerService, MixerMeters, FxNavigator.
+- [PENDIENTE] F3-5: Phrase (baseline en docs/F3_ARCHITECTURE_ES.md):
+  grid/edicion separados del dibujo.
 
 ## F4 - Audio backends extensibles (Application/Audio)
 - Interfaz AudioBackend (open/start/caps/stream/write), AudioRouter con los
