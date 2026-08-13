@@ -186,15 +186,37 @@ static const int kSectionCount_ =
     (int)(sizeof(kSections_) / sizeof(HelpSection));
 
 const HelpSection *HelpRegistry::GetSection(ViewType vt) {
-    if (vt < VT_SONG || vt > VT_MIXER) {
+    // Map each ViewType to its canonical section by name, NOT by ordinal:
+    // kSections_ (line 170) no esta alineado con el enum ViewType desde que
+    // se anadieron TABLE2 (6) y CHOPPER/CHOP PITCH al final del enum, y un
+    // indexado directo hacia que el help de MIXER abriera en CHOPPER
+    // (reportado en consola).  El orden de navegacion del browser no
+    // cambia: GetSectionAt sigue recorriendo kSections_.
+    switch (vt) {
+        case VT_SONG:
+            return &kSections_[0];
+        case VT_CHAIN:
+            return &kSections_[1];
+        case VT_PHRASE:
+            return &kSections_[2];
+        case VT_PROJECT:
+            return &kSections_[3];
+        case VT_INSTRUMENT:
+            return &kSections_[4];
+        case VT_TABLE:
+        case VT_TABLE2:
+            return &kSections_[4];
+        case VT_GROOVE:
+            return &kSections_[6];
+        case VT_MIXER:
+            return &kSections_[7];
         // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): the chopper is a
         // modal, not a regular view type; map it to its help section.
-        if (vt == VT_CHOPPER) {
-            return &kSections_[kSectionCount_ - 2];
-        }
-        return 0;
+        case VT_CHOPPER:
+            return &kSections_[8];
+        default:
+            return 0;
     }
-    return &kSections_[vt];
 }
 
 int HelpRegistry::GetLineCount(const HelpSection *section) {

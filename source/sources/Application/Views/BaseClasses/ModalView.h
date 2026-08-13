@@ -19,6 +19,10 @@ class ModalView : public View, public UI::Navigation::NavModal {
     virtual void NavOnSuspend() { OnSuspend(); }
     virtual void NavOnRestore() { OnRestore(); }
     virtual bool NavIsFinished() { return IsFinished(); }
+    /* Ajuste NavModal -> ModalView: NavModal vive como subobjeto a un
+     * offset del ModalView real; este metodo devuelve el ModalView* correcto
+     * (el thunk de la llamada ya ajusto el this). */
+    void *ModalSelf() { return this; }
 
     // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): a modal pushed on top of
     // this one (e.g. Help over the chopper) suspends it.  Subclasses can

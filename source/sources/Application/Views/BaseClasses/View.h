@@ -173,7 +173,17 @@ class View : public Observable {
     // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): returns the active modal,
     // so AppWindow can show Help for the modal that actually has focus (the
     // chopper) instead of the base view underneath it.
-    ModalView *GetModal() const { return (ModalView *)nav_.Active(); }
+    ModalView *GetModal() const {
+        UI::Navigation::NavModal *n = nav_.Active();
+        return n ? static_cast<ModalView *>(n->ModalSelf()) : 0;
+    }
+    // Modal suspendido bajo el tope (RC4 P1: help pushado sobre un dialogo).
+    ModalView *SuspendedModal() const {
+        UI::Navigation::NavModal *n = nav_.Suspended();
+        return n ? static_cast<ModalView *>(n->ModalSelf()) : 0;
+    }
+    // Alias del tope del stack (mismo ajuste que GetModal).
+    ModalView *ActiveModal() const { return GetModal(); }
     // TREEFROG_CHOPPER_HELP_V1 (Bacon 1.1.1 V13): made virtual so the
     // chopper modal can report VT_CHOPPER and Help opens on its section.
     virtual ViewType GetViewType() const { return viewType_; }

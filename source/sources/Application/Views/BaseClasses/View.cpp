@@ -263,8 +263,8 @@ void View::Redraw() {
 		if (isDirty_) {
 			DrawView() ;
 		}
-		if (nav_.Suspended()) ((ModalView *)nav_.Suspended())->Redraw() ;
-		((ModalView *)nav_.Active())->Redraw() ;
+		if (nav_.Suspended()) SuspendedModal()->Redraw() ;
+		ActiveModal()->Redraw() ;
 	} else {
 		DrawView() ;
 	}
@@ -279,7 +279,7 @@ void View::ProcessButton(unsigned short mask, bool pressed, long eventWhen) {
 	inputEventWhen_=eventWhen ;
 	isDirty_=false ;
 	if (nav_.HasModal()) {
-		ModalView *mv = (ModalView *)nav_.Active();
+		ModalView *mv = ActiveModal();
 		mv->ProcessButton(mask,pressed,eventWhen);
 		if (mv->isDirty_) {
 			isDirty_=true;
@@ -343,7 +343,7 @@ void View::UpdateActiveModal(PlayerEventType type,
                              unsigned int currentTick) {
     if (!nav_.HasModal()) return;
 
-    ModalView *mv = (ModalView *)nav_.Active();
+    ModalView *mv = ActiveModal();
     mv->OnPlayerUpdate(type, currentTick);
 
     if (mv->isDirty_) {
@@ -355,7 +355,7 @@ void View::UpdateActiveModal(PlayerEventType type,
 void View::UpdateActiveModalFrame(unsigned long frameClock) {
     if (!nav_.HasModal()) return;
 
-    ModalView *mv = (ModalView *)nav_.Active();
+    ModalView *mv = ActiveModal();
     mv->OnFrameUpdate(frameClock);
 
     if (mv->isDirty_) {

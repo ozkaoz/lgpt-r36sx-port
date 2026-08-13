@@ -47,6 +47,7 @@ class FakeModal : public NavModal {
     void NavOnSuspend() { trace("S"); }
     void NavOnRestore() { trace("R"); }
     bool NavIsFinished() { return finished_; }
+    void *ModalSelf() { return this; }
 
     int id_;
     bool finished_;

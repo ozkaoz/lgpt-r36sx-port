@@ -30,6 +30,13 @@ class NavModal {
     virtual void NavOnRestore() = 0;
     /* El modal ha terminado (EndModal en la app) y debe hacerse el pop. */
     virtual bool NavIsFinished() = 0;
+    /* Devuelve la direccion del ModalView completo (el contenedor), no la
+     * del subobjeto NavModal: el stack trabaja con NavModal* y un modal de
+     * la app (ModalView : public View, public NavModal) puede vivir en un
+     * offset de subobjeto distinto del NavModal.  El llamador la usa para
+     * recuperar el puntero ajustado (equivalente a un downcast correcto)
+     * sin depender de RTTI. */
+    virtual void *ModalSelf() = 0;
 };
 
 class NavigationController {
