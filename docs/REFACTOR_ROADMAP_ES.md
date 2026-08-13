@@ -25,7 +25,7 @@ terminan ademas con validacion en consola real.
   edit destructivo en frio NO es regresion F1b: mismos callsites que el
   golden, solo el 1er intento tras arranque, sospecha de contencion
   daemon/SD en frio; A/B contra golden pendiente de confirmar). F1b Mixer
-  cerrado (commit pendiente: catalogo CTX_MIXER/CTX_MIXER_FX ampliado con
+  cerrado (commit a820eac: catalogo CTX_MIXER/CTX_MIXER_FX ampliado con
   SELECT/R1(B>A>UP>START)/R2/L2/L1+A y filas FX single-fire; enumerador
   exhaustivo mixer_golden_enum: 32768 combos, 0 mismatches contra el modelo
   golden de MixerView.cpp:534-697; gateway masterSelected_ verificado
