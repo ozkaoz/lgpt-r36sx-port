@@ -54,7 +54,19 @@ terminan ademas con validacion en consola real.
   suspendido con stack lleno, finalizacion del activo. Verde.
 - [PENDIENTE VALIDACION CONSOLA] Help por vista: constatar que el menu help
   se abre en la seccion correspondiente a la pantalla en foco (HelpRegistry
-  por ViewType; AppWindow elige el modal superior si existe).
+  por ViewType; AppWindow elige el modal superior si existe). Primera
+  pasada en consola: MIXER abria en CHOPPER (desajuste ordinal
+  kSections_/ViewType, corregido en 0722cb2).
+- [IMPLEMENTADO] Correccion del crash de consola "R1 en HelpOverlay"
+  (0722cb2): NavigationController trabaja con NavModal* y ModalView
+  (View + NavModal) tiene el NavModal a un offset de subobjeto; los casts
+  C-style en View.cpp/View.h devolvian un puntero desalineado por 168
+  bytes y todo dispatch/dibujo de modal era UB. Se anadio NavModal::
+  ModalSelf() (ajuste thunk, sin RTTI) y toda conversion pasa por el.
+  Reproducido bajo ASAN/UBSAN en tests/host/help_overlay_host_test.cpp
+  (escenarios song y chopper-suspendido, 19 prensas R1) e integrado en
+  scripts/audit.sh. Core 505c49ae desplegado en SD (backup
+  .pre_f2_helpfix_20260813). [PENDIENTE VALIDACION CONSOLA]
 
 ## F3 - Division de clases grandes (Chopper, Mixer, Phrase)
 - SampleChopperModal: extraer estado de operacion, dibujo de panel y logica
