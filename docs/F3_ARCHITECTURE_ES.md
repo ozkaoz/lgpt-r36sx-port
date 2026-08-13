@@ -103,7 +103,8 @@ Ver tercer tramo F3 (no se toca en este commit; inventario completo alla).
   de audio DAW existente en Application/Mixer/MixerService.h, asi que la
   capa pura se llama FxPages y vive en Application/Mixer/FxPages.h),
   `MixerMeters`, `MixerMenu` (menu L1+A declarado como datos puros) y
-  `FxNavigator`.
+  `FxNavigator` (estado del cursor pagina/fila/editTarget + matematica de
+  pasos).  IMPLEMENTADO en F3-4a/b/c/d.
 - F3-5 Phrase: separar logica de grid/edicion del dibujo.
 - Cada tramo: host test + test estatico + audit + build + deploy + commit
   antes de pasar al siguiente.

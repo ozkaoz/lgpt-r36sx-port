@@ -199,11 +199,10 @@ void MixerActionMenuModal::ProcessButtonMask(unsigned short mask,
 // viven en Application/Mixer/FxPages.h (capa pura, sin GUI/audio).
 
 void MixerView::JumpToFxPage(FxPage page) {
-    if (page < FX_PAGE_MIX || page >= FX_PAGE_COUNT) return ;
-    fxPage_ = page ;
-    fxRow_ = 0 ;
-    isDirty_ = true ;
-    ((AppWindow &)w_).SetDirty() ;
+	// F3-4d: rango + reset de fila en el navigator puro.
+	navigator_.SetPage(page) ;
+	isDirty_ = true ;
+	((AppWindow &)w_).SetDirty() ;
 }
 
 void MixerActionMenuApplyCallback(View &view, ModalView &dialog) {
@@ -254,9 +253,8 @@ MixerView::MixerView(GUIWindow &w,ViewData *viewData):View(w,viewData) {
 	invertBatt_=false;
 	soloMode_=false;
 	masterSelected_=false;
-	fxPage_=FX_PAGE_MIX ;
-	fxRow_=0 ;
-	fxEditTarget_=0 ;
+	// F3-4d: navigator_ arranca en su constructor (pagina MIX, fila 0,
+	// target VOL); el estado del cursor FX ya no vive aqui.
 	// F3-4b: meters_ (MixerMeters) se autoceroiza en su constructor; las
 	// barras VU arrancan en 0.
 	// TREEFROG_MIXER_HALF_CELL_BARS_V1 + TREEFROG_GLOBAL_UNDO_V1 (Bacon 1.1.1)
@@ -319,8 +317,8 @@ void MixerView::updateVolume(int delta) {
 	// TREEFROG_FX_PAGES_V3 (Fase 9): on the MIX page the R2-cycled edit
 	// target selects whether UP/DOWN edits the channel volume or one of the
 	// master FX returns (sends are per-instrument now, edited in Instrument).
-	if (fxPage_==FX_PAGE_MIX) {
-		if (fxEditTarget_==1) {
+	if (navigator_.Page()==FX_PAGE_MIX) {
+		if (navigator_.EditTarget()==1) {
 			// TREEFROG_GLOBAL_UNDO_V7: capture old and new percent.
 			FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
 			int oldRet=fxReturnPercent(fx.GetDelayReturn()) ;
@@ -331,7 +329,7 @@ void MixerView::updateVolume(int delta) {
 			isDirty_=true ;
 			return ;
 		}
-		if (fxEditTarget_==2) {
+		if (navigator_.EditTarget()==2) {
 			FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
 			int oldRet=fxReturnPercent(fx.GetReverbReturn()) ;
 			nudgeReverbReturn(delta) ;
@@ -435,7 +433,7 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 	// respeta las colas multi-fire.
 	using namespace UI::Input ;
 	const PadMask pad=(PadMask)mask ;  /* los bits EPBM_* espejan PhysicalKey */
-	const ContextId ctx=(fxPage_==FX_PAGE_MIX)?CTX_MIXER:CTX_MIXER_FX ;
+	const ContextId ctx=(navigator_.Page()==FX_PAGE_MIX)?CTX_MIXER:CTX_MIXER_FX ;
 	const ActionId action=ChordResolver_Resolve(pad,ctx) ;
 
 	switch (action) {
@@ -466,7 +464,7 @@ void MixerView::processNormalButtonMask(unsigned int mask) {
 			return ;
 		case ACTION_CYCLE_FX_EDIT_TARGET:
 			/* MixerView.cpp:579-583: ciclo VOL -> DLY RET -> RVB RET. */
-			fxEditTarget_=(fxEditTarget_+1)%3 ;
+			navigator_.CycleEditTarget() ;
 			isDirty_=true ;
 			((AppWindow &)w_).SetDirty() ;
 			return ;
@@ -769,7 +767,7 @@ bool MixerView::GlobalRedo() {
 // the MIX page the hovered channel resets to volume 100 + pan center, the
 // master bar to volume 100.
 bool MixerView::GlobalResetOption() {
-	if (fxPage_!=FX_PAGE_MIX) {
+	if (navigator_.Page()!=FX_PAGE_MIX) {
 		fxResetRow() ;
 		return true ;
 	}
@@ -1019,7 +1017,7 @@ void MixerView::PostFlushDraw() {
 	// mixer menu, help, ...) and the FX pages own the whole screen; the
 	// pixel VU bars must not be repainted over them (menu letters were
 	// interleaved with the bars).
-	if (GetModal() || fxPage_ != FX_PAGE_MIX) return ;
+	if (GetModal() || navigator_.Page() != FX_PAGE_MIX) return ;
 	unsigned short seamC=app->ResolveColor565(CD_BACKGROUND) ;
 	unsigned short borderC=app->ResolveColor565(CD_BORDER) ;
 	unsigned short redC=app->ResolveColor565(CD_ERROR) ;
@@ -1070,8 +1068,9 @@ void MixerView::PostFlushDraw() {
 // TREEFROG_FX_PAGES_V1 (Fase 4.3) -------------------------------------------
 
 void MixerView::cycleFxPage() {
-	fxPage_=(fxPage_+1)%FX_PAGE_COUNT ;
-	fxRow_=0 ;
+	// F3-4d: ciclo MIX->DELAY->REVERB->EQ->COMP->MIX + reset de fila en el
+	// navigator puro.
+	navigator_.CyclePage() ;
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;
 }
@@ -1098,21 +1097,19 @@ int MixerView::fxRowForId(int id) const {
 }
 
 int MixerView::fxIdForRow(int row) const {
-	return ::fxIdForRow((FxPage)fxPage_,row) ;
+	return ::fxIdForRow(navigator_.Page(),row) ;
 }
 
 void MixerView::fxEditCurve(int id,int delta,bool coarse) {
-	const FxParamSpec &spec=kFxParams_[id] ;
+	// F3-4d: la matematica (semitono/octava + floor + clamps) vive en
+	// FxNavigator::EditValue; aqui solo se lee y se aplica al engine.
 	float v=fxGet(id) ;
-	fxSet(id,fxEditCurveValue(spec,v,delta,coarse)) ;
+	fxSet(id,FxNavigator::EditValue(id,v,delta,coarse)) ;
 }
 
 void MixerView::fxMoveRow(int delta) {
-	int count=fxCountOnPage((FxPage)fxPage_) ;
-	if (count<=0) return ;
-	fxRow_+=delta ;
-	if (fxRow_<0) fxRow_=count-1 ;
-	if (fxRow_>=count) fxRow_=0 ;
+	// F3-4d: wrap de la fila dentro de la pagina en el navigator puro.
+	navigator_.MoveRow(delta) ;
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;
 }
@@ -1127,27 +1124,20 @@ void MixerView::fxMoveRow(int delta) {
 // compressor attack/release/ratio).  F3-4a: fxUsesCurve/fxEditCurveValue
 // moved to FxPages.h.
 void MixerView::fxEditRow(int delta,bool coarse) {
-	int targetId=fxIdForRow(fxRow_) ;
+	// F3-4d: la fila actual y la matematica de pasos (lineal fino/grueso,
+	// bool-ish a paso 1, curva musical) viven en el navigator puro; aqui
+	// solo se hacen el undo, la lectura/escritura del engine y el repintado.
+	int targetId=navigator_.IdForRow() ;
 	if (targetId<0) return ;
-	const FxParamSpec &spec=kFxParams_[targetId] ;
 	// TREEFROG_GLOBAL_UNDO_V1: record the old float value for L1+X undo.
 	float oldVal=fxGet(targetId) ;
 	pushMixUndo(ME_FX,targetId,oldVal) ;
-	if (fxUsesCurve(targetId)) {
-		fxEditCurve(targetId,delta,coarse) ;
-		isDirty_=true ;
-		((AppWindow &)w_).SetDirty() ;
-		return ;
-	}
-	float step=(coarse?10.0f:1.0f) ;
-	// Bool-ish rows (fmt %5.0f, range 0..1) step by 1.
-	if (spec.vmax-spec.vmin<=1.5f) step=1.0f ;
-	float v=fxGet(targetId)+step*(float)delta ;
-	if (v<spec.vmin) v=spec.vmin ;
-	if (v>spec.vmax) v=spec.vmax ;
+	float v=FxNavigator::EditValue(targetId,oldVal,delta,coarse) ;
 	fxSet(targetId,v) ;
-	// TREEFROG_GLOBAL_UNDO_V7: record the post-edit value for redo.
-	if (mixUndoCount_>0) mixUndo_[0].newValue=v ;
+	// TREEFROG_GLOBAL_UNDO_V7: record the post-edit value for redo.  Golden:
+	// solo el path lineal captura newValue (las ediciones en curva no lo
+	// actualizaban en Bacon 1.2.1).
+	if (!fxUsesCurve(targetId) && mixUndoCount_>0) mixUndo_[0].newValue=v ;
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;
 }
@@ -1156,12 +1146,14 @@ void MixerView::fxEditRow(int delta,bool coarse) {
 // A+B restores the hovered parameter to its legacy default so the whole page
 // can be brought back to the Fase 5 "all defaults" state without hunting.
 void MixerView::fxResetRow() {
-	int targetId=fxIdForRow(fxRow_) ;
+	// F3-4d: la fila actual y el vdef golden vienen del navigator puro.
+	int targetId=navigator_.IdForRow() ;
 	if (targetId<0) return ;
 	// TREEFROG_GLOBAL_UNDO_V1: A+B on the FX pages restores vdef; record the
 	// old value so L1+X brings it back.
-	pushMixUndo(ME_FX,targetId,fxGet(targetId),kFxParams_[targetId].vdef) ;
-	fxSet(targetId,kFxParams_[targetId].vdef) ;
+	float vdef=FxNavigator::ResetValue(targetId) ;
+	pushMixUndo(ME_FX,targetId,fxGet(targetId),vdef) ;
+	fxSet(targetId,vdef) ;
 	isDirty_=true ;
 	((AppWindow &)w_).SetDirty() ;
 }
@@ -1262,7 +1254,7 @@ void MixerView::drawFxParamRow(int id,int x,int y,int col) {
 	GUITextProperties props ;
 	char buffer[16] ;
 	const FxParamSpec &spec=kFxParams_[id] ;
-	bool selected=(fxRowForId(id)==fxRow_) ;
+	bool selected=(fxRowForId(id)==navigator_.Row()) ;
 	float v=fxGet(id) ;
 	if (spec.vmax-spec.vmin<=1.5f) {
 		sprintf(buffer,"%-9s%5.0f",spec.label,v) ;
@@ -1363,7 +1355,7 @@ void MixerView::drawDelayPage(const char *title) {
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
-		bool selected=(fxRowForId(id)==fxRow_) ;
+		bool selected=(fxRowForId(id)==navigator_.Row()) ;
 		int y=ml.startY+p ;
 		if (id==FX_P_DLY_BYP) {
 			UiDraw::DrawBypassRow(*this,ml.labelX,ml.valueX,y,v>=0.5f,selected) ;
@@ -1394,7 +1386,7 @@ void MixerView::drawReverbPage(const char *title) {
 	for (int p=0;p<7;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
-		bool selected=(fxRowForId(id)==fxRow_) ;
+		bool selected=(fxRowForId(id)==navigator_.Row()) ;
 		int y=ml.startY+p ;
 		if (id==FX_P_RVB_BYP) {
 			UiDraw::DrawBypassRow(*this,ml.labelX,ml.valueX,y,v>=0.5f,selected) ;
@@ -1432,7 +1424,7 @@ static const char *eqBandName(int id) {
 void MixerView::drawEqRow(int id,int labelX,int valueX,int y) {
 	GUITextProperties props ;
 	char buffer[16] ;
-	bool selected=(fxRowForId(id)==fxRow_) ;
+	bool selected=(fxRowForId(id)==navigator_.Row()) ;
 	bool on=(fxGet(id)>=0.5f) ;
 	// RC4 P2 + RC5: EQ Bypass renders through the unified row; the band EN
 	// toggles keep the "[ ON ]" inline style (they are a per-band enable).
@@ -1502,7 +1494,7 @@ void MixerView::drawCompPage(const char *title) {
 	for (int p=0;p<9;p++) {
 		int id=FX_P_CMP_BYP+p ;  // enum is BYP first, contiguous
 		const FxParamSpec &spec=kFxParams_[id] ;
-		bool selected=(fxRowForId(id)==fxRow_) ;
+		bool selected=(fxRowForId(id)==navigator_.Row()) ;
 		float v=fxGet(id) ;
 		int y=ml.startY+p ;
 		// RC4 P2 + RC5: COMP bypass through the unified row; the rest keep the
@@ -1562,12 +1554,12 @@ void MixerView::drawMixReturns(int y) {
 	// over the meter bank: "RET D:xxx R:xxx FX RETURNS" (26 chars) starts at
 	// column 7, leaving a 7-cell margin on both sides.
 	DrawString(7,y,"RET",props) ;
-	SetColor((fxEditTarget_==1)?CD_HILITE2:CD_NORMAL) ;
-	props.invert_=(fxEditTarget_==1) ;
+	SetColor((navigator_.EditTarget()==1)?CD_HILITE2:CD_NORMAL) ;
+	props.invert_=(navigator_.EditTarget()==1) ;
 	sprintf(buffer,"D:%3d",dly) ;
 	DrawString(11,y,buffer,props) ;
-	SetColor((fxEditTarget_==2)?CD_HILITE2:CD_NORMAL) ;
-	props.invert_=(fxEditTarget_==2) ;
+	SetColor((navigator_.EditTarget()==2)?CD_HILITE2:CD_NORMAL) ;
+	props.invert_=(navigator_.EditTarget()==2) ;
 	sprintf(buffer,"R:%3d",rvb) ;
 	DrawString(17,y,buffer,props) ;
 	props.invert_=false ;
@@ -1579,7 +1571,7 @@ void MixerView::drawFxPages() {
 	GUITextProperties props ;
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
-	if (fxPage_==FX_PAGE_MIX) {
+	if (navigator_.Page()==FX_PAGE_MIX) {
 		// RC6 (compact single-cell meters) + TREEFROG_MIXER_ZERO_DB_CLIP_V5
 		// (Bacon 1.1.1): the MIX page lays out 10 columns: the static CUE
 		// scale (+3/0/-6/-12/-24/-36 dB, compact, right-aligned to the
@@ -1627,7 +1619,7 @@ void MixerView::drawFxPages() {
 		}
 		drawMixReturns(retY) ;
 	} else {
-		drawFxParamPage((FxPage)fxPage_) ;
+		drawFxParamPage(navigator_.Page()) ;
 	}
 	drawNotes() ;
 	drawMap() ;

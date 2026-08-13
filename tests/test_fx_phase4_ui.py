@@ -275,9 +275,16 @@ def check_src_ui_wiring():
                   "GetCompGainReductionDb", "EPBM_SELECT"):
         assert token in src, token
     h = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
-    for token in ("FxPage", "fxPage_", "fxRow_",
-                  "fxEditTarget_", "nudgeDelayReturn", "nudgeReverbReturn"):
+    for token in ("FxPage", "navigator_", "nudgeDelayReturn",
+                  "nudgeReverbReturn"):
         assert token in h, token
+    # F3-4d: the FX cursor state (page/row/edit target) and the step math
+    # moved to the pure FxNavigator layer.
+    nav = (ROOT / "source/sources/Application/Mixer/FxNavigator.h").read_text()
+    for token in ("FxNavigator", "Page()", "Row()", "EditTarget()",
+                  "SetPage", "CyclePage", "MoveRow", "CycleEditTarget",
+                  "EditValue", "ResetValue"):
+        assert token in nav, token
     # F3-4a: the param table, enums and FX_PARAM_COUNT moved to FxPages.h.
     fxp = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
     for token in ("FX_PARAM_COUNT", "FxParamSpec", "kFxParams_",

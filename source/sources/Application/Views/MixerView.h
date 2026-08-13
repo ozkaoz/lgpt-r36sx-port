@@ -12,6 +12,10 @@
 	// F3-4b: medidores VU del Mixer (smoothing golden, nivel de barra y
 	// metrica half-cell L/R) en Application/Mixer/MixerMeters.h (capa pura).
 	#include "Application/Mixer/MixerMeters.h"
+	// F3-4d: navegacion/edicion de las paginas FX (estado pagina/fila/
+	// editTarget + matematica de pasos golden) en Application/Mixer/
+	// FxNavigator.h (capa pura).
+	#include "Application/Mixer/FxNavigator.h"
 
 class MixerView: public View {
 public:
@@ -168,11 +172,10 @@ private:
 	// F3-4b: per-channel display levels (L/R smoothed) live in the pure
 	// MixerMeters layer (TREEFROG_MIXER_VU_SMOOTH_V1 / TREEFROG_MIXER_VU_STOP_RESET_V1).
 	MixerMeters meters_ ;
-	// TREEFROG_FX_PAGES_V1 (Fase 4.3)
-	int fxPage_ ;                 // current FxPage
-	int fxRow_ ;                  // row cursor within the current page
-	// TREEFROG_FX_PAGES_V3 (Fase 9): 0=VOL 1=DLY RET 2=RVB RET on the MIX page
-	int fxEditTarget_ ;
+	// F3-4d: estado del cursor de paginas FX (pagina actual, fila y target
+	// de edicion del MIX page 0=VOL 1=DLY RET 2=RVB RET) y la matematica de
+	// pasos viven en el navigator puro (TREEFROG_FX_PAGES_V1/V3).
+	FxNavigator navigator_ ;
 	// TREEFROG_MIXER_HALF_CELL_BARS_V1: per-meter records (channels 0..7 +
 	// master at SONG_CHANNEL_COUNT) refreshed by DrawView, painted by
 	// PostFlushDraw.

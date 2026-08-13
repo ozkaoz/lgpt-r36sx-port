@@ -191,8 +191,28 @@ terminan ademas con validacion en consola real.
   pre-existente de device/*.c).  Desplegado en SD (backup
   LGPT_BEFORE_U2523_20260813_182741; core en consola = build SHA
   e176da18).
-- [PENDIENTE] F3-4: Mixer (baseline en docs/F3_ARCHITECTURE_ES.md):
-  MixerService, MixerMeters, FxNavigator.
+- [IMPLEMENTADO] F3-4d: FxNavigator - navegacion/edicion de las paginas FX
+  del Mixer extraidas a capa pura (Application/Mixer/FxNavigator.h):
+  estado del cursor (pagina, fila y target de edicion del MIX page
+  0=VOL 1=DLY RET 2=RVB RET) con SetPage (rango + reset de fila),
+  CyclePage (MIX->DELAY->REVERB->EQ->COMP->MIX), MoveRow (wrap por
+  pagina), CycleEditTarget (VOL->DLY RET->RVB RET) e IdForRow (bypass
+  primero); y la matematica golden de pasos EditValue/ResetValue (lineal
+  fino 1 / grueso 10, filas bool-ish a paso 1, curva musical via
+  fxEditCurveValue semitono/octava con floor y clamps, A+B restaura vdef).
+  MixerView migrado: eliminados fxPage_/fxRow_/fxEditTarget_ del header
+  (miembro FxNavigator navigator_), JumpToFxPage/cycleFxPage/fxMoveRow/
+  fxEditRow/fxResetRow/fxEditCurve como delegados; el engine (fxGet/fxSet)
+  y la historia undo (pushMixUndo, newValue solo en el path lineal, igual
+  que golden) siguen en la vista.  Evidencia:
+  tests/host/fx_navigator_host_test.cpp (49 checks golden con ASAN/UBSAN,
+  runner tests/run_host_fx_navigator.sh en audit.sh) + test_f3_4d_baseline.py
+  (capa pura sin GUI/audio, vista sin estado de cursor) + baselines
+  phase14/phase4 actualizados al layout por capas.  Audit completo verde
+  (AUDIT_CLEAN_MAIN_U2523_OK).  Build MIPS del core OK sin diagnosticos en
+  MixerView/FxNavigator (gate solo con deuda F7 pre-existente de
+  device/*.c).  Desplegado en SD (backup LGPT_BEFORE_U2523_20260813_184329;
+  core en consola = build SHA 5a9b78a7).
 - [IMPLEMENTADO] F3-4b: MixerMeters - capa pura de los medidores VU del
   Mixer (Application/Mixer/MixerMeters.h): smoothing golden
   (ataque instantaneo, release *0.6 por frame con piso 0.001, muestreo a 0
@@ -210,8 +230,9 @@ terminan ademas con validacion en consola real.
   diagnosticos en MixerView/MixerMeters (gate solo con deuda F7
   pre-existente de device/*.c).  Desplegado en SD (backup
   LGPT_BEFORE_U2523_20260813_181756; core en consola = build SHA bfb0fa97).
-- [PENDIENTE] F3-4: Mixer (baseline en docs/F3_ARCHITECTURE_ES.md):
-  MixerService, MixerMeters, FxNavigator.
+- [IMPLEMENTADO] F3-4: Mixer completo (baseline en docs/F3_ARCHITECTURE_ES.md):
+  FxPages, MixerMeters, MixerMenu, FxNavigator.  (MixerService es el
+  servicio de audio DAW pre-existente, no una capa de este tramo.)
 - [IMPLEMENTADO] F3-4a: FxPages - capa pura de las paginas FX parametrizadas
   del Mixer (Application/Mixer/FxPages.h).  Los enums FxPage/FxParamId, la
   tabla kFxParams_ (36 filas byte-identicas: DELAY 7, REVERB 7, EQ 13,
