@@ -998,14 +998,7 @@ SampleChopperModal::SampleChopperModal(View &view,
       trimMode_(false),
       pitchMode_(false),
       suspended_(false),
-      pitchSemitones_(0),
-      pitchEditParam_(0),
-      pitchAttackMs_(0),
-      pitchSustainPercent_(100),
-      pitchReleaseMs_(0),
-      pitchScope_(0),
-      undoHistoryCount_(0),
-      redoHistoryCount_(0),
+
       sampleName_(sampleName ? sampleName : ""),
       splitParts_(4) {
     statusMessage_[0] = 0;
@@ -1047,16 +1040,11 @@ int SampleChopperModal::clampInt(int value, int minValue, int maxValue) const { 
 // U2.32: restores stable Listen/Import semantics: Instrument B does not preview; A on Listen previews; L2+B stops.
 // TREEFROG_U2_33_LISTEN_PREVIEW_AUDIO_FIX_STABLE
 bool SampleChopperModal::hasPitchEnvelopeChange() const {
-    return pitchSemitones_ != 0 || pitchAttackMs_ != 0 || pitchReleaseMs_ != 0 || pitchSustainPercent_ != 100;
+    return pitchEnvTool_.HasChange();
 }
 
 void SampleChopperModal::resetPitchEnvelopeSettings() {
-    pitchSemitones_ = 0;
-    pitchEditParam_ = 0;
-    pitchAttackMs_ = 0;
-    pitchSustainPercent_ = 100;
-    pitchReleaseMs_ = 0;
-    pitchScope_ = 0;
+    pitchEnvTool_.Reset();
 }
 
 int SampleChopperModal::getZoomFactor() const {
@@ -1349,12 +1337,12 @@ void SampleChopperModal::captureLogicalState(
     state.zoomPercent = zoomPercent_;
     state.trimMode = trimMode_;
     state.pitchMode = pitchMode_;
-    state.pitchSemitones = pitchSemitones_;
-    state.pitchEditParam = pitchEditParam_;
-    state.pitchAttackMs = pitchAttackMs_;
-    state.pitchSustainPercent = pitchSustainPercent_;
-    state.pitchReleaseMs = pitchReleaseMs_;
-    state.pitchScope = pitchScope_;
+    state.pitchSemitones = pitchEnvTool_.Params().semitones;
+    state.pitchEditParam = pitchEnvTool_.EditParam();
+    state.pitchAttackMs = pitchEnvTool_.Params().attackMs;
+    state.pitchSustainPercent = pitchEnvTool_.Params().sustainPercent;
+    state.pitchReleaseMs = pitchEnvTool_.Params().releaseMs;
+    state.pitchScope = pitchEnvTool_.Params().scope;
 
     snprintf(
         state.samplePath,
@@ -1432,12 +1420,12 @@ void SampleChopperModal::restoreLogicalState(
             MAX_ZOOM_PERCENT);
     trimMode_ = state.trimMode;
     pitchMode_ = state.pitchMode;
-    pitchSemitones_ = state.pitchSemitones;
-    pitchEditParam_ = clampInt(state.pitchEditParam, 0, 5);
-    pitchAttackMs_ = clampInt(state.pitchAttackMs, 0, 5000);
-    pitchSustainPercent_ = clampInt(state.pitchSustainPercent, 0, 150);
-    pitchReleaseMs_ = clampInt(state.pitchReleaseMs, 0, 5000);
-    pitchScope_ = state.pitchScope ? 1 : 0;
+    pitchEnvTool_.SetSemitones(state.pitchSemitones);
+    pitchEnvTool_.SetEditParam(state.pitchEditParam);
+    pitchEnvTool_.SetAttackMs(state.pitchAttackMs);
+    pitchEnvTool_.SetSustainPercent(state.pitchSustainPercent);
+    pitchEnvTool_.SetReleaseMs(state.pitchReleaseMs);
+    pitchEnvTool_.SetScope(state.pitchScope ? 1 : 0);
     chopsInitialized_ = true;
 
     saveChopStateForCurrentSample();
@@ -1449,48 +1437,37 @@ void SampleChopperModal::restoreLogicalState(
 }
 
 void SampleChopperModal::clearLogicalRedo() {
-    redoHistoryCount_ = 0;
+    /* F3-2: el golden solo vaciaba el redo; ClearRedo() de la capa
+       preserva exactamente esa semantica (Push ya invalida el redo). */
+    editHistory_.ClearRedo();
 }
 
 void SampleChopperModal::clearLogicalHistory() {
-    undoHistoryCount_ = 0;
-    redoHistoryCount_ = 0;
+    editHistory_.Clear();
 }
 
 void SampleChopperModal::pushLogicalUndo(
     const char *action) {
     /*
-     * A new branch after physical Undo invalidates the destructive Redo.
-     * The active audio is already the Undo state, so keeping the old Redo
-     * would overwrite later logical edits.
+     * F3-2: la pila la gestiona SampleEditHistory (mismo shift izquierda
+     * si esta llena y misma invalidacion del redo).  El gancho de
+     * destructivos sigue en la vista: una nueva rama tras un Undo
+     * fisico invalida el Redo destructivo.
      */
     if (g_lgptLastDestructiveEditUndone)
         lgptClearDestructiveEditHistory();
 
-    if (undoHistoryCount_ >= MAX_LOGICAL_HISTORY) {
-        for (int i = 1;
-             i < MAX_LOGICAL_HISTORY;
-             ++i) {
-            undoHistory_[i - 1] =
-                undoHistory_[i];
-        }
-        undoHistoryCount_ =
-            MAX_LOGICAL_HISTORY - 1;
-    }
-
-    captureLogicalState(
-        undoHistory_[undoHistoryCount_],
-        action);
-    ++undoHistoryCount_;
-    clearLogicalRedo();
+    LogicalHistoryState state;
+    captureLogicalState(state, action);
+    editHistory_.Push(state);
 }
 
 bool SampleChopperModal::undoLogicalEdit() {
-    if (undoHistoryCount_ <= 0)
+    if (editHistory_.UndoCount() <= 0)
         return false;
 
-    const LogicalHistoryState state =
-        undoHistory_[undoHistoryCount_ - 1];
+    LogicalHistoryState state;
+    editHistory_.PeekUndo(state);
 
     if (state.sampleIndex != sampleIndex_ ||
         strcmp(
@@ -1502,22 +1479,10 @@ bool SampleChopperModal::undoLogicalEdit() {
         return false;
     }
 
-    if (redoHistoryCount_ >= MAX_LOGICAL_HISTORY) {
-        for (int i = 1;
-             i < MAX_LOGICAL_HISTORY;
-             ++i) {
-            redoHistory_[i - 1] =
-                redoHistory_[i];
-        }
-        redoHistoryCount_ =
-            MAX_LOGICAL_HISTORY - 1;
-    }
-
-    captureLogicalState(
-        redoHistory_[redoHistoryCount_],
-        state.action);
-    ++redoHistoryCount_;
-    --undoHistoryCount_;
+    LogicalHistoryState redoState;
+    captureLogicalState(redoState, state.action);
+    if (!editHistory_.Undo(redoState))
+        return false;
 
     restoreLogicalState(state);
 
@@ -1532,11 +1497,11 @@ bool SampleChopperModal::undoLogicalEdit() {
 }
 
 bool SampleChopperModal::redoLogicalEdit() {
-    if (redoHistoryCount_ <= 0)
+    if (editHistory_.RedoCount() <= 0)
         return false;
 
-    const LogicalHistoryState state =
-        redoHistory_[redoHistoryCount_ - 1];
+    LogicalHistoryState state;
+    editHistory_.PeekRedo(state);
 
     if (state.sampleIndex != sampleIndex_ ||
         strcmp(
@@ -1548,22 +1513,10 @@ bool SampleChopperModal::redoLogicalEdit() {
         return false;
     }
 
-    if (undoHistoryCount_ >= MAX_LOGICAL_HISTORY) {
-        for (int i = 1;
-             i < MAX_LOGICAL_HISTORY;
-             ++i) {
-            undoHistory_[i - 1] =
-                undoHistory_[i];
-        }
-        undoHistoryCount_ =
-            MAX_LOGICAL_HISTORY - 1;
-    }
-
-    captureLogicalState(
-        undoHistory_[undoHistoryCount_],
-        state.action);
-    ++undoHistoryCount_;
-    --redoHistoryCount_;
+    LogicalHistoryState undoState;
+    captureLogicalState(undoState, state.action);
+    if (!editHistory_.Redo(undoState))
+        return false;
 
     restoreLogicalState(state);
 
@@ -2201,61 +2154,72 @@ void SampleChopperModal::togglePitchMode() {
 }
 
 void SampleChopperModal::selectPitchEditParam(int delta) {
-    pitchEditParam_ = clampInt(pitchEditParam_ + delta, 0, 5);
-    const char *name = "Pitch";
-    if (pitchEditParam_ == 1) name = "Attack";
-    else if (pitchEditParam_ == 2) name = "Sustain";
-    else if (pitchEditParam_ == 3) name = "Release";
-    else if (pitchEditParam_ == 4) name = "Scope";
-    else if (pitchEditParam_ == 5) name = "Sample";
+    pitchEnvTool_.NudgeEditParam(delta);
+    const char *name =
+        PitchEnvelopeTool::ParamName(pitchEnvTool_.EditParam());
     char msg[64]; snprintf(msg, sizeof(msg), "%s selected", name);
     setStatus(msg);
     isDirty_ = true;
 }
 
 void SampleChopperModal::nudgePitchSemitones(int delta) {
-    int next = clampInt(pitchSemitones_ + delta, -12, 12);
-    if (next == pitchSemitones_) return;
+    int before = pitchEnvTool_.Params().semitones;
+    int next = clampInt(before + delta, LGPT_PITCH_MIN_SEMITONES,
+                        LGPT_PITCH_MAX_SEMITONES);
+    if (next == before) return;
     pushLogicalUndo("Pitch setting");
-    pitchSemitones_ = next;
-    char msg[64]; snprintf(msg, sizeof(msg), "Pitch %+d st", pitchSemitones_);
+    pitchEnvTool_.SetSemitones(next);
+    char msg[64]; snprintf(msg, sizeof(msg), "Pitch %+d st",
+                           pitchEnvTool_.Params().semitones);
     setStatus(msg);
     isDirty_ = true;
 }
 
 void SampleChopperModal::nudgePitchEnvelopeValue(int delta) {
-    if (pitchEditParam_ == 0) {
+    int param = pitchEnvTool_.EditParam();
+    if (param == 0) {
         nudgePitchSemitones(delta);
         return;
     }
 
-    if (pitchEditParam_ == 1) {
-        int next = clampInt(pitchAttackMs_ + (delta * 5), 0, 5000);
-        if (next == pitchAttackMs_) return;
+    if (param == 1) {
+        int before = pitchEnvTool_.Params().attackMs;
+        int next = clampInt(before + (delta * 5), LGPT_PITCH_MIN_ATTACK_MS,
+                            LGPT_PITCH_MAX_ATTACK_MS);
+        if (next == before) return;
         pushLogicalUndo("Attack setting");
-        pitchAttackMs_ = next;
-        char msg[64]; snprintf(msg, sizeof(msg), "Attack %d ms", pitchAttackMs_);
+        pitchEnvTool_.SetAttackMs(next);
+        char msg[64]; snprintf(msg, sizeof(msg), "Attack %d ms",
+                               pitchEnvTool_.Params().attackMs);
         setStatus(msg);
-    } else if (pitchEditParam_ == 2) {
-        int next = clampInt(pitchSustainPercent_ + (delta * 5), 0, 150);
-        if (next == pitchSustainPercent_) return;
+    } else if (param == 2) {
+        int before = pitchEnvTool_.Params().sustainPercent;
+        int next = clampInt(before + (delta * 5),
+                            LGPT_PITCH_MIN_SUSTAIN_PERCENT,
+                            LGPT_PITCH_MAX_SUSTAIN_PERCENT);
+        if (next == before) return;
         pushLogicalUndo("Sustain setting");
-        pitchSustainPercent_ = next;
-        char msg[64]; snprintf(msg, sizeof(msg), "Sustain %d%%", pitchSustainPercent_);
+        pitchEnvTool_.SetSustainPercent(next);
+        char msg[64]; snprintf(msg, sizeof(msg), "Sustain %d%%",
+                               pitchEnvTool_.Params().sustainPercent);
         setStatus(msg);
-    } else if (pitchEditParam_ == 3) {
-        int next = clampInt(pitchReleaseMs_ + (delta * 5), 0, 5000);
-        if (next == pitchReleaseMs_) return;
+    } else if (param == 3) {
+        int before = pitchEnvTool_.Params().releaseMs;
+        int next = clampInt(before + (delta * 5), LGPT_PITCH_MIN_RELEASE_MS,
+                            LGPT_PITCH_MAX_RELEASE_MS);
+        if (next == before) return;
         pushLogicalUndo("Release setting");
-        pitchReleaseMs_ = next;
-        char msg[64]; snprintf(msg, sizeof(msg), "Release %d ms", pitchReleaseMs_);
+        pitchEnvTool_.SetReleaseMs(next);
+        char msg[64]; snprintf(msg, sizeof(msg), "Release %d ms",
+                               pitchEnvTool_.Params().releaseMs);
         setStatus(msg);
-    } else if (pitchEditParam_ == 4) {
+    } else if (param == 4) {
         pushLogicalUndo("Pitch scope");
-        pitchScope_ = pitchScope_ ? 0 : 1;
-        char msg[64]; snprintf(msg, sizeof(msg), "Scope %s", pitchScope_ ? "Chop" : "Sample");
+        pitchEnvTool_.ToggleScope();
+        char msg[64]; snprintf(msg, sizeof(msg), "Scope %s",
+                               pitchEnvTool_.Params().scope ? "Chop" : "Sample");
         setStatus(msg);
-    } else if (pitchEditParam_ == 5) {
+    } else if (param == 5) {
         selectPitchTargetSample(delta);
         return;
     }
@@ -2263,23 +2227,23 @@ void SampleChopperModal::nudgePitchEnvelopeValue(int delta) {
 }
 
 void SampleChopperModal::selectPitchTargetSample(int delta) {
-    int oldPitch = pitchSemitones_;
-    int oldParam = pitchEditParam_;
-    int oldAttack = pitchAttackMs_;
-    int oldSustain = pitchSustainPercent_;
-    int oldRelease = pitchReleaseMs_;
-    int oldScope = pitchScope_;
+    int oldPitch = pitchEnvTool_.Params().semitones;
+    int oldParam = pitchEnvTool_.EditParam();
+    int oldAttack = pitchEnvTool_.Params().attackMs;
+    int oldSustain = pitchEnvTool_.Params().sustainPercent;
+    int oldRelease = pitchEnvTool_.Params().releaseMs;
+    int oldScope = pitchEnvTool_.Params().scope;
 
     loadSampleByIndex(sampleIndex_ + delta, delta > 0 ? "Next pitch sample" : "Prev pitch sample");
 
     pitchMode_ = true;
     trimMode_ = false;
-    pitchSemitones_ = oldPitch;
-    pitchEditParam_ = oldParam;
-    pitchAttackMs_ = oldAttack;
-    pitchSustainPercent_ = oldSustain;
-    pitchReleaseMs_ = oldRelease;
-    pitchScope_ = oldScope;
+    pitchEnvTool_.SetSemitones(oldPitch);
+    pitchEnvTool_.SetEditParam(oldParam);
+    pitchEnvTool_.SetAttackMs(oldAttack);
+    pitchEnvTool_.SetSustainPercent(oldSustain);
+    pitchEnvTool_.SetReleaseMs(oldRelease);
+    pitchEnvTool_.SetScope(oldScope);
 
     char msg[64];
     snprintf(msg, sizeof(msg), "Pitch target sample %02X", sampleIndex_);
@@ -2359,14 +2323,14 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
     static const char *labels[6] = {"Pitch", "Attack", "Sustain",
                                     "Release", "Scope", "Sample"};
     for (int i = 0; i < 6; i++) {
-        bool selected = (pitchEditParam_ == i);
+        bool selected = (pitchEnvTool_.EditParam() == i);
         char value[16];
         switch (i) {
-        case 0: snprintf(value, sizeof(value), "%+3d st", pitchSemitones_); break;
-        case 1: snprintf(value, sizeof(value), "%4d ms", pitchAttackMs_); break;
-        case 2: snprintf(value, sizeof(value), "%3d %%", pitchSustainPercent_); break;
-        case 3: snprintf(value, sizeof(value), "%4d ms", pitchReleaseMs_); break;
-        case 4: snprintf(value, sizeof(value), "%s", pitchScope_ ? "Chop" : "Sample"); break;
+        case 0: snprintf(value, sizeof(value), "%+3d st", pitchEnvTool_.Params().semitones); break;
+        case 1: snprintf(value, sizeof(value), "%4d ms", pitchEnvTool_.Params().attackMs); break;
+        case 2: snprintf(value, sizeof(value), "%3d %%", pitchEnvTool_.Params().sustainPercent); break;
+        case 3: snprintf(value, sizeof(value), "%4d ms", pitchEnvTool_.Params().releaseMs); break;
+        case 4: snprintf(value, sizeof(value), "%s", pitchEnvTool_.Params().scope ? "Chop" : "Sample"); break;
         default: snprintf(value, sizeof(value), "%02X", sampleIndex_); break;
         }
         SetColor(CD_NORMAL);
@@ -2387,36 +2351,8 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
 }
 
 void SampleChopperModal::applyEnvelopeToBuffer(short *samples, int frames, int channels, int rate, int attackMs, int sustainPercent, int releaseMs) {
-    if (!samples || frames <= 0 || channels <= 0 || rate <= 0) return;
-    attackMs = clampInt(attackMs, 0, 5000);
-    releaseMs = clampInt(releaseMs, 0, 5000);
-    sustainPercent = clampInt(sustainPercent, 0, 150);
-
-    int attackFrames = (int)(((long long)attackMs * (long long)rate) / 1000LL);
-    int releaseFrames = (int)(((long long)releaseMs * (long long)rate) / 1000LL);
-    if (attackFrames > frames) attackFrames = frames;
-    if (releaseFrames > frames) releaseFrames = frames;
-
-    double sustain = ((double)sustainPercent) / 100.0;
-    for (int i = 0; i < frames; i++) {
-        double gain = sustain;
-        if (attackFrames > 0 && i < attackFrames) {
-            gain *= (double)i / (double)attackFrames;
-        }
-        if (releaseFrames > 0 && i >= frames - releaseFrames) {
-            int remain = frames - 1 - i;
-            double rel = (remain <= 0) ? 0.0 : ((double)remain / (double)releaseFrames);
-            if (rel < 0.0) rel = 0.0;
-            if (rel > 1.0) rel = 1.0;
-            gain *= rel;
-        }
-        for (int ch = 0; ch < channels; ch++) {
-            int v = (int)((double)samples[i * channels + ch] * gain);
-            if (v < -32768) v = -32768;
-            if (v > 32767) v = 32767;
-            samples[i * channels + ch] = (short)v;
-        }
-    }
+    PitchEnvelopeTool::ApplyEnvelope(samples, frames, channels, rate,
+                                     attackMs, sustainPercent, releaseMs);
 }
 
 bool SampleChopperModal::buildPitchEnvelopeBufferFromRange(int startFrame, int endFrame, int semitones, short **outSamples, int *outFrames, int *outChannels, int *outRate) {
@@ -2436,43 +2372,13 @@ bool SampleChopperModal::buildPitchEnvelopeBufferFromRange(int startFrame, int e
     short *samples = (short *)source->GetSampleBuffer(-1);
     if (!samples || channels <= 0 || rate <= 0 || size <= 1) return false;
 
-    startFrame = clampInt(startFrame, 0, size - 1);
-    endFrame = clampInt(endFrame, startFrame, size - 1);
-    int rangeFrames = endFrame - startFrame + 1;
-    if (rangeFrames <= 1) return false;
-
-    double ratio = pow(2.0, ((double)semitones) / 12.0);
-    if (ratio <= 0.0) return false;
-    int nextSize = (int)(((double)rangeFrames / ratio) + 0.5);
-    if (nextSize < 2) nextSize = 2;
-    if (nextSize > 40000000) return false;
-    short *pitched = (short *)malloc(nextSize * channels * sizeof(short));
-    if (!pitched) return false;
-
-    for (int i = 0; i < nextSize; i++) {
-        double srcPos = (double)i * ratio;
-        int idx = (int)srcPos;
-        double frac = srcPos - (double)idx;
-        if (idx < 0) idx = 0;
-        if (idx >= rangeFrames - 1) { idx = rangeFrames - 1; frac = 0.0; }
-        int idx2 = idx + 1;
-        if (idx2 >= rangeFrames) idx2 = rangeFrames - 1;
-        int srcIdx = startFrame + idx;
-        int srcIdx2 = startFrame + idx2;
-        for (int ch = 0; ch < channels; ch++) {
-            int a = samples[srcIdx * channels + ch];
-            int b = samples[srcIdx2 * channels + ch];
-            int v = (int)((double)a + ((double)(b - a) * frac));
-            if (v < -32768) v = -32768;
-            if (v > 32767) v = 32767;
-            pitched[i * channels + ch] = (short)v;
-        }
+    if (!PitchEnvelopeTool::BuildPitchedRange(
+            samples, size, channels, startFrame, endFrame, semitones,
+            pitchEnvTool_.Params().attackMs,
+            pitchEnvTool_.Params().sustainPercent,
+            pitchEnvTool_.Params().releaseMs, rate, outSamples, outFrames)) {
+        return false;
     }
-
-    applyEnvelopeToBuffer(pitched, nextSize, channels, rate, pitchAttackMs_, pitchSustainPercent_, pitchReleaseMs_);
-
-    if (outSamples) *outSamples = pitched;
-    if (outFrames) *outFrames = nextSize;
     if (outChannels) *outChannels = channels;
     if (outRate) *outRate = rate;
     return true;
@@ -2484,12 +2390,12 @@ bool SampleChopperModal::buildPitchedBuffer(int semitones, short **outSamples, i
 
 bool SampleChopperModal::preparePitchEnvelopePreviewBuffer(short **outSamples, int *outFrames, int *outChannels, int *outRate) {
     if (!pitchMode_) return false;
-    if (pitchScope_) {
+    if (pitchEnvTool_.Params().scope) {
         initializeChopsIfNeeded();
         if (!hasActiveSliceRange()) return false;
-        return buildPitchEnvelopeBufferFromRange(selectedChopStartFrame(), selectedChopEndFrame(), pitchSemitones_, outSamples, outFrames, outChannels, outRate);
+        return buildPitchEnvelopeBufferFromRange(selectedChopStartFrame(), selectedChopEndFrame(), pitchEnvTool_.Params().semitones, outSamples, outFrames, outChannels, outRate);
     }
-    return buildPitchedBuffer(pitchSemitones_, outSamples, outFrames, outChannels, outRate);
+    return buildPitchedBuffer(pitchEnvTool_.Params().semitones, outSamples, outFrames, outChannels, outRate);
 }
 
 static void lgptWriteU2PreviewLE16(I_File *file, unsigned short value) {
@@ -2529,9 +2435,9 @@ bool SampleChopperModal::writePreviewPitchWav(short *samples, int frames, int ch
 void SampleChopperModal::previewPitchSetting() {
     if (!pitchMode_) return;
     if (!hasPitchEnvelopeChange()) {
-        if (pitchScope_) playSelectedChop();
+        if (pitchEnvTool_.Params().scope) playSelectedChop();
         else playFullSample();
-        setStatus(pitchScope_ ? "Preview chop unchanged" : "Preview unchanged");
+        setStatus(pitchEnvTool_.Params().scope ? "Preview chop unchanged" : "Preview unchanged");
         return;
     }
 
@@ -2568,7 +2474,12 @@ void SampleChopperModal::previewPitchSetting() {
     g_chopperPreviewActive = 0;
 #endif
     clearOperationProgress();
-    char msg[64]; snprintf(msg, sizeof(msg), "Preview %s P%+d A%d S%d R%d", pitchScope_ ? "Chop" : "Sample", pitchSemitones_, pitchAttackMs_, pitchSustainPercent_, pitchReleaseMs_);
+    char msg[64]; snprintf(msg, sizeof(msg), "Preview %s P%+d A%d S%d R%d",
+                           pitchEnvTool_.Params().scope ? "Chop" : "Sample",
+                           pitchEnvTool_.Params().semitones,
+                           pitchEnvTool_.Params().attackMs,
+                           pitchEnvTool_.Params().sustainPercent,
+                           pitchEnvTool_.Params().releaseMs);
     setStatus(msg);
     DrawView();
     publishOverlayState();
@@ -2597,7 +2508,7 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     initializeChopsIfNeeded();
     int editStart = 0;
     int editEnd = size - 1;
-    if (pitchScope_) {
+    if (pitchEnvTool_.Params().scope) {
         if (!hasActiveSliceRange()) { setStatus("No chop selected"); return false; }
         editStart = selectedChopStartFrame();
         editEnd = selectedChopEndFrame();
@@ -2610,10 +2521,10 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     stopSamplePreview();
     lgptStopAllAudioBeforeDestructiveEdit();
     setOperationCombo("A");
-    char label[56]; snprintf(label, sizeof(label), "Operacion Pitch %s P%+d", pitchScope_ ? "chop" : "sample", semitones);
+    char label[56]; snprintf(label, sizeof(label), "Operacion Pitch %s P%+d", pitchEnvTool_.Params().scope ? "chop" : "sample", semitones);
     showOperationProgress(label, 0);
     clearLogicalHistory();
-    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, pitchScope_ ? "PitchEnvChop" : "PitchEnv", chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
+    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, pitchEnvTool_.Params().scope ? "PitchEnvChop" : "PitchEnv", chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
     if (!lgptCapturePhysicalSnapshot(source, g_lgptPhysicalUndoSamples, g_lgptPhysicalUndoFrames,
                                      g_lgptPhysicalUndoChannels, g_lgptPhysicalUndoRate)) {
         clearOperationProgress(); setStatus("Undo capture fail"); return false;
@@ -2638,7 +2549,7 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     int oldSelected = chopModel_.selected;
     for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) oldBoundaries[i] = chopModel_.boundaries[i];
 
-    if (pitchScope_) {
+    if (pitchEnvTool_.Params().scope) {
         int beforeFrames = editStart;
         int afterStart = editEnd + 1;
         int afterFrames = size - afterStart;
@@ -2672,7 +2583,7 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     int nextBoundaries[MAX_CHOP_BOUNDARIES];
     for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) nextBoundaries[i] = 0;
     int out = 0;
-    if (!pitchScope_) {
+    if (!pitchEnvTool_.Params().scope) {
         double scale = (size > 1) ? ((double)(nextSize - 1) / (double)(size - 1)) : 1.0;
         for (int i = 0; i < oldCount && i < MAX_CHOP_BOUNDARIES; i++) {
             int v = (int)(((double)oldBoundaries[i] * scale) + 0.5);
@@ -2713,7 +2624,7 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     prepareWaveformPreview();
     centerViewOnCursor();
     publishOverlayState();
-    showOperationProgress(pitchScope_ ? "Operacion Pitch chop" : "Operacion Pitch", 100);
+    showOperationProgress(pitchEnvTool_.Params().scope ? "Operacion Pitch chop" : "Operacion Pitch", 100);
     return true;
 }
 
@@ -3322,7 +3233,7 @@ void SampleChopperModal::ProcessButtonMask(unsigned short mask, bool pressed) {
 
         case ACTION_PITCH_SCOPE_NEXT:
         case ACTION_PITCH_SCOPE_PREV: {
-            if (pitchScope_) {
+            if (pitchEnvTool_.Params().scope) {
                 selectChop(action == ACTION_PITCH_SCOPE_NEXT ? 1 : -1);
                 char msg[64];
                 snprintf(msg, sizeof(msg), "Pitch chop %02d/%02d",
@@ -3399,7 +3310,7 @@ void SampleChopperModal::ProcessButtonMask(unsigned short mask, bool pressed) {
         case ACTION_PITCH_VALUE_UP: nudgePitchEnvelopeValue(1); return;
         case ACTION_PITCH_VALUE_DOWN: nudgePitchEnvelopeValue(-1); return;
         case ACTION_PITCH_PREVIEW: previewPitchSetting(); return;
-        case ACTION_PITCH_APPLY: destructivePitchSample(pitchSemitones_); return;
+        case ACTION_PITCH_APPLY: destructivePitchSample(pitchEnvTool_.Params().semitones); return;
 
         /* Nada resuelto. El bloque pitch del golden consume por defecto con
          * status; los hints de trim tambien son consumidos con status. */

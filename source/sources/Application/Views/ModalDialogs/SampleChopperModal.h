@@ -3,6 +3,8 @@
 
 #include "Application/Views/BaseClasses/ModalView.h"
 #include "Application/Views/ModalDialogs/ChopModel.h"
+#include "Application/Views/ModalDialogs/SampleEditHistory.h"
+#include "Application/Views/ModalDialogs/PitchEnvelopeTool.h"
 #include "UIFramework/Framework/GUITextProperties.h"
 #include <string>
 
@@ -138,20 +140,18 @@ private:
     bool trimMode_;
     bool pitchMode_;
     bool suspended_;
-    int pitchSemitones_;
-    int pitchEditParam_;
-    int pitchAttackMs_;
-    int pitchSustainPercent_;
-    int pitchReleaseMs_;
-    int pitchScope_;
+    // F3-2 (docs/F3_ARCHITECTURE_ES.md): parametros pitch/env y DSP puro
+    // extraidos a PitchEnvelopeTool; el historial logico undo/redo
+    // (LogicalHistoryState) a SampleEditHistory.  La vista conserva
+    // mensajes, preview, preview del pitch, y el orden de las escrituras
+    // golden via los metodos delegados (capture/restore/push/undo/redo
+    // siguen aqui como adapter de la capa pura).
+    PitchEnvelopeTool pitchEnvTool_;
+    SampleEditHistory<LogicalHistoryState> editHistory_;
     // F3-1 (docs/F3_ARCHITECTURE_ES.md): estado de cortes (boundaries,
     // count, seleccion) extraido a ChopModel con los algoritmos golden;
     // la vista conserva mensajes, preview, historia y dibujo.
     ChopModel chopModel_;
-    LogicalHistoryState undoHistory_[MAX_LOGICAL_HISTORY];
-    LogicalHistoryState redoHistory_[MAX_LOGICAL_HISTORY];
-    int undoHistoryCount_;
-    int redoHistoryCount_;
     std::string sampleName_;
     std::string samplePath_;
     char statusMessage_[64];
