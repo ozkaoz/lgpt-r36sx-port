@@ -1004,8 +1004,6 @@ SampleChopperModal::SampleChopperModal(View &view,
       pitchSustainPercent_(100),
       pitchReleaseMs_(0),
       pitchScope_(0),
-      selectedChop_(0),
-      boundaryCount_(0),
       undoHistoryCount_(0),
       redoHistoryCount_(0),
       sampleName_(sampleName ? sampleName : ""),
@@ -1017,7 +1015,7 @@ SampleChopperModal::SampleChopperModal(View &view,
         samplePath_ += sampleName_;
     }
     for (int i = 0; i < MAX_COLUMNS; i++) { minColumn_[i] = 0; maxColumn_[i] = 0; }
-    for (int b = 0; b < MAX_CHOP_BOUNDARIES; b++) boundaries_[b] = 0;
+    for (int b = 0; b < MAX_CHOP_BOUNDARIES; b++) chopModel_.boundaries[b] = 0;
     prepareWaveformPreview();
     publishOverlayState();
 }
@@ -1162,9 +1160,9 @@ void SampleChopperModal::resetChopState() {
     trimMode_ = false;
     pitchMode_ = false;
     resetPitchEnvelopeSettings();
-    selectedChop_ = 0;
-    boundaryCount_ = 0;
-    for (int b = 0; b < MAX_CHOP_BOUNDARIES; b++) boundaries_[b] = 0;
+    chopModel_.selected = 0;
+    chopModel_.boundaryCount = 0;
+    for (int b = 0; b < MAX_CHOP_BOUNDARIES; b++) chopModel_.boundaries[b] = 0;
 }
 
 bool SampleChopperModal::restoreChopStateForCurrentSample() {
@@ -1194,14 +1192,14 @@ bool SampleChopperModal::restoreChopStateForCurrentSample() {
             resetChopState();
             return false;
         }
-        boundaries_[i] = value;
+        chopModel_.boundaries[i] = value;
         previous = value;
     }
-    for (int i = count; i < MAX_CHOP_BOUNDARIES; i++) boundaries_[i] = 0;
+    for (int i = count; i < MAX_CHOP_BOUNDARIES; i++) chopModel_.boundaries[i] = 0;
 
-    boundaryCount_ = count;
-    selectedChop_ = clampInt(saved.selectedChop, 0, boundaryCount_ - 2);
-    cursorFrame_ = boundaries_[selectedChop_];
+    chopModel_.boundaryCount = count;
+    chopModel_.selected = clampInt(saved.selectedChop, 0, chopModel_.boundaryCount - 2);
+    cursorFrame_ = chopModel_.boundaries[chopModel_.selected];
     viewStartFrame_ = 0;
     trimMode_ = false;
     chopsInitialized_ = true;
@@ -1209,7 +1207,7 @@ bool SampleChopperModal::restoreChopStateForCurrentSample() {
 }
 
 void SampleChopperModal::saveChopStateForCurrentSample() {
-    if (!hasAssignedSample() || sourceSize_ <= 1 || !chopsInitialized_ || boundaryCount_ < 2) return;
+    if (!hasAssignedSample() || sourceSize_ <= 1 || !chopsInitialized_ || chopModel_.boundaryCount < 2) return;
 
     const void *projectKey = (viewData_ && viewData_->project_) ? (const void *)viewData_->project_ : 0;
     int slot = lgptFindChopperSavedStateLoose(projectKey, sampleIndex_, sampleName_, sourceSize_);
@@ -1226,9 +1224,9 @@ void SampleChopperModal::saveChopStateForCurrentSample() {
     saved.sampleIndex = sampleIndex_;
     saved.sourceSize = sourceSize_;
     saved.sampleName = sampleName_;
-    saved.boundaryCount = clampInt(boundaryCount_, 2, MAX_CHOP_BOUNDARIES);
-    saved.selectedChop = clampInt(selectedChop_, 0, saved.boundaryCount - 2);
-    for (int i = 0; i < saved.boundaryCount; i++) saved.boundaries[i] = boundaries_[i];
+    saved.boundaryCount = clampInt(chopModel_.boundaryCount, 2, MAX_CHOP_BOUNDARIES);
+    saved.selectedChop = clampInt(chopModel_.selected, 0, saved.boundaryCount - 2);
+    for (int i = 0; i < saved.boundaryCount; i++) saved.boundaries[i] = chopModel_.boundaries[i];
     for (int i = saved.boundaryCount; i < LGPT_CHOPPER_SAVED_BOUNDARIES; i++) saved.boundaries[i] = 0;
     if (wasNewSlotForSample) { for (int i = 0; i < 100; i++) saved.chopInstrument[i] = -1; }
     lgptWritePersistentChopState(saved);
@@ -1256,12 +1254,12 @@ void SampleChopperModal::loadSampleByIndex(int index, const char *reason) {
         trimMode_ = false;
         pitchMode_ = false;
         resetPitchEnvelopeSettings();
-        selectedChop_ = 0;
-        boundaryCount_ = 0;
+        chopModel_.selected = 0;
+        chopModel_.boundaryCount = 0;
         sampleName_.clear();
         samplePath_.clear();
         for (int i = 0; i < MAX_COLUMNS; i++) { minColumn_[i] = 0; maxColumn_[i] = 0; }
-        for (int b = 0; b < MAX_CHOP_BOUNDARIES; b++) boundaries_[b] = 0;
+        for (int b = 0; b < MAX_CHOP_BOUNDARIES; b++) chopModel_.boundaries[b] = 0;
         publishOverlayState();
         setStatus("No samples in pool");
         return;
@@ -1293,10 +1291,10 @@ void SampleChopperModal::loadSampleByIndex(int index, const char *reason) {
     trimMode_ = false;
     pitchMode_ = false;
     resetPitchEnvelopeSettings();
-    selectedChop_ = 0;
-    boundaryCount_ = 0;
+    chopModel_.selected = 0;
+    chopModel_.boundaryCount = 0;
     for (int i = 0; i < MAX_COLUMNS; i++) { minColumn_[i] = 0; maxColumn_[i] = 0; }
-    for (int b = 0; b < MAX_CHOP_BOUNDARIES; b++) boundaries_[b] = 0;
+    for (int b = 0; b < MAX_CHOP_BOUNDARIES; b++) chopModel_.boundaries[b] = 0;
 
     InstrumentBank *bank = viewData_ && viewData_->project_ ? viewData_->project_->GetInstrumentBank() : 0;
     if (bank && instrumentIndex_ >= 0 && instrumentIndex_ < MAX_SAMPLEINSTRUMENT_COUNT) {
@@ -1323,24 +1321,19 @@ void SampleChopperModal::selectSample(int delta) {
 }
 
 void SampleChopperModal::sortBoundaries() {
-    for (int i = 0; i < boundaryCount_ - 1; i++) {
-        for (int j = i + 1; j < boundaryCount_; j++) {
-            if (boundaries_[j] < boundaries_[i]) { int t = boundaries_[i]; boundaries_[i] = boundaries_[j]; boundaries_[j] = t; }
-        }
-    }
+    // F3-1: delegado a ChopModel (bubble golden identico).
+    chopModel_.Sort();
 }
 
 int SampleChopperModal::findBoundaryIndex(int frame) const {
-    for (int i = 0; i < boundaryCount_; i++) if (boundaries_[i] == frame) return i;
-    return -1;
+    // F3-1: delegado a ChopModel (lineal golden).
+    return chopModel_.Find(frame);
 }
 
 void SampleChopperModal::initializeChopsIfNeeded() {
     if (chopsInitialized_ || sourceSize_ <= 1) return;
-    boundaryCount_ = 2;
-    boundaries_[0] = 0;
-    boundaries_[1] = sourceSize_ - 1;
-    selectedChop_ = 0;
+    // F3-1: estado en ChopModel (algoritmo golden identico).
+    chopModel_.InitRange(sourceSize_);
     chopsInitialized_ = true;
 }
 
@@ -1349,8 +1342,8 @@ void SampleChopperModal::captureLogicalState(
     const char *action) const {
     state.sampleIndex = sampleIndex_;
     state.sourceSize = sourceSize_;
-    state.selectedChop = selectedChop_;
-    state.boundaryCount = boundaryCount_;
+    state.selectedChop = chopModel_.selected;
+    state.boundaryCount = chopModel_.boundaryCount;
     state.cursorFrame = cursorFrame_;
     state.viewStartFrame = viewStartFrame_;
     state.zoomPercent = zoomPercent_;
@@ -1379,50 +1372,50 @@ void SampleChopperModal::captureLogicalState(
 
     for (int i = 0; i < MAX_CHOP_BOUNDARIES; ++i)
         state.boundaries[i] =
-            i < boundaryCount_ ? boundaries_[i] : 0;
+            i < chopModel_.boundaryCount ? chopModel_.boundaries[i] : 0;
 }
 
 void SampleChopperModal::restoreLogicalState(
     const LogicalHistoryState &state) {
     sourceSize_ = state.sourceSize;
     sampleSize_ = state.sourceSize;
-    boundaryCount_ =
+    chopModel_.boundaryCount =
         clampInt(
             state.boundaryCount,
             2,
             MAX_CHOP_BOUNDARIES);
 
     for (int i = 0; i < MAX_CHOP_BOUNDARIES; ++i)
-        boundaries_[i] = 0;
+        chopModel_.boundaries[i] = 0;
 
-    for (int i = 0; i < boundaryCount_; ++i)
-        boundaries_[i] =
+    for (int i = 0; i < chopModel_.boundaryCount; ++i)
+        chopModel_.boundaries[i] =
             clampInt(
                 state.boundaries[i],
                 0,
                 sourceSize_ > 0 ? sourceSize_ - 1 : 0);
 
     if (sourceSize_ > 1) {
-        boundaries_[0] = 0;
-        boundaries_[boundaryCount_ - 1] =
+        chopModel_.boundaries[0] = 0;
+        chopModel_.boundaries[chopModel_.boundaryCount - 1] =
             sourceSize_ - 1;
     }
 
-    for (int i = 1; i < boundaryCount_; ++i) {
-        if (boundaries_[i] <= boundaries_[i - 1])
-            boundaries_[i] =
-                boundaries_[i - 1] + 1;
+    for (int i = 1; i < chopModel_.boundaryCount; ++i) {
+        if (chopModel_.boundaries[i] <= chopModel_.boundaries[i - 1])
+            chopModel_.boundaries[i] =
+                chopModel_.boundaries[i - 1] + 1;
         if (sourceSize_ > 0 &&
-            boundaries_[i] >= sourceSize_)
-            boundaries_[i] =
+            chopModel_.boundaries[i] >= sourceSize_)
+            chopModel_.boundaries[i] =
                 sourceSize_ - 1;
     }
 
-    selectedChop_ =
+    chopModel_.selected =
         clampInt(
             state.selectedChop,
             0,
-            boundaryCount_ - 2);
+            chopModel_.boundaryCount - 2);
     cursorFrame_ =
         clampInt(
             state.cursorFrame,
@@ -1599,7 +1592,7 @@ bool SampleChopperModal::redoLastChopperEdit() {
 void SampleChopperModal::addChopAtCursor() {
     if (sourceSize_ <= 1) { setStatus("No sample to chop"); return; }
     initializeChopsIfNeeded();
-    if (boundaryCount_ >= MAX_CHOP_BOUNDARIES) { setStatus("Max 100 chops reached"); return; }
+    if (chopModel_.boundaryCount >= MAX_CHOP_BOUNDARIES) { setStatus("Max 100 chops reached"); return; }
     int frame = getCursorFrame();
     bool liveCut = false;
     if (previewActive_ && Player::GetInstance()->IsStreaming()) {
@@ -1610,22 +1603,22 @@ void SampleChopperModal::addChopAtCursor() {
             liveCut = true;
         }
     }
-    int minEdge = (boundaryCount_ >= 2) ? boundaries_[0] : 0;
-    int maxEdge = (boundaryCount_ >= 2) ? boundaries_[boundaryCount_ - 1] : (sourceSize_ - 1);
+    int minEdge = (chopModel_.boundaryCount >= 2) ? chopModel_.boundaries[0] : 0;
+    int maxEdge = (chopModel_.boundaryCount >= 2) ? chopModel_.boundaries[chopModel_.boundaryCount - 1] : (sourceSize_ - 1);
     if (frame <= minEdge || frame >= maxEdge) { setStatus("Cannot chop at edge"); return; }
-    for (int i = 0; i < boundaryCount_; i++) {
-        if (abs(boundaries_[i] - frame) <= 1) { setStatus("Chop already exists"); return; }
+    for (int i = 0; i < chopModel_.boundaryCount; i++) {
+        if (abs(chopModel_.boundaries[i] - frame) <= 1) { setStatus("Chop already exists"); return; }
     }
     pushLogicalUndo("Add cut");
-    boundaries_[boundaryCount_++] = frame;
+    // F3-1: append + sort golden en ChopModel.
+    chopModel_.Append(frame);
     sortBoundaries();
     int idx = findBoundaryIndex(frame);
-    if (idx > 0) selectedChop_ = idx - 1;
-    if (selectedChop_ < 0) selectedChop_ = 0;
-    if (selectedChop_ > boundaryCount_ - 2) selectedChop_ = boundaryCount_ - 2;
+    if (idx > 0) chopModel_.selected = idx - 1;
+    chopModel_.ClampSelectedToChops();
     saveChopStateForCurrentSample();
     publishOverlayState();
-    char msg[64]; snprintf(msg, sizeof(msg), liveCut ? "Live chop %02d at %d" : "Chop %02d at %d", selectedChop_, frame); setStatus(msg);
+    char msg[64]; snprintf(msg, sizeof(msg), liveCut ? "Live chop %02d at %d" : "Chop %02d at %d", chopModel_.selected, frame); setStatus(msg);
 }
 
 void SampleChopperModal::deleteSelectedChop() {
@@ -1634,19 +1627,13 @@ void SampleChopperModal::deleteSelectedChop() {
 
     /* Chops are stored as boundaries. Deleting a chop removes one internal boundary
        and merges the selected region with a neighbor. Edge boundaries 0/end are never removed. */
-    int removeIdx = (selectedChop_ > 0) ? selectedChop_ : 1;
-    if (removeIdx <= 0 || removeIdx >= boundaryCount_ - 1) { setStatus("Cannot delete edge"); return; }
+    int removeIdx = (chopModel_.selected > 0) ? chopModel_.selected : 1;
+    if (removeIdx <= 0 || removeIdx >= chopModel_.boundaryCount - 1) { setStatus("Cannot delete edge"); return; }
 
     pushLogicalUndo("Merge cuts");
-    for (int i = removeIdx; i < boundaryCount_ - 1; i++) boundaries_[i] = boundaries_[i + 1];
-    boundaryCount_--;
-    if (boundaryCount_ < 2) {
-        boundaryCount_ = 2;
-        boundaries_[0] = 0;
-        boundaries_[1] = sourceSize_ > 0 ? sourceSize_ - 1 : 0;
-    }
-    if (selectedChop_ > boundaryCount_ - 2) selectedChop_ = boundaryCount_ - 2;
-    if (selectedChop_ < 0) selectedChop_ = 0;
+    // F3-1: shift-remove golden + reinit minimo en ChopModel.
+    chopModel_.RemoveChop(removeIdx, sourceSize_);
+    chopModel_.ClampSelectedToChops();
     trimMode_ = false;
     cursorFrame_ = selectedChopStartFrame();
     saveChopStateForCurrentSample();
@@ -1659,36 +1646,34 @@ void SampleChopperModal::deleteSelectedChop() {
 void SampleChopperModal::selectChop(int delta) {
     initializeChopsIfNeeded();
     if (!hasUserChops()) { setStatus("No user chops"); return; }
-    int maxChop = boundaryCount_ - 2;
-    selectedChop_ = clampInt(selectedChop_ + delta, 0, maxChop);
-    cursorFrame_ = boundaries_[selectedChop_];
+    int maxChop = chopModel_.boundaryCount - 2;
+    chopModel_.selected = clampInt(chopModel_.selected + delta, 0, maxChop);
+    cursorFrame_ = chopModel_.boundaries[chopModel_.selected];
     saveChopStateForCurrentSample();
     ensureCursorVisible();
     prepareWaveformPreview();
     publishOverlayState();
-    char msg[64]; snprintf(msg, sizeof(msg), "Selected chop %02d", selectedChop_); setStatus(msg);
+    char msg[64]; snprintf(msg, sizeof(msg), "Selected chop %02d", chopModel_.selected); setStatus(msg);
 }
 
 bool SampleChopperModal::hasUserChops() const {
-    return (boundaryCount_ > 2);
+    return (chopModel_.boundaryCount > 2);
 }
 
 bool SampleChopperModal::hasActiveSliceRange() const {
-    if (boundaryCount_ < 2 || sourceSize_ <= 1) return false;
-    if (boundaryCount_ > 2) return true;
-    return (boundaries_[0] > 0 || boundaries_[1] < sourceSize_ - 1);
+    if (chopModel_.boundaryCount < 2 || sourceSize_ <= 1) return false;
+    if (chopModel_.boundaryCount > 2) return true;
+    return (chopModel_.boundaries[0] > 0 || chopModel_.boundaries[1] < sourceSize_ - 1);
 }
 
 int SampleChopperModal::selectedChopStartFrame() const {
-    if (boundaryCount_ < 2) return 0;
-    int idx = clampInt(selectedChop_, 0, boundaryCount_ - 2);
-    return boundaries_[idx];
+    // F3-1: delegado a ChopModel (clamps golden identicos).
+    return chopModel_.StartFrameForSelected();
 }
 
 int SampleChopperModal::selectedChopEndFrame() const {
-    if (boundaryCount_ < 2) return sourceSize_ > 0 ? sourceSize_ - 1 : 0;
-    int idx = clampInt(selectedChop_ + 1, 1, boundaryCount_ - 1);
-    return boundaries_[idx];
+    // F3-1: delegado a ChopModel (clamps golden identicos).
+    return chopModel_.EndFrameForSelected(sourceSize_);
 }
 
 int SampleChopperModal::getFrameStepForEdit() const {
@@ -1717,19 +1702,19 @@ void SampleChopperModal::toggleTrimMode() {
 
 void SampleChopperModal::nudgeSelectedStart(int deltaFrames) {
     initializeChopsIfNeeded();
-    if (boundaryCount_ < 2) { setStatus("No range to trim"); return; }
-    int idx = selectedChop_;
-    int minFrame = (idx == 0) ? 0 : boundaries_[idx - 1] + 1;
-    int maxFrame = boundaries_[idx + 1] - 1;
+    if (chopModel_.boundaryCount < 2) { setStatus("No range to trim"); return; }
+    int idx = chopModel_.selected;
+    int minFrame = (idx == 0) ? 0 : chopModel_.boundaries[idx - 1] + 1;
+    int maxFrame = chopModel_.boundaries[idx + 1] - 1;
     int nextFrame =
         clampInt(
-            boundaries_[idx] + deltaFrames,
+            chopModel_.boundaries[idx] + deltaFrames,
             minFrame,
             maxFrame);
-    if (nextFrame == boundaries_[idx]) return;
+    if (nextFrame == chopModel_.boundaries[idx]) return;
     pushLogicalUndo("Move cut start");
-    boundaries_[idx] = nextFrame;
-    cursorFrame_ = boundaries_[idx];
+    chopModel_.boundaries[idx] = nextFrame;
+    cursorFrame_ = chopModel_.boundaries[idx];
     saveChopStateForCurrentSample();
     ensureCursorVisible();
     prepareWaveformPreview();
@@ -1739,19 +1724,19 @@ void SampleChopperModal::nudgeSelectedStart(int deltaFrames) {
 
 void SampleChopperModal::nudgeSelectedEnd(int deltaFrames) {
     initializeChopsIfNeeded();
-    if (boundaryCount_ < 2) { setStatus("No range to trim"); return; }
-    int idx = selectedChop_ + 1;
-    int minFrame = boundaries_[idx - 1] + 1;
-    int maxFrame = (idx == boundaryCount_ - 1) ? (sourceSize_ - 1) : (boundaries_[idx + 1] - 1);
+    if (chopModel_.boundaryCount < 2) { setStatus("No range to trim"); return; }
+    int idx = chopModel_.selected + 1;
+    int minFrame = chopModel_.boundaries[idx - 1] + 1;
+    int maxFrame = (idx == chopModel_.boundaryCount - 1) ? (sourceSize_ - 1) : (chopModel_.boundaries[idx + 1] - 1);
     int nextFrame =
         clampInt(
-            boundaries_[idx] + deltaFrames,
+            chopModel_.boundaries[idx] + deltaFrames,
             minFrame,
             maxFrame);
-    if (nextFrame == boundaries_[idx]) return;
+    if (nextFrame == chopModel_.boundaries[idx]) return;
     pushLogicalUndo("Move cut end");
-    boundaries_[idx] = nextFrame;
-    cursorFrame_ = boundaries_[idx];
+    chopModel_.boundaries[idx] = nextFrame;
+    cursorFrame_ = chopModel_.boundaries[idx];
     saveChopStateForCurrentSample();
     ensureCursorVisible();
     prepareWaveformPreview();
@@ -1763,9 +1748,9 @@ void SampleChopperModal::nudgeSelectedEnd(int deltaFrames) {
 void SampleChopperModal::cropToSelectedRange() {
     if (sourceSize_ <= 1) { setStatus("No sample to crop"); return; }
     initializeChopsIfNeeded();
-    if (boundaryCount_ < 2) { setStatus("No range to crop"); return; }
+    if (chopModel_.boundaryCount < 2) { setStatus("No range to crop"); return; }
 
-    selectedChop_ = clampInt(selectedChop_, 0, boundaryCount_ - 2);
+    chopModel_.selected = clampInt(chopModel_.selected, 0, chopModel_.boundaryCount - 2);
     int start = selectedChopStartFrame();
     int end = selectedChopEndFrame();
     if (end <= start) { setStatus("Bad crop range"); return; }
@@ -1773,11 +1758,11 @@ void SampleChopperModal::cropToSelectedRange() {
     /* U2.14: safe logical crop. We keep the chosen/trimmed range as a single S01 slice
        and ignore material outside it at playback time. We do not rewrite the WAV file here. */
     pushLogicalUndo("Keep logical range");
-    boundaryCount_ = 2;
-    boundaries_[0] = start;
-    boundaries_[1] = end;
-    for (int i = 2; i < MAX_CHOP_BOUNDARIES; i++) boundaries_[i] = 0;
-    selectedChop_ = 0;
+    chopModel_.boundaryCount = 2;
+    chopModel_.boundaries[0] = start;
+    chopModel_.boundaries[1] = end;
+    for (int i = 2; i < MAX_CHOP_BOUNDARIES; i++) chopModel_.boundaries[i] = 0;
+    chopModel_.selected = 0;
     trimMode_ = false;
     cursorFrame_ = start;
     saveChopStateForCurrentSample();
@@ -1797,18 +1782,9 @@ void SampleChopperModal::splitSampleIntoEqualParts(int parts) {
     int step = sourceSize_ / parts;
     if (step < 1) { setStatus("Sample too small"); return; }
     pushLogicalUndo("Split sample");
-    boundaryCount_ = 0;
-    for (int i = 0; i < parts; i++) {
-        if (boundaryCount_ >= MAX_CHOP_BOUNDARIES) break;
-        boundaries_[boundaryCount_++] = i * step;
-    }
-    int last = sourceSize_ - 1;
-    if (boundaryCount_ == 0 || boundaries_[boundaryCount_ - 1] != last) {
-        if (boundaryCount_ < MAX_CHOP_BOUNDARIES) boundaries_[boundaryCount_++] = last;
-        else boundaries_[boundaryCount_ - 1] = last;
-    }
-    sortBoundaries();
-    selectedChop_ = 0;
+    // F3-1: rebuild de boundaryes golden en ChopModel (el guard de
+    // step<1 y el status se evaluaron arriba, igual que el golden).
+    chopModel_.SplitIntoEqualParts(parts, sourceSize_);
     trimMode_ = false;
     cursorFrame_ = 0;
     saveChopStateForCurrentSample();
@@ -1833,11 +1809,8 @@ void SampleChopperModal::clearAllChops() {
     initializeChopsIfNeeded();
     if (sourceSize_ <= 1) { setStatus("No sample to clear"); return; }
     pushLogicalUndo("Clear chops");
-    boundaryCount_ = 2;
-    boundaries_[0] = 0;
-    boundaries_[1] = sourceSize_ - 1;
-    for (int i = 2; i < MAX_CHOP_BOUNDARIES; i++) boundaries_[i] = 0;
-    selectedChop_ = 0;
+    // F3-1: estado en ChopModel (rango minimo + cero del resto).
+    chopModel_.ClearAll(sourceSize_);
     trimMode_ = false;
     cursorFrame_ = 0;
     saveChopStateForCurrentSample();
@@ -1864,19 +1837,19 @@ void SampleChopperModal::cycleSplitParts() {
 void SampleChopperModal::snapSelectedBoundaryToZeroCross(bool isStart) {
     if (!hasAssignedSample() || sourceSize_ <= 1) { setStatus("No sample loaded"); return; }
     initializeChopsIfNeeded();
-    if (boundaryCount_ < 2) { setStatus("No chops to snap"); return; }
+    if (chopModel_.boundaryCount < 2) { setStatus("No chops to snap"); return; }
     SoundSource *source = SamplePool::GetInstance()->GetSource(sampleIndex_);
     if (!source) { setStatus("No WAV source"); return; }
     short *samples = (short *)source->GetSampleBuffer(-1);
     int channels = source->GetChannelCount(-1);
     if (!samples || channels <= 0) { setStatus("Bad sample buffer"); return; }
 
-    int idx = selectedChop_;
-    if (!isStart) idx = clampInt(idx + 1, 1, boundaryCount_ - 1);
-    if (idx < 0 || idx >= boundaryCount_) { setStatus("Invalid boundary"); return; }
-    int frame = boundaries_[idx];
-    int minFrame = (idx == 0) ? 0 : boundaries_[idx - 1] + 1;
-    int maxFrame = (idx == boundaryCount_ - 1) ? (sourceSize_ - 1) : (boundaries_[idx + 1] - 1);
+    int idx = chopModel_.selected;
+    if (!isStart) idx = clampInt(idx + 1, 1, chopModel_.boundaryCount - 1);
+    if (idx < 0 || idx >= chopModel_.boundaryCount) { setStatus("Invalid boundary"); return; }
+    int frame = chopModel_.boundaries[idx];
+    int minFrame = (idx == 0) ? 0 : chopModel_.boundaries[idx - 1] + 1;
+    int maxFrame = (idx == chopModel_.boundaryCount - 1) ? (sourceSize_ - 1) : (chopModel_.boundaries[idx + 1] - 1);
     int lo = frame - 64; if (lo < minFrame) lo = minFrame;
     int hi = frame + 64; if (hi > maxFrame) hi = maxFrame;
     int best = frame;
@@ -1891,7 +1864,7 @@ void SampleChopperModal::snapSelectedBoundaryToZeroCross(bool isStart) {
     }
     if (best != frame) {
         pushLogicalUndo(isStart ? "Snap start" : "Snap end");
-        boundaries_[idx] = best;
+        chopModel_.boundaries[idx] = best;
         cursorFrame_ = best;
         sortBoundaries();
         saveChopStateForCurrentSample();
@@ -1923,9 +1896,9 @@ bool SampleChopperModal::destructiveCropToSelectedRange() {
     }
 
     initializeChopsIfNeeded();
-    if (boundaryCount_ < 2) { setStatus("No range to crop"); return false; }
+    if (chopModel_.boundaryCount < 2) { setStatus("No range to crop"); return false; }
 
-    selectedChop_ = clampInt(selectedChop_, 0, boundaryCount_ - 2);
+    chopModel_.selected = clampInt(chopModel_.selected, 0, chopModel_.boundaryCount - 2);
     int start = selectedChopStartFrame();
     int end = selectedChopEndFrame();
 
@@ -1950,7 +1923,7 @@ bool SampleChopperModal::destructiveCropToSelectedRange() {
     showOperationProgress("Operacion Crop", 5);
 
     clearLogicalHistory();
-    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Crop", boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Crop", chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
     if (!lgptCapturePhysicalSnapshot(source, g_lgptPhysicalUndoSamples, g_lgptPhysicalUndoFrames,
                                      g_lgptPhysicalUndoChannels, g_lgptPhysicalUndoRate)) {
         clearOperationProgress(); setStatus("Undo capture fail"); return false;
@@ -1984,11 +1957,11 @@ bool SampleChopperModal::destructiveCropToSelectedRange() {
     sampleSize_ = frameCount;
     viewStartFrame_ = 0;
     cursorFrame_ = 0;
-    boundaryCount_ = 2;
-    boundaries_[0] = 0;
-    boundaries_[1] = frameCount - 1;
-    for (int i = 2; i < MAX_CHOP_BOUNDARIES; i++) boundaries_[i] = 0;
-    selectedChop_ = 0;
+    chopModel_.boundaryCount = 2;
+    chopModel_.boundaries[0] = 0;
+    chopModel_.boundaries[1] = frameCount - 1;
+    for (int i = 2; i < MAX_CHOP_BOUNDARIES; i++) chopModel_.boundaries[i] = 0;
+    chopModel_.selected = 0;
     trimMode_ = true;
     chopsInitialized_ = true;
 
@@ -1997,7 +1970,7 @@ bool SampleChopperModal::destructiveCropToSelectedRange() {
         clearOperationProgress(); setStatus("Redo capture fail"); return false;
     }
 
-    lgptFinishDestructiveEdit(boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    lgptFinishDestructiveEdit(chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
     saveChopStateForCurrentSample();
     refreshCurrentInstrumentAfterSampleEdit(sourceSize_);
     prepareWaveformPreview();
@@ -2022,9 +1995,9 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
     }
 
     initializeChopsIfNeeded();
-    if (boundaryCount_ < 2) { setStatus("No range to delete"); return false; }
+    if (chopModel_.boundaryCount < 2) { setStatus("No range to delete"); return false; }
 
-    selectedChop_ = clampInt(selectedChop_, 0, boundaryCount_ - 2);
+    chopModel_.selected = clampInt(chopModel_.selected, 0, chopModel_.boundaryCount - 2);
     int start = selectedChopStartFrame();
     int end = selectedChopEndFrame();
 
@@ -2049,7 +2022,7 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
     showOperationProgress("Operacion Delete", 5);
 
     clearLogicalHistory();
-    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Delete", boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Delete", chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
     if (!lgptCapturePhysicalSnapshot(source, g_lgptPhysicalUndoSamples, g_lgptPhysicalUndoFrames,
                                      g_lgptPhysicalUndoChannels, g_lgptPhysicalUndoRate)) {
         clearOperationProgress(); setStatus("Undo capture fail"); return false;
@@ -2089,8 +2062,8 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
     sync();
 
     int oldBoundaries[MAX_CHOP_BOUNDARIES];
-    int oldCount = boundaryCount_;
-    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) oldBoundaries[i] = boundaries_[i];
+    int oldCount = chopModel_.boundaryCount;
+    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) oldBoundaries[i] = chopModel_.boundaries[i];
     int nextBoundaries[MAX_CHOP_BOUNDARIES];
     for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) nextBoundaries[i] = 0;
     int out = 0;
@@ -2109,11 +2082,11 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
 
     sourceSize_ = nextSize;
     sampleSize_ = nextSize;
-    boundaryCount_ = out;
-    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) boundaries_[i] = (i < boundaryCount_) ? nextBoundaries[i] : 0;
-    selectedChop_ = clampInt(selectedChop_, 0, boundaryCount_ - 2);
+    chopModel_.boundaryCount = out;
+    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) chopModel_.boundaries[i] = (i < chopModel_.boundaryCount) ? nextBoundaries[i] : 0;
+    chopModel_.selected = clampInt(chopModel_.selected, 0, chopModel_.boundaryCount - 2);
     viewStartFrame_ = 0;
-    cursorFrame_ = boundaries_[selectedChop_];
+    cursorFrame_ = chopModel_.boundaries[chopModel_.selected];
     trimMode_ = true;
     chopsInitialized_ = true;
 
@@ -2122,7 +2095,7 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
         clearOperationProgress(); setStatus("Redo capture fail"); return false;
     }
 
-    lgptFinishDestructiveEdit(boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    lgptFinishDestructiveEdit(chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
     saveChopStateForCurrentSample();
     refreshCurrentInstrumentAfterSampleEdit(sourceSize_);
     prepareWaveformPreview();
@@ -2179,22 +2152,22 @@ bool SampleChopperModal::restoreLastDestructiveEdit(bool redo) {
 
     sourceSize_ = restoreFrames;
     sampleSize_ = restoreFrames;
-    boundaryCount_ = clampInt(restoreCount, 2, MAX_CHOP_BOUNDARIES);
-    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) boundaries_[i] = 0;
-    for (int i = 0; i < boundaryCount_; i++)
-        boundaries_[i] = clampInt(restoreBoundaries[i], 0, restoreFrames - 1);
-    boundaries_[0] = 0;
-    boundaries_[boundaryCount_ - 1] = restoreFrames - 1;
-    for (int i = 1; i < boundaryCount_; i++) {
-        if (boundaries_[i] <= boundaries_[i - 1])
-            boundaries_[i] = boundaries_[i - 1] + 1;
-        if (boundaries_[i] >= restoreFrames)
-            boundaries_[i] = restoreFrames - 1;
+    chopModel_.boundaryCount = clampInt(restoreCount, 2, MAX_CHOP_BOUNDARIES);
+    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) chopModel_.boundaries[i] = 0;
+    for (int i = 0; i < chopModel_.boundaryCount; i++)
+        chopModel_.boundaries[i] = clampInt(restoreBoundaries[i], 0, restoreFrames - 1);
+    chopModel_.boundaries[0] = 0;
+    chopModel_.boundaries[chopModel_.boundaryCount - 1] = restoreFrames - 1;
+    for (int i = 1; i < chopModel_.boundaryCount; i++) {
+        if (chopModel_.boundaries[i] <= chopModel_.boundaries[i - 1])
+            chopModel_.boundaries[i] = chopModel_.boundaries[i - 1] + 1;
+        if (chopModel_.boundaries[i] >= restoreFrames)
+            chopModel_.boundaries[i] = restoreFrames - 1;
     }
 
-    selectedChop_ = clampInt(restoreSelected, 0, boundaryCount_ - 2);
+    chopModel_.selected = clampInt(restoreSelected, 0, chopModel_.boundaryCount - 2);
     viewStartFrame_ = 0;
-    cursorFrame_ = boundaries_[selectedChop_];
+    cursorFrame_ = chopModel_.boundaries[chopModel_.selected];
     trimMode_ = true;
     chopsInitialized_ = true;
     g_lgptLastDestructiveEditUndone = !redo;
@@ -2377,8 +2350,8 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
 
     snprintf(buffer, sizeof(buffer), "I%02X S%02X C%02d/%02d",
              instrumentIndex_, sampleIndex_,
-             selectedChop_ + 1,
-             (boundaryCount_ > 1 ? boundaryCount_ - 1 : 1));
+             chopModel_.selected + 1,
+             (chopModel_.boundaryCount > 1 ? chopModel_.boundaryCount - 1 : 1));
     SetColor(CD_NORMAL);
     props.invert_ = false;
     DrawString(ml.labelX, ml.startY, buffer, props);
@@ -2631,7 +2604,7 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     char label[56]; snprintf(label, sizeof(label), "Operacion Pitch %s P%+d", pitchScope_ ? "chop" : "sample", semitones);
     showOperationProgress(label, 0);
     clearLogicalHistory();
-    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, pitchScope_ ? "PitchEnvChop" : "PitchEnv", boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, pitchScope_ ? "PitchEnvChop" : "PitchEnv", chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
     if (!lgptCapturePhysicalSnapshot(source, g_lgptPhysicalUndoSamples, g_lgptPhysicalUndoFrames,
                                      g_lgptPhysicalUndoChannels, g_lgptPhysicalUndoRate)) {
         clearOperationProgress(); setStatus("Undo capture fail"); return false;
@@ -2652,9 +2625,9 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
     int nextSize = processedFrames;
     short *nextBuffer = processed;
     int oldBoundaries[MAX_CHOP_BOUNDARIES];
-    int oldCount = boundaryCount_;
-    int oldSelected = selectedChop_;
-    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) oldBoundaries[i] = boundaries_[i];
+    int oldCount = chopModel_.boundaryCount;
+    int oldSelected = chopModel_.selected;
+    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) oldBoundaries[i] = chopModel_.boundaries[i];
 
     if (pitchScope_) {
         int beforeFrames = editStart;
@@ -2716,16 +2689,16 @@ bool SampleChopperModal::destructivePitchSample(int semitones) {
         else nextBoundaries[out - 1] = nextSize - 1;
     }
     if (out < 2) { out = 2; nextBoundaries[0] = 0; nextBoundaries[1] = nextSize - 1; }
-    boundaryCount_ = out;
-    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) boundaries_[i] = (i < boundaryCount_) ? nextBoundaries[i] : 0;
+    chopModel_.boundaryCount = out;
+    for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++) chopModel_.boundaries[i] = (i < chopModel_.boundaryCount) ? nextBoundaries[i] : 0;
 
     sourceSize_ = nextSize;
     sampleSize_ = nextSize;
-    selectedChop_ = clampInt(oldSelected, 0, boundaryCount_ - 2);
-    cursorFrame_ = boundaries_[selectedChop_];
+    chopModel_.selected = clampInt(oldSelected, 0, chopModel_.boundaryCount - 2);
+    cursorFrame_ = chopModel_.boundaries[chopModel_.selected];
     viewStartFrame_ = 0;
     chopsInitialized_ = true;
-    lgptFinishDestructiveEdit(boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    lgptFinishDestructiveEdit(chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
     saveChopStateForCurrentSample();
     refreshCurrentInstrumentAfterSampleEdit(sourceSize_);
     prepareWaveformPreview();
@@ -2764,7 +2737,7 @@ bool SampleChopperModal::normalizeSample() {
     char label[56]; snprintf(label, sizeof(label), "Operacion normalizar peak %d", peak);
     showOperationProgress(label, 0);
     clearLogicalHistory();
-    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Normalize", boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    lgptBeginDestructiveEdit(samplePath_, sampleIndex_, "Normalize", chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
     if (!lgptCapturePhysicalSnapshot(source, g_lgptPhysicalUndoSamples, g_lgptPhysicalUndoFrames,
                                      g_lgptPhysicalUndoChannels, g_lgptPhysicalUndoRate)) {
         clearOperationProgress(); setStatus("Undo capture fail"); return false;
@@ -2796,14 +2769,14 @@ bool SampleChopperModal::normalizeSample() {
 
     /* The frame length is unchanged, so chop boundaries stay valid as-is. */
     for (int i = 0; i < MAX_CHOP_BOUNDARIES; i++)
-        if (i >= boundaryCount_) boundaries_[i] = 0;
+        if (i >= chopModel_.boundaryCount) chopModel_.boundaries[i] = 0;
     sourceSize_ = size;
     sampleSize_ = size;
-    selectedChop_ = clampInt(selectedChop_, 0, boundaryCount_ - 2);
-    cursorFrame_ = boundaries_[selectedChop_];
+    chopModel_.selected = clampInt(chopModel_.selected, 0, chopModel_.boundaryCount - 2);
+    cursorFrame_ = chopModel_.boundaries[chopModel_.selected];
     viewStartFrame_ = 0;
     chopsInitialized_ = true;
-    lgptFinishDestructiveEdit(boundaries_, boundaryCount_, selectedChop_, sourceSize_);
+    lgptFinishDestructiveEdit(chopModel_.boundaries, chopModel_.boundaryCount, chopModel_.selected, sourceSize_);
     saveChopStateForCurrentSample();
     refreshCurrentInstrumentAfterSampleEdit(sourceSize_);
     prepareWaveformPreview();
@@ -2881,8 +2854,8 @@ void SampleChopperModal::publishOverlayState() {
     if (g_chopperCursorPx < 0) g_chopperCursorPx = 0;
     for (int i = 0; i < MAX_COLUMNS; i++) { g_chopperMinColumn[i] = minColumn_[i]; g_chopperMaxColumn[i] = maxColumn_[i]; }
     g_chopperMarkerCount = 0;
-    for (int b = 1; b < boundaryCount_ - 1 && g_chopperMarkerCount < TF_MAX_CHOP_MARKERS; b++) {
-        int px = frameToPixel(boundaries_[b]);
+    for (int b = 1; b < chopModel_.boundaryCount - 1 && g_chopperMarkerCount < TF_MAX_CHOP_MARKERS; b++) {
+        int px = frameToPixel(chopModel_.boundaries[b]);
         if (px >= 0) g_chopperMarkerPx[g_chopperMarkerCount++] = px;
     }
     g_chopperSelectedStartPx = -1;
@@ -2895,9 +2868,9 @@ void SampleChopperModal::publishOverlayState() {
     g_chopperPreviewActive = previewActive_ ? 1 : 0;
     g_chopperPreviewStartFrame = previewStartFrame_;
     g_chopperPreviewEndFrame = previewEndFrame_;
-    if (hasActiveSliceRange() && selectedChop_ >= 0 && selectedChop_ <= boundaryCount_ - 2) {
-        int startFrame = boundaries_[selectedChop_];
-        int endFrame = boundaries_[selectedChop_ + 1];
+    if (hasActiveSliceRange() && chopModel_.selected >= 0 && chopModel_.selected <= chopModel_.boundaryCount - 2) {
+        int startFrame = chopModel_.boundaries[chopModel_.selected];
+        int endFrame = chopModel_.boundaries[chopModel_.selected + 1];
         int viewFrames = getViewFrameCount();
         int viewEnd = viewStartFrame_ + viewFrames - 1;
         g_chopperSelectedStartPx = frameToPixel(startFrame);
@@ -2963,7 +2936,7 @@ void SampleChopperModal::assignSelectedChopToPhrase() {
     if (row < 0 || row > 15) row = 0;
     char status[64];
     if (LGPTChopperAssignSavedChopToPhraseRow(viewData_, phraseIndex, row,
-                                              instrumentIndex_, selectedChop_, 0,
+                                              instrumentIndex_, chopModel_.selected, 0,
                                               true, status, sizeof(status))) {
         setStatus(status);
     } else {
@@ -3094,7 +3067,7 @@ void SampleChopperModal::exportChopsToPhrase() {
     int rowStart = viewData_->phraseCurPos_;
     if (rowStart < 0 || rowStart > 15) rowStart = 0;
 
-    int chopCount = boundaryCount_ - 1;
+    int chopCount = chopModel_.boundaryCount - 1;
     int maxRows = 16 - rowStart;
     if (chopCount > maxRows) chopCount = maxRows;
     if (chopCount <= 0) {
@@ -3106,7 +3079,7 @@ void SampleChopperModal::exportChopsToPhrase() {
     for (int i = 0; i < chopCount; i++) {
         unsigned short nextInstr = bank->Clone((unsigned short)instrumentIndex_);
         if (nextInstr == NO_MORE_INSTRUMENT) break;
-        if (!configureChopInstrument((int)nextInstr, boundaries_[i], boundaries_[i + 1])) break;
+        if (!configureChopInstrument((int)nextInstr, chopModel_.boundaries[i], chopModel_.boundaries[i + 1])) break;
 
         int row = rowStart + i;
         int offset = 16 * phraseIndex + row;
@@ -3176,7 +3149,7 @@ void SampleChopperModal::drawSampleInfo(GUITextProperties &props) {
     snprintf(buffer, sizeof(buffer), "Inst:%02X Smpl:%02X Zoom:%03d%%", instrumentIndex_, sampleIndex_ < 0 ? 0 : sampleIndex_, zoomPercent_);
     buffer[37] = 0; drawStringAbs(2, 4, buffer, props);
     if (!hasAssignedSample()) { drawStringAbs(2, 5, "No sample assigned", props); drawStringAbs(2, 6, "No chop actions", props); }
-    else { std::string name = sampleName_; if (name.size() > 31) name = name.substr(0, 31); snprintf(buffer, sizeof(buffer), "Name:%s", name.c_str()); buffer[37] = 0; drawStringAbs(2, 5, buffer, props); snprintf(buffer, sizeof(buffer), "Frame:%d/%d Chop:%02d/%02d%s", cursorFrame_, sourceSize_ > 0 ? sourceSize_ - 1 : 0, hasActiveSliceRange() ? selectedChop_ : 0, hasActiveSliceRange() ? (boundaryCount_ - 1) : 0, trimMode_ ? " ADJ" : ""); buffer[37] = 0; drawStringAbs(2, 6, buffer, props); }
+    else { std::string name = sampleName_; if (name.size() > 31) name = name.substr(0, 31); snprintf(buffer, sizeof(buffer), "Name:%s", name.c_str()); buffer[37] = 0; drawStringAbs(2, 5, buffer, props); snprintf(buffer, sizeof(buffer), "Frame:%d/%d Chop:%02d/%02d%s", cursorFrame_, sourceSize_ > 0 ? sourceSize_ - 1 : 0, hasActiveSliceRange() ? chopModel_.selected : 0, hasActiveSliceRange() ? (chopModel_.boundaryCount - 1) : 0, trimMode_ ? " ADJ" : ""); buffer[37] = 0; drawStringAbs(2, 6, buffer, props); }
     if (statusMessage_[0]) { SetColor(CD_HILITE1); drawStringAbs(2, 23, statusMessage_, props); }
 }
 
@@ -3344,8 +3317,8 @@ void SampleChopperModal::ProcessButtonMask(unsigned short mask, bool pressed) {
                 selectChop(action == ACTION_PITCH_SCOPE_NEXT ? 1 : -1);
                 char msg[64];
                 snprintf(msg, sizeof(msg), "Pitch chop %02d/%02d",
-                         selectedChop_ + 1,
-                         (boundaryCount_ > 1 ? boundaryCount_ - 1 : 1));
+                         chopModel_.selected + 1,
+                         (chopModel_.boundaryCount > 1 ? chopModel_.boundaryCount - 1 : 1));
                 setStatus(msg);
             } else {
                 setStatus("Set Scope Chop first");

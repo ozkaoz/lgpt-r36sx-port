@@ -2,6 +2,7 @@
 #define _SAMPLE_CHOPPER_MODAL_H_
 
 #include "Application/Views/BaseClasses/ModalView.h"
+#include "Application/Views/ModalDialogs/ChopModel.h"
 #include "UIFramework/Framework/GUITextProperties.h"
 #include <string>
 
@@ -143,9 +144,10 @@ private:
     int pitchSustainPercent_;
     int pitchReleaseMs_;
     int pitchScope_;
-    int selectedChop_;
-    int boundaryCount_;
-    int boundaries_[MAX_CHOP_BOUNDARIES];
+    // F3-1 (docs/F3_ARCHITECTURE_ES.md): estado de cortes (boundaries,
+    // count, seleccion) extraido a ChopModel con los algoritmos golden;
+    // la vista conserva mensajes, preview, historia y dibujo.
+    ChopModel chopModel_;
     LogicalHistoryState undoHistory_[MAX_LOGICAL_HISTORY];
     LogicalHistoryState redoHistory_[MAX_LOGICAL_HISTORY];
     int undoHistoryCount_;
