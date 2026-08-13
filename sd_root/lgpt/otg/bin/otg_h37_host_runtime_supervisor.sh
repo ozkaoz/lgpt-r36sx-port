@@ -37,14 +37,16 @@ pick_log_path(){ p="$1"; if ( : >> "$p" ) 2>/dev/null; then printf '%s' "$p"; el
 # v14.3: stop daemons gracefully - SIGUSR1 (drain + clean PCM close) before
 # SIGTERM/SIGKILL. Killing a live musb URB stream abruptly wedges the
 # controller on the Sampler bounce.
-# U2.68 LIVE_LOG_FLUSH: the console shutdown path can be skipped (hard
-# power-off, daemon holding the card), which used to lose the SP404 daemon
-# and supervisor logs. Every 5 ticks this copies the RAM log tree to the SD
-# (cp -f: the console has no RTC, so tmpfs mtime 1970 vs FAT mtime 1980
-# made cp -u believe the SD copy was always newer and never overwrite it),
-# so the host-side evidence survives even if the clean shutdown never
-# flushes. RO-proof: probe the SD once per call; if it is not writable,
-# skip quietly.
+# U2.68 LIVE_LOG_FLUSH (H42: now OPT-IN): the console shutdown path can be
+# skipped (hard power-off, daemon holding the card), which used to lose the
+# SP404 daemon and supervisor logs. Every 5 ticks this copies the RAM log
+# tree to the SD (cp -f: the console has no RTC, so tmpfs mtime 1970 vs FAT
+# mtime 1980 made cp -u believe the SD copy was always newer and never
+# overwrite it). Per the zero-runtime-SD-writes mandate, the periodic copy is
+# OFF by default: enable it with LGPT_LIVE_FLUSH=1 (the clean-shutdown flush
+# still persists logs once). RO-proof: probe the SD once per call; if it is
+# not writable, skip quietly.
+LIVE_FLUSH="${LGPT_LIVE_FLUSH:-0}"
 flush_tick=0
 live_flush(){
   SD_LOGS="/mnt/sdcard/LGPT_OTG_LOGS"
@@ -146,7 +148,7 @@ while [ "$STOP" -eq 0 ] && policy_host; do
   sp404_wanted && run_sp404=1
   midi_wanted && run_midi=1
   detect_tick=$((detect_tick + 1))
-  if [ "$detect_tick" -ge 3 ]; then
+  if [ "$detect_tick" -ge 2 ]; then
     detect_tick=0
     [ -r "$BIN/otg_h37_host_device_detect.sh" ] && detect_now
   fi
@@ -226,8 +228,11 @@ while [ "$STOP" -eq 0 ] && policy_host; do
   fi
 
   flush_tick=$((flush_tick+1))
-  if [ "$flush_tick" -ge 5 ]; then flush_tick=0; live_flush; fi
-  sleep 1
+  if [ "$flush_tick" -ge 5 ]; then
+    flush_tick=0
+    [ "$LIVE_FLUSH" = "1" ] && live_flush
+  fi
+  sleep 0.3
   backoff=1
 done
 log "POLICY_EXIT policy=$(cat "$POLICY_FILE" 2>/dev/null || echo missing)"

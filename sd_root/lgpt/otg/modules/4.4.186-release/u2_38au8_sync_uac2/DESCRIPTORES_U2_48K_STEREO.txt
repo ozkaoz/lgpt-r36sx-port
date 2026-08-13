@@ -1,0 +1,80 @@
+=== ARRAY as_in_hdr_desc (4 ptrs) ===
+  [ 0] ptr out of .data
+  [ 1] ptr out of .data
+  [ 2] NULL
+  [ 3] NULL
+=== ARRAY as_iso_in_desc (2 ptrs) ===
+  [ 0] ptr out of .data
+  [ 1] NULL
+=== ARRAY as_iso_out_desc (2 ptrs) ===
+  [ 0] ptr out of .data
+  [ 1] NULL
+=== ARRAY as_out_hdr_desc (4 ptrs) ===
+  [ 0] ptr out of .data
+  [ 1] ptr out of .data
+  [ 2] NULL
+  [ 3] NULL
+=== ARRAY fs_audio_desc (22 ptrs) ===
+  [ 0] -> .data+0x0000 : T0b
+  [ 1] -> .data+0x0000 : IF num=0 alt=0 n_eps=0
+  [ 2] -> .data+0x0000 : CS AC_HEADER bcd=0802
+  [ 3] -> .data+0x0000 : CS CLOCK_SRC clk_id=6 attr=01 EXTERNAL/VAR
+  [ 4] -> .data+0x0000 : CS CLOCK_SRC clk_id=5 attr=01 EXTERNAL/VAR
+  [ 5] -> .data+0x0000 : CS INPUT_TERM term_id=1 type=0101
+  [ 6] -> .data+0x0000 : CS INPUT_TERM term_id=2 type=0200
+  [ 7] -> .data+0x0000 : CS OUTPUT_TERM term_id=4 type=0101
+  [ 8] -> .data+0x0000 : CS OUTPUT_TERM term_id=3 type=0300
+  [ 9] -> .data+0x0000 : IF num=0 alt=0 n_eps=0
+  [10] -> .data+0x0000 : IF num=0 alt=1 n_eps=1
+  [11] -> .data+0x0000 : CS AC_HEADER bcd=0100
+  [12] -> .data+0x0000 : CS INPUT_TERM term_id=1 type=0000
+  [13] -> .data+0x0000 : EP addr=00 sync=SYNC     bm=0d mps=1023 interval=1
+  [14] -> .data+0x0000 : CS_EP sel=1
+  [15] -> .data+0x0000 : IF num=0 alt=0 n_eps=0
+  [16] -> .data+0x0000 : IF num=0 alt=1 n_eps=1
+  [17] -> .data+0x0000 : CS AC_HEADER bcd=0100
+  [18] -> .data+0x0000 : CS INPUT_TERM term_id=1 type=0000
+  [19] -> .data+0x0000 : EP addr=80 sync=SYNC     bm=0d mps=1023 interval=1
+  [20] -> .data+0x0000 : CS_EP sel=1
+  [21] NULL
+=== ARRAY hs_audio_desc (22 ptrs) ===
+  [ 0] -> .data+0x0000 : T0b
+  [ 1] -> .data+0x0000 : IF num=0 alt=0 n_eps=0
+  [ 2] -> .data+0x0000 : CS AC_HEADER bcd=0802
+  [ 3] -> .data+0x0000 : CS CLOCK_SRC clk_id=6 attr=01 EXTERNAL/VAR
+  [ 4] -> .data+0x0000 : CS CLOCK_SRC clk_id=5 attr=01 EXTERNAL/VAR
+  [ 5] -> .data+0x0000 : CS INPUT_TERM term_id=1 type=0101
+  [ 6] -> .data+0x0000 : CS INPUT_TERM term_id=2 type=0200
+  [ 7] -> .data+0x0000 : CS OUTPUT_TERM term_id=4 type=0101
+  [ 8] -> .data+0x0000 : CS OUTPUT_TERM term_id=3 type=0300
+  [ 9] -> .data+0x0000 : IF num=0 alt=0 n_eps=0
+  [10] -> .data+0x0000 : IF num=0 alt=1 n_eps=1
+  [11] -> .data+0x0000 : CS AC_HEADER bcd=0100
+  [12] -> .data+0x0000 : CS INPUT_TERM term_id=1 type=0000
+  [13] -> .data+0x0000 : EP addr=00 sync=SYNC     bm=0d mps=1024 interval=4
+  [14] -> .data+0x0000 : CS_EP sel=1
+  [15] -> .data+0x0000 : IF num=0 alt=0 n_eps=0
+  [16] -> .data+0x0000 : IF num=0 alt=1 n_eps=1
+  [17] -> .data+0x0000 : CS AC_HEADER bcd=0100
+  [18] -> .data+0x0000 : CS INPUT_TERM term_id=1 type=0000
+  [19] -> .data+0x0000 : EP addr=00 sync=SYNC     bm=0d mps=1024 interval=4
+  [20] -> .data+0x0000 : CS_EP sel=1
+  [21] NULL
+=== ARRAY iad_desc (2 ptrs) ===
+  [ 0] ptr out of .data
+  [ 1] ptr out of .data
+=== ARRAY in_clk_src_desc (2 ptrs) ===
+  [ 0] ptr out of .data
+  [ 1] -> .data+0x0101 : T00
+=== ARRAY io_out_ot_desc (3 ptrs) ===
+  [ 0] ptr out of .data
+  [ 1] ptr out of .data
+  [ 2] -> .data+0x0305 : None
+=== ARRAY out_clk_src_desc (2 ptrs) ===
+  [ 0] ptr out of .data
+  [ 1] -> .data+0x0101 : T00
+=== ARRAY usb_in_ot_desc (3 ptrs) ===
+  [ 0] ptr out of .data
+  [ 1] ptr out of .data
+  [ 2] -> .data+0x0306 : None
+DESCRIPTOR_SUMMARY SYNC=4 ASYNC=0 ADAPTIVE=0 NO_SYNC=0 INT_FIXED=0

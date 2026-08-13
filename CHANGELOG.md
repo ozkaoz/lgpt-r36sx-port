@@ -1,5 +1,42 @@
 # Changelog
 
+## Release: Bacon 1.2 U2.72 - Mixer (final) - estabilización total 48k stereo
+
+- **Estado**: release final del port `stabilize-bacon-1.2.1` (rama
+  `stabilize-bacon-1.2.1`), ABI7, audio 48 kHz stereo en los cuatro modos
+  (Local / Windows / Android / Sampler SP404MKII). Prueba de campo completa
+  superada: switches directos repetidos entre los cuatro modos y sesiones
+  continuas sin crash, sin stall del Sampler y sin detour manual por Android.
+- **U2.72 H43** (`7df42da`):
+  - Core: `signal(SIGPIPE, SIG_IGN)` en `retro_init` - el core moría al
+    entrar a Sampler porque el daemon SP404 (único lector del FIFO
+    `O_WRONLY|O_NONBLOCK`) se eliminaba durante el cambio de modo y el write
+    disparaba SIGPIPE. Ahora el cambio SP404->Local/Windows/Android no tumba
+    el core.
+  - Bridge: tracking del FIFO abierto (`g_fifo_open_path`) y
+    `fifo_compatible_with_mode()`; el fast-apply del cambio de driver solo se
+    ejecuta si el FIFO abierto es el correcto; si no, cierra el FIFO y fuerza
+    el apply completo de perfil. Elimina el bloqueo SP404->Windows que
+    exigía el detour por Android.
+  - Daemon SP404: tope de corrección ASRC 30.000->1.200 ppm (el pitch
+    audible provenía del control golpeando +/-1% al barrer los bursts del
+    core), EMA 15/16 del backlog de control (filtra el "peloteo" del ring),
+    hold floor de 2.400 frames en `asrc_prepare_period` (nunca drena el ring
+    a cero) y bookkeeping real del REENUM con salida del daemon tras 8
+    intentos fallidos (`SP404_REENUM_EXHAUSTED`) liberando el rol musb host
+    para que el supervisor reintente por backoff normal.
+  - El pitch residual del modo Sampler (~+0,3%) es inherente al reloj
+    ADAPTIVE del SP404 y se compensa con el ASRC (inaudible).
+- **U2.71 H39+H40/H41/H42** (`d1c36c9`): presupuesto wall-clock de la SD,
+  staging de escrituras parciales (sin escrituras a SD en runtime), micro-ASRC
+  PI en el daemon Windows (`r36s_u241_usb_audio_io`), y el par de fixes de
+  ASRC de Sampler.
+- **U2.70** (`713913f`): ASRC FIR16 Lanczos-8 (tabla limpia, fila 79==81
+  corregida) + selector `ASRC_FIR_TAPS` A/B en ambos drivers.
+- **U2.69** (`be8cdcb`): ASRC drift fix para Sampler/SP404 (sin bypass,
+  límites ampliados, integral 3->12, backlog 2.400->3.600) + sync del payload
+  Bacon-1.2.
+
 ## Update: Bacon 1.2 U2.69 - ASRC drift fix (Sampler / SP404MKII)
 
 - **Estado**: actualización de la pre-release Bacon 1.2 (Mixer Dev).
