@@ -98,8 +98,17 @@ terminan ademas con validacion en consola real.
   lectura -> un solo crash de timing. Fix 6114766 (U2.52.0): Stop+Sleep
   antes del rewrite (mismo stream audible). Core f72e346f desplegado
   (backup .pre_u2520_stream_order_20260813). [PENDIENTE VALIDACION CONSOLA]
-- [PENDIENTE] F3-2: SampleEditHistory (stacks con capture/restore por
-  callbacks) y PitchEnvelopeTool (parametros pitch/env + buffer builder).
+- [IMPLEMENTADO 858be5c] F3-2: SampleEditHistory (stacks undo/redo con
+  capture/restore por el dueno via PeekUndo/PeekRedo) y PitchEnvelopeTool
+  (parametros pitch/env + buffer builder) extraidos como capas puras
+  header-only; la vista delega (pitchEnvTool_/editHistory_) y conserva
+  mensajes y gancho de destructivos. Evidencia: tests host de equivalencia
+  golden bajo ASAN/UBSAN (tests/host/edit_history_host_test.cpp + 
+  pitch_tool_host_test.cpp) y test estatico de baseline
+  (tests/test_f3_2_baseline.py) + test_u2510_global_chop_history
+  actualizado a la capa + audit. Build MIPS del core OK sin diagnosticos
+  (el gate estricto solo reporta warnings pre-existentes de device/*.c,
+  deuda F7). [PENDIENTE VALIDACION CONSOLA]
 - [PENDIENTE] F3-3: ChopperView (dibujo) + PreviewService; queda
   ChopperController con la logica.
 - [PENDIENTE] F3-4: Mixer (baseline en docs/F3_ARCHITECTURE_ES.md):
