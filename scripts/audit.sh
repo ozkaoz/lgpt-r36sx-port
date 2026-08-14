@@ -19,6 +19,7 @@ bash "$ROOT/tests/run_host_mixer_menu.sh"
 bash "$ROOT/tests/run_host_fx_navigator.sh"
 bash "$ROOT/tests/run_host_phrase_grid_edit.sh"
 bash "$ROOT/tests/run_host_phrase_undo.sh"
+bash "$ROOT/tests/run_host_audio_driver_modes.sh"
 for f in "$ROOT/scripts/"*.sh; do bash -n "$f"; done
 for f in otg_u241_common.sh otg_u241_setup_once.sh otg_u241_apply_profile_once.sh otg_u241_shutdown.sh; do sh -n "$ROOT/device/$f"; done
 gcc -std=gnu99 -Wall -Wextra -Werror=implicit-function-declaration -fsyntax-only "$ROOT/device/r36s_u2523_usb_audio_io.c"

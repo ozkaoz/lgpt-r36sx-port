@@ -1,4 +1,5 @@
 #include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
+#include "Application/Audio/AudioDriverModeTable.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -442,53 +443,18 @@ static int marker_fresh(const char *p, int max_age_sec) {
     return (now - st.st_mtime) <= max_age_sec;
 }
 
-static const char *mode_name(int mode) {
-    switch (mode) {
-    case U241_WINDOWS: return "Windows";
-    case U241_ANDROID: return "Android";
-    case U241_USB_OUT: return "Sampler";
-    case U241_SP404_IN: return "Sampler";
-    case U241_MIDI: return "MIDI";
-    case U241_LOCAL_CONSOLE:
-    default: return "Local Console";
-    }
-}
+// F4a: delegados a la tabla declarativa de modos (Application/Audio/
+// AudioDriverModeTable.h, docs/F4_ARCHITECTURE_ES.md).  Los ids del enum
+// U241_* son identicos a kAudioDriverMode*; el comportamiento (incluido el
+// fallback default = LOCAL_CONSOLE) es byte-identico al de los switches
+// originales (golden Bacon 1.2.1).
+static const char *mode_name(int mode) { return AudioDriverModeName(mode); }
 
-static const char *mode_token(int mode) {
-    switch (mode) {
-    case U241_WINDOWS: return "USB_DUPLEX";
-    case U241_ANDROID: return "USB_IN";
-    case U241_USB_OUT: return "USB_OUT";
-    case U241_SP404_IN: return "SP404_IN";
-    case U241_MIDI: return "MIDI";
-    case U241_LOCAL_CONSOLE:
-    default: return "LOCAL_CONSOLE";
-    }
-}
+static const char *mode_token(int mode) { return AudioDriverModeToken(mode); }
 
-static const char *policy_token(int mode) {
-    switch (mode) {
-    case U241_WINDOWS: return "USB_DUPLEX_OTG";
-    case U241_ANDROID: return "USB_IN_OTG";
-    case U241_USB_OUT: return "USB_OUT_OTG";
-    case U241_SP404_IN: return "USB_OUT_OTG";
-    case U241_MIDI: return "MIDI_OTG";
-    case U241_LOCAL_CONSOLE:
-    default: return "LOCAL_CONSOLE";
-    }
-}
+static const char *policy_token(int mode) { return AudioDriverModePolicyToken(mode); }
 
-static const char *branch_name_for_mode(int mode) {
-    switch (mode) {
-    case U241_WINDOWS: return "audio_driver_usb_duplex";
-    case U241_ANDROID: return "audio_driver_usb_in";
-    case U241_USB_OUT: return "audio_driver_usb_out";
-    case U241_SP404_IN: return "audio_driver_sp404_in";
-    case U241_MIDI: return "audio_driver_midi";
-    case U241_LOCAL_CONSOLE:
-    default: return "audio_driver_local_console";
-    }
-}
+static const char *branch_name_for_mode(int mode) { return AudioDriverModeBranchName(mode); }
 
 static void write_active_branch_file(int mode) {
     mkdir(kBranchRoot, 0777);
@@ -514,29 +480,11 @@ static void write_active_branch_file(int mode) {
 }
 
 static const char *mode_desc(int mode) {
-    switch (mode) {
-    case U241_WINDOWS:
-        return "Duplex UAC2 gadget (PC host)";
-    case U241_ANDROID:
-        return "Duplex UAC2 gadget (phone host)";
-    case U241_USB_OUT:
-        return "SP404: console sound to sampler (EXT SOURCE)";
-    case U241_SP404_IN:
-        return "SP404 IN: sampler->console, recording only";
-    case U241_MIDI:
-        return "MIDI: USB piano/controller";
-    case U241_LOCAL_CONSOLE:
-    default:
-        return "Console sound, OTG may stay connected";
-    }
+    return AudioDriverModeDescription(mode);
 }
 
 static int selectable_mode(int mode) {
-    return mode == U241_LOCAL_CONSOLE ||
-        mode == U241_WINDOWS ||
-        mode == U241_ANDROID ||
-        mode == U241_USB_OUT ||
-        mode == U241_MIDI;
+    return AudioDriverModeIsSelectable(mode);
 }
 
 static int mode_from_text(const char *s) {
@@ -717,15 +665,11 @@ static int detected_device(void) {
  * Windows gadget mode keeps its existing out+in semantics.
  */
 static int mode_has_out(int mode) {
-    if (mode == U241_USB_OUT) return !g_sampler_direction_in;
-    return mode == U241_WINDOWS;
+    return AudioDriverModeHasOut(mode, g_sampler_direction_in);
 }
 
 static int mode_has_in(int mode) {
-    if (mode == U241_USB_OUT) return g_sampler_direction_in;
-    return mode == U241_WINDOWS ||
-        mode == U241_ANDROID ||
-        mode == U241_SP404_IN;
+    return AudioDriverModeHasIn(mode, g_sampler_direction_in);
 }
 
 static const char *device_out_fifo(int device) {
@@ -2124,7 +2068,7 @@ const char *TreeFrogUac2Bridge_CycleDriverMode(void) {
 #endif
 }
 
-int TreeFrogUac2Bridge_GetDriverModeCount(void) { return 5; }
+int TreeFrogUac2Bridge_GetDriverModeCount(void) { return AudioDriverModeCount(); }
 
 int TreeFrogUac2Bridge_GetSamplerDirectionIn(void) {
 #if TREEFROG_UAC2_BRIDGE

@@ -335,6 +335,17 @@ terminan ademas con validacion en consola real.
 - Los daemons device/*.c NO cambian en esta fase (contrato 48k/2ch/S16_LE).
 - Evidencia: caminos de datos identicos; validacion en consola (samples,
   sampler, USB out, stop/start frecuente).
+- **F4a [IMPLEMENTADO]** (ver docs/F4_ARCHITECTURE_ES.md): tabla
+  declarativa de los 6 modos del driver como datos puros
+  `Application/Audio/AudioDriverModeTable.h` (semilla de datos del futuro
+  AudioRouter).  El bridge delega (mode_name/mode_desc/mode_token/
+  policy_token/branch_name_for_mode/selectable_mode/mode_has_out/mode_has_in
+  + GetDriverModeCount) con paridad byte-identica y fallback LOCAL_CONSOLE;
+  las capacidades de direccion del sampler se pasan por parametro.  Host
+  test ASAN/UBSAN 68 checks `AUDIO_DRIVER_MODES_HOST_ALL_OK`; baseline
+  `F4A_BASELINE_OK` (incluye contrato de valores del enum U241_*).  Audit
+  completo `AUDIT_CLEAN_MAIN_U2523_OK`; build `7709b665` desplegado en SD
+  (== build); backup `LGPT_BEFORE_U2523_20260813_220015`.
 
 ## F5 - Politica de storage/SD estricta (Service/Storage)
 - StorageService clasifica: Volatile (cache, tmp), Persistent (config.xml,
