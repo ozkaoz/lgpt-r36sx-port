@@ -461,10 +461,22 @@ terminan ademas con validacion en consola real.
   `4be71632` desplegados en SD == build; backup
   `LGPT_BEFORE_U2523_20260813_231021`.
 
-## F8 - Harness de regresion funcional en host
-- Core compilable en x86_64 (make X64) con salida a null/SDL; runner que
-  inyecta inputs EPBM_* y compara secuencias de acciones (ActionId) contra el
-  comportamiento catalogado; base de datos de escenarios por vista.
+## F8 [IMPLEMENTADO] - Harness de regresion funcional en host
+- Build X64 del core en host: NO VIABLE en este entorno (faltan
+  pkg-config/libSDL2/ALSA/JACK; apt no completa; rutas con espacios
+  rompen rules_base). Documentado como deuda en F8_ARCHITECTURE_ES.md.
+- En su lugar: `Application/UI/Input/ScenarioCatalog.h` (BD de escenarios
+  por vista: 56 escenarios, 6 contextos, multi-fire del golden, requisitos
+  estables y negaciones, cada uno con referencia a la rama dorada).
+- `tests/host/scenario_runner_host_test.cpp` inyecta EPBM_* en
+  `ChordResolver_Resolve` y verifica golden + determinismo + unicidad +
+  coherencia con ActionMap + cobertura
+  (`ACTION_SCENARIOS_HOST_ALL_OK`, 342 checks, ASAN/UBSAN).
+- `tests/test_f8_baseline.py` (`F8_BASELINE_OK`, 64 checks) y runner
+  integrado en `scripts/audit.sh`.
+- Doc `docs/F8_ARCHITECTURE_ES.md`; audit
+  `AUDIT_CLEAN_MAIN_U2523_OK`; core `ea7a80e4` + daemon `4be71632`
+  desplegados == SD; backup `LGPT_BEFORE_U2523_20260813_235903`.
 
 ## F9 - Riesgos y optimizaciones
 - Documentar riesgos en el camino critico de audio (retro_run -> FIFO -> ASRC
