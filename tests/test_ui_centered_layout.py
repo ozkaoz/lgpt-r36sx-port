@@ -30,7 +30,7 @@ from these views reaches rows 27..29; the DSP param table is unchanged.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VIEWS = ROOT / "source/sources/Application/Views"
+VIEWS = ROOT / "source/sources/Application/UI/Views"
 
 UIDRAW_H = (VIEWS / "BaseClasses/UiDraw.h").read_text()
 UIDRAW_CPP = (VIEWS / "BaseClasses/UiDraw.cpp").read_text()

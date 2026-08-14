@@ -1,7 +1,7 @@
 #ifndef _SELECT_PROJECT_DIALOG_H_
 #define _SELECT_PROJECT_DIALOG_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/Errors/Result.h"
 

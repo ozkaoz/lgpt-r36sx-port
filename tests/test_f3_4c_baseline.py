@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MM = ROOT / "source/sources/Application/Mixer/MixerMenu.h"
-MV_CPP = ROOT / "source/sources/Application/Views/MixerView.cpp"
+MV_CPP = ROOT / "source/sources/Application/UI/Views/MixerView.cpp"
 
 TOKENS = [
     "kMixerMasterMenuRowCount", "kMixerTrackMenuRowCount",

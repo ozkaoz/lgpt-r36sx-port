@@ -1,7 +1,7 @@
 #ifndef _HELP_REGISTRY_H_
 #define _HELP_REGISTRY_H_
 
-#include "Application/Views/BaseClasses/View.h"
+#include "Application/UI/Views/BaseClasses/View.h"
 
 /*
  * TREEFROG_HELP_REGISTRY_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, points

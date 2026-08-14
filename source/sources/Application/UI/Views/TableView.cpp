@@ -15,9 +15,9 @@
 #include "Application/Player/TablePlayback.h"
 #include "Application/Utils/HelpLegend.h"
 #include "Application/Utils/char.h"
-#include "Application/Views/BaseClasses/UiColors.h"
-#include "Application/Views/CommandSelectorCommon.h"
-#include "Application/Views/ModalDialogs/CommandSelectorModal.h"
+#include "Application/UI/Views/BaseClasses/UiColors.h"
+#include "Application/UI/Views/CommandSelectorCommon.h"
+#include "Application/UI/Views/ModalDialogs/CommandSelectorModal.h"
 #include <string.h>
 
 #define FCC_EDIT MAKE_FOURCC('T', 'B', 'E', 'D')

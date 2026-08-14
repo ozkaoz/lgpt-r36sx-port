@@ -2,7 +2,7 @@
 #include "GrooveView.h"
 #include "Application/Model/Groove.h"
 #include "Application/Utils/char.h"
-#include "Application/Views/BaseClasses/UiColors.h"
+#include "Application/UI/Views/BaseClasses/UiColors.h"
 #include <string.h>
 
 GrooveView::GrooveView(GUIWindow &w,ViewData *viewData):View(w,viewData) {

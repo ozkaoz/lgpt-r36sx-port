@@ -7,7 +7,7 @@
  */
 #include <stdio.h>
 #include <string.h>
-#include "Application/Views/ModalDialogs/ChopModel.h"
+#include "Application/UI/Views/ModalDialogs/ChopModel.h"
 
 static int g_failures = 0;
 #define CHECK(cond)                                                          \

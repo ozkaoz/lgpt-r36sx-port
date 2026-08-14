@@ -210,8 +210,8 @@
 		737CD71D0D61A0A4007CF7F0 /* AudioOutDriver.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = AudioOutDriver.h; sourceTree = "<group>"; };
 		737CD76E0D61A3A7007CF7F0 /* WavFileWriter.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = WavFileWriter.cpp; sourceTree = "<group>"; };
 		737CD76F0D61A3A7007CF7F0 /* WavFileWriter.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = WavFileWriter.h; sourceTree = "<group>"; };
-		737CD7730D61A3DE007CF7F0 /* ModalView.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = ModalView.cpp; path = ../sources/Application/Views/BaseClasses/ModalView.cpp; sourceTree = SOURCE_ROOT; };
-		737CD7740D61A3DE007CF7F0 /* ModalView.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = ModalView.h; path = ../sources/Application/Views/BaseClasses/ModalView.h; sourceTree = SOURCE_ROOT; };
+		737CD7730D61A3DE007CF7F0 /* ModalView.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = ModalView.cpp; path = ../sources/Application/UI/Views/BaseClasses/ModalView.cpp; sourceTree = SOURCE_ROOT; };
+		737CD7740D61A3DE007CF7F0 /* ModalView.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = ModalView.h; path = ../sources/Application/UI/Views/BaseClasses/ModalView.h; sourceTree = SOURCE_ROOT; };
 		737CD7780D61A3F1007CF7F0 /* MessageBox.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = MessageBox.cpp; sourceTree = "<group>"; };
 		737CD7790D61A3F1007CF7F0 /* MessageBox.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = MessageBox.h; sourceTree = "<group>"; };
 		737D11870BCE66F000099CB3 /* Application.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = Application.cpp; sourceTree = "<group>"; };
@@ -389,8 +389,8 @@
 		73A4F10D0DAB749C006B1114 /* NewProjectDialog.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = NewProjectDialog.h; sourceTree = "<group>"; };
 		73A4F10E0DAB749C006B1114 /* SelectProjectDialog.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = SelectProjectDialog.cpp; sourceTree = "<group>"; };
 		73A4F10F0DAB749C006B1114 /* SelectProjectDialog.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = SelectProjectDialog.h; sourceTree = "<group>"; };
-		73A4F1160DAB74B1006B1114 /* NullView.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = NullView.cpp; path = ../sources/Application/Views/NullView.cpp; sourceTree = SOURCE_ROOT; };
-		73A4F1170DAB74B1006B1114 /* NullView.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = NullView.h; path = ../sources/Application/Views/NullView.h; sourceTree = SOURCE_ROOT; };
+		73A4F1160DAB74B1006B1114 /* NullView.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = NullView.cpp; path = ../sources/Application/UI/Views/NullView.cpp; sourceTree = SOURCE_ROOT; };
+		73A4F1170DAB74B1006B1114 /* NullView.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = NullView.h; path = ../sources/Application/UI/Views/NullView.h; sourceTree = SOURCE_ROOT; };
 		73A4F11C0DAB7511006B1114 /* CommandDispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = CommandDispatcher.cpp; sourceTree = "<group>"; };
 		73A4F11D0DAB7511006B1114 /* CommandDispatcher.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = CommandDispatcher.h; sourceTree = "<group>"; };
 		73A4F11E0DAB7511006B1114 /* EventDispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = EventDispatcher.cpp; sourceTree = "<group>"; };
@@ -431,12 +431,12 @@
 		73A640210D3CF91D00F43955 /* AudioFileStreamer.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = AudioFileStreamer.cpp; sourceTree = "<group>"; };
 		73A640220D3CF91D00F43955 /* AudioFileStreamer.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = AudioFileStreamer.h; sourceTree = "<group>"; };
 		73A640280D3CF94000F43955 /* FileSystem.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = FileSystem.cpp; sourceTree = "<group>"; };
-		73A6402B0D3CF95F00F43955 /* GrooveView.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = GrooveView.cpp; path = ../sources/Application/Views/GrooveView.cpp; sourceTree = SOURCE_ROOT; };
-		73A6402C0D3CF95F00F43955 /* GrooveView.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = GrooveView.h; path = ../sources/Application/Views/GrooveView.h; sourceTree = SOURCE_ROOT; };
+		73A6402B0D3CF95F00F43955 /* GrooveView.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = GrooveView.cpp; path = ../sources/Application/UI/Views/GrooveView.cpp; sourceTree = SOURCE_ROOT; };
+		73A6402C0D3CF95F00F43955 /* GrooveView.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = GrooveView.h; path = ../sources/Application/UI/Views/GrooveView.h; sourceTree = SOURCE_ROOT; };
 		73A640340D3CF9CB00F43955 /* SampleVariable.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = SampleVariable.cpp; sourceTree = "<group>"; };
 		73A640350D3CF9CB00F43955 /* SampleVariable.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = SampleVariable.h; sourceTree = "<group>"; };
-		73A640390D3CF9E100F43955 /* UIStaticField.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = UIStaticField.cpp; path = ../sources/Application/Views/BaseClasses/UIStaticField.cpp; sourceTree = SOURCE_ROOT; };
-		73A6403A0D3CF9E100F43955 /* UIStaticField.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = UIStaticField.h; path = ../sources/Application/Views/BaseClasses/UIStaticField.h; sourceTree = SOURCE_ROOT; };
+		73A640390D3CF9E100F43955 /* UIStaticField.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = UIStaticField.cpp; path = ../sources/Application/UI/Views/BaseClasses/UIStaticField.cpp; sourceTree = SOURCE_ROOT; };
+		73A6403A0D3CF9E100F43955 /* UIStaticField.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = UIStaticField.h; path = ../sources/Application/UI/Views/BaseClasses/UIStaticField.h; sourceTree = SOURCE_ROOT; };
 		73A88F8510E89070006BF857 /* DATATYPE.H */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = DATATYPE.H; sourceTree = "<group>"; };
 		73A88F8610E89070006BF857 /* EMUERRS.H */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = EMUERRS.H; sourceTree = "<group>"; };
 		73A88F8710E89070006BF857 /* ENAB.CPP */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ENAB.CPP; sourceTree = "<group>"; };
@@ -495,12 +495,12 @@
 		87CA0E8B0F7E1052001D6BD0 /* MixBus.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MixBus.h; sourceTree = "<group>"; };
 		87CA0E8C0F7E1052001D6BD0 /* MixerService.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MixerService.cpp; sourceTree = "<group>"; };
 		87CA0E8D0F7E1052001D6BD0 /* MixerService.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MixerService.h; sourceTree = "<group>"; };
-		87CA0E910F7E1085001D6BD0 /* UITempoField.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = UITempoField.cpp; path = ../sources/Application/Views/BaseClasses/UITempoField.cpp; sourceTree = SOURCE_ROOT; };
-		87CA0E920F7E1085001D6BD0 /* UITempoField.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = UITempoField.h; path = ../sources/Application/Views/BaseClasses/UITempoField.h; sourceTree = SOURCE_ROOT; };
+		87CA0E910F7E1085001D6BD0 /* UITempoField.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = UITempoField.cpp; path = ../sources/Application/UI/Views/BaseClasses/UITempoField.cpp; sourceTree = SOURCE_ROOT; };
+		87CA0E920F7E1085001D6BD0 /* UITempoField.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = UITempoField.h; path = ../sources/Application/UI/Views/BaseClasses/UITempoField.h; sourceTree = SOURCE_ROOT; };
 		87CA0E950F7E10C8001D6BD0 /* ApplicationCommandDispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ApplicationCommandDispatcher.cpp; sourceTree = "<group>"; };
 		87CA0E960F7E10C8001D6BD0 /* ApplicationCommandDispatcher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ApplicationCommandDispatcher.h; sourceTree = "<group>"; };
-		87CA0E9D0F7E110D001D6BD0 /* MixerView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MixerView.cpp; path = ../sources/Application/Views/MixerView.cpp; sourceTree = SOURCE_ROOT; };
-		87CA0E9E0F7E110D001D6BD0 /* MixerView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MixerView.h; path = ../sources/Application/Views/MixerView.h; sourceTree = SOURCE_ROOT; };
+		87CA0E9D0F7E110D001D6BD0 /* MixerView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MixerView.cpp; path = ../sources/Application/UI/Views/MixerView.cpp; sourceTree = SOURCE_ROOT; };
+		87CA0E9E0F7E110D001D6BD0 /* MixerView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MixerView.h; path = ../sources/Application/UI/Views/MixerView.h; sourceTree = SOURCE_ROOT; };
 		87CA0EA00F7E1122001D6BD0 /* MidiInDevice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MidiInDevice.cpp; sourceTree = "<group>"; };
 		87CA0EA10F7E1122001D6BD0 /* MidiInDevice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MidiInDevice.h; sourceTree = "<group>"; };
 		87CA0EA20F7E1122001D6BD0 /* MidiOutDevice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MidiOutDevice.cpp; sourceTree = "<group>"; };
@@ -700,7 +700,7 @@
 				737CD7790D61A3F1007CF7F0 /* MessageBox.h */,
 			);
 			name = ModalDialogs;
-			path = ../sources/Application/Views/ModalDialogs;
+			path = ../sources/Application/UI/Views/ModalDialogs;
 			sourceTree = SOURCE_ROOT;
 		};
 		737D11860BCE66F000099CB3 /* Application */ = {

@@ -7,7 +7,7 @@
 #include "Application/Instruments/SampleInstrument.h"
 #include "Application/Instruments/WavFile.h"
 #include "Services/Time/TimeService.h"
-#include "Application/Views/ModalDialogs/SampleManagerDialog.h"
+#include "Application/UI/Views/ModalDialogs/SampleManagerDialog.h"
 // TREEFROG_U2_34_SAMPLE_MANAGER_PURGE
 // TREEFROG_U2_35_SAMPLE_MANAGER_IMPORT_FORCE_DELETE
 // TREEFROG_U2_36_IMPORT_DEDUP_LISTEN_LAYOUT_USAGE

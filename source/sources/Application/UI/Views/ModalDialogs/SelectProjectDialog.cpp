@@ -5,7 +5,7 @@
 #include "TreeFrogTextEditor.h"
 #include "TreeFrogMenuModal.h"
 #include "System/Console/Trace.h"
-#include "Application/Views/ModalDialogs/MessageBox.h"
+#include "Application/UI/Views/ModalDialogs/MessageBox.h"
 #include "Application/AppWindow.h"
 
 #include <algorithm>

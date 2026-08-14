@@ -1,7 +1,7 @@
 #ifndef _SAMPLE_MANAGER_DIALOG_H_
 #define _SAMPLE_MANAGER_DIALOG_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
 
 class SampleManagerDialog: public ModalView {
 public:

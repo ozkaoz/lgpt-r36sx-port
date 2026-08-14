@@ -4,8 +4,8 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "Application/Views/ModalDialogs/ChopModel.h"
-#include "Application/Views/ModalDialogs/PreviewService.h"
+#include "Application/UI/Views/ModalDialogs/ChopModel.h"
+#include "Application/UI/Views/ModalDialogs/PreviewService.h"
 
 /*
  * ChopperController.h -- F3-3c (docs/F3_ARCHITECTURE_ES.md): logica de

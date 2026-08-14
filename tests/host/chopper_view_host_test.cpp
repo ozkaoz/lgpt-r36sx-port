@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "Application/Views/ModalDialogs/ChopperView.h"
+#include "Application/UI/Views/ModalDialogs/ChopperView.h"
 
 static int checks = 0;
 static const int G_ZOOMS[3] = {5, 50, 100};

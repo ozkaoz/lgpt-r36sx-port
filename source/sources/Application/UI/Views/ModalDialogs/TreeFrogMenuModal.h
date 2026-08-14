@@ -1,7 +1,7 @@
 #ifndef _TREEFROG_MENU_MODAL_H_
 #define _TREEFROG_MENU_MODAL_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
 #include <string>
 #include <vector>
 

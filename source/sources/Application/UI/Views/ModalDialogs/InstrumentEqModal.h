@@ -1,7 +1,7 @@
 #ifndef _INSTRUMENT_EQ_MODAL_H_
 #define _INSTRUMENT_EQ_MODAL_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
 #include "UIFramework/Framework/GUITextProperties.h"
 
 class SampleInstrument ;

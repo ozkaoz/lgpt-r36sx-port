@@ -16,8 +16,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FXP = ROOT / "source/sources/Application/Mixer/FxPages.h"
-MV_CPP = ROOT / "source/sources/Application/Views/MixerView.cpp"
-MV_H = ROOT / "source/sources/Application/Views/MixerView.h"
+MV_CPP = ROOT / "source/sources/Application/UI/Views/MixerView.cpp"
+MV_H = ROOT / "source/sources/Application/UI/Views/MixerView.h"
 
 LABELS = [
     # DELAY (7)

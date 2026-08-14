@@ -13,10 +13,10 @@
 #include <string.h>
 #include "UIFramework/Interfaces/I_GUIWindowImp.h"
 #include "Application/AppWindow.h"
-#include "Application/Views/BaseClasses/HelpOverlay.h"
-#include "Application/Views/BaseClasses/HelpRegistry.h"
-#include "Application/Views/BaseClasses/ModalView.h"
-#include "Application/Views/BaseClasses/UiDraw.h"
+#include "Application/UI/Views/BaseClasses/HelpOverlay.h"
+#include "Application/UI/Views/BaseClasses/HelpRegistry.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/UiDraw.h"
 
 static int g_failures = 0;
 #define CHECK(cond) do { \

@@ -13,7 +13,7 @@
  */
 #include <stdio.h>
 #include <string.h>
-#include "Application/Views/ModalDialogs/SampleEditHistory.h"
+#include "Application/UI/Views/ModalDialogs/SampleEditHistory.h"
 
 static int g_failures = 0;
 #define CHECK(cond)                                                          \

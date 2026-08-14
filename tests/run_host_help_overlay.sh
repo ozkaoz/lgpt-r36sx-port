@@ -17,11 +17,11 @@ g++ -std=gnu++03 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
   -include "$SRC/Adapters/TREEFROG/Compat/SDL_types_force.h" \
   -I"$SRC/Adapters/TREEFROG/Compat" \
   -I"$SRC" \
-  "$SRC/Application/Views/BaseClasses/View.cpp" \
-  "$SRC/Application/Views/BaseClasses/ModalView.cpp" \
-  "$SRC/Application/Views/BaseClasses/HelpOverlay.cpp" \
-  "$SRC/Application/Views/BaseClasses/HelpRegistry.cpp" \
-  "$SRC/Application/Views/BaseClasses/UiDraw.cpp" \
+  "$SRC/Application/UI/Views/BaseClasses/View.cpp" \
+  "$SRC/Application/UI/Views/BaseClasses/ModalView.cpp" \
+  "$SRC/Application/UI/Views/BaseClasses/HelpOverlay.cpp" \
+  "$SRC/Application/UI/Views/BaseClasses/HelpRegistry.cpp" \
+  "$SRC/Application/UI/Views/BaseClasses/UiDraw.cpp" \
   "$SRC/Application/UI/Navigation/NavigationController.cpp" \
   "$ROOT/tests/host/help_overlay_host_stubs.cpp" \
   "$ROOT/tests/host/help_overlay_host_test.cpp" \

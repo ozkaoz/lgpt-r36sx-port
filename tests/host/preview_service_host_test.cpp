@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "Application/Views/ModalDialogs/PreviewService.h"
+#include "Application/UI/Views/ModalDialogs/PreviewService.h"
 
 static int checks = 0;
 

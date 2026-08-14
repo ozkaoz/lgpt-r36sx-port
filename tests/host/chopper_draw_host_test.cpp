@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "Application/Views/ModalDialogs/ChopperView.h"
+#include "Application/UI/Views/ModalDialogs/ChopperView.h"
 
 static int checks = 0;
 

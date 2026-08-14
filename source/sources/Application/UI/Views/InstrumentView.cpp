@@ -8,7 +8,7 @@ extern "C" void TreeFrogInputTrace_LogView(
     int pressed,
     int audioLatched);
 
-#include "Application/Views/ModalDialogs/UsbRecordModal.h"
+#include "Application/UI/Views/ModalDialogs/UsbRecordModal.h"
 #include "Application/Instruments/MidiInstrument.h"
 #include "Application/Instruments/SampleInstrument.h"
 #include "Application/Instruments/SamplePool.h"

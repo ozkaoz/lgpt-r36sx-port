@@ -1,5 +1,5 @@
 #include "SampleManagerDialog.h"
-#include "Application/Views/BaseClasses/UiDraw.h"
+#include "Application/UI/Views/BaseClasses/UiDraw.h"
 // TREEFROG_U2_34_SAMPLE_MANAGER_PURGE
 // TREEFROG_U2_35_SAMPLE_MANAGER_IMPORT_FORCE_DELETE
 // TREEFROG_U2_36_IMPORT_DEDUP_LISTEN_LAYOUT_USAGE

@@ -16,10 +16,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "source/sources/Application"
-MV = (SRC / "Views/MixerView.cpp").read_text()
-IV = (SRC / "Views/InstrumentView.cpp").read_text()
-HR = (SRC / "Views/BaseClasses/HelpRegistry.cpp").read_text()
-CHO = (SRC / "Views/ModalDialogs/SampleChopperModal.cpp").read_text()
+MV = (SRC / "UI/Views/MixerView.cpp").read_text()
+IV = (SRC / "UI/Views/InstrumentView.cpp").read_text()
+HR = (SRC / "UI/Views/BaseClasses/HelpRegistry.cpp").read_text()
+CHO = (SRC / "UI/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
 
 
 def check_mixerview_master():
@@ -78,7 +78,7 @@ def check_ascii_widget_allowlist():
     assert frames == 0, frames
     # F3-3b: el placeholder vive en la capa pura ChopperView (dibujo 40x30);
     # la vista lo pinta drenando la grilla.
-    assert "no sample loaded" in (SRC / "Views/ModalDialogs/ChopperView.h").read_text()
+    assert "no sample loaded" in (SRC / "UI/Views/ModalDialogs/ChopperView.h").read_text()
     assert "ChopperView::DrawEmptyWaveformText(grid)" in CHO
     for view in (MV, IV):
         assert "=====" not in view and "+-----" not in view

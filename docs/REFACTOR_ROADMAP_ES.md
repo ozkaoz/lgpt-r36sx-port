@@ -426,6 +426,18 @@ terminan ademas con validacion en consola real.
   device daemons). Movimientos = movimientos puros + include fixes, en commits
   separados por area; nunca mezclar con cambios de comportamiento.
 
+### F6 [IMPLEMENTADO] (ver docs/F6_ARCHITECTURE_ES.md)
+- `Application/Views` movido a `Application/UI/Views` (git mv puro),
+  con include fixes en 35 archivos de source, el Makefile (COMMONDIRS),
+  los proyectos IDE legacy (xcode/vcproj/vcxproj/lgptest.dev) y los 40+
+  baselines/scripts que escanean rutas.
+- Ya estaban en su lugar objetivo: Application/Audio (F4), UI/Input,
+  UI/Navigation, Services/Audio|Midi|Controllers|Time, Services/Storage
+  (F5) y los adapters Platform (TREEFROG/Unix) + device daemons.
+- Audit `AUDIT_CLEAN_MAIN_U2523_OK`; core MIPS byte-identico `7709b665`
+  desplegado en SD == build (movimiento puro sin cambios de codigo);
+  backup `LGPT_BEFORE_U2523_20260813_230223`.
+
 ## F7 - Deuda tecnica
 - Borrar TreeFrogWindowsSpscTransport.cpp (muerto, 0 callers) y sus menciones.
 - Warnings de host: variables sin uso en r36s_u2523_usb_audio_io.c (1709/1755)

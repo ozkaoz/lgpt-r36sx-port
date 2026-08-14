@@ -857,19 +857,19 @@
 						>
 					</File>
 					<File
-						RelativePath="..\sources\Application\Views\MixerView.cpp"
+						RelativePath="..\sources\Application\UI\Views\MixerView.cpp"
 						>
 					</File>
 					<File
-						RelativePath="..\sources\Application\Views\MixerView.h"
+						RelativePath="..\sources\Application\UI\Views\MixerView.h"
 						>
 					</File>
 					<File
-						RelativePath="..\sources\Application\Views\NullView.cpp"
+						RelativePath="..\sources\Application\UI\Views\NullView.cpp"
 						>
 					</File>
 					<File
-						RelativePath="..\sources\Application\Views\NullView.h"
+						RelativePath="..\sources\Application\UI\Views\NullView.h"
 						>
 					</File>
 					<File
@@ -936,11 +936,11 @@
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\BaseClasses\ModalView.cpp"
+							RelativePath="..\sources\Application\UI\Views\BaseClasses\ModalView.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\BaseClasses\ModalView.h"
+							RelativePath="..\sources\Application\UI\Views\BaseClasses\ModalView.h"
 							>
 						</File>
 						<File
@@ -996,11 +996,11 @@
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\BaseClasses\UITempoField.cpp"
+							RelativePath="..\sources\Application\UI\Views\BaseClasses\UITempoField.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\BaseClasses\UITempoField.h"
+							RelativePath="..\sources\Application\UI\Views\BaseClasses\UITempoField.h"
 							>
 						</File>
 						<File
@@ -1020,43 +1020,43 @@
 						Name="ModalDialogs"
 						>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\ImportSampleDialog.cpp"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\ImportSampleDialog.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\ImportSampleDialog.h"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\ImportSampleDialog.h"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\MessageBox.cpp"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\MessageBox.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\MessageBox.h"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\MessageBox.h"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\NewProjectDialog.cpp"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\NewProjectDialog.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\NewProjectDialog.h"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\NewProjectDialog.h"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\SelectProjectDialog.cpp"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\SelectProjectDialog.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\SelectProjectDialog.h"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\SelectProjectDialog.h"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\CommandSelectorModal.h"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\CommandSelectorModal.h"
 							>
 						</File>
 						<File
-							RelativePath="..\sources\Application\Views\ModalDialogs\CommandSelectorModal.cpp"
+							RelativePath="..\sources\Application\UI\Views\ModalDialogs\CommandSelectorModal.cpp"
 							>
 					</File>
 					</Filter>

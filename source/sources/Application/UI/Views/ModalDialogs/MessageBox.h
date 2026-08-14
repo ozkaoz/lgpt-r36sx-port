@@ -1,7 +1,7 @@
 #ifndef _MESSAGE_BOX_H_
 #define _MESSAGE_BOX_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
 #include <string>
 
 #ifdef MessageBox

@@ -18,8 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MM = ROOT / "source/sources/Application/Mixer/MixerMeters.h"
-MV_CPP = ROOT / "source/sources/Application/Views/MixerView.cpp"
-MV_H = ROOT / "source/sources/Application/Views/MixerView.h"
+MV_CPP = ROOT / "source/sources/Application/UI/Views/MixerView.cpp"
+MV_H = ROOT / "source/sources/Application/UI/Views/MixerView.h"
 
 TOKENS = [
     "class MixerMeters", "SmoothFrame", "BarLevel", "GeometryFor",

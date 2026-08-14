@@ -12,7 +12,7 @@
 #ifndef _TREEFROG_TEXT_EDITOR_H_
 #define _TREEFROG_TEXT_EDITOR_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
 
 class TreeFrogTextEditor : public ModalView {
 public:

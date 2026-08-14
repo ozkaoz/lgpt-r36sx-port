@@ -42,9 +42,9 @@ COMMONDIRS := \
 	../sources/Application/Audio \
 	../sources/Application/Audio/FxEngine \
 	../sources/Application/FX \
-	../sources/Application/Views \
-	../sources/Application/Views/ModalDialogs \
-	../sources/Application/Views/BaseClasses \
+	../sources/Application/UI/Views \
+	../sources/Application/UI/Views/ModalDialogs \
+	../sources/Application/UI/Views/BaseClasses \
 	../sources/Application/Model \
 	../sources/Application/Utils \
 	../sources/Application/Player \

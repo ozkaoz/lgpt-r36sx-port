@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-base=root/'source/sources/Application/Views/ModalDialogs'
+base=root/'source/sources/Application/UI/Views/ModalDialogs'
 cpp=(base/'ImportSampleDialog.cpp').read_text()
 editor=(base/'TreeFrogTextEditor.cpp').read_text()
 blob=cpp+editor

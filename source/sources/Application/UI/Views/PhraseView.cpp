@@ -7,10 +7,10 @@
 #include "Application/Phrase/PhraseUndo.h"
 #include "Application/Utils/HelpLegend.h"
 #include "Application/Utils/char.h"
-#include "Application/Views/BaseClasses/UiColors.h"
-#include "Application/Views/CommandSelectorCommon.h"
+#include "Application/UI/Views/BaseClasses/UiColors.h"
+#include "Application/UI/Views/CommandSelectorCommon.h"
 #include "ModalDialogs/SampleChopperModal.h"
-#include "Application/Views/ModalDialogs/CommandSelectorModal.h"
+#include "Application/UI/Views/ModalDialogs/CommandSelectorModal.h"
 #include "System/Console/Trace.h"
 #include "UIController.h"
 #include <stdlib.h>

@@ -30,9 +30,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-SCM_H = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.h").read_text()
-SCM_CPP = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
-CC_H = (ROOT / "source/sources/Application/Views/ModalDialogs/ChopperController.h").read_text()
+SCM_H = (ROOT / "source/sources/Application/UI/Views/ModalDialogs/SampleChopperModal.h").read_text()
+SCM_CPP = (ROOT / "source/sources/Application/UI/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
+CC_H = (ROOT / "source/sources/Application/UI/Views/ModalDialogs/ChopperController.h").read_text()
 AUDIT = (ROOT / "scripts/audit.sh").read_text()
 
 

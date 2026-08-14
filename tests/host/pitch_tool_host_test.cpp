@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "Application/Views/ModalDialogs/PitchEnvelopeTool.h"
+#include "Application/UI/Views/ModalDialogs/PitchEnvelopeTool.h"
 
 static int g_failures = 0;
 #define CHECK(cond)                                                          \

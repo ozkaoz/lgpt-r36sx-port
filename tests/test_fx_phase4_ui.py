@@ -263,7 +263,7 @@ def check_mix_return_edit():
 
 
 def check_src_ui_wiring():
-    src = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
+    src = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
     for token in ("cycleFxPage", "fxEditRow", "fxMoveRow", "fxGet", "fxSet",
                   "drawFxPages", "drawFxParamPage", "drawMixReturns",
                   "FX_PAGE_MIX", "FX_PAGE_DELAY", "FX_PAGE_REVERB",
@@ -274,7 +274,7 @@ def check_src_ui_wiring():
                   "fxReturnPercent", "fxReturnFromPercent",
                   "GetCompGainReductionDb", "EPBM_SELECT"):
         assert token in src, token
-    h = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
+    h = (ROOT / "source/sources/Application/UI/Views/MixerView.h").read_text()
     for token in ("FxPage", "navigator_", "nudgeDelayReturn",
                   "nudgeReverbReturn"):
         assert token in h, token

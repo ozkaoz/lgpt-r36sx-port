@@ -1,7 +1,7 @@
 #ifndef _IMPORT_SAMPLE_DIALOG_H_
 #define _IMPORT_SAMPLE_DIALOG_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
 #include "Foundation/T_SimpleList.h"
 #include "System/FileSystem/FileSystem.h"
 #include <string>

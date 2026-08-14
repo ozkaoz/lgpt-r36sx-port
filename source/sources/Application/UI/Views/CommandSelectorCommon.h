@@ -2,7 +2,7 @@
 #define _COMMAND_SELECTOR_COMMON_H_
 
 #include "Application/Instruments/CommandList.h"
-#include "Application/Views/BaseClasses/View.h"
+#include "Application/UI/Views/BaseClasses/View.h"
 
 namespace CommandSelectorCommon {
 

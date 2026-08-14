@@ -3,7 +3,7 @@
 #include "Application/Utils/char.h"
 #include "System/Console/Trace.h"
 #include "UIController.h"
-#include "Application/Views/BaseClasses/UiColors.h"
+#include "Application/UI/Views/BaseClasses/UiColors.h"
 #include <string.h>
 
 ChainView::ChainView(GUIWindow &w, ViewData *viewData) : View(w, viewData) {

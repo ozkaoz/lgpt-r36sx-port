@@ -136,9 +136,9 @@ def check_vdef_in_range_semantics():
 
 
 def check_src_guards():
-    mv = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
-    mh = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
-    iv = (ROOT / "source/sources/Application/Views/InstrumentView.cpp").read_text()
+    mv = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
+    mh = (ROOT / "source/sources/Application/UI/Views/MixerView.h").read_text()
+    iv = (ROOT / "source/sources/Application/UI/Views/InstrumentView.cpp").read_text()
     for token in ("fxResetRow", "vdef", "FX_PAGE_EQ", "FX_PAGE_COMP"):
         assert token in mv, token
     # F3-4a: the table rows moved to FxPages.h.

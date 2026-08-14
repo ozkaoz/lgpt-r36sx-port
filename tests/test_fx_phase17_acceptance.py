@@ -43,10 +43,10 @@ APP = ROOT / "source/sources/Application"
 CL_CPP = (APP / "Instruments/CommandList.cpp").read_text()
 CL_H = (APP / "Instruments/CommandList.h").read_text()
 HELP = (APP / "Utils/HelpLegend.h").read_text()
-PV = (APP / "Views/PhraseView.cpp").read_text()
-TV = (APP / "Views/TableView.cpp").read_text()
-IV = (APP / "Views/InstrumentView.cpp").read_text()
-MIX = (APP / "Views/MixerView.cpp").read_text()
+PV = (APP / "UI/Views/PhraseView.cpp").read_text()
+TV = (APP / "UI/Views/TableView.cpp").read_text()
+IV = (APP / "UI/Views/InstrumentView.cpp").read_text()
+MIX = (APP / "UI/Views/MixerView.cpp").read_text()
 SI_CPP = (APP / "Instruments/SampleInstrument.cpp").read_text()
 SI_H = (APP / "Instruments/SampleInstrument.h").read_text()
 MIXER = (APP / "Model/Mixer.cpp").read_text()
@@ -262,7 +262,7 @@ def check_ui_bounds():
     assert "CMP BYP" in MIX or 'Bypass' in MIX
     assert "Soft Clip" in MIX
     # EQ and COMP are separate pages
-    assert "FxPage" in (APP / "Views/MixerView.h").read_text()
+    assert "FxPage" in (APP / "UI/Views/MixerView.h").read_text()
     assert "EQ" in MIX and "COMP" in MIX
     print("UI: no page over help rows, centered title, CMP BYP/SCL visible, EQ/COMP separate OK")
 

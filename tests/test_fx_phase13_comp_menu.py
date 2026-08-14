@@ -26,8 +26,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-MIX = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
-MIX_H = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
+MIX = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
+MIX_H = (ROOT / "source/sources/Application/UI/Views/MixerView.h").read_text()
 
 # Mirror Fase 13 kFxParams_ COMP section: (id, label, vmin, vmax, vdef).
 COMP_PARAMS = [

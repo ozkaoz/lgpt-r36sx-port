@@ -2,12 +2,12 @@
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-hdr = (root / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.h").read_text()
-cpp = (root / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
-layer = (root / "source/sources/Application/Views/ModalDialogs/SampleEditHistory.h").read_text()
+hdr = (root / "source/sources/Application/UI/Views/ModalDialogs/SampleChopperModal.h").read_text()
+cpp = (root / "source/sources/Application/UI/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
+layer = (root / "source/sources/Application/UI/Views/ModalDialogs/SampleEditHistory.h").read_text()
 # F3-3c: los action labels de los flujos de edicion viven en la capa
 # ChopperController (host_.PushLogicalUndo); los de pitch en la vista.
-cc = (root / "source/sources/Application/Views/ModalDialogs/ChopperController.h").read_text()
+cc = (root / "source/sources/Application/UI/Views/ModalDialogs/ChopperController.h").read_text()
 bundle = hdr + cpp + cc
 
 for marker in [

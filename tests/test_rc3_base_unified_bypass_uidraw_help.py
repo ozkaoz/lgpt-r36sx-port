@@ -26,15 +26,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-MIX_CPP = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
-MIX_H = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
-UIDRAW_H = (ROOT / "source/sources/Application/Views/BaseClasses/UiDraw.h").read_text()
-UIDRAW_CPP = (ROOT / "source/sources/Application/Views/BaseClasses/UiDraw.cpp").read_text()
-UICOL_H = (ROOT / "source/sources/Application/Views/BaseClasses/UiColors.h").read_text()
-HELPREG_H = (ROOT / "source/sources/Application/Views/BaseClasses/HelpRegistry.h").read_text()
-HELPREG_CPP = (ROOT / "source/sources/Application/Views/BaseClasses/HelpRegistry.cpp").read_text()
-HELPOVL_H = (ROOT / "source/sources/Application/Views/BaseClasses/HelpOverlay.h").read_text()
-HELPOVL_CPP = (ROOT / "source/sources/Application/Views/BaseClasses/HelpOverlay.cpp").read_text()
+MIX_CPP = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
+MIX_H = (ROOT / "source/sources/Application/UI/Views/MixerView.h").read_text()
+UIDRAW_H = (ROOT / "source/sources/Application/UI/Views/BaseClasses/UiDraw.h").read_text()
+UIDRAW_CPP = (ROOT / "source/sources/Application/UI/Views/BaseClasses/UiDraw.cpp").read_text()
+UICOL_H = (ROOT / "source/sources/Application/UI/Views/BaseClasses/UiColors.h").read_text()
+HELPREG_H = (ROOT / "source/sources/Application/UI/Views/BaseClasses/HelpRegistry.h").read_text()
+HELPREG_CPP = (ROOT / "source/sources/Application/UI/Views/BaseClasses/HelpRegistry.cpp").read_text()
+HELPOVL_H = (ROOT / "source/sources/Application/UI/Views/BaseClasses/HelpOverlay.h").read_text()
+HELPOVL_CPP = (ROOT / "source/sources/Application/UI/Views/BaseClasses/HelpOverlay.cpp").read_text()
 APPW_CPP = (ROOT / "source/sources/Application/AppWindow.cpp").read_text()
 APPW_H = (ROOT / "source/sources/Application/AppWindow.h").read_text()
 
@@ -134,7 +134,7 @@ def check_uidraw_primitives():
     assert "x >= UiDraw::kScreenWidth" in UIDRAW_CPP
     assert "y >= UiDraw::kScreenHeight" in UIDRAW_CPP
     # View grants UiDraw access to its draw primitives.
-    view_h = (ROOT / "source/sources/Application/Views/BaseClasses/View.h").read_text()
+    view_h = (ROOT / "source/sources/Application/UI/Views/BaseClasses/View.h").read_text()
     assert "friend class UiDraw" in view_h
     print("UiDraw primitives and 40x30 clamping OK")
 
@@ -149,12 +149,12 @@ def check_uicolors():
     assert "CD_MUTE" in UICOL_H
     # RC4 P3 (PLAN_RC4): sequencing views render page titles with the
     # semantic role instead of raw CD_NORMAL.
-    groove = (ROOT / "source/sources/Application/Views/GrooveView.cpp").read_text()
-    project = (ROOT / "source/sources/Application/Views/ProjectView.cpp").read_text()
-    song = (ROOT / "source/sources/Application/Views/SongView.cpp").read_text()
-    chain = (ROOT / "source/sources/Application/Views/ChainView.cpp").read_text()
-    phrase = (ROOT / "source/sources/Application/Views/PhraseView.cpp").read_text()
-    table = (ROOT / "source/sources/Application/Views/TableView.cpp").read_text()
+    groove = (ROOT / "source/sources/Application/UI/Views/GrooveView.cpp").read_text()
+    project = (ROOT / "source/sources/Application/UI/Views/ProjectView.cpp").read_text()
+    song = (ROOT / "source/sources/Application/UI/Views/SongView.cpp").read_text()
+    chain = (ROOT / "source/sources/Application/UI/Views/ChainView.cpp").read_text()
+    phrase = (ROOT / "source/sources/Application/UI/Views/PhraseView.cpp").read_text()
+    table = (ROOT / "source/sources/Application/UI/Views/TableView.cpp").read_text()
     for src, name in ((groove, "Groove"), (project, "Project"), (song, "Song"),
                       (chain, "Chain"), (phrase, "Phrase"), (table, "Table")):
         assert "UiColors::Resolve(UI_COLOR_TITLE)" in src, name
@@ -168,7 +168,7 @@ def check_layout_model():
     assert "int UiDraw::CenterTextX" in UIDRAW_CPP
     assert "MakeCenteredMenuLayout" in UIDRAW_H and "MakeCenteredMenuLayout" in UIDRAW_CPP
     assert "struct MenuLayout" in UIDRAW_H
-    project = (ROOT / "source/sources/Application/Views/ProjectView.cpp").read_text()
+    project = (ROOT / "source/sources/Application/UI/Views/ProjectView.cpp").read_text()
     assert "UiDraw::CenterTextX" in project
     assert "UiDraw::MakeCenteredMenuLayout" in project
     print("layout bounds + centered menu helpers OK")
@@ -181,10 +181,10 @@ def check_p5_global_uidraw():
         assert token in UIDRAW_H, token
         assert token in UIDRAW_CPP, token
     # Each has a real consumer in the char-screen views.
-    helpovl = (ROOT / "source/sources/Application/Views/BaseClasses/HelpOverlay.cpp").read_text()
+    helpovl = (ROOT / "source/sources/Application/UI/Views/BaseClasses/HelpOverlay.cpp").read_text()
     assert "UiDraw::DrawSelectionRegion" in helpovl
-    sm = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleManagerDialog.cpp").read_text()
-    smh = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleManagerDialog.h").read_text()
+    sm = (ROOT / "source/sources/Application/UI/Views/ModalDialogs/SampleManagerDialog.cpp").read_text()
+    smh = (ROOT / "source/sources/Application/UI/Views/ModalDialogs/SampleManagerDialog.h").read_text()
     assert "UiDraw::DrawStatusMessage" in sm
     assert "UiDraw::DrawErrorMessage" in sm
     assert "setStatusError" in smh and "setStatusError" in sm
@@ -194,7 +194,7 @@ def check_p5_global_uidraw():
 
 def check_p5_warning_error_colors():
     # RC4 P5: CD_WARNING/CD_ERROR exist and map to real GUI colors.
-    view_h = (ROOT / "source/sources/Application/Views/BaseClasses/View.h").read_text()
+    view_h = (ROOT / "source/sources/Application/UI/Views/BaseClasses/View.h").read_text()
     assert "CD_WARNING" in view_h and "CD_ERROR" in view_h
     assert "CD_WARNING" in APPW_CPP and "CD_ERROR" in APPW_CPP
     assert "warningColor_" in APPW_H and "errorColor_" in APPW_H
@@ -253,8 +253,8 @@ def check_help_overlay():
 
 
 def check_view_push_modal():
-    view_h = (ROOT / "source/sources/Application/Views/BaseClasses/View.h").read_text()
-    view_cpp = (ROOT / "source/sources/Application/Views/BaseClasses/View.cpp").read_text()
+    view_h = (ROOT / "source/sources/Application/UI/Views/BaseClasses/View.h").read_text()
+    view_cpp = (ROOT / "source/sources/Application/UI/Views/BaseClasses/View.cpp").read_text()
     # PushModal suspends the active modal and restores it on close (RC4 11.3).
     assert "bool PushModal" in view_h
     assert "suspendedModal_" in view_h and "RestoreSuspendedModal" in view_h
@@ -296,7 +296,7 @@ def check_makefile_registration():
 def check_p6_chopper_modernization():
     # RC4 P6 (PLAN_RC4 section 11.7): the Graphical Chopper draws its frame
     # with solid cells, never ASCII box-drawing chars.
-    chopper = (ROOT / "source/sources/Application/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
+    chopper = (ROOT / "source/sources/Application/UI/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
     frameStart = chopper.index("void SampleChopperModal::drawFrame")
     frameEnd = chopper.index("void SampleChopperModal::drawSampleInfo")
     frame = chopper[frameStart:frameEnd]
@@ -305,14 +305,14 @@ def check_p6_chopper_modernization():
     # F3-3b: el marco (celdas solidas CD_BORDER) vive en la capa pura
     # ChopperView; la vista drena CHOP_COLOR_BORDER -> CD_BORDER.
     assert "ChopperView::DrawFrame(grid)" in frame
-    assert "CHOP_COLOR_BORDER" in (ROOT / "source/sources/Application/Views/ModalDialogs/ChopperView.h").read_text()
+    assert "CHOP_COLOR_BORDER" in (ROOT / "source/sources/Application/UI/Views/ModalDialogs/ChopperView.h").read_text()
     assert "SetColor(CD_BORDER)" in chopper
     print("RC4 P6 chopper solid frame (no ASCII) OK")
 
 
 def check_p6_tabs_scroll_consumers():
     # RC4 P6: DrawTabs and DrawScrollIndicator have real consumers.
-    helpovl = (ROOT / "source/sources/Application/Views/BaseClasses/HelpOverlay.cpp").read_text()
+    helpovl = (ROOT / "source/sources/Application/UI/Views/BaseClasses/HelpOverlay.cpp").read_text()
     assert "UiDraw::DrawTabs" in helpovl
     assert "UiDraw::DrawScrollIndicator" in helpovl
     assert "prevSec" in helpovl and "nextSec" in helpovl

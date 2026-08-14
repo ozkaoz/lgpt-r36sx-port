@@ -5,7 +5,7 @@
 #include "Application/Audio/SpectrumAnalyzer.h"
 #include "Application/Instruments/InstrumentBank.h"
 #include "Application/Instruments/SampleInstrument.h"
-#include "Application/Views/ViewData.h"
+#include "Application/UI/Views/ViewData.h"
 #include "UIFramework/BasicDatas/GUIEvent.h"
 
 #include <math.h>

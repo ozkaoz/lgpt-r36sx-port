@@ -80,7 +80,7 @@ class DelayCrossfadeModel:
 
 
 def check_no_send_ret_rows():
-    src = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
+    src = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
     for token in ("\"DLY SND\"", "\"DLY RET\"", "\"RVB SND\"", "\"RVB RET\""):
         assert token not in src, token
     # returns are master controls now, surfaced on the MIX page (Fase 9)

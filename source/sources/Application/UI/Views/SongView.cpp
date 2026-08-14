@@ -8,7 +8,7 @@
 #include "System/Console/Trace.h"
 #include "System/System/System.h"
 #include "UIController.h"
-#include "Application/Views/BaseClasses/UiColors.h"
+#include "Application/UI/Views/BaseClasses/UiColors.h"
 #include <iostream>
 #include <sstream>
 #include <stdlib.h>

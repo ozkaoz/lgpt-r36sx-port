@@ -21,8 +21,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PU = ROOT / "source/sources/Application/Phrase/PhraseUndo.h"
-PV_CPP = ROOT / "source/sources/Application/Views/PhraseView.cpp"
-PV_H = ROOT / "source/sources/Application/Views/PhraseView.h"
+PV_CPP = ROOT / "source/sources/Application/UI/Views/PhraseView.cpp"
+PV_H = ROOT / "source/sources/Application/UI/Views/PhraseView.h"
 
 TOKENS = [
     "kPhraseUndoHistorySize", "PhraseUndoSnapshot", "PhraseUndoCapture",

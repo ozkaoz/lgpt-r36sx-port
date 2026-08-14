@@ -7,7 +7,7 @@
 #include "Application/Instruments/SampleInstrument.h"
 #include "Application/Instruments/CommandList.h"
 #include "Application/Player/Player.h"
-#include "Application/Views/BaseClasses/UiDraw.h"
+#include "Application/UI/Views/BaseClasses/UiDraw.h"
 #include "System/FileSystem/FileSystem.h"
 #include "Services/Time/TimeService.h"
 #include <unistd.h>

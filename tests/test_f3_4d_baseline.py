@@ -22,8 +22,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FN = ROOT / "source/sources/Application/Mixer/FxNavigator.h"
-MV_CPP = ROOT / "source/sources/Application/Views/MixerView.cpp"
-MV_H = ROOT / "source/sources/Application/Views/MixerView.h"
+MV_CPP = ROOT / "source/sources/Application/UI/Views/MixerView.cpp"
+MV_H = ROOT / "source/sources/Application/UI/Views/MixerView.h"
 
 TOKENS = [
     "FxNavigator", "Page()", "Row()", "EditTarget()", "SetPage",

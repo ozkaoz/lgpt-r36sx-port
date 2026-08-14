@@ -14,7 +14,7 @@ static void TreeFrogStartTrace(const char *msg) {
 
 
 #include "Player.h"
-#include "Application/Views/BaseClasses/ViewEvent.h"
+#include "Application/UI/Views/BaseClasses/ViewEvent.h"
 #include "System/io/Status.h"
 #include "System/System/System.h"
 #include "Application/Instruments/CommandList.h"
@@ -23,7 +23,7 @@ static void TreeFrogStartTrace(const char *msg) {
 #include "System/Console/n_assert.h"
 #include "Application/Player/TablePlayback.h"
 #include "Application/Model/Groove.h"
-#include "Application/Views/ModalDialogs/SampleChopperModal.h"
+#include "Application/UI/Views/ModalDialogs/SampleChopperModal.h"
 #include <math.h>
 #include <string.h>
 #include "Services/Midi/MidiService.h"

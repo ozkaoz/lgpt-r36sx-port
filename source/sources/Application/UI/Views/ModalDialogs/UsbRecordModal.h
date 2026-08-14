@@ -1,7 +1,7 @@
 #ifndef _USB_RECORD_MODAL_H_
 #define _USB_RECORD_MODAL_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
 #include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
 
 class UsbRecordModal : public ModalView {

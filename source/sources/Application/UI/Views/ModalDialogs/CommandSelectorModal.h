@@ -1,10 +1,10 @@
 #ifndef _COMMAND_SELECTOR_MODAL_H_
 #define _COMMAND_SELECTOR_MODAL_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
-#include "Application/Views/BaseClasses/View.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/BaseClasses/View.h"
 #include "Application/Instruments/CommandList.h"
-#include "Application/Views/CommandSelectorCommon.h"
+#include "Application/UI/Views/CommandSelectorCommon.h"
 
 // TREEFROG_SELECTOR_FAMILIES_RC2 (RC2):
 // The FX command selector stays named "FX" and is organized by functional

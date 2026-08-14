@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-#include "Application/Views/ModalDialogs/ChopperController.h"
+#include "Application/UI/Views/ModalDialogs/ChopperController.h"
 
 static int g_checks = 0;
 static int g_fails = 0;

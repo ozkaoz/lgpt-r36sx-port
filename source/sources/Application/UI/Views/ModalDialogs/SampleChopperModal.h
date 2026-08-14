@@ -1,13 +1,13 @@
 #ifndef _SAMPLE_CHOPPER_MODAL_H_
 #define _SAMPLE_CHOPPER_MODAL_H_
 
-#include "Application/Views/BaseClasses/ModalView.h"
-#include "Application/Views/ModalDialogs/ChopModel.h"
-#include "Application/Views/ModalDialogs/SampleEditHistory.h"
-#include "Application/Views/ModalDialogs/PitchEnvelopeTool.h"
-#include "Application/Views/ModalDialogs/PreviewService.h"
-#include "Application/Views/ModalDialogs/ChopperView.h"
-#include "Application/Views/ModalDialogs/ChopperController.h"
+#include "Application/UI/Views/BaseClasses/ModalView.h"
+#include "Application/UI/Views/ModalDialogs/ChopModel.h"
+#include "Application/UI/Views/ModalDialogs/SampleEditHistory.h"
+#include "Application/UI/Views/ModalDialogs/PitchEnvelopeTool.h"
+#include "Application/UI/Views/ModalDialogs/PreviewService.h"
+#include "Application/UI/Views/ModalDialogs/ChopperView.h"
+#include "Application/UI/Views/ModalDialogs/ChopperController.h"
 #include "UIFramework/Framework/GUITextProperties.h"
 #include <string>
 

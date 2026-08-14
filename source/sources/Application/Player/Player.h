@@ -3,8 +3,8 @@
 #include "Foundation/T_Singleton.h"
 #include "Foundation/Observable.h"
 #include "System/Timer/Timer.h"
-#include "Application/Views/ViewData.h"
-#include "Application/Views/BaseClasses/ViewEvent.h"
+#include "Application/UI/Views/ViewData.h"
+#include "Application/UI/Views/BaseClasses/ViewEvent.h"
 #include "PlayerMixer.h"
 #include "SyncMaster.h"
 
