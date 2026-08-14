@@ -291,11 +291,36 @@ terminan ademas con validacion en consola real.
   pre-existente de device/*.c).  Desplegado en SD (backup
   LGPT_BEFORE_U2523_20260813_190916; core en consola = build SHA
   9892f230).
-- [PENDIENTE] F3-5b: PhraseUndo - historia snapshot/restore de la Phrase
-  (PhraseEdit 16 pasos + historia 16 slots) extraida de PhraseView junto
-  con el refactor de GlobalUndo/Redo hacia la capa; se queda en la vista
-  solo la politica de push (cuando se captura un snapshot, incluyendo
-  PasteChop/InsertPhraseGuidedPlan).
+- [IMPLEMENTADO] F3-5b: PhraseUndo - historia snapshot/restore de la
+  Phrase extraida a capa pura (Application/Phrase/PhraseUndo.h): el struct
+  PhraseUndoSnapshot (layout identico al PhraseEdit original: 10 arrays de
+  16 pasos + currentPhrase), PhraseUndoCapture (snapshot del bloque
+  16*currentPhrase del modelo), PhraseUndoSnapshotEqual (dedup V9),
+  PhraseUndoPush (shift + cap kPhraseUndoHistorySize=16 + clear redo +
+  guard de reentrada), PhraseUndoRestore (V8: publica el indice de frase
+  editada sin mover el cursor) y PhraseUndoStep (paso undo/redo compartido
+  que desapila el tope de FROM, lo inserta en TO y restaura el modelo;
+  devuelve true con pila vacia, igual que golden).  PhraseView migrado:
+  pushPhraseUndo es un delegado de PhraseUndoPush con el guard
+  g_phraseUndoPushActive (politica de reentrada de la vista), GlobalUndo/
+  GlobalRedo delegan en PhraseUndoStep y conservan el efecto local golden
+  (reclaman el combo L1+X/R1+X con true, viewData_->phraseCurPos_ = row_,
+  isDirty_); los arrays de historia pasan a ser PhraseUndoSnapshot con
+  kPhraseHistorySize como alias publico de kPhraseUndoHistorySize y
+  typedef PhraseEdit para compatibilidad.  Se queda en la vista la politica
+  de push (que acciones capturan el estado pre-edit: updateCursorValue,
+  pasteLast, cut/paste clipboard, interpolate, chop, command selector,
+  VM_NEW A, VM_CLONE L+A).  Evidencia:
+  tests/host/phrase_undo_host_test.cpp (7 suites con ASAN/UBSAN via
+  stub de System + Phrase.cpp, runner tests/run_host_phrase_undo.sh en
+  audit.sh) + test_f3_5b_baseline.py (capa pura sin GUI/audio/ViewData,
+  mecanica fuera de la vista, politica y efecto local conservados).
+  Baselines existentes (F3-5a, ui_centered, fx_phase17, rc3) pasan sin
+  cambios.  Audit completo verde (AUDIT_CLEAN_MAIN_U2523_OK).  Build MIPS
+  del core OK sin diagnosticos en PhraseView/PhraseUndo (gate solo con
+  deuda F7 pre-existente de device/*.c).  Desplegado en SD (backup
+  LGPT_BEFORE_U2523_20260813_213535; core en consola = build SHA
+  7709b665).
 - [PENDIENTE] F3-5: Phrase (baseline en docs/F3_ARCHITECTURE_ES.md):
   grid/edicion separados del dibujo.
 

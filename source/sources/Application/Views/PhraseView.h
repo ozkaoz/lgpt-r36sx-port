@@ -6,6 +6,7 @@
 #include "BaseClasses/View.h"
 #include "ViewData.h"
 #include "Application/Phrase/PhraseGridEdit.h"
+#include "Application/Phrase/PhraseUndo.h"
 
 #define FCC_EDIT MAKE_FOURCC('V', 'O', 'L', 'M')
 
@@ -92,29 +93,20 @@ class PhraseView : public View {
     // layout golden que el struct clipboard original de la vista).
     PhraseClipboard clipboard_;
 
-    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): undo/redo history.  A PhraseEdit
-    // snapshots all 16 steps of the edited phrase plus the editor cursor.
+    // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): undo/redo history.  F3-5b: los
+    // snapshots, la captura push y el paso undo/redo viven en la capa pura
+    // PhraseUndo.h; la vista conserva los arrays de historia y la politica
+    // de push (que acciones capturan el estado pre-edit).
   public:
-    static const int kPhraseHistorySize = 16;
-    // TREEFROG_GLOBAL_UNDO_V8 (Bacon 1.1.1 V16): the snapshot no longer
-    // carries the cursor; undo/redo must not move the cursor back to the
-    // edit site (that reads as "undo did nothing" after navigating away).
-    struct PhraseEdit {
-        uchar note[16];
-        uchar instr[16];
-        uchar vol[16];
-        uchar pitch[16];
-        FourCC cmd1[16];
-        ushort param1[16];
-        FourCC cmd2[16];
-        ushort param2[16];
-        FourCC cmd3[16];
-        ushort param3[16];
-        uchar currentPhrase;
-    };
-    PhraseEdit phraseUndo_[kPhraseHistorySize];
+    // F3-5b: el tamano golden (16) es la constante de la capa pura; se
+    // conserva kPhraseHistorySize como alias publico de compatibilidad.
+    static const int kPhraseHistorySize = kPhraseUndoHistorySize;
+    // F3-5b: el snapshot es el tipo puro de PhraseUndo.h (mismo layout que
+    // el PhraseEdit original: 10 arrays de 16 pasos + currentPhrase).
+    typedef PhraseUndoSnapshot PhraseEdit;
+    PhraseUndoSnapshot phraseUndo_[kPhraseUndoHistorySize];
     int phraseUndoCount_;
-    PhraseEdit phraseRedo_[kPhraseHistorySize];
+    PhraseUndoSnapshot phraseRedo_[kPhraseUndoHistorySize];
     int phraseRedoCount_;
     void pushPhraseUndo();
 

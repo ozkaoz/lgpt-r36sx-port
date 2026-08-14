@@ -110,11 +110,14 @@ Ver tercer tramo F3 (no se toca en este commit; inventario completo alla).
   de columnas/limites/offsets de paso, clamp/wrap golden, paso de celda
   con scale-snap normalizado y auto-fill, pasteLast por columna, seleccion
   (normalize/extend), portapapeles (fill/cut/paste) e interpolacion, todos
-  puros (Types/Phrase/Scale/CommandList).  Queda en la vista la politica
-  de undo, el hex editor de comandos (cols 5/7), chop, audition/Player y
-  DrawView.  F3-5b (PENDIENTE): PhraseUndo - historia snapshot/restore
-  (PhraseEdit 16 pasos + 16 slots) con GlobalUndo/Redo delegados; la
-  politica de push se queda en la vista.
+  puros (Types/Phrase/Scale/CommandList).  Queda en la vista el hex editor
+  de comandos (cols 5/7), chop, audition/Player y DrawView.
+  F3-5b (IMPLEMENTADO, Application/Phrase/PhraseUndo.h): historia
+  snapshot/restore golden (PhraseUndoSnapshot 10x16 + currentPhrase,
+  capture/equal/push/restore/step, cap 16, dedup V9, guard de reentrada);
+  la vista conserva la politica de push, el guard y el efecto local
+  (phraseCurPos_/isDirty_); kPhraseHistorySize = alias publico y
+  typedef PhraseEdit para compatibilidad.
 - Cada tramo: host test + test estatico + audit + build + deploy + commit
   antes de pasar al siguiente.
 

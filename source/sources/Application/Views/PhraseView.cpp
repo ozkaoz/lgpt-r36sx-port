@@ -4,6 +4,7 @@
 #include "Application/Model/Scale.h"
 #include "Application/Model/Table.h"
 #include "Application/Phrase/PhraseGridEdit.h"
+#include "Application/Phrase/PhraseUndo.h"
 #include "Application/Utils/HelpLegend.h"
 #include "Application/Utils/char.h"
 #include "Application/Views/BaseClasses/UiColors.h"
@@ -919,78 +920,24 @@ void PhraseView::ProcessButtonMask(unsigned short mask, bool pressed) {
 // TREEFROG_GLOBAL_UNDO_V9 (Bacon 1.1.1): two edit paths can snapshot the SAME
 // pre-edit state twice in one press (pasteLast() then pasteDefaultChopForRow()
 // both push when an empty row is pasted into a chopped instrument).  Dropping
-// consecutive duplicate snapshots here keeps the history to real mutations
-// only, so undo/redo no longer walk through invisible no-op steps.
-typedef PhraseView::PhraseEdit PhraseEditT;
-static bool phraseEditEqual(const PhraseEditT &a, const PhraseEditT &b) {
-    if (a.currentPhrase != b.currentPhrase) return false;
-    return memcmp(a.note, b.note, sizeof(a.note)) == 0 &&
-           memcmp(a.instr, b.instr, sizeof(a.instr)) == 0 &&
-           memcmp(a.vol, b.vol, sizeof(a.vol)) == 0 &&
-           memcmp(a.pitch, b.pitch, sizeof(a.pitch)) == 0 &&
-           memcmp(a.cmd1, b.cmd1, sizeof(a.cmd1)) == 0 &&
-           memcmp(a.param1, b.param1, sizeof(a.param1)) == 0 &&
-           memcmp(a.cmd2, b.cmd2, sizeof(a.cmd2)) == 0 &&
-           memcmp(a.param2, b.param2, sizeof(a.param2)) == 0 &&
-           memcmp(a.cmd3, b.cmd3, sizeof(a.cmd3)) == 0 &&
-           memcmp(a.param3, b.param3, sizeof(a.param3)) == 0;
-}
+// consecutive duplicate snapshots keeps the history to real mutations only,
+// so undo/redo no longer walk through invisible no-op steps.
+// F3-5b: la mecanica de la historia (captura, dedup, shift, cap, restore y
+// el paso undo/redo) vive en la capa pura Application/Phrase/PhraseUndo.h;
+// aqui queda la politica: el guard de reentrada, el momento de captura y el
+// efecto local del undo/redo (phraseCurPos_, isDirty_).
 static bool g_phraseUndoPushActive = false;
 void PhraseView::pushPhraseUndo() {
-    if (g_phraseUndoPushActive) return;
-    g_phraseUndoPushActive = true;
-    PhraseEdit e;
-    memcpy(e.note, phrase_->note_ + 16 * viewData_->currentPhrase_, 16);
-    memcpy(e.instr, phrase_->instr_ + 16 * viewData_->currentPhrase_, 16);
-    memcpy(e.vol, phrase_->vol_ + 16 * viewData_->currentPhrase_, 16);
-    memcpy(e.pitch, phrase_->pitch_ + 16 * viewData_->currentPhrase_, 16);
-    memcpy(e.cmd1, phrase_->cmd1_ + 16 * viewData_->currentPhrase_, 16 * sizeof(FourCC));
-    memcpy(e.param1, phrase_->param1_ + 16 * viewData_->currentPhrase_, 16 * sizeof(ushort));
-    memcpy(e.cmd2, phrase_->cmd2_ + 16 * viewData_->currentPhrase_, 16 * sizeof(FourCC));
-    memcpy(e.param2, phrase_->param2_ + 16 * viewData_->currentPhrase_, 16 * sizeof(ushort));
-    memcpy(e.cmd3, phrase_->cmd3_ + 16 * viewData_->currentPhrase_, 16 * sizeof(FourCC));
-    memcpy(e.param3, phrase_->param3_ + 16 * viewData_->currentPhrase_, 16 * sizeof(ushort));
-    e.currentPhrase = (uchar)viewData_->currentPhrase_;
-    /* TREEFROG_GLOBAL_UNDO_V9: a repeat snapshot of the SAME pre-edit state
-       (second push in the same gesture) adds nothing to the history. */
-    if (phraseUndoCount_ > 0 && phraseEditEqual(e, phraseUndo_[0])) {
-        g_phraseUndoPushActive = false;
-        return;
-    }
-    for (int i = kPhraseHistorySize - 1; i > 0; i--) phraseUndo_[i] = phraseUndo_[i - 1];
-    phraseUndo_[0] = e;
-    phraseUndoCount_++;
-    if (phraseUndoCount_ > kPhraseHistorySize) phraseUndoCount_ = kPhraseHistorySize;
-    phraseRedoCount_ = 0;
-    g_phraseUndoPushActive = false;
-}
-
-static void phraseUndoRestore(Phrase *phrase, const PhraseView::PhraseEdit &e, ViewData *viewData) {
-    memcpy(phrase->note_ + 16 * e.currentPhrase, e.note, 16);
-    memcpy(phrase->instr_ + 16 * e.currentPhrase, e.instr, 16);
-    memcpy(phrase->vol_ + 16 * e.currentPhrase, e.vol, 16);
-    memcpy(phrase->pitch_ + 16 * e.currentPhrase, e.pitch, 16);
-    memcpy(phrase->cmd1_ + 16 * e.currentPhrase, e.cmd1, 16 * sizeof(FourCC));
-    memcpy(phrase->param1_ + 16 * e.currentPhrase, e.param1, 16 * sizeof(ushort));
-    memcpy(phrase->cmd2_ + 16 * e.currentPhrase, e.cmd2, 16 * sizeof(FourCC));
-    memcpy(phrase->param2_ + 16 * e.currentPhrase, e.param2, 16 * sizeof(ushort));
-    memcpy(phrase->cmd3_ + 16 * e.currentPhrase, e.cmd3, 16 * sizeof(FourCC));
-    memcpy(phrase->param3_ + 16 * e.currentPhrase, e.param3, 16 * sizeof(ushort));
-    // TREEFROG_GLOBAL_UNDO_V8: the edit target is restored so the change is
-    // visible, but the cursor stays where the user left it.
-    viewData->currentPhrase_ = e.currentPhrase;
+    PhraseUndoPush(phrase_, viewData_->currentPhrase_, phraseUndo_,
+                   &phraseUndoCount_, &phraseRedoCount_, &g_phraseUndoPushActive);
 }
 
 bool PhraseView::GlobalUndo() {
+    // golden: con historia vacia el combo L1+X se reclama igualmente (true)
+    // y no se toca ni el modelo ni el cursor local.
     if (phraseUndoCount_ == 0) return true;
-    PhraseEdit e = phraseUndo_[0];
-    for (int i = 0; i < phraseUndoCount_ - 1; i++) phraseUndo_[i] = phraseUndo_[i + 1];
-    phraseUndoCount_--;
-    for (int i = kPhraseHistorySize - 1; i > 0; i--) phraseRedo_[i] = phraseRedo_[i - 1];
-    phraseRedo_[0] = e;
-    phraseRedoCount_++;
-    if (phraseRedoCount_ > kPhraseHistorySize) phraseRedoCount_ = kPhraseHistorySize;
-    phraseUndoRestore(phrase_, e, viewData_);
+    PhraseUndoStep(phrase_, phraseUndo_, &phraseUndoCount_, phraseRedo_,
+                   &phraseRedoCount_, &viewData_->currentPhrase_);
     viewData_->phraseCurPos_ = row_;
     isDirty_ = true;
     return true;
@@ -998,14 +945,8 @@ bool PhraseView::GlobalUndo() {
 
 bool PhraseView::GlobalRedo() {
     if (phraseRedoCount_ == 0) return true;
-    PhraseEdit e = phraseRedo_[0];
-    for (int i = 0; i < phraseRedoCount_ - 1; i++) phraseRedo_[i] = phraseRedo_[i + 1];
-    phraseRedoCount_--;
-    for (int i = kPhraseHistorySize - 1; i > 0; i--) phraseUndo_[i] = phraseUndo_[i - 1];
-    phraseUndo_[0] = e;
-    phraseUndoCount_++;
-    if (phraseUndoCount_ > kPhraseHistorySize) phraseUndoCount_ = kPhraseHistorySize;
-    phraseUndoRestore(phrase_, e, viewData_);
+    PhraseUndoStep(phrase_, phraseRedo_, &phraseRedoCount_, phraseUndo_,
+                   &phraseUndoCount_, &viewData_->currentPhrase_);
     viewData_->phraseCurPos_ = row_;
     isDirty_ = true;
     return true;
