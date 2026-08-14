@@ -27,7 +27,7 @@ SampleManagerDialog::SampleManagerDialog(View &view)
 }
 
 SampleManagerDialog::~SampleManagerDialog() {
-    Player::GetInstance()->StopStreaming();
+    Player::GetInstance()->StopStreamingAndRelease();
 }
 
 void SampleManagerDialog::setStatus(const char *fmt, ...) {
@@ -180,7 +180,7 @@ void SampleManagerDialog::deleteSelectedSample() {
     Player *p=Player::GetInstance();
     if (p) {
         if (p->IsRunning()) p->Stop();
-        if (p->IsStreaming()) p->StopStreaming();
+        if (p->IsStreaming()) p->StopStreamingAndRelease();
     }
     clampSelection();
     int count = pool->GetNameListSize();
@@ -224,7 +224,7 @@ void SampleManagerDialog::forceDeleteSelectedSample() {
     Player *p=Player::GetInstance();
     if (p) {
         if (p->IsRunning()) p->Stop();
-        if (p->IsStreaming()) p->StopStreaming();
+        if (p->IsStreaming()) p->StopStreamingAndRelease();
     }
     clampSelection();
     int count = pool->GetNameListSize();

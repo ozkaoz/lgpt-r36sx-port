@@ -64,6 +64,12 @@ void AudioFileStreamer::Stop() {
 	Trace::Debug("Streaming stopped");
 } ;
 
+void AudioFileStreamer::StopAndRelease() {
+	Stop() ;
+	SAFE_DELETE(wav_) ;
+	Trace::Debug("Streaming stopped and WAV released");
+} ;
+
 bool AudioFileStreamer::IsPlaying() const { return mode_==AFSM_PLAYING ; }
 int AudioFileStreamer::GetPosition() const { return position_ ; }
 int AudioFileStreamer::GetStartFrame() const { return startFrame_ ; }

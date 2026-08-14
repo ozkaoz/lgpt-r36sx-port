@@ -163,7 +163,11 @@ void PlayerMixer::StopStreaming() {
 	fileStreamer_.Stop() ;
 } ;
 
-bool PlayerMixer::IsStreaming() { return fileStreamer_.IsPlaying() ; }
+void PlayerMixer::StopStreamingAndRelease() {
+	fileStreamer_.StopAndRelease() ;
+} ;
+
+ bool PlayerMixer::IsStreaming() { return fileStreamer_.IsPlaying() ; }
 int PlayerMixer::GetStreamingPosition() { return fileStreamer_.GetPosition() ; }
 int PlayerMixer::GetStreamingStartFrame() { return fileStreamer_.GetStartFrame() ; }
 int PlayerMixer::GetStreamingEndFrame() { return fileStreamer_.GetEndFrame() ; }

@@ -7,7 +7,16 @@
  * SD by the OTG supervisor) and then re-raises with the default disposition,
  * preserving the original death behavior.
  *
- * Async-signal-safe by construction: only write() on a pre-opened fd plus
+ * U2.53.1: the trap also opens a second best-effort fd straight to the SD
+ * card (/mnt/sdcard/LGPT_OTG_LOGS/crash.txt, the supervisor's own log dir)
+ * at install time.  The full dump is appended to both fds exactly once when
+ * the crash fires: never periodic, never truncated, so a hard crash that
+ * skips the clean-shutdown flush still reaches the card without any runtime
+ * SD write traffic.  If the card is unreachable, the open fails silently
+ * and tmpfs remains the only target.  The install-time "ARMED" marker is
+ * deliberately written to tmpfs only, keeping the SD untouched at boot.
+ *
+ * Async-signal-safe by construction: only write() on pre-opened fds plus
  * a hand-rolled hex formatter.  No malloc, no stdio, no locks.  Register
  * layout is MIPS-specific (mcontext_t from <ucontext.h>); on non-MIPS host
  * builds (host_syntax_check.sh) only a minimal signature is emitted. */
@@ -21,14 +30,24 @@
 #include <ucontext.h>
 
 static int gCrashFd = -1;
+static int gCrashSdFd = -1;
 static volatile sig_atomic_t gCrashHandling = 0;
 
-static void crashWrite(const char *s) {
-    if (gCrashFd >= 0) {
+static void crashWriteFd(int fd, const char *s) {
+    if (fd >= 0) {
         size_t n = strlen(s);
-        ssize_t r = write(gCrashFd, s, n);
+        ssize_t r = write(fd, s, n);
         (void)r;
     }
+}
+
+static void crashWrite(const char *s) {
+    crashWriteFd(gCrashFd, s);
+    crashWriteFd(gCrashSdFd, s);
+}
+
+static void crashWriteTmp(const char *s) {
+    crashWriteFd(gCrashFd, s);
 }
 
 static void crashHex(unsigned long long v) {
@@ -113,9 +132,14 @@ void LgptCrashTrapInstall(void) {
     if (gCrashFd >= 0) return;
     gCrashFd = open("/tmp/r36sx_lgpt_logs/crash.txt",
                     O_WRONLY | O_CREAT | O_APPEND, 0666);
+    gCrashSdFd = open("/mnt/sdcard/LGPT_OTG_LOGS/crash.txt",
+                      O_WRONLY | O_CREAT | O_APPEND, 0666);
     /* Marker doubles as a live probe that the trap is armed: it appears in
-     * the mirrored crash.txt after boot and in the core binary. */
-    crashWrite("LGPT_CRASHTRAP_ARMED_U2.53.0\n");
+     * the mirrored crash.txt after boot and in the core binary (build.sh
+     * greps the exact "U2.53.0" string, so it is kept verbatim).  tmpfs
+     * only: the SD must not receive boot-time writes (zero-runtime-writes
+     * rule). */
+    crashWriteTmp("LGPT_CRASHTRAP_ARMED_U2.53.0\n");
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = LgptCrashTrapHandler;

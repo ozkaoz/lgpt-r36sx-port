@@ -6,7 +6,7 @@ cpp=(base/'ImportSampleDialog.cpp').read_text()
 editor=(base/'TreeFrogTextEditor.cpp').read_text()
 blob=cpp+editor
 assert 'U2523_RENAME_CARET_ALIGNMENT_GITHUB_FINAL' in blob
-assert 'snprintf(line, sizeof(line), "Name: %-24.24s", stem_);' in editor
+assert 'snprintf(line, sizeof(line), "Name: %-22.22s", stem_);' in editor
 assert 'DrawString(1, 2, line, props);' in editor
 assert 'int caret = 6 + cursor_;' in editor
 assert 'int caret = 7 + cursor_;' not in blob

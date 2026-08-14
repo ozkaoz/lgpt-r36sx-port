@@ -503,8 +503,8 @@ void ImportSampleDialog::ConfirmPendingBrowserRename(const char *newName) {
     }
 
     Player *player=Player::GetInstance();
-    if (player) { player->Stop(); player->StopStreaming(); }
-    TimeService::GetInstance()->Sleep(60);
+    if (player) { player->Stop(); player->StopStreamingAndRelease(); }
+    // No timing-dependent sleep needed; StopStreamingAndRelease() is deterministic
 
     SamplePool *pool=SamplePool::GetInstance();
     const int projectIndex=pool ? pool->FindIdenticalProjectSample(source) : -1;
@@ -608,9 +608,9 @@ void ImportSampleDialog::ConfirmPendingBrowserDelete() {
     Player *player = Player::GetInstance();
     if (player) {
         player->Stop();
-        player->StopStreaming();
+        player->StopStreamingAndRelease();
     }
-    TimeService::GetInstance()->Sleep(60);
+    // No timing-dependent sleep needed; StopStreamingAndRelease() is deterministic
     unlink(kListenPreviewTemporaryPath);
 
     SamplePool *pool = SamplePool::GetInstance();

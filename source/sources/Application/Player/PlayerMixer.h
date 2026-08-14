@@ -43,7 +43,8 @@ public:
 	void StartStreaming(const Path &) ;
 	void StartStreamingAt(const Path &, int startFrame) ;
 	void StartStreamingRangeAt(const Path &, int startFrame, int endFrame) ;
-	void StopStreaming()  ;
+void StopStreaming()  ;
+	void StopStreamingAndRelease() ;
 	bool IsStreaming() ;
 	int GetStreamingPosition() ;
 	int GetStreamingStartFrame() ;

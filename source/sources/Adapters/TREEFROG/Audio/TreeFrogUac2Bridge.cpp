@@ -140,7 +140,7 @@ static int16_t g_fifo_pending[H40_FIFO_PENDING_CAP_SAMPLES];
 static unsigned g_fifo_pending_samples = 0;
 static unsigned long g_fifo_pending_drop_frames = 0;
 static unsigned long g_fifo_pending_stage_events = 0;
-static int g_usb_channels = 1;
+static int g_usb_channels = 2;
 static int g_usb_rate = 48000;
 static int g_engine_rate = 48000;
 static int g_mixer_volume_percent = 100;

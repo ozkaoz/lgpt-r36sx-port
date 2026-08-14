@@ -1358,18 +1358,28 @@ void Player::StartStreamingRangeAt(const Path &path,int startFrame,int endFrame)
 	mixer_->StartStreamingRangeAt(path,startFrame,endFrame) ;
 }
 void Player::StopStreaming() {
-#if defined(PLATFORM_TREEFROG)
-    /* TREEFROG_V1_2_LISTEN_STREAM_ARM: disarm after stream preview only when
-       the sequencer itself is not running. This avoids muting normal playback. */
-    if (!isRunning_) {
-        TreeFrogAudioSetPlaybackArmed(0);
-    }
-#endif
+ #if defined(PLATFORM_TREEFROG)
+     /* TREEFROG_V1_2_LISTEN_STREAM_ARM: disarm after stream preview only when
+        the sequencer itself is not running. This avoids muting normal playback. */
+     if (!isRunning_) {
+TreeFrogAudioSetPlaybackArmed(0);
+     }
+ #endif
 
 	mixer_->StopStreaming() ;
-}
+} ;
 
-bool Player::IsStreaming() { return mixer_->IsStreaming() ; }
+void Player::StopStreamingAndRelease() {
+ #if defined(PLATFORM_TREEFROG)
+     if (!isRunning_) {
+         TreeFrogAudioSetPlaybackArmed(0);
+     }
+ #endif
+
+	mixer_->StopStreamingAndRelease() ;
+} ;
+
+ bool Player::IsStreaming() { return mixer_->IsStreaming() ; }
 int Player::GetStreamingPosition() { return mixer_->GetStreamingPosition() ; }
 int Player::GetStreamingStartFrame() { return mixer_->GetStreamingStartFrame() ; }
 int Player::GetStreamingEndFrame() { return mixer_->GetStreamingEndFrame() ; }

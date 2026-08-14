@@ -229,10 +229,14 @@ u2414_create_gadget() {
             AUDIO_CHMASK=3
             AUDIO_CHANNELS=2
             ;;
-        *)
-            AUDIO_PROFILE=MONO_48K
+        MONO_48K)
             AUDIO_CHMASK=1
             AUDIO_CHANNELS=1
+            ;;
+        *)
+            AUDIO_PROFILE=STEREO_48K
+            AUDIO_CHMASK=3
+            AUDIO_CHANNELS=2
             ;;
     esac
 

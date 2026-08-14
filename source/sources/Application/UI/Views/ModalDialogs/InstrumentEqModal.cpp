@@ -272,7 +272,7 @@ InstrumentEqModal::InstrumentEqModal(View &view, int instrumentIndex)
     loadFromInstrument();
     SpectrumAnalyzer::Get().SetArmed(true);
     publishToOverlay();
-    SetWindow(40, 24);
+    SetWindow(36, 24);
 }
 
 InstrumentEqModal::~InstrumentEqModal() {

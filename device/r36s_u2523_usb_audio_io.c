@@ -72,7 +72,7 @@ static const char *AUDIO_PROFILE = "/tmp/r36sx_lgpt_usb/audio_profile";
 static const char *AUDIO_CHANNELS = "/tmp/r36sx_lgpt_usb/audio_channels";
 static const char *AUDIO_RATE = "/tmp/r36sx_lgpt_usb/audio_rate";
 static const char *PLAYBACK_PCM_STATUS = "/tmp/r36sx_lgpt_usb/playback_pcm_status";
-static unsigned g_audio_channels = 1;
+static unsigned g_audio_channels = 2;
 static unsigned g_audio_rate = 48000;
 
 static void loge(const char *msg) { fprintf(stderr, "%s errno=%d (%s)\n", msg, errno, strerror(errno)); }

@@ -1686,7 +1686,7 @@ bool SampleChopperModal::destructiveCropToSelectedRange() {
     Player *p=Player::GetInstance();
     if (p) {
         if (p->IsRunning()) p->Stop();
-        if (p->IsStreaming()) p->StopStreaming();
+        if (p->IsStreaming()) p->StopStreamingAndRelease();
     }
 
     initializeChopsIfNeeded();
@@ -1785,7 +1785,7 @@ bool SampleChopperModal::destructiveDeleteSelectedRange() {
     Player *p=Player::GetInstance();
     if (p) {
         if (p->IsRunning()) p->Stop();
-        if (p->IsStreaming()) p->StopStreaming();
+        if (p->IsStreaming()) p->StopStreamingAndRelease();
     }
 
     initializeChopsIfNeeded();
@@ -1982,6 +1982,13 @@ void SampleChopperModal::togglePitchMode() {
     if (!hasAssignedSample()) { setStatus("No sample for pitch"); return; }
     if (!hasWaveform_) { setStatus("No waveform loaded"); return; }
     if (sourceSize_ <= 1 || sourceChannels_ <= 0 || sourceRate_ <= 0) { setStatus("Sample not ready for pitch"); return; }
+    // Safety: verify sample data is accessible before entering pitch mode
+    SamplePool *pool = SamplePool::GetInstance();
+    if (!pool) { setStatus("Sample pool unavailable"); return; }
+    SoundSource *source = pool->GetSource(sampleIndex_);
+    if (!source) { setStatus("Sample source unavailable"); return; }
+    short *buffer = (short *)source->GetSampleBuffer(-1);
+    if (!buffer) { setStatus("Sample buffer unavailable"); return; }
     pitchMode_ = !pitchMode_;
     if (pitchMode_) {
         trimMode_ = false;
@@ -2134,30 +2141,38 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
     if (!pitchMode_) return;
     char buffer[40];
 
+    // Clear pitch panel area with solid dark background (matching other menus)
 #if defined(PLATFORM_TREEFROG)
-    /* U2.29: pitch mode must own the whole center panel area. Disable the
-       waveform overlay before the next video refresh and clear the entire
-       waveform band, not only the former narrow panel. This removes the right
-       side bars visible in U2.28 and avoids drawing over the Frame line. */
     g_chopperOverlayActive = 0;
-    /* TREEFROG_U2_40_PITCH_OVERLAY_CLEANUP (Bacon 1.1.1): clear the whole
-       panel (60..240) so no stale chopper text remains visible behind the
-       pitch/env submenu (previously rows 22+ kept ghost letters). */
-    tf_rect(0, 60, 320, 180, tf_rgb565(10, 10, 24));
+    // Clear pitch panel area with solid background (y=59..176, height 118)
+    tf_rect(0, 59, 320, 118, tf_rgb565(10, 10, 24));
 #endif
+
+    // Frame around the pitch/envelope area, drawn with direct framebuffer
+    // pixels: DrawString writes to the 40x30 char screen (AppWindow), so
+    // cell rows 59..177 overflowed _charScreen[1200] and corrupted memory.
+    tf_rect(0, 59, 320, 1, tf_rgb565(63, 95, 191));
+    tf_rect(0, 176, 320, 1, tf_rgb565(63, 95, 191));
+    tf_rect(0, 60, 1, 116, tf_rgb565(63, 95, 191));
+    tf_rect(319, 60, 1, 116, tf_rgb565(63, 95, 191));
 
     // RC6: the Pitch/Env submenu follows the port-wide graphical language
     // (same as the other submenus): a centered title on the row just above a
     // centered label/value block, no ASCII box.  Each row highlights the
     // edited parameter by inverting on CD_HILITE2.
-    MenuLayout ml = UiDraw::MakeCenteredMenuLayout(7, 11, 10, 2);
+    MenuLayout ml = UiDraw::MakeCenteredMenuLayout(7, 11, 10, 2, 40, 8, 22);
     UiDraw::DrawCenteredTitleAt(*this, ml.startY - 1, "PITCH/ENV");
 
     // F3-3b: composicion de celdas del pitch (header, labels, valores)
     // en ChopperView (capa pura); posiciones y colores reales aqui.
-    ChopperView::ComposeHeaderLine(buffer, sizeof(buffer), instrumentIndex_,
-                                   sampleIndex_, chopModel_.selected + 1,
-                                   (chopModel_.boundaryCount > 1 ? chopModel_.boundaryCount - 1 : 1));
+    // Safety: check if sample data is valid before accessing
+    if (hasAssignedSample() && sourceSize_ > 1) {
+        ChopperView::ComposeHeaderLine(buffer, sizeof(buffer), instrumentIndex_,
+                                       sampleIndex_, chopModel_.selected + 1,
+                                       (chopModel_.boundaryCount > 1 ? chopModel_.boundaryCount - 1 : 1));
+    } else {
+        snprintf(buffer, sizeof(buffer), "No sample loaded");
+    }
     SetColor(CD_NORMAL);
     props.invert_ = false;
     DrawString(ml.labelX, ml.startY, buffer, props);
@@ -2165,6 +2180,7 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
     for (int i = 0; i < 6; i++) {
         bool selected = (pitchEnvTool_.EditParam() == i);
         char value[16];
+        // Safety: check pitchEnvTool validity
         ChopperView::ComposePitchValue(value, sizeof(value), i,
                                        pitchEnvTool_.Params().semitones,
                                        pitchEnvTool_.Params().attackMs,
@@ -2200,11 +2216,15 @@ bool SampleChopperModal::buildPitchEnvelopeBufferFromRange(int startFrame, int e
     if (outFrames) *outFrames = 0;
     if (outChannels) *outChannels = 0;
     if (outRate) *outRate = 0;
+    // Safety: check sample validity before accessing SamplePool
     if (!hasAssignedSample() || sourceSize_ <= 1) return false;
     if (semitones < -12) semitones = -12;
     if (semitones > 12) semitones = 12;
 
-    SoundSource *source = SamplePool::GetInstance()->GetSource(sampleIndex_);
+    // Safety: check SamplePool and source validity
+    SamplePool *pool = SamplePool::GetInstance();
+    if (!pool) return false;
+    SoundSource *source = pool->GetSource(sampleIndex_);
     if (!source) return false;
     int channels = source->GetChannelCount(-1);
     int rate = source->GetSampleRate(-1);
@@ -2230,6 +2250,7 @@ bool SampleChopperModal::buildPitchedBuffer(int semitones, short **outSamples, i
 
 bool SampleChopperModal::preparePitchEnvelopePreviewBuffer(short **outSamples, int *outFrames, int *outChannels, int *outRate) {
     if (!pitchMode_) return false;
+    if (!hasAssignedSample() || sourceSize_ <= 1) return false;
     if (pitchEnvTool_.Params().scope) {
         initializeChopsIfNeeded();
         if (!hasActiveSliceRange()) return false;
@@ -2297,10 +2318,11 @@ void SampleChopperModal::previewPitchSetting() {
        ReplaceBuffer()s it on disk; the audio-thread streamer holds its own
        WavFile open over that path, so a mid-read truncate can yield a corrupt
        read and crash the port. Prior order (rewrite, then Stop+Sleep) made the
-       crash timing-dependent (reported once over many previews). */
+       crash timing-dependent (reported once over many previews).
+       Now uses StopStreamingAndRelease() for deterministic WAV release;
+       no timing-dependent sleep needed. */
     if (Player::GetInstance()->IsStreaming()) {
-        Player::GetInstance()->StopStreaming();
-        TimeService::GetInstance()->Sleep(80);
+        Player::GetInstance()->StopStreamingAndRelease();
     }
     bool ok = writePreviewPitchWav(pitched, frames, channels, rate, logical);
     free(pitched);
@@ -2864,7 +2886,7 @@ static void lgptStopAllAudioBeforeDestructiveEdit() {
     Player *p = Player::GetInstance();
     if (p) {
         if (p->IsRunning()) p->Stop();
-        if (p->IsStreaming()) p->StopStreaming();
+        if (p->IsStreaming()) p->StopStreamingAndRelease();
     }
 }
 
@@ -2983,15 +3005,24 @@ void SampleChopperModal::clearOperationProgress() {
 void SampleChopperModal::drawOperationOverlay(GUITextProperties &props) {
     if (!operationActive_) return;
     char msg[64];
-    /* Bacon 1.1.1 V15: port-wide graphical language (centered title over a
-       label/value block, same as the Pitch/Env panel) -- no ASCII box of
-       '+'/'-'/'|' characters.  The percent row is the current operation. */
-    /* Bacon 1.1.1 V16: the operation panel sits over the pixel waveform
-       band; clear its full cell area (title row 9 through hint row 13, y
-       72..127) so stale waveform pixels never show between the text rows.
-       The glyph cells are opaque, but the panel has no box around it. */
-    tf_rect(0, 72, 320, 56, tf_rgb565(10, 10, 24));
-    UiDraw::DrawCenteredTitleAt(*this, 10, "OPERATION");
+
+    /* F3-3b: operation overlay draws a solid dark panel over the center area
+       (rows 8..17, y=64..143 in pixels) to fully cover pitch/envelope screen
+       and waveform area.  Uses solid dark background for readability. */
+    tf_rect(0, 64, 320, 112, tf_rgb565(10, 10, 24));
+    // Frame around the operation panel, direct framebuffer pixels (same
+    // rationale as drawPitchScreen: DrawString cannot leave the char screen).
+    tf_rect(0, 63, 320, 1, tf_rgb565(63, 95, 191));
+    tf_rect(0, 176, 320, 1, tf_rgb565(63, 95, 191));
+    tf_rect(0, 64, 1, 112, tf_rgb565(63, 95, 191));
+    tf_rect(319, 64, 1, 112, tf_rgb565(63, 95, 191));
+
+    /* U2.52: the flush repaints every char cell over the tf_rect panel, so
+       clear the underlying cells (rows 8..21) for the overlay to read as a
+       solid dark panel with the operation text on top. */
+    ClearRect(0, 8, 40, 14);
+
+    UiDraw::DrawCenteredTitleAt(*this, 8, "OPERATION");
     MenuLayout ml = UiDraw::MakeCenteredMenuLayout(2, 10, 22, 2);
     SetColor(CD_NORMAL);
     props.invert_ = false;
@@ -3019,7 +3050,7 @@ void SampleChopperModal::DrawView() {
     drawTopBar(props);
     drawFrame(props);
     drawSampleInfo(props);
-    if (!hasWaveform_) drawEmptyWaveformText(props);
+    if (!hasWaveform_ && !pitchMode_) drawEmptyWaveformText(props);
     drawControls(props);
     drawPitchScreen(props);
     drawOperationOverlay(props);

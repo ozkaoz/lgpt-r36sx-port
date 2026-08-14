@@ -66,32 +66,32 @@ const char *TreeFrogTextEditor::GetFinalName() {
 }
 
 void TreeFrogTextEditor::DrawView() {
-    SetWindow(38, 9);
+    SetWindow(36, 9);
     GUITextProperties props;
     props.invert_ = false;
     SetColor(CD_HILITE2);
     props.invert_ = true;
-    char titleLine[39];
-    memset(titleLine, ' ', 38);
-    titleLine[38] = 0;
+    char titleLine[37];
+    memset(titleLine, ' ', 36);
+    titleLine[36] = 0;
     int titleLen = (int)strlen(title_);
-    int titleStart = (38 - titleLen) / 2;
+    int titleStart = (36 - titleLen) / 2;
     if (titleStart < 0) titleStart = 0;
     memcpy(titleLine + titleStart, title_, titleLen);
     DrawString(0, 0, titleLine, props);
     props.invert_ = false;
 
-    char line[40];
-    snprintf(line, sizeof(line), "Name: %-24.24s", stem_);
+    char line[37];
+    snprintf(line, sizeof(line), "Name: %-22.22s", stem_);
     SetColor(CD_HILITE2);
     DrawString(1, 2, line, props);
 
-    char cursorLine[40];
+    char cursorLine[37];
     memset(cursorLine, ' ', sizeof(cursorLine));
     cursorLine[sizeof(cursorLine) - 1] = 0;
     int caret = 6 + cursor_;
     if (caret < 1) caret = 1;
-    if (caret > 35) caret = 35;
+    if (caret > 33) caret = 33;
     cursorLine[caret] = '^';
     DrawString(1, 3, cursorLine, props);
 

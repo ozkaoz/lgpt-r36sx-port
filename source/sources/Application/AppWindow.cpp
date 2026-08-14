@@ -265,16 +265,20 @@ void AppWindow::DrawString(const char *string, GUIPoint &pos,
     // we know we don't have mode than 40 chars
 
     char buffer[41];
-    int len = strlen(string);
+    int len = (int)strlen(string);
     int offset = (pos._x < 0) ? -pos._x / 8 : 0;
     len -= offset;
+    if (len < 0) len = 0;
     int available = 40 - ((pos._x < 0) ? 0 : pos._x);
+    if (available < 0) available = 0;
     len = MIN(len, available);
+    if (len <= 0) return;
     memcpy(buffer, string + offset, len);
     buffer[len] = 0;
 
     NAssert((pos._x < 40) && (pos._y < 30));
     int index = pos._x + 40 * pos._y;
+    if ((index < 0) || (index + len > 40 * 30)) return;
     memcpy(_charScreen + index, buffer, len);
     #if TREEFROG_DISABLE_ALL_UI_INVERT
     unsigned char prop = colorIndex_;

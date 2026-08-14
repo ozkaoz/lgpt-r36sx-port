@@ -7,9 +7,12 @@
 extern "C" {
 #endif
 
-/* U2.53.0: diagnostic-only crash trap.  Catches hard faults (SEGV/BUS/ABRT/
+/* U2.53.1: diagnostic-only crash trap.  Catches hard faults (SEGV/BUS/ABRT/
  * ILL/FPE), writes a minimal register dump to /tmp/r36sx_lgpt_logs/crash.txt
- * (RAM; the OTG supervisor mirrors it to /mnt/sdcard/lgpt/otg/logs), then
+ * (RAM; the OTG supervisor mirrors it to /mnt/sdcard/LGPT_OTG_LOGS on
+ * clean shutdown) and, best-effort, appends the same dump directly to
+ * /mnt/sdcard/LGPT_OTG_LOGS/crash.txt once at crash time via a pre-opened
+ * fd (never periodic, never truncated; safe for the SD card), then
  * re-raises the signal with the default disposition so the process dies
  * exactly as it did before.  No audio/UI path is touched; install is O(1)
  * at retro_init. */

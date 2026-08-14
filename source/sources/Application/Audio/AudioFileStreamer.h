@@ -18,7 +18,8 @@ public:
 	bool Start(const Path &) ;
 	bool StartAt(const Path &, int startFrame) ;
 	bool StartRangeAt(const Path &, int startFrame, int endFrame) ;
-	void Stop() ;
+void Stop() ;
+	void StopAndRelease() ;
 	bool IsPlaying() const ;
 	int GetPosition() const ;
 	int GetStartFrame() const ;
