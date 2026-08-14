@@ -321,8 +321,12 @@ terminan ademas con validacion en consola real.
   deuda F7 pre-existente de device/*.c).  Desplegado en SD (backup
   LGPT_BEFORE_U2523_20260813_213535; core en consola = build SHA
   7709b665).
-- [PENDIENTE] F3-5: Phrase (baseline en docs/F3_ARCHITECTURE_ES.md):
-  grid/edicion separados del dibujo.
+- [IMPLEMENTADO] F3-5: Phrase completo (baseline en
+  docs/F3_ARCHITECTURE_ES.md): F3-5a PhraseGridEdit (grid/edicion puro:
+  pasos N/V/P/I, pasteLast, seleccion, clipboard, interpolacion) + F3-5b
+  PhraseUndo (historia snapshot/restore golden).  Queda en PhraseView el
+  dibujo, el hex editor de comandos, chop, audition/Player, navegacion y
+  la politica de push de la historia.
 
 ## F4 - Audio backends extensibles (Application/Audio)
 - Interfaz AudioBackend (open/start/caps/stream/write), AudioRouter con los
