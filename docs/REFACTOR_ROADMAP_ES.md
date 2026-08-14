@@ -478,11 +478,27 @@ terminan ademas con validacion en consola real.
   `AUDIT_CLEAN_MAIN_U2523_OK`; core `ea7a80e4` + daemon `4be71632`
   desplegados == SD; backup `LGPT_BEFORE_U2523_20260813_235903`.
 
-## F9 - Riesgos y optimizaciones
-- Documentar riesgos en el camino critico de audio (retro_run -> FIFO -> ASRC
-  -> daemon) y los limites actuales (PPM 1200, hold floor 2400, reenum 8).
-- Optimizaciones solo donde el analisis muestre ganancia medible y no cambien
-  el comportamiento observable (sin tocar tiempos de arranque/fast-apply).
+## F9 [IMPLEMENTADO] - Riesgos y optimizaciones
+- Documentado en `docs/F9_RISKS_ES.md`: cadena critica
+  retro_run -> bridge (H39/H40) -> FIFO tmpfs -> daemon (ASRC) ->
+  ALSA/USB, con refs exactas de codigo para cada eslabon.
+- Limites verificados en codigo: `ASRC_MAX_CORRECTION_PPM` 1200 (ambos
+  daemons), `ASRC_INTEGRAL_LIMIT_PPM` 1000 (u2523) vs 30000 (sp404),
+  backlog target/prime 2400 frames (u2523:570-571) y hold floor 2400
+  (sp404:958), re-enumeracion SP404: 8 intentos / ventana 30 s / stall
+  5 s / exit 3 (sp404:2925-2975), budget retro cap 1 s (H39), staging
+  FIFO 16384 (H40), prebuffer monitor 960 (F4), USB-REC solo tmpfs.
+- Optimizaciones solo candidatas y documentadas (deuda): unificar
+  integral ASRC (medir antes), header ASRC comun, exponer PPM en
+  BRIDGE_PROGRESS, alarma de latency_trim_events, consolidar paths
+  runtime. Ninguna toca timings ni comportamiento observable.
+- Baseline `tests/test_f9_baseline.py` (`F9_BASELINE_OK`): coherencia
+  docs <-> codigo de los limites + verificacion de que ninguna escritura
+  peridica del camino critico cae en /mnt/sdcard (solo config por evento
+  y diagnostic de F5).
+- Doc `docs/F9_RISKS_ES.md`; audit `AUDIT_CLEAN_MAIN_U2523_OK`; core
+  `ea7a80e4` + daemon `4be71632` byte-identicos, desplegados SD == build;
+  backup `LGPT_BEFORE_U2523_20260814_002016`.
 
 ## F10 - Evidencia de preservacion + paquete
 - Informe final: diff de comportamiento por area (input, menus, audio, SD),
