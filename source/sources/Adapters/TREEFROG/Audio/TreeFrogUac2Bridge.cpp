@@ -617,16 +617,18 @@ static int daemon_pid_alive(void) {
 
 static int requested_audio_channels(void) {
     /*
-     * Absence, truncation or an unknown profile must converge on the same
-     * recovery baseline used by the setup script.  Only an explicit stereo
-     * request may select two channels; otherwise the core and script could
-     * disagree forever during first boot and trigger an endless rebuild loop.
+     * T8 BACON14: STEREO_48K is the port-wide contract (configfs, bridge,
+     * daemon and launcher all default to 48 kHz stereo).  Absence,
+     * truncation or an unknown profile must converge on the same recovery
+     * baseline used by the setup script; only an explicit MONO_48K request
+     * may select one channel.  The core and the script share the default,
+     * so first boot can never trigger an endless rebuild loop.
      */
     return file_contains(
                kRequestedAudioProfile,
-               "STEREO_48K")
-        ? 2
-        : 1;
+               "MONO_48K")
+        ? 1
+        : 2;
 }
 
 static int android_stream_ready_raw(void) {

@@ -217,12 +217,12 @@ u2414_create_gadget() {
     # isochronous packet cadence at 1 ms.  44.1 kHz would require alternating
     # fractional packet sizes and is less robust on this synchronous endpoint.
     #
-    # U2.51.4 retains MONO_48K as the validated compatibility baseline.
-    # STEREO_48K remains available as an explicit second-stage experiment.
-    # This isolates descriptor/channel regressions before re-enabling stereo.
+    # T8 BACON14: STEREO_48K is the port-wide contract (configfs, bridge,
+    # daemon and launcher all default to 48 kHz stereo).  MONO_48K remains
+    # only as an explicit opt-in/fallback for legacy compatibility.
     PROFILE_FILE=/mnt/sdcard/lgpt/otg/audio_usb_profile
     AUDIO_PROFILE="$(cat "$PROFILE_FILE" 2>/dev/null || true)"
-    [ -n "$AUDIO_PROFILE" ] || AUDIO_PROFILE=MONO_48K
+    [ -n "$AUDIO_PROFILE" ] || AUDIO_PROFILE=STEREO_48K
 
     case "$AUDIO_PROFILE" in
         STEREO_48K)

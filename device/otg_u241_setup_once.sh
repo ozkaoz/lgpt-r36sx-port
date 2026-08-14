@@ -50,14 +50,14 @@ date
 
 REQUESTED_PROFILE="$(cat "$BASE/audio_usb_profile" 2>/dev/null || true)"
 case "$REQUESTED_PROFILE" in
-    STEREO_48K)
-        EXPECTED_CHANNELS=2
-        EXPECTED_CHMASK=3
-        ;;
-    *)
-        REQUESTED_PROFILE=MONO_48K
+    MONO_48K)
         EXPECTED_CHANNELS=1
         EXPECTED_CHMASK=1
+        ;;
+    *)
+        REQUESTED_PROFILE=STEREO_48K
+        EXPECTED_CHANNELS=2
+        EXPECTED_CHMASK=3
         ;;
 esac
 

@@ -465,6 +465,17 @@ static int wait_playback_writable(int pcm, int timeout_ms) {
     return (pfd.revents & POLLOUT) ? 1 : 0;
 }
 
+/* T9 BACON14: ALSA available frames en el device buffer (headroom real
+ * del sink).  Solo telemetria; no altera el flujo de escritura.  El
+ * kernel 4.4 carece de READ_AVAIL_FRAMES; STATUS (0x20) ya expone
+ * snd_pcm_status.avail para playback = frames escribibles. */
+static int pcm_avail_frames(int pcm) {
+    struct snd_pcm_status st;
+    memset(&st, 0, sizeof(st));
+    if (ioctl(pcm, SNDRV_PCM_IOCTL_STATUS, &st) < 0) return -1;
+    return (int)st.avail;
+}
+
 static int write_frames_exact(
     int pcm,
     int16_t *buf,
@@ -537,7 +548,53 @@ static unsigned ring_drop_oldest_samples(unsigned n) {
     rfill -= dropped;
     return dropped;
 }
-static void drain_fifo(int in, long *dropped) { int16_t inbuf[4096]; for (;;) { ssize_t r = read(in, inbuf, sizeof(inbuf)); if (r > 0) { unsigned samples = (unsigned)(r / 2); unsigned pushed = ring_push_samples(inbuf, samples); if (pushed < samples && dropped) *dropped += (long)(samples - pushed); continue; } if (r == 0) break; if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) break; loge("read fifo"); break; } }
+/* T7 BACON14: the fifo is a byte stream; a read can return any byte
+ * count, and one PCM frame is 2 (mono) or 4 (stereo) bytes. The old
+ * r/2 truncation silently discarded an odd trailing byte, shifting the
+ * L/R interleave by one sample and producing channel skew. Carry the
+ * partial bytes between read() calls and push only whole frames. */
+static unsigned char drain_partial[4];
+static unsigned drain_partial_len = 0;
+static void drain_fifo(int in, long *dropped) {
+    unsigned char inbuf[8192];
+    for (;;) {
+        ssize_t r = read(in, inbuf, sizeof(inbuf));
+        if (r <= 0) {
+            if (r == 0) break;
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) break;
+            loge("read fifo");
+            break;
+        }
+        unsigned char *p = inbuf;
+        size_t n = (size_t)r;
+        if (drain_partial_len) {
+            size_t take = n < (size_t)(4U - drain_partial_len) ? n : (size_t)(4U - drain_partial_len);
+            memcpy(drain_partial + drain_partial_len, p, take);
+            drain_partial_len += (unsigned)take;
+            p += take;
+            n -= take;
+            if (drain_partial_len == 4U) {
+                unsigned pushed = ring_push_samples((const int16_t *)drain_partial, 1);
+                if (pushed < 1U && dropped) *dropped += 1L;
+                drain_partial_len = 0U;
+            }
+        }
+        {
+            const size_t whole = (n / 4U) * 4U;
+            if (whole > 0) {
+                const unsigned samples = (unsigned)(whole / 2U);
+                const unsigned pushed = ring_push_samples((const int16_t *)p, samples);
+                if (pushed < samples && dropped) *dropped += (long)(samples - pushed);
+            }
+            p += whole;
+            n -= whole;
+        }
+        if (n > 0) {
+            memcpy(drain_partial, p, n);
+            drain_partial_len = (unsigned)n;
+        }
+    }
+}
 static void flush_input_fifo(int in) {
     if (in < 0) return;
     int16_t junk[2048];
@@ -552,6 +609,7 @@ static void flush_input_fifo(int in) {
     }
     if (discarded > 0)
         fprintf(stderr, "PCM_FIFO_FLUSH discarded_samples=%ld\n", discarded);
+    drain_partial_len = 0U;
 }
 /* ---- ABI7 ASRC engine (ported from H38.1 FIR8, feed-ratio 1.0, 48 kHz). ----
  * The ABI7 ring keeps the SPSC FIFO backlog in S16_LE interleaved samples.
@@ -1754,6 +1812,8 @@ int main(int argc, char **argv) {
     long starvation_events = 0;
     long poll_timeouts = 0;
     long xruns = 0;
+    long avail_min = -1;
+    long avail_max = -1;
     long dropped = 0;
     long reconnects = 0;
     long playback_prepare_failures = 0;
@@ -2008,13 +2068,21 @@ int main(int argc, char **argv) {
         } else {
             if (good_write_streak < 1000) ++good_write_streak;
             if (good_write_streak >= 8) mark_active();
+            {
+                int avail_frames = pcm_avail_frames(pcm);
+                if (avail_frames >= 0) {
+                    if (avail_min < 0 || avail_frames < avail_min)
+                        avail_min = avail_frames;
+                    if (avail_frames > avail_max) avail_max = avail_frames;
+                }
+            }
         }
 
         total_frames += hw_period_frames;
         ++period_writes;
         if ((period_writes % 200) == 0) {
             fprintf(stderr,
-                    "BRIDGE_PROGRESS_U2517_ASRC frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld clock_hold=%llu starvation_events=%ld asrc_hold_frames=%llu output_frames=%llu periods_rendered=%llu backlog=%u backlog_min=%u backlog_max=%u step_ppm=%d xruns=%ld dropped=%ld reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%u channels=%u prepare_failures=%ld poll_timeouts=%ld short_writes=%ld primed=%d phase_ms=%.1f\n",
+                    "BRIDGE_PROGRESS_U2517_ASRC frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld clock_hold=%llu starvation_events=%ld asrc_hold_frames=%llu output_frames=%llu periods_rendered=%llu backlog=%u backlog_min=%u backlog_max=%u step_ppm=%d xruns=%ld dropped=%ld reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%u channels=%u prepare_failures=%ld poll_timeouts=%ld short_writes=%ld primed=%d phase_ms=%.1f avail_min=%ld avail_max=%ld\n",
                     total_frames, (double)total_frames / 48000.0,
                     period_writes, signal_periods,
                     source_silence_periods, asrc_clock_hold_periods,
@@ -2028,7 +2096,8 @@ int main(int argc, char **argv) {
                     hw_period_frames, g_audio_channels,
                     playback_prepare_failures, poll_timeouts,
                     short_write_events, stream_primed,
-                    (double)(asrc_phase_q32 >> 32) * 1000.0 / 48000.0);
+                    (double)(asrc_phase_q32 >> 32) * 1000.0 / 48000.0,
+                    avail_min, avail_max);
             play_peak = 0;
         }
     }
