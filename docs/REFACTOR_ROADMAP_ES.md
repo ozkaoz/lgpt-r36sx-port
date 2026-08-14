@@ -393,13 +393,32 @@ terminan ademas con validacion en consola real.
   + AudioCapabilities declarados y conectados al puente sin tocar la ruta
   estable.
 
-## F5 - Politica de storage/SD estricta (Service/Storage)
+## F5 - Politica de storage/SD estricta
 - StorageService clasifica: Volatile (cache, tmp), Persistent (config.xml,
   last_project) y Diagnostic (LGPT_OTG_LOGS). Inventario completo de
   reads/writes actuales; rutas derivadas de la raiz TreeFrogSystem.
 - Los daemons y el core comparten la misma politica; nada nuevo escribe en la
   SD fuera de los tres tipos.
 - Evidencia: inventario {ruta, tipo, quien, cuando} documentado y auditado.
+
+### F5 [IMPLEMENTADO] (ver docs/F5_ARCHITECTURE_ES.md)
+- `Services/Storage/StoragePolicy.h`: capa pura C++03 que declara la
+  clasificacion Volatile/Persistent/Diagnostic, la raiz unica del core
+  (`/mnt/sdcard/lgpt`, la misma del alias `bin`) y el inventario
+  declarativo `{ruta, tipo, quien, cuando}` de los accesos de file del
+  port (core + daemons).  Fronteras de segmento: `/mnt/sdcard/lgpt2` no
+  clasifica como lgpt.
+- El core ya deriva todas sus rutas de la raiz via alias `bin:` (verificado
+  por el baseline); los literales del bridge (otg/, LGPT_OTG_LOGS, /tmp/
+  ABI) estan documentados en el inventario y auditados por barrido
+  estatico de `source/` y `device/`: ninguna ruta literal queda fuera de
+  los tres tipos.
+- Host test `STORAGE_POLICY_HOST_ALL_OK` (55 checks ASAN/UBSAN); baseline
+  `F5_BASELINE_OK` (capa pura + barrido estatico + raiz unica); audit
+  `AUDIT_CLEAN_MAIN_U2523_OK`; core MIPS byte-identico `7709b665` (capa
+  pura sin consumidor runtime) desplegado en SD == build; backup
+  `LGPT_BEFORE_U2523_20260813_225053`.  F5 cierra la politica de
+  storage/SD de punta a punta.
 
 ## F6 - Arquitectura objetivo (estructura de carpetas)
 - Aplicar: Application/Audio, Application/UI (Input, Menus, Navigation,
