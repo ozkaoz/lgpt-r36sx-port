@@ -379,6 +379,19 @@ terminan ademas con validacion en consola real.
   identico `7709b665`.  Host test `AUDIO_BACKEND_HOST_ALL_OK` (48 checks
   ASAN/UBSAN); baseline `F4D_BASELINE_OK`; audit `AUDIT_CLEAN_MAIN_U2523_OK`;
   deploy SD == build; backup `LGPT_BEFORE_U2523_20260813_223016`.
+- **F4e [IMPLEMENTADO]** (ver docs/F4_ARCHITECTURE_ES.md): `AudioEngine.h`
+  — politica de estado del motor como capa pura (mute local golden U2.52.5
+  ANDROID_NO_MUTE + hasOut&&!nomute&&raw, paso ASRC del monitor
+  usb/engine con fallback 1.0, ganancia conservadora 75% y prebuffer 960).
+  El bridge delega should_mute_now y el bucle del monitor; el estado
+  runtime (raw, cache de ficheros, ring, fifos) queda en el bridge.  Core
+  MIPS byte-identico `7709b665`.  Host test `AUDIO_ENGINE_HOST_ALL_OK`
+  (38 checks ASAN/UBSAN); baseline `F4E_BASELINE_OK`; audit
+  `AUDIT_CLEAN_MAIN_U2523_OK`; deploy SD == build; backup
+  `LGPT_BEFORE_U2523_20260813_223545`.  Con esto el objetivo 6 queda
+  cubierto de punta a punta: AudioEngine -> AudioRouter -> AudioBackend
+  + AudioCapabilities declarados y conectados al puente sin tocar la ruta
+  estable.
 
 ## F5 - Politica de storage/SD estricta (Service/Storage)
 - StorageService clasifica: Volatile (cache, tmp), Persistent (config.xml,

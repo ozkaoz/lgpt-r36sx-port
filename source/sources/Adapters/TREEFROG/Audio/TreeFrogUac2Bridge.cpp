@@ -1,6 +1,7 @@
 #include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
 #include "Application/Audio/AudioDriverModeTable.h"
 #include "Application/Audio/AudioRouter.h"
+#include "Application/Audio/AudioEngine.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -993,10 +994,11 @@ static int should_mute_now(void) {
      * so routing audio to USB must not silence the console: the user hears
      * the project locally while the phone capture feeds the Record modal.
      */
-    if (g_driver_mode == U241_ANDROID) return 0;
-    return mode_has_out(g_driver_mode) &&
-           !nomute_file_present() &&
-           g_usb_raw;
+    // F4e: regla golden declarada en AudioEngine (U2.52.5 ANDROID_NO_MUTE +
+    // hasOut && !nomute && raw); el estado runtime viaja como parametros.
+    return AudioEngineShouldMute(
+        g_driver_mode, g_sampler_direction_in,
+        g_usb_raw, nomute_file_present());
 }
 
 static void reap_setup_child_nonblocking(void) {
@@ -1840,9 +1842,7 @@ void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo48000(
     }
 
     const double step =
-        (g_engine_rate > 0)
-            ? (double)g_usb_rate / (double)g_engine_rate
-            : 1.0;
+        AudioEngineMonitorStep(g_engine_rate, g_usb_rate);
 
     for (int i = 0; i < frames; ++i) {
         const unsigned frame_index =
@@ -1878,8 +1878,8 @@ void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo48000(
             ((double)r1 - (double)r0) * frac);
 
         /* Conservative monitor gain leaves headroom for local mixing. */
-        left = (left * 75) / 100;
-        right = (right * 75) / 100;
+        left = AudioEngineMonitorApplyGain(left);
+        right = AudioEngineMonitorApplyGain(right);
 
         stereo[i * 2] = clamp16(
             (int)stereo[i * 2] + left);

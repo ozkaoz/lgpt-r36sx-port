@@ -274,4 +274,78 @@ datos ni timings.  El core MIPS resultante es byte-identico (sha256
 - Audit completo: `AUDIT_CLEAN_MAIN_U2523_OK`.
 - Build MIPS byte-identico `7709b665` desplegado en SD (== build); backup
   `LGPT_BEFORE_U2523_20260813_223016`.
-- Commit: <sha F4d>.
+- Commit: `2d4d389`.
+
+## F4e - AudioEngine (politica de estado del motor)
+
+### Que se hizo
+
+`Application/Audio/AudioEngine.h` (capa pura header-only C++03): las
+reglas golden de decision que el puente evalua en cada ciclo de stream,
+como funciones puras cuyo estado runtime viaja como parametros:
+
+- `AudioEngineShouldMute(mode, dir, usbRawPresent,
+  disableMuteFilePresent)`: replica golden de `should_mute_now()`:
+  - ANDROID nunca muta (U2.52.5 ANDROID_NO_MUTE: AOA input-only, el
+    usuario oye el proyecto local mientras el telefono graba).
+  - El resto muta si el modo tiene salida USB (mode_has_out), hay USB
+    raw presente y no existe el override disable_mute_local.
+- `AudioEngineMonitorStep(engineRate, usbRate)`: paso ASRC del monitor de
+  captura = usb/engine (fallback 1.0 si el engine no reporta tasa).
+- `AudioEngineMonitorApplyGain(sample)`: ganancia conservadora del
+  monitor 75% (headroom para el mix local).
+- Constantes golden: `kAudioEngineMonitorPrebufferSamples = 960`
+  (U2415_MONITOR_PREBUFFER_SAMPLES) y
+  `kAudioEngineMonitorGainPercent = 75`.
+
+### Delegacion del bridge
+
+```c
+static int should_mute_now(void) {
+    // F4e: regla golden declarada en AudioEngine ...
+    return AudioEngineShouldMute(
+        g_driver_mode, g_sampler_direction_in,
+        g_usb_raw, nomute_file_present());
+}
+...
+const double step = AudioEngineMonitorStep(g_engine_rate, g_usb_rate);
+...
+left = AudioEngineMonitorApplyGain(left);
+right = AudioEngineMonitorApplyGain(right);
+```
+
+El estado runtime permanece en el bridge: g_was_muted/log del cambio de
+mute, cache de nomute_file, ring buffer del monitor, fifos, prebuffer
+fill y el bucle de mezcla.
+
+### Paridad byte-identica
+
+El core MIPS es byte-identico al de F4a..F4d (sha256 `7709b665`): las
+funciones del engine son inline y compilan al mismo codigo que las
+expresiones originales.
+
+### Objetivo 6 cubierto
+
+Con F4a..F4e la cadena del objetivo 6 queda declarada y conectada al
+puente sin tocar la ruta estable:
+
+```
+AudioEngine (F4e: mute/ASRC/gain)      <- bridge delega
+   -> AudioRouter (F4c: modo efectivo, host-role, ciclo) <- bridge delega
+      -> AudioBackend (F4d: 5 clases, ops, caps por clase)
+         -> AudioDriverModeTable (F4a: 6 modos golden)
+            -> AudioCapabilities (F4b: vocabulario)
+```
+
+### Evidencia del tramo
+
+- Host test `tests/host/audio_engine_host_test.cpp`, runner
+  `tests/run_host_audio_engine.sh` en `scripts/audit.sh`:
+  `AUDIO_ENGINE_HOST_ALL_OK (38 checks)` ASAN/UBSAN (mute por modo/dir,
+  step ASRC, gain, coherencia mute <-> hasOut).
+- Baseline `tests/test_f4e_baseline.py`: `F4E_BASELINE_OK` (capa pura con
+  solo los 3 includes hermanos; estado runtime del bridge intacto).
+- Audit completo: `AUDIT_CLEAN_MAIN_U2523_OK`.
+- Build MIPS byte-identico `7709b665` desplegado en SD (== build); backup
+  `LGPT_BEFORE_U2523_20260813_223545`.
+- Commit: 61e7770.
