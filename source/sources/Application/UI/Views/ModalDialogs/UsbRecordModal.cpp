@@ -1335,11 +1335,11 @@ void UsbRecordModal::DrawView() {
     if (pendingTake) {
         SetColor(CD_HILITE2);
         props.invert_ = true;
-        DrawString(1, 7, "  TAKE PENDING: PREVIEW / SAVE / DISCARD ", props);
+        DrawString(1, 7, "TAKE PENDING: PREVIEW/SAVE/DISCARD", props);
         props.invert_ = false;
     } else {
         SetColor(CD_NORMAL);
-        DrawString(1, 7, "                                        ", props);
+        DrawString(1, 7, "                                   ", props);
     }
 
     static const char *labels[ITEM_COUNT] = {
@@ -1459,8 +1459,8 @@ void UsbRecordModal::DrawView() {
         DrawString(1, 20, "R1+LEFT back; B stops Preview", props);
     }
 
-    DrawString(1, 22, "Preview follows the active audio driver", props);
-    DrawString(1, 23, "Unsaved take is temporary until Save", props);
+    DrawString(1, 22, "Preview follows the audio driver", props);
+    DrawString(1, 23, "Unsaved take is temporary till Save", props);
 }
 
 void UsbRecordModal::ProcessButtonMask(

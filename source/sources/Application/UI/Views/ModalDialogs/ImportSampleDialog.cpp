@@ -48,7 +48,7 @@ public:
 
         SetColor(CD_RECORD);
         props.invert_ = true;
-        DrawString(0, 0, "     DELETE SELECTED WAV FROM SD     ", props);
+        DrawString(0, 0, "    DELETE SELECTED WAV FROM SD     ", props);
         props.invert_ = false;
 
         SetColor(CD_NORMAL);
@@ -56,7 +56,7 @@ public:
         snprintf(line, sizeof(line), "Sample: %-27.27s", name_);
         DrawString(1, 2, line, props);
         DrawString(1, 3, "Also removes identical project copy", props);
-        DrawString(1, 4, "and clears its instrument assignments.", props);
+        DrawString(1, 4, "and clears instrument assignments.", props);
 
         SetColor(CD_RECORD);
         DrawString(1, 6, "A CONFIRM DELETE", props);

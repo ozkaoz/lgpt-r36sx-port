@@ -13,7 +13,7 @@ required=[
  'unlink(sourcePath)',
  'TreeFrogUac2Bridge_CommitUsbCapture();',
  'Save or Discard the current take first',
- 'Unsaved take is temporary until Save',
+ 'Unsaved take is temporary till Save',
 ]
 for marker in required:
     assert marker in cpp or marker in h, marker
