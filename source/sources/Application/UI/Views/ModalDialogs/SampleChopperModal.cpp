@@ -2144,8 +2144,10 @@ void SampleChopperModal::drawPitchScreen(GUITextProperties &props) {
     // Clear pitch panel area with solid dark background (matching other menus)
 #if defined(PLATFORM_TREEFROG)
     g_chopperOverlayActive = 0;
-    // Clear pitch panel area with solid background (y=59..176, height 118)
-    tf_rect(0, 59, 320, 118, tf_rgb565(10, 10, 24));
+    // Clear pitch panel area with solid background (y=60..175, height 116);
+    // ends one pixel before char row 22 so status (23), hints (24-25) and
+    // the frame row (22) are never overwritten by the panel clear.
+    tf_rect(0, 60, 320, 116, tf_rgb565(10, 10, 24));
 #endif
 
     // Frame around the pitch/envelope area, drawn with direct framebuffer

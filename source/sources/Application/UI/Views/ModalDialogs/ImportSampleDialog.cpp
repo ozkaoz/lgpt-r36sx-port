@@ -311,8 +311,8 @@ void ImportSampleDialog::preview(Path &element) {
 	if (!element.IsDirectory()) {
         std::string previewPath;
         int previewFrames = 0;
-        Player::GetInstance()->StopStreaming();
-        TimeService::GetInstance()->Sleep(80);
+        Player::GetInstance()->StopStreamingAndRelease();
+        // No timing-dependent sleep needed; StopStreamingAndRelease() is deterministic
 
         /* U2.33: R36S confirmed that the Listen action reached this function
            and displayed a status message, but StartStreaming() on the generated
@@ -341,7 +341,7 @@ void ImportSampleDialog::preview(Path &element) {
 }
 
 void ImportSampleDialog::endPreview() {
-	Player::GetInstance()->StopStreaming() ;
+	Player::GetInstance()->StopStreamingAndRelease() ;
     /* Preview is an internal transient artifact, never a project sample. */
     unlink(kListenPreviewTemporaryPath);
 }

@@ -1124,8 +1124,8 @@ void UsbRecordModal::previewRecording() {
         return;
     }
 
-    player->StopStreaming();
-    TimeService::GetInstance()->Sleep(80);
+    player->StopStreamingAndRelease();
+    // No timing-dependent sleep needed; StopStreamingAndRelease() is deterministic
 
     if (!preparePreview(path, &frames, reason, sizeof(reason))) {
         setSessionState(SESSION_ERROR, reason);
