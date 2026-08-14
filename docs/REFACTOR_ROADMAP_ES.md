@@ -500,7 +500,20 @@ terminan ademas con validacion en consola real.
   `ea7a80e4` + daemon `4be71632` byte-identicos, desplegados SD == build;
   backup `LGPT_BEFORE_U2523_20260814_002016`.
 
-## F10 - Evidencia de preservacion + paquete
-- Informe final: diff de comportamiento por area (input, menus, audio, SD),
-  comparativa de la politicas catalogadas vs. realidad en consola, y release
-  de regresion documentado (incluye pruebas de campo).
+## F10 [IMPLEMENTADO] - Evidencia de preservacion + paquete
+- Informe final `docs/F10_EVIDENCE_ES.md`: mapa original, problemas
+  encontrados y resueltos (crash HelpOverlay UB 168 bytes, crash pitch
+  preview, lag Windows USB abierto, help por vista), arquitectura
+  aplicada, estructura final, politicas oficiales (input, menus,
+  navegacion, storage/SD, audio), deuda, bugs, riesgos, oportunidades,
+  pruebas de regresion, evidencia de preservacion (F4a-F6 core
+  byte-identico `7709b665`; F7 en adelante `ea7a80e4` + daemon
+  `4be71632`; protocolo de publicacion con verificacion en SD antes del
+  commit) y recomendaciones para multitrack USB.
+- Baseline `tests/test_f10_baseline.py` (`F10_BASELINE_OK`): coherencia
+  del informe con la realidad (SHA del build actual == golden
+  documentados, runners en audit.sh, roadmap con F1-F10 cerrados).
+- Audit `AUDIT_CLEAN_MAIN_U2523_OK`; core `ea7a80e4` + daemon
+  `4be71632` byte-identicos, desplegados SD == build (verificados antes
+  del commit: core y daemon activo en la SD coinciden con el build);
+  backup `LGPT_BEFORE_U2523_20260814_002532`.
