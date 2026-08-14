@@ -46,7 +46,7 @@ FORBIDDEN = [
     "unistd.h", "fcntl.h", "stdio.h", "stdlib.h", "string.h", "sys/",
     "open(", "mkfifo", "mkdir(", "snprintf", "fprintf",
     "TreeFrogUac2Bridge_", "g_driver_mode", "g_sampler_direction_in",
-    "U241_", "TREEFROG_UAC2_BRIDGE", "#include",
+    "U241_", "TREEFROG_UAC2_BRIDGE",
 ]
 
 GOLDEN_STRINGS = [
@@ -81,6 +81,12 @@ def check_layer():
         assert token in t, token
     for token in FORBIDDEN:
         assert token not in t, token
+    # F4a es una capa pura: el unico include permitido es la capa hermana
+    # AudioCapabilities.h (F4b), tambien pura.  Nada mas.
+    for line in t.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#include"):
+            assert stripped == '#include "Application/Audio/AudioCapabilities.h"', stripped
     print("layer guards OK")
 
 

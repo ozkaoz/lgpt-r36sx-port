@@ -94,4 +94,74 @@ paridad de FIFO intacta.
 - Audit completo: `AUDIT_CLEAN_MAIN_U2523_OK`.
 - Build MIPS `lgpt_r36sx_u2523.so` sha256 `7709b665...` desplegado en SD
   (== build); backup `LGPT_BEFORE_U2523_20260813_220015`.
-- Commit: <sha F4a> (docs/F4_ARCHITECTURE_ES.md).
+- Commit: `d2c1069` (docs/F4_ARCHITECTURE_ES.md).
+
+## F4b - AudioCapabilities (vocabulario declarativo de capacidades)
+
+### Que se hizo
+
+Dos capas puras nuevas en `Application/Audio/`:
+
+1. `AudioCapabilities.h`: el lenguaje del objetivo 6 como datos puros.
+   Ocho bits de capacidad con sus nombres legibles (fuente de verdad unica
+   para Help/UI/diagnostico):
+
+   | bit | capacidad       |
+   |-----|-----------------|
+   | 0   | Stereo Output   |
+   | 1   | Stereo Input    |
+   | 2   | USB Device      |
+   | 3   | USB Host        |
+   | 4   | MIDI            |
+   | 5   | Capture         |
+   | 6   | Clock Sync      |
+   | 7   | Hotplug         |
+
+   `Clock Sync` y `Hotplug` quedan reservados: ningun modo actual los
+   declara (vocabulario para backends futuros, p.ej. multitrack USB).
+
+2. `AudioDriverModeTable.h` (F4a + extension): `AudioDriverModeCapabilities
+   (mode, samplerDirectionIn)` deriva la mascara de capacidades de cada
+   modo EXCLUSIVAMENTE desde primitivos golden:
+
+   - StereoOutput = hasOut || LOCAL_CONSOLE (la consola siempre suena).
+   - StereoInput = hasIn.
+   - UsbDevice = WINDOWS (unico rol periferico/gadget del bridge).
+   - UsbHost = ANDROID, USB_OUT, SP404_IN, MIDI (host-role devices).
+   - Midi = modo MIDI.
+   - Capture = hasIn && != LOCAL_CONSOLE.
+
+   Resultado por modo (con el toggle del sampler):
+
+   | modo      | capacidades                                   |
+   |-----------|-----------------------------------------------|
+   | LOCAL     | Stereo Output                                 |
+   | WINDOWS   | Out + In + USB Device + Capture               |
+   | ANDROID   | In + USB Host + Capture                       |
+   | USB_OUT   | dir0: Out + USB Host | dir1: In + USB Host + Capture |
+   | MIDI      | USB Host + MIDI                               |
+   | SP404_IN  | In + USB Host + Capture                       |
+   | fallback  | (ninguna; selectable=0)                       |
+
+### Por que el bridge no se toca
+
+`AudioDriverModeCapabilities` es una proyeccion declarativa de la misma
+semantica que el runtime ya declara en `mode_has_out/mode_has_in`: no
+cambia ninguna ruta.  El core MIPS resultante es byte-identico al de F4a
+(sha256 `7709b665`).  F4c conectara el `AudioRouter` (seleccion de backend
+consumiendo la tabla + capacidades) y ahi el puente empezara a consultar
+capacidades sin cambiar comportamiento.
+
+### Evidencia del tramo
+
+- Host test `tests/host/audio_capabilities_host_test.cpp`, runner
+  `tests/run_host_audio_capabilities.sh` en `scripts/audit.sh`:
+  `AUDIO_CAPABILITIES_HOST_ALL_OK (55 checks)` ASAN/UBSAN (vocabulario,
+  proyeccion por modo y consistencia caps<->hasOut/hasIn).
+- Baselines: `F4A_BASELINE_OK` (ahora permite como unico include la capa
+  hermana pura) y `F4B_BASELINE_OK` (vocabulario puro, derivacion solo de
+  primitivos golden, bridge sin consumir capacidades).
+- Audit completo: `AUDIT_CLEAN_MAIN_U2523_OK`.
+- Build MIPS byte-identico `7709b665` desplegado en SD (== build); backup
+  `LGPT_BEFORE_U2523_20260813_220749`.
+- Commit: <sha F4b>.

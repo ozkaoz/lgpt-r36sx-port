@@ -346,6 +346,19 @@ terminan ademas con validacion en consola real.
   `F4A_BASELINE_OK` (incluye contrato de valores del enum U241_*).  Audit
   completo `AUDIT_CLEAN_MAIN_U2523_OK`; build `7709b665` desplegado en SD
   (== build); backup `LGPT_BEFORE_U2523_20260813_220015`.
+- **F4b [IMPLEMENTADO]** (ver docs/F4_ARCHITECTURE_ES.md): vocabulario de
+  capacidades declarativas `Application/Audio/AudioCapabilities.h` (8
+  capabilities del objetivo 6: Stereo Output/Input, USB Device/Host, MIDI,
+  Capture, Clock Sync, Hotplug — las dos ultimas reservadas para backends
+  futuros).  `AudioDriverModeTable.h` deriva `AudioDriverModeCapabilities`
+  por modo SOLO desde los primitivos golden (hasOut/hasIn + rol gadget vs
+  host-role del bridge); el bridge no consume capacidades todavia (la
+  proyeccion es metadata; la ruta runtime no se toca — core MIPS byte-
+  identico `7709b665`).  Host test `AUDIO_CAPABILITIES_HOST_ALL_OK`
+  (55 checks ASAN/UBSAN); baselines `F4A_BASELINE_OK` (ajustado: unico
+  include permitido = AudioCapabilities.h) y `F4B_BASELINE_OK`.  Audit
+  completo `AUDIT_CLEAN_MAIN_U2523_OK`; deploy SD == build; backup
+  `LGPT_BEFORE_U2523_20260813_220749`.
 
 ## F5 - Politica de storage/SD estricta (Service/Storage)
 - StorageService clasifica: Volatile (cache, tmp), Persistent (config.xml,

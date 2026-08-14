@@ -1,6 +1,8 @@
 #ifndef _AUDIO_DRIVER_MODE_TABLE_H_
 #define _AUDIO_DRIVER_MODE_TABLE_H_
 
+#include "Application/Audio/AudioCapabilities.h"
+
 // F4a (docs/F4_ARCHITECTURE_ES.md): tabla declarativa de los backends de
 // audio del driver UAC2 como datos puros.  Es el nucleo de datos del futuro
 // AudioRouter (objetivo F4): cada entrada describe un modo del driver con
@@ -135,6 +137,41 @@ inline int AudioDriverModeHasIn(int mode, int samplerDirectionIn) {
 // Replica golden del conteo de la UI del driver (GetDriverModeCount).
 inline int AudioDriverModeCount(void) {
     return kAudioDriverModeUiCount;
+}
+
+// F4b (docs/F4_ARCHITECTURE_ES.md): capacidades declarativas de un modo,
+// derivadas SOLO de los primitivos golden del bridge (mode_has_out/
+// mode_has_in, rol gadget vs host-role y la identidad del modo).  Ningun
+// dato nuevo: es la misma semantica que el runtime declara en
+// mode_has_out/mode_has_in, proyectada al vocabulario de
+// AudioCapabilities.h (objetivo 6).
+//
+// Reglas de derivacion (fieles a los comentarios golden del bridge):
+//   - StereoOutput: el modo tiene salida USB (mode_has_out) o es el
+//     LOCAL_CONSOLE (siempre suena localmente).
+//   - StereoInput:  el modo tiene entrada USB (mode_has_in).
+//   - UsbDevice:    WINDOWS es el unico rol periferico (gadget).
+//   - UsbHost:      ANDROID, USB_OUT, SP404_IN y MIDI son host-role.
+//   - Midi:         solo el modo MIDI.
+//   - Capture:      el modo tiene entrada (mode_has_in) y no es LOCAL.
+//   - ClockSync/Hotplug: ningun modo actual los declara (vocabulario
+//     reservado para backends futuros, p.ej. multitrack USB).
+inline unsigned int AudioDriverModeCapabilities(int mode,
+                                                int samplerDirectionIn) {
+    const int hasOut = AudioDriverModeHasOut(mode, samplerDirectionIn);
+    const int hasIn = AudioDriverModeHasIn(mode, samplerDirectionIn);
+    unsigned int caps = 0;
+    if (hasOut || mode == kAudioDriverModeLocalConsole)
+        caps |= kAudioCapStereoOutput;
+    if (hasIn) caps |= kAudioCapStereoInput;
+    if (mode == kAudioDriverModeWindows) caps |= kAudioCapUsbDevice;
+    if (mode == kAudioDriverModeAndroid ||
+        mode == kAudioDriverModeUsbOut ||
+        mode == kAudioDriverModeSp404In ||
+        mode == kAudioDriverModeMidi) caps |= kAudioCapUsbHost;
+    if (mode == kAudioDriverModeMidi) caps |= kAudioCapMidi;
+    if (hasIn && mode != kAudioDriverModeLocalConsole) caps |= kAudioCapCapture;
+    return caps;
 }
 
 #endif
