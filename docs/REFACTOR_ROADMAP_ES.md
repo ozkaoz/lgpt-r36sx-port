@@ -359,6 +359,16 @@ terminan ademas con validacion en consola real.
   include permitido = AudioCapabilities.h) y `F4B_BASELINE_OK`.  Audit
   completo `AUDIT_CLEAN_MAIN_U2523_OK`; deploy SD == build; backup
   `LGPT_BEFORE_U2523_20260813_220749`.
+- **F4c [IMPLEMENTADO]** (ver docs/F4_ARCHITECTURE_ES.md): `AudioRouter.h`
+  — politica declarativa de seleccion/routing de backends (mapeo efectivo
+  USB_OUT+dirIN->SP404_IN, clasificacion host-role derivada de la capacidad
+  UsbHost, ciclo next/prev de la secuencia UI).  El bridge la consume en
+  SetDriverMode/CycleDriverMode; la politica runtime (debounce, fast-apply,
+  close_fifo, launch_apply_profile_once) queda intacta.  Host test
+  `AUDIO_ROUTER_HOST_ALL_OK` (30 checks ASAN/UBSAN); baseline
+  `F4C_BASELINE_OK`.  Audit `AUDIT_CLEAN_MAIN_U2523_OK`; core MIPS
+  byte-identico `7709b665` (la delegacion inline compila al mismo codigo);
+  deploy SD == build; backup `LGPT_BEFORE_U2523_20260813_221336`.
 
 ## F5 - Politica de storage/SD estricta (Service/Storage)
 - StorageService clasifica: Volatile (cache, tmp), Persistent (config.xml,

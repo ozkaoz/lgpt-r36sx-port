@@ -1,5 +1,6 @@
 #include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
 #include "Application/Audio/AudioDriverModeTable.h"
+#include "Application/Audio/AudioRouter.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -1997,10 +1998,8 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
 #if TREEFROG_UAC2_BRIDGE
     if (!selectable_mode(mode)) return mode_name(mode);
 
-    const int effective =
-        (mode == U241_USB_OUT && g_sampler_direction_in)
-            ? U241_SP404_IN
-            : mode;
+    // F4c: mapeo efectivo golden en AudioRouter.
+    const int effective = AudioRouteEffectiveMode(mode, g_sampler_direction_in);
 
     if (g_driver_mode == mode) {
         if (effective != mode) write_mode_file(effective);
@@ -2024,10 +2023,7 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
      * If the gadget, daemon and FIFO are already present, changing LOCAL/USB
      * is a core routing decision.  Do not fork the profile script.
      */
-    if (g_driver_mode == U241_ANDROID ||
-        g_driver_mode == U241_USB_OUT ||
-        g_driver_mode == U241_SP404_IN ||
-        g_driver_mode == U241_MIDI) {
+    if (AudioRouteIsHostRoleMode(g_driver_mode)) {
         /*
          * U2.52 HOST_ROLE_MODE_ALWAYS_APPLY:
          * Host-role modes (Android AOA, SP404 sampler OUT/IN, MIDI) load ALSA
@@ -2060,8 +2056,8 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
 
 const char *TreeFrogUac2Bridge_CycleDriverMode(void) {
 #if TREEFROG_UAC2_BRIDGE
-    int next = (g_driver_mode + 1) %
-        TreeFrogUac2Bridge_GetDriverModeCount();
+    // F4c: secuencia del ciclo declarada en AudioRouter.
+    const int next = AudioRouteCycleNext(g_driver_mode);
     return TreeFrogUac2Bridge_SetDriverMode(next);
 #else
     return "DISABLED";

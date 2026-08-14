@@ -164,4 +164,62 @@ capacidades sin cambiar comportamiento.
 - Audit completo: `AUDIT_CLEAN_MAIN_U2523_OK`.
 - Build MIPS byte-identico `7709b665` desplegado en SD (== build); backup
   `LGPT_BEFORE_U2523_20260813_220749`.
-- Commit: <sha F4b>.
+- Commit: `fd0f124`.
+
+## F4c - AudioRouter (politica declarativa de seleccion/routing)
+
+### Que se hizo
+
+`Application/Audio/AudioRouter.h` (capa pura header-only C++03): la
+politica de seleccion de backend del bridge como funciones puras que solo
+consumen la tabla golden de modos y el vocabulario de capacidades:
+
+- `AudioRouteEffectiveMode(mode, dir)`: replica golden del mapeo de
+  SetDriverMode — USB_OUT con direccion sampler IN se ejecuta como
+  SP404_IN; cualquier otro modo es identidad.
+- `AudioRouteIsHostRoleMode(mode)`: replica golden de la clasificacion
+  U2.52 HOST_ROLE_MODE_ALWAYS_APPLY (ANDROID/USB_OUT/SP404_IN/MIDI exigen
+  apply completo de perfil + supervisor, nunca fast apply), derivada de la
+  capacidad UsbHost declarada por el modo (misma fuente de verdad que las
+  capacidades — no duplica la lista).
+- `AudioRouteCycleNext`/`AudioRouteCyclePrev`: secuencia UI de 5 modos
+  (SP404_IN no se lista), matematica de CycleDriverMode y del modal.
+
+### Delegacion del bridge
+
+```c
+// SetDriverMode
+const int effective = AudioRouteEffectiveMode(mode, g_sampler_direction_in);
+...
+if (AudioRouteIsHostRoleMode(g_driver_mode)) {   // antes: 4 comparaciones
+    close_fifo_if_open("fifo closed host-role apply");
+    launch_apply_profile_once(effective);
+...
+// CycleDriverMode
+const int next = AudioRouteCycleNext(g_driver_mode);
+```
+
+La politica runtime NO se mueve: debounce de 180 ms, fast-apply
+(runtime_ready_fast + fifo_compatible_with_mode), close_fifo_if_open,
+write_mode_file y launch_apply_profile_once siguen viviendo en el bridge.
+
+### Paridad byte-identica
+
+El core MIPS resultante es byte-identico al de F4a/F4b (sha256 `7709b665`):
+las funciones del router son inline y compilan al mismo codigo que las
+comparaciones originales.  Es la evidencia mas fuerte posible de que la
+politica no cambio.
+
+### Evidencia del tramo
+
+- Host test `tests/host/audio_router_host_test.cpp`, runner
+  `tests/run_host_audio_router.sh` en `scripts/audit.sh`:
+  `AUDIO_ROUTER_HOST_ALL_OK (30 checks)` ASAN/UBSAN (mapeo efectivo,
+  host-role por modo, ciclo next/prev, coherencia host-role == UsbHost).
+- Baseline `tests/test_f4c_baseline.py`: `F4C_BASELINE_OK` (capa pura con
+  solo los 2 includes hermanos; politica runtime del bridge intacta:
+  debounce, pending, fifo, profile).
+- Audit completo: `AUDIT_CLEAN_MAIN_U2523_OK`.
+- Build MIPS byte-identico `7709b665` desplegado en SD (== build); backup
+  `LGPT_BEFORE_U2523_20260813_221336`.
+- Commit: <sha F4c>.
