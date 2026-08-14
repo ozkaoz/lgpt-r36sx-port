@@ -5,17 +5,18 @@
 #include "Application/Mixer/MixerService.h"
 #include "Application/Persistency/PersistencyService.h"
 #include "Application/Player/TablePlayback.h"
+#include "Application/UI/Input/ChordResolver.h"
 #include "Application/Utils/char.h"
-#include "Application/Views/ModalDialogs/MessageBox.h"
-#include "Application/Views/ModalDialogs/SelectProjectDialog.h"
-#include "Application/Views/ModalDialogs/AudioDriverModal.h"
-#include "Application/Views/BaseClasses/HelpOverlay.h"
+#include "Application/UI/Views/ModalDialogs/MessageBox.h"
+#include "Application/UI/Views/ModalDialogs/SelectProjectDialog.h"
+#include "Application/UI/Views/ModalDialogs/AudioDriverModal.h"
+#include "Application/UI/Views/BaseClasses/HelpOverlay.h"
 #include "Foundation/Variables/WatchedVariable.h"
 #include "Player/Player.h"
 #include "Services/Midi/MidiService.h"
 #include "System/Console/Trace.h"
 #include "UIFramework/Interfaces/I_GUIWindowFactory.h"
-#include "Views/UIController.h"
+#include "UI/Views/UIController.h"
 #include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -631,20 +632,43 @@ void AppWindow::RequestExportRender(int mode) {
 #endif
 }
 
+// F1b input policy (REFACTOR_ROADMAP_ES.md): los acordes globales del golden
+// (helpCombo SELECT+R1 = EPBM_SELECT | EPBM_R, audioCombo SELECT+R2 =
+// EPBM_SELECT | EPBM_R2) quedan expresados en el catalogo CTX_GLOBAL
+// (ActionMap.cpp) y aqui se consultan por accion semantica. El estado de
+// latcheo y la desambiguacion V16 de L1+R1+X (que requiere historia de
+// prensas) siguen siendo runtime del adapter, como documenta la tabla.
+static bool GlobalHelpChord(unsigned short mask) {
+    return UI::Input::ChordResolver_Matches(
+        (UI::Input::PadMask)mask, UI::Input::CTX_GLOBAL,
+        UI::Input::ACTION_OPEN_HELP);
+}
+static bool GlobalAudioChord(unsigned short mask) {
+    return UI::Input::ChordResolver_Matches(
+        (UI::Input::PadMask)mask, UI::Input::CTX_GLOBAL,
+        UI::Input::ACTION_OPEN_AUDIO_DRIVER);
+}
+static bool GlobalHelpReleased(unsigned short mask) {
+    return UI::Input::ChordResolver_ChordAbsent(
+        (UI::Input::PadMask)mask, UI::Input::CTX_GLOBAL,
+        UI::Input::ACTION_OPEN_HELP);
+}
+static bool GlobalAudioReleased(unsigned short mask) {
+    return UI::Input::ChordResolver_ChordAbsent(
+        (UI::Input::PadMask)mask, UI::Input::CTX_GLOBAL,
+        UI::Input::ACTION_OPEN_AUDIO_DRIVER);
+}
+
 void AppWindow::SynchronizeInputMask(unsigned short mask) {
     _mask = mask;
-    const unsigned short audioCombo =
-        EPBM_SELECT | EPBM_R2;
     if (_audioShortcutLatched &&
-        (_mask & audioCombo) != audioCombo) {
+        !GlobalAudioChord(mask)) {
         _audioShortcutLatched = false;
     }
     // TREEFROG_HELP_OVERLAY_V1 (PLAN_RC3_MODERNIZACION_VISUAL_ES.md, point 13):
     // the help latch clears once SELECT+R1 (R1 = EPBM_R) is released.
-    const unsigned short helpCombo =
-        EPBM_SELECT | EPBM_R;
     if (_helpShortcutLatched &&
-        (_mask & helpCombo) != helpCombo) {
+        !GlobalHelpChord(mask)) {
         _helpShortcutLatched = false;
     }
 }
@@ -704,10 +728,9 @@ bool AppWindow::onEvent(GUIEvent &event) {
         SynchronizeInputMask(
             (unsigned short)(event.GetValue() & 0xffffL));
 
-        const unsigned short audioCombo =
-            EPBM_SELECT | EPBM_R2;
-        const unsigned short helpCombo =
-            EPBM_SELECT | EPBM_R;
+        // F1b: los combos de abajo (helpCombo SELECT+R1, audioCombo
+        // SELECT+R2) se resuelven contra el catalogo CTX_GLOBAL; el golden
+        // los tenia como constantes bit a bit (AppWindow.cpp, Bacon 1.2.1).
 
         // TREEFROG_HELP_NAV_V15 (Bacon 1.1.1 V15): while a Help overlay is
         // open, L1/R1/L2/R2 presses always reach it for section navigation,
@@ -813,7 +836,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
         // state change); SELECT+R2 keeps the Audio Driver dialog.
         // RC4 P1 (PLAN_RC4 section 11.3): Help may open over an already-open
         // dialog via PushModal, which suspends and later restores it.
-        if ((_mask & helpCombo) == helpCombo &&
+        if (GlobalHelpChord(_mask) &&
             _currentView) {
             if (!_helpShortcutLatched) {
                 _helpShortcutLatched = true;
@@ -838,7 +861,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
             break;
         }
 
-        if ((_mask & audioCombo) == audioCombo &&
+        if (GlobalAudioChord(_mask) &&
             _currentView &&
             !_currentView->HasModal()) {
             if (!_audioShortcutLatched) {
@@ -857,8 +880,8 @@ bool AppWindow::onEvent(GUIEvent &event) {
         // SELECT stayed pressed (only the mixer felt like it worked).  The
         // latch now only blocks while its own chord is still held.
         if (_helpShortcutLatched || _audioShortcutLatched) {
-            if ((_mask & helpCombo) != helpCombo &&
-                (_mask & audioCombo) != audioCombo) {
+            if (!GlobalHelpChord(_mask) &&
+                !GlobalAudioChord(_mask)) {
                 _helpShortcutLatched = false;
                 _audioShortcutLatched = false;
             } else {
@@ -898,7 +921,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
                     _mask,
                     false,
                     event.When());
-            if ((_mask & (EPBM_SELECT | EPBM_R)) == 0) {
+            if (GlobalHelpReleased(_mask)) {
                 _helpShortcutLatched = false;
             }
             break;
@@ -911,8 +934,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
                     false,
                     event.When());
 
-            if ((_mask &
-                 (EPBM_SELECT | EPBM_R2)) == 0) {
+            if (GlobalAudioReleased(_mask)) {
                 _audioShortcutLatched = false;
             }
             break;
@@ -928,9 +950,6 @@ bool AppWindow::onEvent(GUIEvent &event) {
 
     case ET_PADBUTTONDOWN: {
         _mask |= v;
-
-        const unsigned short audioCombo = EPBM_SELECT | EPBM_R2;
-        const unsigned short helpCombo = EPBM_SELECT | EPBM_R;
         /*
          * U2.42.0 DO_NOT_REPLACE_ACTIVE_MODAL:
          * keep the original global controls and Song combinations untouched.
@@ -979,7 +998,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
                 break;
             }
         }
-        if ((_mask & helpCombo) == helpCombo &&
+        if (GlobalHelpChord(_mask) &&
             _currentView) {
             if (!_helpShortcutLatched) {
                 _helpShortcutLatched = true;
@@ -1003,7 +1022,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
             break;
         }
 
-        if ((_mask & audioCombo) == audioCombo &&
+        if (GlobalAudioChord(_mask) &&
             _currentView && !_currentView->HasModal()) {
             if (!_audioShortcutLatched) {
                 _audioShortcutLatched = true;
@@ -1017,8 +1036,8 @@ bool AppWindow::onEvent(GUIEvent &event) {
 
         // TREEFROG_HELP_NAV_V14: same latch relaxation as the mask path.
         if (_helpShortcutLatched || _audioShortcutLatched) {
-            if ((_mask & helpCombo) != helpCombo &&
-                (_mask & audioCombo) != audioCombo) {
+            if (!GlobalHelpChord(_mask) &&
+                !GlobalAudioChord(_mask)) {
                 _helpShortcutLatched = false;
                 _audioShortcutLatched = false;
             } else {
@@ -1037,7 +1056,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
         if (_helpShortcutLatched) {
             if (_currentView)
                 _currentView->ProcessButton(_mask, false, event.When());
-            if ((_mask & (EPBM_SELECT | EPBM_R)) == 0) {
+            if (GlobalHelpReleased(_mask)) {
                 _helpShortcutLatched = false;
             }
             break;
@@ -1050,7 +1069,7 @@ bool AppWindow::onEvent(GUIEvent &event) {
              */
             if (_currentView)
                 _currentView->ProcessButton(_mask, false, event.When());
-            if ((_mask & (EPBM_SELECT | EPBM_R2)) == 0) {
+            if (GlobalAudioReleased(_mask)) {
                 _audioShortcutLatched = false;
             }
             break;

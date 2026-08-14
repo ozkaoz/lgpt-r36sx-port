@@ -30,7 +30,7 @@ from these views reaches rows 27..29; the DSP param table is unchanged.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VIEWS = ROOT / "source/sources/Application/Views"
+VIEWS = ROOT / "source/sources/Application/UI/Views"
 
 UIDRAW_H = (VIEWS / "BaseClasses/UiDraw.h").read_text()
 UIDRAW_CPP = (VIEWS / "BaseClasses/UiDraw.cpp").read_text()
@@ -220,57 +220,61 @@ def check_set_window_30():
 
 
 # ---------------------------------------------------------------------------
-# 8. MIX page: 9 meters, one cell, uniform spacing, inside 0..39
+# 8. MIX page: 9 meters (MST + 8 ch) one-cell columns, inside 0..39
 # ---------------------------------------------------------------------------
+# NOTE: updated for the golden baseline (Bacon 1.1.1 V16 + RC6, stereo
+# meters): layout constants are masterX=4, channel0X=8, channelPitch=4,
+# chLabelX=38, barHeight=15 (bars 5..19); each meter is a single cell
+# column (L/R drawn on the same x by drawMeterBar(side 0/1)).
 def check_mixer_meters():
-    draw = MIX_CPP[MIX_CPP.index("if (fxPage_==FX_PAGE_MIX)"):
-                   MIX_CPP.index("drawNotes()")]
-    assert "SONG_CHANNEL_COUNT+1" in draw          # 9 meters
-    assert "meterWidth=1" in draw
-    assert "meterPitch=3" in draw
-    assert "(meterCount-1)*meterPitch+meterWidth" in draw   # bankWidth 25
-    assert "firstMeterX" in draw
-    # Uniform positions: firstMeterX=7, pitch 3 -> all within 0..39.
-    first = 7
-    positions = [first + i * 3 for i in range(9)]
-    assert positions == [7, 10, 13, 16, 19, 22, 25, 28, 31]
+    draw = MIX_CPP[MIX_CPP.index("void MixerView::drawFxPages"):
+                   MIX_CPP.index("void MixerView::DrawView")]
+    assert "masterX=4" in draw and "channel0X=8" in draw
+    assert "channelPitch=4" in draw and "chLabelX=38" in draw
+    assert "barHeight=15" in draw
+    # 9 meters: 8 channels in a loop + 1 master bar.
+    assert "for (int i=0;i<SONG_CHANNEL_COUNT;i++)" in draw
+    assert "drawVolumeBar(i,channel0X+i*channelPitch,labelY,barHeight)" in draw
+    assert "drawMasterBar(masterX,labelY,barHeight)" in draw
+    # Uniform positions: MST at 4, channels 8..36 pitch 4 -> 9 columns,
+    # all inside 0..39, no overlap.
+    positions = [4] + [8 + i * 4 for i in range(8)]
+    assert positions == [4, 8, 12, 16, 20, 24, 28, 32, 36]
     assert all(0 <= p <= 39 for p in positions)
     assert len(set(positions)) == 9
-    assert all(positions[i + 1] - positions[i] == 3 for i in range(8))
-    # Bars are drawn one cell per row (single column).
+    assert all(positions[i + 1] - positions[i] == 4 for i in range(8))
+    # One-cell column per meter: stereo bars share the x (drawMeterBar side
+    # 0/1); labels and volume numbers are centered at x-1 over the axis.
     bar = MIX_CPP[MIX_CPP.index("void MixerView::drawVolumeBar"):
                   MIX_CPP.index("void MixerView::drawMasterBar")]
     mbar = MIX_CPP[MIX_CPP.index("void MixerView::drawMasterBar"):
                    MIX_CPP.index("void MixerView::cycleFxPage")]
-    for seg in (bar, mbar):
-        assert "totalCells=height" in seg
-        assert "2*height" not in seg
-        assert "DrawString(x,y+1+row" in seg
-    # Channel labels and volume numbers are drawn at x-1 (centered over the
-    # 1-cell meter axis); the master "MST" label keeps its x-1 rule too.
+    # F3-4b: the L/R levels come from the MixerMeters layer.
+    assert "drawMeterBar(x,y,height,meters_.LevelL(channel)" in bar
+    assert "drawMeterBar(x,y,height,meters_.LevelR(channel)" in bar
     assert "DrawString(x-1,y,hex,props)" in bar
     assert "DrawString(x-1,y+height+2" in bar
     assert "DrawString(x-1,y,\"MST\",props)" in mbar
-    print("8. 9 single-cell meters uniformly spaced in 0..39 OK")
+    assert "meterRecords_[SONG_CHANNEL_COUNT]" in mbar   # master meter slot
+    print("8. 9 one-column meters (8ch pitch 4 + MST) in 0..39 OK")
 
 
 # ---------------------------------------------------------------------------
 # 9. Mixer block layout: centered vertically, FX RETURNS own row, no 27..29
 # ---------------------------------------------------------------------------
 def check_mixer_block_bounds():
-    draw = MIX_CPP[MIX_CPP.index("if (fxPage_==FX_PAGE_MIX)"):
-                   MIX_CPP.index("drawNotes()")]
-    # Constants used by the block.
-    assert "labelY=6" in draw and "barHeight=12" in draw
+    draw = MIX_CPP[MIX_CPP.index("void MixerView::drawFxPages"):
+                   MIX_CPP.index("void MixerView::DrawView")]
+    # Constants used by the block (Bacon 1.1.1 V16: header 3, labels 4,
+    # bars 5..19, volumes 21, pan/mute row 22).
+    assert "labelY=4" in draw and "barHeight=15" in draw
     assert "numY=labelY+barHeight+2" in draw
-    assert "muteY=numY+1" in draw
-    assert "retY=muteY+1" in draw
-    # The whole block stays inside the safe band: labels 6, bars 7..18,
-    # numbers 20, mute 21, FX RETURNS 22 -- never rows 26..29.
-    label_y, bar_h = 6, 12
+    assert "retY=3" in draw
+    # The whole block stays inside the safe band: FX RETURNS 3, labels 4,
+    # bars 5..19, numbers 21, pan 22 -- never rows 26..29.
+    label_y, bar_h = 4, 15
     num_y = label_y + bar_h + 2
-    mute_y = num_y + 1
-    ret_y = mute_y + 1
+    ret_y = 3
     assert label_y >= KBAND_TOP
     assert bar_h <= KBAND_BOT - label_y
     assert ret_y <= KBAND_BOT
@@ -280,7 +284,7 @@ def check_mixer_block_bounds():
     assert "void MixerView::drawMixReturns(int y)" in MIX_CPP
     # Nothing on these pages reaches the footer rows 27..29.
     for seg_name, start_marker, end_marker in (
-            ("MIX", "if (fxPage_==FX_PAGE_MIX)", "drawNotes()"),
+            ("MIX", "void MixerView::drawFxPages", "void MixerView::DrawView"),
             ("DELAY", "void MixerView::drawDelayPage", "void MixerView::drawReverbPage"),
             ("EQ", "void MixerView::drawEqPage", "void MixerView::drawCompPage"),
             ("COMP", "void MixerView::drawCompPage", "void MixerView::drawMixReturns")):
@@ -323,6 +327,8 @@ def check_bypass_columns():
 # 11. DSP ranges / defaults / enum unchanged by the layout refactor
 # ---------------------------------------------------------------------------
 def check_dsp_table_unchanged():
+    # F3-4a: the FxParamSpec table + enums moved to FxPages.h.
+    FXP = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
     # The FxParamSpec table keeps every range/default (layout only changed).
     specs = [
         ("{ \"DLY TIM\"", "10.0f, 2000.0f"),
@@ -338,18 +344,18 @@ def check_dsp_table_unchanged():
         ("{ \"CMP REL\"", "1.0f, 2000.0f, 200.0f"),
     ]
     for label, rest in specs:
-        idx = MIX_CPP.index(label)
-        assert rest in MIX_CPP[idx:idx + 90], (label, rest)
+        idx = FXP.index(label)
+        assert rest in FXP[idx:idx + 90], (label, rest)
     # FxParamId enum order is unchanged (bypass last per page, band EN first).
-    e = MIX_H.index("enum FxParamId")
-    assert MIX_H.index("FX_P_DLY_BYP", e) > MIX_H.index("FX_P_DLY_TIME", e)
-    assert MIX_H.index("FX_P_RVB_BYP", e) > MIX_H.index("FX_P_RVB_PRE", e)
-    assert MIX_H.index("FX_P_EQ_LOW_EN", e) > MIX_H.index("FX_P_EQ_BYP", e)
-    assert MIX_H.index("FX_P_CMP_BYP", e) > MIX_H.index("FX_P_EQ_HI_Q", e)
-    assert MIX_H.index("FX_P_CMP_SC", e) > MIX_H.index("FX_P_CMP_BYP", e)
+    e = FXP.index("enum FxParamId")
+    assert FXP.index("FX_P_DLY_BYP", e) > FXP.index("FX_P_DLY_TIME", e)
+    assert FXP.index("FX_P_RVB_BYP", e) > FXP.index("FX_P_RVB_PRE", e)
+    assert FXP.index("FX_P_EQ_LOW_EN", e) > FXP.index("FX_P_EQ_BYP", e)
+    assert FXP.index("FX_P_CMP_BYP", e) > FXP.index("FX_P_EQ_HI_Q", e)
+    assert FXP.index("FX_P_CMP_SC", e) > FXP.index("FX_P_CMP_BYP", e)
     # Mixer FxPage order untouched.
-    assert MIX_H.index("FX_PAGE_MIX") < MIX_H.index("FX_PAGE_DELAY")
-    assert MIX_H.index("FX_PAGE_COMP") < MIX_H.index("FX_PAGE_COUNT")
+    assert FXP.index("FX_PAGE_MIX") < FXP.index("FX_PAGE_DELAY")
+    assert FXP.index("FX_PAGE_COMP") < FXP.index("FX_PAGE_COUNT")
     print("11. DSP ranges/defaults and FxParamId/FxPage enums unchanged OK")
 
 
@@ -360,7 +366,7 @@ def check_footer_band():
     # drawMap/drawNotes intentionally own rows 26..29 (View.cpp); the menu
     # blocks of the Mixer and its pages must never reach them.
     block_max_row = {
-        "MIX": 22,       # FX RETURNS row
+        "MIX": 22,       # pan row (y+height+3 = 22)
         "DELAY": 17,
         "REVERB": 17,
         "EQ": 21,

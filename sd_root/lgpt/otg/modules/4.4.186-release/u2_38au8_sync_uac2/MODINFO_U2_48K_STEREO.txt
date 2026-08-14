@@ -1,0 +1,8 @@
+filename:       /mnt/d/R36S/PORT LPTRACKER/BUILD/U2414_48K_STEREO/usb_f_uac2_u2_48k_stereo.ko
+author:         Jaswinder Singh
+author:         Yadwinder Singh
+license:        GPL
+alias:          usbfunc:uac2
+r36sx_build:    R36SX_U2_48K_STEREO_2026
+depends:        
+vermagic:       4.4.186-release preempt MIPS32_R2 32BIT 

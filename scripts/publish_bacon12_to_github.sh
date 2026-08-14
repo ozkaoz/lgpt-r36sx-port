@@ -20,9 +20,9 @@ TMP_ROOT=""
 mkdir -p "$LOG_ROOT" "$BACKUP_ROOT"
 exec > >(tee -a "$LOG") 2>&1
 
-CORE_SHA256="d3178aab497ea94e4c41ea3323ffabffb63efc19237e7fcc11868e8f4b5b8826"
-DAEMON_SHA256="53258f2b8b3749c866af248814eb147f0762a1b17cfffb644adb573167b52815"
-SP404_SHA256="b75a2477226ac25a45a80911c73bb5915555c0d748748214dbb96219d088cda1"
+CORE_SHA256="c1ffe58977bcf48a643b2938b59c0c247812ae4f4a96ab9bb6c493c370ed17cd"
+DAEMON_SHA256="29fb293b2a7da54e5afc1641939f91891bf005efbc22854df6ac821fcc88543b"
+SP404_SHA256="810bdc53b6f712193285d490db15fffabb28ddffaeaf992e1d8949be01d85844"
 MIDI_SHA256="3f0ea7a23db7390f1fb3b73cbda97f66316c6568d0c7574b838579a014baee80"
 APK_SHA256="89a99d50571948788f1f0d2a3c1ebf313e6bf7a531874b5fc0885ba754ef1c3a"
 
@@ -206,7 +206,7 @@ validate_tree() {
   [[ -s "$sd_root/lgpt/otg/H38_7_ABI7_THREE_MODE.txt" ]] || fail "H38.7 marker missing in SD payload"
   grep -F 'VERSION=H38.7_ABI7_BACON12_MIXER_DEV' "$sd_root/lgpt/otg/H38_7_ABI7_THREE_MODE.txt" >/dev/null ||
     fail "H38.7 marker content invalid"
-  grep -F 'SP404_DAEMON_SHA256=b75a2477226ac25a45a80911c73bb5915555c0d748748214dbb96219d088cda1' "$sd_root/lgpt/otg/H38_7_ABI7_THREE_MODE.txt" >/dev/null ||
+  grep -Fi 'SP404_DAEMON_SHA256=810bdc53b6f712193285d490db15fffabb28ddffaeaf992e1d8949be01d85844' "$sd_root/lgpt/otg/H38_7_ABI7_THREE_MODE.txt" >/dev/null ||
     fail "H38.7 marker SP404 sha missing"
 
   grep -F 'BACON_1.2_MIXER_DEV' \

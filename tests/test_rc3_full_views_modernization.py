@@ -16,10 +16,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "source/sources/Application"
-MV = (SRC / "Views/MixerView.cpp").read_text()
-IV = (SRC / "Views/InstrumentView.cpp").read_text()
-HR = (SRC / "Views/BaseClasses/HelpRegistry.cpp").read_text()
-CHO = (SRC / "Views/ModalDialogs/SampleChopperModal.cpp").read_text()
+MV = (SRC / "UI/Views/MixerView.cpp").read_text()
+IV = (SRC / "UI/Views/InstrumentView.cpp").read_text()
+HR = (SRC / "UI/Views/BaseClasses/HelpRegistry.cpp").read_text()
+CHO = (SRC / "UI/Views/ModalDialogs/SampleChopperModal.cpp").read_text()
 
 
 def check_mixerview_master():
@@ -69,19 +69,21 @@ def check_help_registry():
 
 
 def check_ascii_widget_allowlist():
-    # RC4 P6 (PLAN_RC4 11.7): the Chopper's structural frame is now drawn
-    # with solid CD_BORDER cells.  RC6: the Pitch/Env panel follows the
-    # port-wide menu language (centered title + label/value block), so only
-    # the intentional operation-progress overlay keeps an inverted ASCII box
-    # plus the `--`/`----` value placeholders.
-    # 1 box x 2 border lines = 2 `+----+` lines remain.
+    # RC6.1 (f141460): the Chopper operation overlay and the Pitch/Env panel
+    # use the port-wide graphical language (centered title + label/value
+    # block); no ASCII box of '+'/'-'/'|' remains in the chopper source.
+    # This is the baseline at Bacon 1.2.1: 0 frames, placeholder is a
+    # space-padded line (not dashes).
     frames = CHO.count("+------")
-    assert frames == 2, frames
-    assert "----------- no sample loaded -----------" in CHO  # placeholder text
+    assert frames == 0, frames
+    # F3-3b: el placeholder vive en la capa pura ChopperView (dibujo 40x30);
+    # la vista lo pinta drenando la grilla.
+    assert "no sample loaded" in (SRC / "UI/Views/ModalDialogs/ChopperView.h").read_text()
+    assert "ChopperView::DrawEmptyWaveformText(grid)" in CHO
     for view in (MV, IV):
         assert "=====" not in view and "+-----" not in view
         assert not __import__("re").search(r'"[^"]*\*{3}[^"]*"', view)
-    print("ASCII widget allowlist: 1 Chopper operation overlay, no others OK")
+    print("ASCII widget allowlist: 0 Chopper ASCII boxes (RC6.1), no others OK")
 
 
 check_mixerview_master()

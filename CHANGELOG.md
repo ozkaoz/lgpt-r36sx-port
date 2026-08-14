@@ -1,138 +1,64 @@
 # Changelog
 
-## U2.52.8 - Fix dlopen (revert `-Bsymbolic-functions`) + swap de botones R1+A / SELECT (2026-08-11) - core `ae290ba4` + install SD
+## Release: Bacon 1.2 U2.72 - Mixer (final) - estabilización total 48k stereo
 
-- **Motivo**: el core `ed7f7266` (liga con `-Wl,-Bsymbolic-functions`) crashea
-  en dlopen antes de `retro_init` (`SIG=11 f0 addr=0x00000000 pc=0xe0d98` en
-  `LGPT_U2524_COPYROOT_UAC2_LAUNCHER.log`; `boot_debug.log` sin
-  `retro_init.enter`). El build sin el flag (`95852a1b`/`a2eef511`) sí pasaba
-  dlopen, así que el flag era el responsable del crash, no el loader.
-- **Cocina**: revertidas las `LDFLAGS` del Makefile.TREEFROG a las stock. Con
-  el ligado stock el slot GOT de `sfReader::FillSampleBucket` queda bien
-  enlazado sin parches: `lw t9,-26296(gp)` → slot `0x147ea8` = `0x000db914` =
-  `RIFFRead` (y `-27724` → `resetSampleCollector`, `-28256` → `CloseRIFF`).
-  Verificado en el binario final: 24 exports `retro_*`, strings del paquete
-  presentes. Build limpio completo determinista (mismo md5 en rebuild
-  incremental y en rebuild from scratch) con 0 warnings, 0 errores.
-- **Botones** (fuentes): `R1+A` → nombre aleatorio (`OnRandomize()` en
-  `TreeFrogTextEditor.cpp`, status "Random name (R1+A again for another)");
-  `SELECT` en la lista de proyectos → menú `PROJECT ACTIONS`
-  (Rename/Export/Delete) en `SelectProjectDialog.cpp`. Se retiró el combo
-  `R+A` del menú de acciones.
-- **Instalación en SD** (G:): core `lgpt_r36sx_port_libretro.so` =
-  `ae290ba43d4b7452609c9449f3e5c535` en `cubegm\cores`, backups en
-  `lgpt_r36sx_port_libretro.ed7f7266.so.bak` (core crash) y
-  `BACKUPS\LGPT_BEFORE_BSYMBOLIC_20260811_0013\` (a2eef511) y
-  `lgpt_r36sx_port_libretro.d22d2f12.so.bak` (95852a1b).
-- **Pendiente en device**: validar dlopen + los 3 combos (R1+A random,
-  SELECT acciones, R1+LEFT cancelar) y el flujo Windows-host.
+- **Estado**: release final del port `stabilize-bacon-1.2.1` (rama
+  `stabilize-bacon-1.2.1`), ABI7, audio 48 kHz stereo en los cuatro modos
+  (Local / Windows / Android / Sampler SP404MKII). Prueba de campo completa
+  superada: switches directos repetidos entre los cuatro modos y sesiones
+  continuas sin crash, sin stall del Sampler y sin detour manual por Android.
+- **U2.72 H43** (`7df42da`):
+  - Core: `signal(SIGPIPE, SIG_IGN)` en `retro_init` - el core moría al
+    entrar a Sampler porque el daemon SP404 (único lector del FIFO
+    `O_WRONLY|O_NONBLOCK`) se eliminaba durante el cambio de modo y el write
+    disparaba SIGPIPE. Ahora el cambio SP404->Local/Windows/Android no tumba
+    el core.
+  - Bridge: tracking del FIFO abierto (`g_fifo_open_path`) y
+    `fifo_compatible_with_mode()`; el fast-apply del cambio de driver solo se
+    ejecuta si el FIFO abierto es el correcto; si no, cierra el FIFO y fuerza
+    el apply completo de perfil. Elimina el bloqueo SP404->Windows que
+    exigía el detour por Android.
+  - Daemon SP404: tope de corrección ASRC 30.000->1.200 ppm (el pitch
+    audible provenía del control golpeando +/-1% al barrer los bursts del
+    core), EMA 15/16 del backlog de control (filtra el "peloteo" del ring),
+    hold floor de 2.400 frames en `asrc_prepare_period` (nunca drena el ring
+    a cero) y bookkeeping real del REENUM con salida del daemon tras 8
+    intentos fallidos (`SP404_REENUM_EXHAUSTED`) liberando el rol musb host
+    para que el supervisor reintente por backoff normal.
+  - El pitch residual del modo Sampler (~+0,3%) es inherente al reloj
+    ADAPTIVE del SP404 y se compensa con el ASRC (inaudible).
+- **U2.71 H39+H40/H41/H42** (`d1c36c9`): presupuesto wall-clock de la SD,
+  staging de escrituras parciales (sin escrituras a SD en runtime), micro-ASRC
+  PI en el daemon Windows (`r36s_u241_usb_audio_io`), y el par de fixes de
+  ASRC de Sampler.
+- **U2.70** (`713913f`): ASRC FIR16 Lanczos-8 (tabla limpia, fila 79==81
+  corregida) + selector `ASRC_FIR_TAPS` A/B en ambos drivers.
+- **U2.69** (`be8cdcb`): ASRC drift fix para Sampler/SP404 (sin bypass,
+  límites ampliados, integral 3->12, backlog 2.400->3.600) + sync del payload
+  Bacon-1.2.
 
-## Fix UAC2: mis-binding GOT sfReader.RIFFRead (2026-08-11) - core `ed7f7266` + install SD U2.52.3
+## Update: Bacon 1.2 U2.69 - ASRC drift fix (Sampler / SP404MKII)
 
-- **Motivo**: crash reproducible del port al cargar soundfonts (pc `0xded98`,
-  `sfReader::FillSampleBucket`). El linker bfd mips de la toolchain buildroot
-  enlazó el `R_MIPS_CALL16` de `RIFFRead` al símbolo `RIFFOpen` (slot GOT
-  `0x147eb8` = `0x000db77c` en el build `d22d2f12`/`95852a1b`); el core bueno
-  de referencia (1.2.1) enlaza `RIFFRead` y no había relocs `R_MIPS_JUMP_SLOT`
-  que corregir en carga. Los fuentes eran idénticos entre ambos builds (md5
-  `7d7d76ad`), así que el responsable era la ligazón dinámica, no el loader.
-- **Cocina**: `-Wl,-Bsymbolic-functions` en `LDFLAGS` de
-  `projects/Makefile.TREEFROG` (línea LDFLAGS). Verificado estático: el slot
-  GOT de `FillSampleBucket` queda en `0x147c9c` = `0x000db910` = `RIFFRead`
-  correcto; 24 exports `retro_*` intactas. Rebuild completo limpiando `.o`
-  (el build no es determinista: `95852a1b` ≠ `d22d2f12`, pero la zona de crash
-  era idéntica en ambos; con `-Bsymbolic-functions` el binding es correcto).
-- **Instalación en SD** (G:): core `lgpt_r36sx_port_libretro.so` =
-  `ed7f7266ac0fa6a1f673ab914d91b5fd` en `cubegm\cores`, backup previo en
-  `BACKUPS\LGPT_BEFORE_BSYMBOLIC_20260811_*`. Daemons y scripts OTG de la SD
-  verificados md5-idénticos a `BUILD\U2523` y `device\` (incluye
-  `cubegm\lgpt` = `lgpt_launcher_u241.sh`).
-- **Pendiente en device**: reproducir flujo Windows-host (modo Windows) con
-  reproducción activa y shutdown limpio (flush `LGPT_OTG_LOGS`) para
-  diagnosticar "USB warming" (marker=0) sin flujo de audio; el sampler driver
-  ya funciona OK.
-
-## Ops: Paquete ciclo de vida de SD (2026-08-06) - U2.54b C++ logs a RAM y shutdown visible
-
-- **Motivo**: cerrar el paquete U2.54. Quedaban escritores C/C++ con rutas
-  hardcodeadas a la SD (core, bridge y daemons) y el apagado limpio no era
-  visible en la consola: el usuario salía de LGPT al menú sin saber si la SD
-  estaba sincronizada.
-- **Cocina: migrados a tmpfs los escritores C++** (todos respetan las rutas
-  de destino que `collect_logs.sh` lee del host tras el flush):
-  - `TreeFrogLibretro.cpp` `boot_diag_log()`: `boot_debug.log` →
-    `/tmp/r36sx_lgpt_logs/` (RAM).
-  - `TreeFrogUac2Bridge.cpp`: `kLog` (`uac2_bridge_lgpt.log`),
-    `kRuntimeMirrorDir` (`runtime_state`) y el log de setup del fork → RAM
-    (`/tmp/r36sx_lgpt_logs` y `/tmp/r36sx_lgpt_logs/mirror`); el destino SD
-    final tras el flush es idéntico al anterior. El fallback `/tmp` del setup
-    se conserva para FAT montada RO.
-  - Daemons `r36s_u2523_usb_audio_io.c` / `r36s_sp404_host_audio_io.c`:
-    `mirror_runtime_state()` escribe en
-    `/tmp/r36sx_lgpt_logs/mirror/runtime_state` (antes cada cambio de estado
-    hacía writes+mkdirs en `/mnt/sdcard/lgpt/otg/logs/runtime_state`);
-    `FIFO_DUMP_DIR` (dump diagnóstico del SP404) → RAM.
-  - Se conservan en SD las configuraciones legítimas de baja frecuencia:
-    `LOWLAT_SENTINEL`, `audio_driver_mode`, `CAPTURE_STAGING_DIR` (grabaciones
-    USB del usuario) y volume/branch persistidos del bridge.
-- **Shutdown visible (SHUTDOWN_VISIBLE)**: `AppWindow::ShowShutdownNotice()`
-  (toast público) y máquina de fases en `retro_run`: al salir del juego el
-  core muestra "Syncing SD... don't power off" (~1 s) y luego
-  "SD synced. Power off from the menu" antes de `RETRO_ENVIRONMENT_SHUTDOWN`.
-- **Flush en el launcher**: `lgpt_launcher_u241.sh` ya no hace `exec` de
-  picoarch; al retornar ejecuta `u2414_flush_logs_to_sd()` + `sync` (best-
-  effort: FAT RO no bloquea la vuelta al menú). La SD solo se escribe una vez
-  por ciclo de sesión, en el punto en que el usuario vuelve al menú.
-- **Precaución**: los binarios ARM de los daemons (`sd_root/lgpt/otg/bin/`)
-  deben recompilarse en consola desde `device/*.c` (el binario de la tarjeta
-  empaquetada sigue siendo el antiguo).
-- **Validado**: `sh -n` OK en los 17 scripts, `tests/test_copy_root_launcher.sh`
-  pasa (asserts nuevos: `PICO_EXIT=0` y `LAUNCHER_FLUSH_DONE=1`). El core no
-  se compiló en este host (cruza a ARM), el build se hace en consola.
-
-## Ops: Paquete ciclo de vida de SD (2026-08-06) - U2.54 RAM-first logging
-
-- **Motivo**: tres memorias SD dañadas durante el desarrollo. La causa del
-  desgaste acelerado no es el firmware sino la topología de escrituras: el
-  launcher (`exec picoarch >> $LOG`), los daemons, supervisores y scripts
-  hacían appends continuos byte-a-byte sobre `LGPT_OTG_LOGS` durante toda la
-  sesión, más el desgaste por atime del montaje.
-- **Cambio**: los logs de runtime ahora viven en tmpfs (RAM)
-  (`/tmp/r36sx_lgpt_logs`) en: `lgpt_launcher_u241.sh`, `otg_u241_common.sh`,
-  `otg_u241_setup_once.sh`, `otg_u241_apply_profile_once.sh`,
-  `otg_u241_shutdown.sh`, `otg_h37_host_runtime_supervisor.sh`,
-  `otg_h37_host_device_detect.sh`, `otg_h37_android_runtime_supervisor.sh`.
-- **Flush único al apagado**: `otg_u241_shutdown.sh` llama a
-  `u2414_flush_logs_to_sd()` (en `otg_u241_common.sh`), que copia el árbol RAM
-  a `LGPT_OTG_LOGS` y al mirror `lgpt/otg/logs` (rutas que lee
-  `collect_logs.sh`) en una sola ráfaga contigua + `sync`. El diagnóstico no
-  se pierde en apagado limpio; solo un apagado brusco pierde la última sesión.
-- **noatime**: `lgpt_launcher_u241.sh` remonta el root de la SD con
-  `noatime` best-effort si es un mountpoint real (arkOS ya usa noatime;
-  fallback silencioso en host).
-- **Override preservado**: `LGPT_LOGROOT` sigue permitiendo forzar el destino
-  de logs (tests, instalación). `tests/test_copy_root_launcher.sh` ahora
-  verifica que el default sea tmpfs y usa el override para el run.
-- **Nota**: el core C++ todavía escribe `boot_debug.log`/`uac2_bridge_lgpt.log`
-  en `/mnt/sdcard/LGPT_OTG_LOGS` (path hardcodeado); son archivos discretos,
-  no streams. Reubicarlos exigiría recompilar el core y queda fuera de este
-  paquete.
-- **Validado**: `sh -n` OK en los 17 scripts (device + sd_root + test) y
-  `tests/test_copy_root_launcher.sh` pasa.
-
-## Ops: Incidente de SD (2026-08-06) - Recuperacion y Runbook
-
-- **Incidente**: la SD de la R36SX quedo ilegible tras insertarla en la
-  consola. El controlador empezo a reportar 3,94 GB (antes 29,3 GB),
-  lecturas en bruto `0xFF` y errores CRC a partir de ~4 GB, y no fue
-  posible crear particion ("Not enough available capacity").
-- **Causa raiz**: degradacion del controlador fisico de la tarjeta, no una
-  FAT sucia. No se puede ampliar la capacidad del controlador por software.
-- **Recuperacion**: `clean all` + reinsertado fisico + particion al maximo
-  reportado + FAT32 + restauracion desde `BACKUPS/SD_FULL_BACKUP_*`.
-- **Registrado en**: `docs/RUNBOOK_RECUPERACION_SD_ES.md` (paso a paso,
-  diagnostico, lazy de datos a futura.)
-
+- **Estado**: actualización de la pre-release Bacon 1.2 (Mixer Dev).
+  Elimina los tirones audibles (~2/s) que producía el daemon
+  `r36s_sp404_host_audio_io` en el modo Sampler con SP404MKII.
+- **Causa raíz**: el ASRC usaba un bypass passthrough 1:1 cuando ambas tasas
+  eran 48 kHz (`ASRC_PASSTHROUGH_NOW`), con step fijo = 1.0. El reloj real del
+  fifo del core (~47.784 f/s) difiere del device (48.000 f/s) en ~4.500 ppm;
+  sin corrección el backlog se drenaba y el daemon insertaba períodos de 480
+  frames en cero (10 ms de silencio) cada ~2.2 s.
+- **Fix**: el lazo ASRC P/I (FIR8 160 fases + control proporcional/integral de
+  backlog) ahora se ejecuta SIEMPRE, sin bypass. Límites ampliados de ±1.200
+  ppm a ±10.000 ppm (cubren la deriva real), ganancia integral 3->12
+  (convergencia ~3-4 s), backlog objetivo 2.400->3.600 frames. Los tirones
+  desaparecen y la corrección resultante (~0,45 % de resampleo) es inaudible.
+- **Fuente/daemon**: `device/r36s_sp404_host_audio_io.c` - SP404 daemon
+  `810bdc53b6f712193285d490db15fffabb28ddffaeaf992e1d8949be01d85844`.
+- **Supervisor**: `otg_h37_host_runtime_supervisor.sh` ahora usa `cp -f` en el
+  flush de logs (antes `cp -u` nunca sobrescribía por el mtime 1970 vs 1980 de
+  FAT sin RTC) - logs frescos llegan siempre a `LGPT_OTG_LOGS/`.
+- **Core 2CH FIFO FIX U2.68**: `c1ffe58977bcf48a643b2938b59c0c247812ae4f4a96ab9bb6c493c370ed17cd`.
+- **Label**: `H38.7_ABI7_BACON12_MIXER_DEV_2CH_FIFO_FIX_U2.69_ASRC_DRIFT_FIX`.
 ## Update: Bacon 1.2.1 U2.52.7 - Per-instrument 8-Band EQ + Live Spectrum
 
 - **Estado**: actualización de la pre-release Bacon 1.2.1 (Chopper UAF

@@ -1,4 +1,7 @@
 #include "Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.h"
+#include "Application/Audio/AudioDriverModeTable.h"
+#include "Application/Audio/AudioRouter.h"
+#include "Application/Audio/AudioEngine.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -97,6 +100,11 @@ enum {
 };
 
 static int g_fifo_fd = -1;
+/* H43: path of the FIFO currently held by g_fifo_fd (device_out_fifo result).
+ * Used to reject a "fast apply" when the open FIFO belongs to a different
+ * device than the newly selected mode (e.g. SP404 FIFO still open while the
+ * user selects Windows).  Device FIFO path strings are static literals. */
+static const char *g_fifo_open_path = 0;
 static int g_setup_started = 0;
 static int g_setup_attempts = 0;
 static long long g_last_setup_attempt_ms = -1000000;
@@ -120,6 +128,18 @@ static unsigned g_resample_phase_160 = 0;
 enum { U2514_RESAMPLE_INPUT_CAPACITY_FRAMES = 8192 };
 static int16_t g_resample_input[U2514_RESAMPLE_INPUT_CAPACITY_FRAMES * 2];
 static unsigned g_resample_input_fill_frames = 0;
+/* H40: bounded staging for partial fifo writes. The fifo is O_NONBLOCK;
+ * when the daemon is momentarily behind, write() can accept a fraction of
+ * the block (or nothing). Previously the remainder was silently dropped,
+ * which clipped ~20-40 ms of audio on every backpressure event. The staged
+ * buffer keeps the remaining samples and retries from the front on the
+ * next submit; the cap bounds worst-case added latency (~341 ms at
+ * 48 kHz stereo) and overflow drops the OLDEST samples, never the newest. */
+enum { H40_FIFO_PENDING_CAP_SAMPLES = 16384 };
+static int16_t g_fifo_pending[H40_FIFO_PENDING_CAP_SAMPLES];
+static unsigned g_fifo_pending_samples = 0;
+static unsigned long g_fifo_pending_drop_frames = 0;
+static unsigned long g_fifo_pending_stage_events = 0;
 static int g_usb_channels = 1;
 static int g_usb_rate = 48000;
 static int g_engine_rate = 48000;
@@ -160,15 +180,10 @@ static const char *kNoMute = "/mnt/sdcard/lgpt/otg/disable_mute_local";
 static const char *kU2430BuildMarker =
     "R36SX U2.51.7 MONITOR FIFO HANDSHAKE FILENAME EDITOR CORE";
 static const char *kFifo = "/tmp/r36sx_uac2_bridge_fifo";
-/* SD lifecycle U2.54b: session logs live in the RAM log tree; the launcher
- * flushes /tmp/r36sx_lgpt_logs to /mnt/sdcard/LGPT_OTG_LOGS once when
- * picoarch returns (the destination path on the card is unchanged). */
 static const char *kLog = "/tmp/r36sx_lgpt_logs/uac2_bridge_lgpt.log";
 static const char *kActiveMarker = "/tmp/r36sx_uac2_usb_active";
 static const char *kRuntimeDir = "/tmp/r36sx_lgpt_usb";
 static const char *kDaemonPid = "/tmp/r36sx_lgpt_usb/daemon_pid";
-/* SD lifecycle U2.54b: runtime-state mirror in RAM; the single SD flush at
- * exit persists it to /mnt/sdcard/LGPT_OTG_LOGS/runtime_state as before. */
 static const char *kRuntimeMirrorDir = "/tmp/r36sx_lgpt_logs/runtime_state";
 static const char *kCaptureCmd = "/tmp/r36sx_lgpt_usb/usb_capture_cmd";
 static const char *kCaptureStatus = "/tmp/r36sx_lgpt_usb/usb_capture_status";
@@ -430,53 +445,18 @@ static int marker_fresh(const char *p, int max_age_sec) {
     return (now - st.st_mtime) <= max_age_sec;
 }
 
-static const char *mode_name(int mode) {
-    switch (mode) {
-    case U241_WINDOWS: return "Windows";
-    case U241_ANDROID: return "Android";
-    case U241_USB_OUT: return "Sampler";
-    case U241_SP404_IN: return "Sampler";
-    case U241_MIDI: return "MIDI";
-    case U241_LOCAL_CONSOLE:
-    default: return "Local Console";
-    }
-}
+// F4a: delegados a la tabla declarativa de modos (Application/Audio/
+// AudioDriverModeTable.h, docs/F4_ARCHITECTURE_ES.md).  Los ids del enum
+// U241_* son identicos a kAudioDriverMode*; el comportamiento (incluido el
+// fallback default = LOCAL_CONSOLE) es byte-identico al de los switches
+// originales (golden Bacon 1.2.1).
+static const char *mode_name(int mode) { return AudioDriverModeName(mode); }
 
-static const char *mode_token(int mode) {
-    switch (mode) {
-    case U241_WINDOWS: return "USB_DUPLEX";
-    case U241_ANDROID: return "USB_IN";
-    case U241_USB_OUT: return "USB_OUT";
-    case U241_SP404_IN: return "SP404_IN";
-    case U241_MIDI: return "MIDI";
-    case U241_LOCAL_CONSOLE:
-    default: return "LOCAL_CONSOLE";
-    }
-}
+static const char *mode_token(int mode) { return AudioDriverModeToken(mode); }
 
-static const char *policy_token(int mode) {
-    switch (mode) {
-    case U241_WINDOWS: return "USB_DUPLEX_OTG";
-    case U241_ANDROID: return "USB_IN_OTG";
-    case U241_USB_OUT: return "USB_OUT_OTG";
-    case U241_SP404_IN: return "USB_OUT_OTG";
-    case U241_MIDI: return "MIDI_OTG";
-    case U241_LOCAL_CONSOLE:
-    default: return "LOCAL_CONSOLE";
-    }
-}
+static const char *policy_token(int mode) { return AudioDriverModePolicyToken(mode); }
 
-static const char *branch_name_for_mode(int mode) {
-    switch (mode) {
-    case U241_WINDOWS: return "audio_driver_usb_duplex";
-    case U241_ANDROID: return "audio_driver_usb_in";
-    case U241_USB_OUT: return "audio_driver_usb_out";
-    case U241_SP404_IN: return "audio_driver_sp404_in";
-    case U241_MIDI: return "audio_driver_midi";
-    case U241_LOCAL_CONSOLE:
-    default: return "audio_driver_local_console";
-    }
-}
+static const char *branch_name_for_mode(int mode) { return AudioDriverModeBranchName(mode); }
 
 static void write_active_branch_file(int mode) {
     mkdir(kBranchRoot, 0777);
@@ -502,29 +482,11 @@ static void write_active_branch_file(int mode) {
 }
 
 static const char *mode_desc(int mode) {
-    switch (mode) {
-    case U241_WINDOWS:
-        return "Duplex UAC2 gadget (PC host)";
-    case U241_ANDROID:
-        return "Duplex UAC2 gadget (phone host)";
-    case U241_USB_OUT:
-        return "SP404: console sound to sampler (EXT SOURCE)";
-    case U241_SP404_IN:
-        return "SP404 IN: sampler->console, recording only";
-    case U241_MIDI:
-        return "MIDI: USB piano/controller";
-    case U241_LOCAL_CONSOLE:
-    default:
-        return "Console sound, OTG may stay connected";
-    }
+    return AudioDriverModeDescription(mode);
 }
 
 static int selectable_mode(int mode) {
-    return mode == U241_LOCAL_CONSOLE ||
-        mode == U241_WINDOWS ||
-        mode == U241_ANDROID ||
-        mode == U241_USB_OUT ||
-        mode == U241_MIDI;
+    return AudioDriverModeIsSelectable(mode);
 }
 
 static int mode_from_text(const char *s) {
@@ -588,8 +550,9 @@ static void au10z_write_text_file(const char *path, const char *text) {
 
 static void au10z_mirror_runtime_file(const char *leaf, const char *text) {
     if (!leaf || !leaf[0]) return;
-    /* SD lifecycle U2.54b: the mirror lives in the RAM log tree only; the
-     * exit flush creates the SD destination directories itself. */
+    /* H42: the mirror target is tmpfs (kRuntimeMirrorDir). The SD mkdirs
+     * below used to create FAT directory entries on every capture command;
+     * removed for the zero-runtime-SD-writes mandate. */
     mkdir(kRuntimeMirrorDir, 0777);
     char p[256];
     snprintf(p, sizeof(p), "%s/%s", kRuntimeMirrorDir, leaf);
@@ -704,15 +667,11 @@ static int detected_device(void) {
  * Windows gadget mode keeps its existing out+in semantics.
  */
 static int mode_has_out(int mode) {
-    if (mode == U241_USB_OUT) return !g_sampler_direction_in;
-    return mode == U241_WINDOWS;
+    return AudioDriverModeHasOut(mode, g_sampler_direction_in);
 }
 
 static int mode_has_in(int mode) {
-    if (mode == U241_USB_OUT) return g_sampler_direction_in;
-    return mode == U241_WINDOWS ||
-        mode == U241_ANDROID ||
-        mode == U241_SP404_IN;
+    return AudioDriverModeHasIn(mode, g_sampler_direction_in);
 }
 
 static const char *device_out_fifo(int device) {
@@ -1017,14 +976,14 @@ static int should_mute_now(void) {
      * U2.41.5.1 LOCAL_MIX_ISOLATION:
      * The project is always sent to Windows in USB_DUPLEX, including while
      * prelisten is active.  Mute only the local project mix; the PC monitor is
-     * added afterwards by MixUsbCaptureMonitorStereo44100().
+     * added afterwards by MixUsbCaptureMonitorStereo48000().
      */
     /*
      * U2.51.4 USB_EXCLUSIVE_RECORD_MONITOR:
      * When the OTG gadget is configured, the tracker project is routed to the
      * USB host and removed from the local mix.  The Record modal may still add
      * PC->console monitor audio afterwards through
-     * MixUsbCaptureMonitorStereo44100().  Therefore normal OTG playback is
+     * MixUsbCaptureMonitorStereo48000().  Therefore normal OTG playback is
      * heard only in Windows, while prelisten exists only inside Record.
      *
      * disable_mute_local is retained only as an explicit diagnostic override.
@@ -1035,10 +994,11 @@ static int should_mute_now(void) {
      * so routing audio to USB must not silence the console: the user hears
      * the project locally while the phone capture feeds the Record modal.
      */
-    if (g_driver_mode == U241_ANDROID) return 0;
-    return mode_has_out(g_driver_mode) &&
-           !nomute_file_present() &&
-           g_usb_raw;
+    // F4e: regla golden declarada en AudioEngine (U2.52.5 ANDROID_NO_MUTE +
+    // hasOut && !nomute && raw); el estado runtime viaja como parametros.
+    return AudioEngineShouldMute(
+        g_driver_mode, g_sampler_direction_in,
+        g_usb_raw, nomute_file_present());
 }
 
 static void reap_setup_child_nonblocking(void) {
@@ -1188,8 +1148,10 @@ static void close_fifo_if_open(const char *why) {
     if (g_fifo_fd >= 0) {
         close(g_fifo_fd);
         g_fifo_fd = -1;
+        g_fifo_open_path = 0;
         g_resample_phase_160 = 0;
         g_resample_input_fill_frames = 0;
+        g_fifo_pending_samples = 0;
         log_msg(why ? why : "fifo closed");
     }
 }
@@ -1224,6 +1186,7 @@ static void ensure_fifo_open_nonblocking(void) {
         return;
     }
     g_android_fifo_miss_start_ms = 0;
+    g_fifo_open_path = out_fifo;
     log_msg("fifo opened");
 }
 
@@ -1621,7 +1584,7 @@ static int capture_recording_active(void) {
     return strstr(g_capture_status, "recording") != 0 || strstr(g_capture_status, "rec start") != 0;
 }
 
-void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
+void TreeFrogUac2Bridge_SubmitStereo48000(const int16_t *stereo, int frames) {
 #if TREEFROG_UAC2_BRIDGE
     ++g_submit_count;
     if (!g_au11i2_build_marker_logged) {
@@ -1765,18 +1728,88 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
     }
 
     if (out_frames <= 0) return;
-    const size_t sample_count =
-        (size_t)out_frames * (size_t)g_usb_channels;
-    ssize_t written = write(
-        g_fifo_fd,
-        out,
-        sample_count * sizeof(int16_t));
-    if (written < 0) {
-        if (errno == EPIPE || errno == ENXIO || errno == EBADF)
-            close_fifo_if_open(
-                "fifo closed after hard write error");
-        else if ((g_submit_count % 240) == 0)
-            log_msg("fifo write nonfatal error");
+
+    /* H40: first drain any remainder of a previous partial write, so older
+     * audio is never overtaken by newer blocks. */
+    if (g_fifo_pending_samples > 0) {
+        const size_t pend_bytes =
+            (size_t)g_fifo_pending_samples * sizeof(int16_t);
+        const ssize_t n = write(g_fifo_fd, g_fifo_pending, pend_bytes);
+        if (n < 0) {
+            if (errno == EPIPE || errno == ENXIO || errno == EBADF) {
+                close_fifo_if_open(
+                    "fifo closed after hard write error (pending)");
+                return;
+            }
+            /* EAGAIN (or other nonfatal): keep staged, retry next submit. */
+        } else if (n > 0) {
+            const size_t consumed = (size_t)n / sizeof(int16_t);
+            if (consumed >= g_fifo_pending_samples) {
+                g_fifo_pending_samples = 0;
+            } else {
+                memmove(
+                    g_fifo_pending,
+                    g_fifo_pending + consumed,
+                    (size_t)(g_fifo_pending_samples - consumed) *
+                        sizeof(int16_t));
+                g_fifo_pending_samples -=
+                    (unsigned)(consumed);
+            }
+        }
+    }
+
+    {
+        const size_t sample_count =
+            (size_t)out_frames * (size_t)g_usb_channels;
+        ssize_t written = write(
+            g_fifo_fd,
+            out,
+            sample_count * sizeof(int16_t));
+        if (written < 0) {
+            if (errno == EPIPE || errno == ENXIO || errno == EBADF) {
+                close_fifo_if_open(
+                    "fifo closed after hard write error");
+                return;
+            }
+            written = 0; /* EAGAIN: stage the whole block below. */
+        }
+        const size_t w_samples =
+            (size_t)written / sizeof(int16_t);
+        if (w_samples < sample_count) {
+            size_t rem = sample_count - w_samples;
+            const int16_t *src = out + w_samples;
+            ++g_fifo_pending_stage_events;
+            if (rem > H40_FIFO_PENDING_CAP_SAMPLES) {
+                /* Pathological: even the newest block does not fit. Keep the
+                 * most recent tail, drop the rest (counted). */
+                src += rem - H40_FIFO_PENDING_CAP_SAMPLES;
+                g_fifo_pending_drop_frames +=
+                    (unsigned long)((rem - H40_FIFO_PENDING_CAP_SAMPLES) /
+                                    2u);
+                rem = H40_FIFO_PENDING_CAP_SAMPLES;
+            }
+            if ((size_t)g_fifo_pending_samples + rem >
+                H40_FIFO_PENDING_CAP_SAMPLES) {
+                const size_t excess =
+                    (size_t)g_fifo_pending_samples + rem -
+                    H40_FIFO_PENDING_CAP_SAMPLES;
+                memmove(
+                    g_fifo_pending,
+                    g_fifo_pending + excess,
+                    (size_t)(g_fifo_pending_samples - excess) *
+                        sizeof(int16_t));
+                g_fifo_pending_samples -= (unsigned)(excess);
+                g_fifo_pending_drop_frames +=
+                    (unsigned long)(excess / 2u);
+            }
+            memcpy(
+                g_fifo_pending + g_fifo_pending_samples,
+                src,
+                rem * sizeof(int16_t));
+            g_fifo_pending_samples += (unsigned)(rem);
+            if ((g_submit_count % 240) == 0)
+                log_msg("fifo backpressure: staged frames pending");
+        }
     }
 #else
     (void)stereo;
@@ -1784,7 +1817,7 @@ void TreeFrogUac2Bridge_SubmitStereo44100(const int16_t *stereo, int frames) {
 #endif
 }
 
-void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo44100(
+void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo48000(
     int16_t *stereo,
     int frames) {
 #if TREEFROG_UAC2_BRIDGE
@@ -1813,9 +1846,7 @@ void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo44100(
     }
 
     const double step =
-        (g_engine_rate > 0)
-            ? (double)g_usb_rate / (double)g_engine_rate
-            : 1.0;
+        AudioEngineMonitorStep(g_engine_rate, g_usb_rate);
 
     for (int i = 0; i < frames; ++i) {
         const unsigned frame_index =
@@ -1851,8 +1882,8 @@ void TreeFrogUac2Bridge_MixUsbCaptureMonitorStereo44100(
             ((double)r1 - (double)r0) * frac);
 
         /* Conservative monitor gain leaves headroom for local mixing. */
-        left = (left * 75) / 100;
-        right = (right * 75) / 100;
+        left = AudioEngineMonitorApplyGain(left);
+        right = AudioEngineMonitorApplyGain(right);
 
         stereo[i * 2] = clamp16(
             (int)stereo[i * 2] + left);
@@ -1949,14 +1980,30 @@ const char *TreeFrogUac2Bridge_GetDriverModeName(void) {
 #endif
 }
 
+/*
+ * H43 FIFO_MODE_COMPAT:
+ * A "fast apply" (pure core-routing switch) is only legal when the FIFO that
+ * is currently open belongs to the newly selected mode.  The Windows gadget
+ * contract can report ready while an open SP404 host FIFO is still active
+ * (SP404 daemon alive), and in the pre-H43 code the Windows fast-apply left
+ * the SP404 FIFO open, kept the SP404 daemon running and never ran the
+ * profile script -- the "Sampler -> Windows does not switch" report.
+ * Any mismatch forces the full apply path (profile script + supervisor
+ * handover), which tears the host role down and starts the target backend.
+ */
+static int fifo_compatible_with_mode(int mode) {
+    if (g_fifo_fd < 0) return 1;
+    if (mode == U241_LOCAL_CONSOLE) return 1;
+    if (g_fifo_open_path == 0) return 0;
+    return strcmp(g_fifo_open_path, kFifo) == 0;
+}
+
 const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
 #if TREEFROG_UAC2_BRIDGE
     if (!selectable_mode(mode)) return mode_name(mode);
 
-    const int effective =
-        (mode == U241_USB_OUT && g_sampler_direction_in)
-            ? U241_SP404_IN
-            : mode;
+    // F4c: mapeo efectivo golden en AudioRouter.
+    const int effective = AudioRouteEffectiveMode(mode, g_sampler_direction_in);
 
     if (g_driver_mode == mode) {
         if (effective != mode) write_mode_file(effective);
@@ -1980,10 +2027,7 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
      * If the gadget, daemon and FIFO are already present, changing LOCAL/USB
      * is a core routing decision.  Do not fork the profile script.
      */
-    if (g_driver_mode == U241_ANDROID ||
-        g_driver_mode == U241_USB_OUT ||
-        g_driver_mode == U241_SP404_IN ||
-        g_driver_mode == U241_MIDI) {
+    if (AudioRouteIsHostRoleMode(g_driver_mode)) {
         /*
          * U2.52 HOST_ROLE_MODE_ALWAYS_APPLY:
          * Host-role modes (Android AOA, SP404 sampler OUT/IN, MIDI) load ALSA
@@ -1997,11 +2041,12 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
         close_fifo_if_open("fifo closed host-role apply");
         launch_apply_profile_once(effective);
         log_msg("driver mode host-role apply requested");
-    } else if (runtime_ready_fast()) {
+    } else if (runtime_ready_fast() && fifo_compatible_with_mode(g_driver_mode)) {
         if (g_driver_mode == U241_LOCAL_CONSOLE)
             close_fifo_if_open("fifo closed fast local-console switch");
         log_msg("driver mode fast apply runtime-ready");
     } else {
+        close_fifo_if_open("fifo closed full apply");
         launch_apply_profile_once(effective);
         log_msg("driver mode setup apply requested");
     }
@@ -2015,15 +2060,15 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
 
 const char *TreeFrogUac2Bridge_CycleDriverMode(void) {
 #if TREEFROG_UAC2_BRIDGE
-    int next = (g_driver_mode + 1) %
-        TreeFrogUac2Bridge_GetDriverModeCount();
+    // F4c: secuencia del ciclo declarada en AudioRouter.
+    const int next = AudioRouteCycleNext(g_driver_mode);
     return TreeFrogUac2Bridge_SetDriverMode(next);
 #else
     return "DISABLED";
 #endif
 }
 
-int TreeFrogUac2Bridge_GetDriverModeCount(void) { return 5; }
+int TreeFrogUac2Bridge_GetDriverModeCount(void) { return AudioDriverModeCount(); }
 
 int TreeFrogUac2Bridge_GetSamplerDirectionIn(void) {
 #if TREEFROG_UAC2_BRIDGE

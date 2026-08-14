@@ -34,9 +34,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-IV_CPP = (ROOT / "source/sources/Application/Views/InstrumentView.cpp").read_text()
-UIH_CPP = (ROOT / "source/sources/Application/Views/BaseClasses/UIIntVarField.cpp").read_text()
-UIH_H = (ROOT / "source/sources/Application/Views/BaseClasses/UIIntVarField.h").read_text()
+IV_CPP = (ROOT / "source/sources/Application/UI/Views/InstrumentView.cpp").read_text()
+UIH_CPP = (ROOT / "source/sources/Application/UI/Views/BaseClasses/UIIntVarField.cpp").read_text()
+UIH_H = (ROOT / "source/sources/Application/UI/Views/BaseClasses/UIIntVarField.h").read_text()
 SI_H = (ROOT / "source/sources/Application/Instruments/SampleInstrument.h").read_text()
 SI_CPP = (ROOT / "source/sources/Application/Instruments/SampleInstrument.cpp").read_text()
 

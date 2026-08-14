@@ -18,11 +18,11 @@ BASE=(
   -I"$SOURCE/Adapters/TREEFROG/Compat" -I"$SOURCE"
 )
 FILES=(
-  "$SOURCE/Application/Views/BaseClasses/UiDraw.cpp"
-  "$SOURCE/Application/Views/BaseClasses/HelpRegistry.cpp"
-  "$SOURCE/Application/Views/BaseClasses/HelpOverlay.cpp"
+  "$SOURCE/Application/UI/Views/BaseClasses/UiDraw.cpp"
+  "$SOURCE/Application/UI/Views/BaseClasses/HelpRegistry.cpp"
+  "$SOURCE/Application/UI/Views/BaseClasses/HelpOverlay.cpp"
   "$SOURCE/Application/AppWindow.cpp"
-  "$SOURCE/Application/Views/MixerView.cpp"
+  "$SOURCE/Application/UI/Views/MixerView.cpp"
 )
 for f in "${FILES[@]}"; do
   echo "== $f =="

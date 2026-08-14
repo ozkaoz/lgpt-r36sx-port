@@ -27,8 +27,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-MIX = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
-MIX_H = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
+MIX = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
+MIX_H = (ROOT / "source/sources/Application/UI/Views/MixerView.h").read_text()
 
 SEMITONE = 2.0 ** (1.0 / 12.0)
 
@@ -121,12 +121,19 @@ def check_zero_floor_not_stuck():
 def check_source_guards():
     assert "void MixerView::fxEditCurve" in MIX
     assert "fxEditCurve" in MIX_H
-    assert "static bool fxUsesCurve" in MIX
-    # fxEditRow routes curve params through the curve editor.
+    # F3-4a: fxUsesCurve/fxEditCurveValue moved to FxPages.h.
+    fxp = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
+    assert "bool fxUsesCurve" in fxp
+    assert "fxEditCurveValue" in fxp
+    # F3-4d: fxEditRow routes the step math through the pure FxNavigator
+    # layer (which dispatches curve vs linear), not inline in the view.
+    nav = (ROOT / "source/sources/Application/Mixer/FxNavigator.h").read_text()
+    assert "static float EditValue" in nav
+    assert "fxUsesCurve(id)" in nav
+    assert "fxEditCurveValue(spec" in nav
     idx = MIX.index("void MixerView::fxEditRow")
     block = MIX[idx:idx + 1200]
-    assert "fxUsesCurve(targetId)" in block
-    assert "fxEditCurve(targetId,delta,coarse)" in block
+    assert "FxNavigator::EditValue(targetId" in block
     # The curve covers frequencies + wide-range time/ratio params.
     for tok in ("FX_P_DLY_TIME", "FX_P_RVB_PRE", "FX_P_RVB_DEC",
                 "FX_P_CMP_ATK", "FX_P_CMP_REL", "FX_P_CMP_RAT"):

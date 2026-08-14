@@ -21,14 +21,16 @@ BASE=(
 )
 FILES=(
   "$SOURCE/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp"
+  "$SOURCE/Adapters/TREEFROG/Main/CrashTrap.cpp"
   "$SOURCE/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp"
   "$SOURCE/Application/AppWindow.cpp"
-  "$SOURCE/Application/Views/InstrumentView.cpp"
-  "$SOURCE/Application/Views/ModalDialogs/UsbRecordModal.cpp"
-  "$SOURCE/Application/Views/ModalDialogs/ImportSampleDialog.cpp"
+  "$SOURCE/Application/UI/Views/InstrumentView.cpp"
+  "$SOURCE/Application/UI/Views/ModalDialogs/UsbRecordModal.cpp"
+  "$SOURCE/Application/UI/Views/ModalDialogs/ImportSampleDialog.cpp"
   "$SOURCE/Application/Instruments/SamplePool.cpp"
   "$SOURCE/Application/Instruments/SampleVariable.cpp"
-  "$SOURCE/Application/Views/ModalDialogs/SampleChopperModal.cpp"
+  "$SOURCE/Application/UI/Views/ModalDialogs/SampleChopperModal.cpp"
+  "$SOURCE/Application/UI/Views/MixerView.cpp"
   "$SOURCE/Application/Audio/AudioFileStreamer.cpp"
   "$SOURCE/Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.cpp"
 )
@@ -40,7 +42,7 @@ done
 for file_path in \
   "$SOURCE/Adapters/TREEFROG/Main/TreeFrogLibretro.cpp" \
   "$SOURCE/Adapters/TREEFROG/GUI/TreeFrogEventManager.cpp" \
-  "$SOURCE/Application/Views/ModalDialogs/UsbRecordModal.cpp"; do
+  "$SOURCE/Application/UI/Views/ModalDialogs/UsbRecordModal.cpp"; do
   g++ "${BASE[@]}" -UTREEFROG_INPUT_DEBUG -DTREEFROG_INPUT_DEBUG=1 \
     -DTREEFROG_ENABLE_START=1 -DTREEFROG_ENABLE_SELECT=1 \
     -fsyntax-only "$file_path"
@@ -60,7 +62,7 @@ grep -Fq 'U2510_STEREO_48K_DYNAMIC_PROFILE' "$TMP/strings.txt"
 RECORD_OBJECT="$TMP/UsbRecordModal.o"
 g++ "${BASE[@]}" -DTREEFROG_ENABLE_START=1 -DTREEFROG_ENABLE_SELECT=1 \
   -O2 -ffunction-sections -fdata-sections -fPIC \
-  -c "$SOURCE/Application/Views/ModalDialogs/UsbRecordModal.cpp" \
+  -c "$SOURCE/Application/UI/Views/ModalDialogs/UsbRecordModal.cpp" \
   -o "$RECORD_OBJECT"
 readelf -Ws "$RECORD_OBJECT" > "$TMP/UsbRecordModal.readelf.txt"
 grep -Fq 'TreeFrogU2520RecordBuildMarker' "$TMP/UsbRecordModal.readelf.txt"
@@ -86,7 +88,7 @@ CHOPPER_STRINGS="$TMP/SampleChopperModal.strings.txt"
 
 g++ "${BASE[@]}" -DTREEFROG_ENABLE_START=1 -DTREEFROG_ENABLE_SELECT=1 \
   -O2 -ffunction-sections -fdata-sections -fPIC \
-  -c "$SOURCE/Application/Views/ModalDialogs/SampleChopperModal.cpp" \
+  -c "$SOURCE/Application/UI/Views/ModalDialogs/SampleChopperModal.cpp" \
   -o "$CHOPPER_OBJECT"
 
 readelf -Ws "$CHOPPER_OBJECT" > "$CHOPPER_READELF"
@@ -101,7 +103,7 @@ sh -n "$ROOT/device/otg_u241_setup_once.sh"
 IMPORT_OBJECT="$TMP/ImportSampleDialog.o"
 g++ "${BASE[@]}" -DTREEFROG_ENABLE_START=1 -DTREEFROG_ENABLE_SELECT=1 \
   -O2 -ffunction-sections -fdata-sections -fPIC \
-  -c "$SOURCE/Application/Views/ModalDialogs/ImportSampleDialog.cpp" \
+  -c "$SOURCE/Application/UI/Views/ModalDialogs/ImportSampleDialog.cpp" \
   -o "$IMPORT_OBJECT"
 readelf -Ws "$IMPORT_OBJECT" > "$TMP/ImportSampleDialog.readelf.txt"
 grep -Fq 'TreeFrogU2523BrowserManageBuildMarker' "$TMP/ImportSampleDialog.readelf.txt"

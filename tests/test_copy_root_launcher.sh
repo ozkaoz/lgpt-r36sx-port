@@ -37,16 +37,6 @@ chmod +x "$SD/cubegm/picoarch"
 printf 'mock arm core for host layout test\n' > "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so"
 
 sh -n "$SD/cubegm/lgpt"
-
-# SD lifecycle U2.54: the launcher must default its logs to tmpfs (RAM), not
-# the SD card - the SD only receives one flush at clean shutdown.
-grep -F 'LOGROOT="${LGPT_LOGROOT:-/tmp/r36sx_lgpt_logs}"' "$SD/cubegm/lgpt" >/dev/null || {
-    echo 'TEST_FAIL: launcher LOGROOT default is not tmpfs' >&2
-    exit 22
-}
-
-# Force the SD logroot override so the run below asserts the log pipeline
-# against a deterministic path (host has no real tmpfs lifecycle here).
 LGPT_SD_ROOT="$SD" LGPT_LOGROOT="$SD/LGPT_OTG_LOGS" "$SD/cubegm/lgpt"
 
 for rel in \

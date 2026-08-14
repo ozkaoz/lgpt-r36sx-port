@@ -80,7 +80,7 @@ class DelayCrossfadeModel:
 
 
 def check_no_send_ret_rows():
-    src = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
+    src = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
     for token in ("\"DLY SND\"", "\"DLY RET\"", "\"RVB SND\"", "\"RVB RET\""):
         assert token not in src, token
     # returns are master controls now, surfaced on the MIX page (Fase 9)
@@ -93,13 +93,13 @@ def check_delay_mix_default_full_wet():
     # engine constructor sets full wet
     fxe_cpp = (ROOT / "source/sources/Application/Audio/FxEngine/FxEngine.cpp").read_text()
     assert "SetMix(i2fp(1))" in fxe_cpp
-    # FxParamSpec table: DLY MIX row belongs to DELAY and defaults to 1.0
-    # (the third float column is vdef).
+    # F3-4a: the FxParamSpec table moved to FxPages.h.  DLY MIX row belongs to
+    # DELAY and defaults to 1.0 (the third float column is vdef).
     import re
-    mix_cpp = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
+    fxp = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
     m = re.search(
         r'\{\s*"DLY MIX",\s*FX_PAGE_DELAY,\s*(-?\d+\.\d+f),\s*(-?\d+\.\d+f),\s*(-?\d+\.\d+f)',
-        mix_cpp)
+        fxp)
     assert m, "DLY MIX"
     vdef = m.group(3)
     assert float(vdef[:-1]) == 1.0, vdef
@@ -108,15 +108,15 @@ def check_delay_mix_default_full_wet():
 
 def check_rvb_mix_row_gone():
     # RC2 (point 3.1): RVB MIX was removed from the param table and the page.
-    mix_cpp = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
-    mix_h = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
-    assert "\"RVB MIX\"" not in mix_cpp
-    assert "FX_P_RVB_MIX" not in mix_h
+    # F3-4a: the table and enums live in FxPages.h.
+    fxp = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
+    assert "\"RVB MIX\"" not in fxp
+    assert "FX_P_RVB_MIX" not in fxp
     # the reverb page still exposes the full wet tail + mode + bypass
     for token in ("FX_P_RVB_PRE", "FX_P_RVB_DEC", "FX_P_RVB_SIZ",
                   "FX_P_RVB_DMP", "FX_P_RVB_WID", "FX_P_RVB_MODE",
                   "FX_P_RVB_BYP"):
-        assert token in mix_h, token
+        assert token in fxp, token
     print("RVB MIX row removed from the param table / page OK")
 
 

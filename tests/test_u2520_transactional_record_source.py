@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-cpp=(root/'source/sources/Application/Views/ModalDialogs/UsbRecordModal.cpp').read_text()
-h=(root/'source/sources/Application/Views/ModalDialogs/UsbRecordModal.h').read_text()
+cpp=(root/'source/sources/Application/UI/Views/ModalDialogs/UsbRecordModal.cpp').read_text()
+h=(root/'source/sources/Application/UI/Views/ModalDialogs/UsbRecordModal.h').read_text()
 required=[
  'U2520_PENDING_TAKE_RECORD_EDITOR_PHYSICAL_EDGE_READY',
  '"/tmp/r36sx_lgpt_record"',

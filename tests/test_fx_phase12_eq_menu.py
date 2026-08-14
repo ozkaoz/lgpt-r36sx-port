@@ -30,8 +30,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-MIX = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
-MIX_H = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
+MIX = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
+MIX_H = (ROOT / "source/sources/Application/UI/Views/MixerView.h").read_text()
 
 # Mirror Fase 12 kFxParams_ EQ section: (id, label, vmin, vmax, vdef).
 EQ_PARAMS = [
@@ -145,8 +145,10 @@ def check_source_guards():
     # Row renderer + musical frequency editing helpers.
     assert "void MixerView::drawEqRow" in MIX
     assert "void MixerView::drawEqPage" in MIX
+    # F3-4a: the curve constant and the kFxParams_ EQ rows moved to FxPages.h.
+    fxp = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
     assert "fxUsesCurve" in MIX
-    assert "1.05946309436" in MIX or "2.0 ** (1.0 / 12.0)" in MIX
+    assert "1.05946309436" in fxp or "2.0 ** (1.0 / 12.0)" in fxp
     # Units and ON/OFF rendering in the EQ menu.
     assert "[ %s ]" in MIX and '"ON"' in MIX and '"OFF"' in MIX
     assert "%6.0f Hz" in MIX
@@ -156,14 +158,14 @@ def check_source_guards():
     # Header declares the EQ menu methods (RC5: drawEqRow takes the centered
     # label/value columns).
     assert "drawEqPage(const char *title)" in MIX_H and "drawEqRow(int id,int labelX,int valueX,int y)" in MIX_H
-    # Enum is EN-first per band (order marker comment in the header).
-    assert "FX_P_EQ_LOW_EN" in MIX_H and "FX_P_EQ_LOW_FRQ" in MIX_H
-    l = MIX_H.index("FX_P_EQ_LOW_EN")
-    assert "FX_P_EQ_LOW_FRQ" in MIX_H[l:l + 120]
+    # F3-4a: the FxParamId enums moved to FxPages.h (EN-first per band).
+    assert "FX_P_EQ_LOW_EN" in fxp and "FX_P_EQ_LOW_FRQ" in fxp
+    l = fxp.index("FX_P_EQ_LOW_EN")
+    assert "FX_P_EQ_LOW_FRQ" in fxp[l:l + 120]
     # Bypass is the first EQ param (top row) and the EQ page keeps its own
     # dedicated layout instead of the generic row list.
-    first = MIX.index("{ \"EQ  BYP\"")
-    assert first < MIX.index("{ \"LO  EN\""), "EN-first band order"
+    first = fxp.index("{ \"EQ  BYP\"")
+    assert first < fxp.index("{ \"LO  EN\""), "EN-first band order"
     print("source guards OK")
 
 

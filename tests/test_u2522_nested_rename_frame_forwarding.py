@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-cpp=(root/'source/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp').read_text()
-h=(root/'source/sources/Application/Views/ModalDialogs/ImportSampleDialog.h').read_text()
+cpp=(root/'source/sources/Application/UI/Views/ModalDialogs/ImportSampleDialog.cpp').read_text()
+h=(root/'source/sources/Application/UI/Views/ModalDialogs/ImportSampleDialog.h').read_text()
 assert 'U2522_NESTED_RENAME_FRAME_FORWARDING_CRASH_SAFE' in cpp
 assert 'void ImportSampleDialog::OnFrameUpdate(unsigned long frameClock)' in cpp
 assert 'if (HasModal()) UpdateActiveModalFrame(frameClock);' in cpp

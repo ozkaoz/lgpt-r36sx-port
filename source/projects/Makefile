@@ -35,14 +35,16 @@ COMMONDIRS := \
 	../sources/UIFramework/SimpleBaseClasses \
 	../sources/UIFramework/Interfaces \
 	../sources/Application \
+	../sources/Application/UI/Input \
+	../sources/Application/UI/Navigation \
 	../sources/Application/Controllers \
 	../sources/Application/Commands \
 	../sources/Application/Audio \
 	../sources/Application/Audio/FxEngine \
 	../sources/Application/FX \
-	../sources/Application/Views \
-	../sources/Application/Views/ModalDialogs \
-	../sources/Application/Views/BaseClasses \
+	../sources/Application/UI/Views \
+	../sources/Application/UI/Views/ModalDialogs \
+	../sources/Application/UI/Views/BaseClasses \
 	../sources/Application/Model \
 	../sources/Application/Utils \
 	../sources/Application/Player \
@@ -224,6 +226,7 @@ W32DIRS     :=  .\
 #---------------------------------------------------------------------------------
 
 COMMONFILES := \
+	ChordResolver.o ActionMap.o NavigationController.o \
 	Logger.o Trace.o Result.o Status.o Config.o \
 	Timer.o FileSystem.o FontConfig.o \
 	SysMutex.o TimeService.o \

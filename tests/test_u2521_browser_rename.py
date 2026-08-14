@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-cpp=(root/'source/sources/Application/Views/ModalDialogs/ImportSampleDialog.cpp').read_text()
-h=(root/'source/sources/Application/Views/ModalDialogs/ImportSampleDialog.h').read_text()
+cpp=(root/'source/sources/Application/UI/Views/ModalDialogs/ImportSampleDialog.cpp').read_text()
+h=(root/'source/sources/Application/UI/Views/ModalDialogs/ImportSampleDialog.h').read_text()
 pool=(root/'source/sources/Application/Instruments/SamplePool.cpp').read_text()
 poolh=(root/'source/sources/Application/Instruments/SamplePool.h').read_text()
 required=[

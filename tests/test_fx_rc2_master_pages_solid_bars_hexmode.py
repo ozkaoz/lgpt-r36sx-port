@@ -31,11 +31,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-MV_CPP = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
-MV_H = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
-UIF_CPP = (ROOT / "source/sources/Application/Views/BaseClasses/UIIntVarField.cpp").read_text()
-UIF_H = (ROOT / "source/sources/Application/Views/BaseClasses/UIIntVarField.h").read_text()
-BIGHEX_CPP = (ROOT / "source/sources/Application/Views/BaseClasses/UIBigHexVarField.cpp").read_text()
+MV_CPP = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
+MV_H = (ROOT / "source/sources/Application/UI/Views/MixerView.h").read_text()
+UIF_CPP = (ROOT / "source/sources/Application/UI/Views/BaseClasses/UIIntVarField.cpp").read_text()
+UIF_H = (ROOT / "source/sources/Application/UI/Views/BaseClasses/UIIntVarField.h").read_text()
+BIGHEX_CPP = (ROOT / "source/sources/Application/UI/Views/BaseClasses/UIBigHexVarField.cpp").read_text()
 
 
 # ---------------------------------------------------------------------------

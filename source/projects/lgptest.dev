@@ -20,7 +20,7 @@ ObjectOutput=
 OverrideOutput=0
 OverrideOutputName=
 HostApplication=
-Folders=_docs,_makefile,Adapters,Adapters/DEB,Adapters/DEB/GUI,Adapters/GP2X,Adapters/GP2X/Audio,Adapters/GP2X/Midi,Adapters/GP32,Adapters/NDS,Adapters/SDL,Adapters/SDL/GUI,Adapters/Unix,Adapters/W32,Adapters/W32/Audio,Adapters/W32/Midi,Application,Application/Audio,Application/Commands,Application/Controllers,Application/Instruments,Application/Model,Application/Persistency,Application/Player,Application/Utils,Application/Views,Application/Views/BaseClasses,External,External/Compression,External/TinyXML,Foundation,Foundation/Services,Foundation/Types,Foundation/Variables,Services,Services/Audio,Services/Midi,System,UIFramework
+Folders=_docs,_makefile,Adapters,Adapters/DEB,Adapters/DEB/GUI,Adapters/GP2X,Adapters/GP2X/Audio,Adapters/GP2X/Midi,Adapters/GP32,Adapters/NDS,Adapters/SDL,Adapters/SDL/GUI,Adapters/Unix,Adapters/W32,Adapters/W32/Audio,Adapters/W32/Midi,Application,Application/Audio,Application/Commands,Application/Controllers,Application/Instruments,Application/Model,Application/Persistency,Application/Player,Application/Utils,Application/UI/Views,Application/UI/Views/BaseClasses,External,External/Compression,External/TinyXML,Foundation,Foundation/Services,Foundation/Types,Foundation/Variables,Services,Services/Audio,Services/Midi,System,UIFramework
 CommandLine=
 UseCustomMakefile=0
 CustomMakefile=
@@ -322,7 +322,7 @@ BuildCmd=
 [Unit32]
 FileName=..\sources\Application\views\ViewData.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -332,7 +332,7 @@ BuildCmd=
 [Unit33]
 FileName=..\sources\Application\views\ChainView.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -342,7 +342,7 @@ BuildCmd=
 [Unit34]
 FileName=..\sources\Application\views\ConsoleView.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -352,7 +352,7 @@ BuildCmd=
 [Unit35]
 FileName=..\sources\Application\views\ConsoleView.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -362,7 +362,7 @@ BuildCmd=
 [Unit36]
 FileName=..\sources\Application\views\PhraseView.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -372,7 +372,7 @@ BuildCmd=
 [Unit37]
 FileName=..\sources\Application\views\PhraseView.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -382,7 +382,7 @@ BuildCmd=
 [Unit38]
 FileName=..\sources\Application\views\ProjectView.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -392,7 +392,7 @@ BuildCmd=
 [Unit39]
 FileName=..\sources\Application\views\ProjectView.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -402,7 +402,7 @@ BuildCmd=
 [Unit40]
 FileName=..\sources\Application\views\SongView.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -412,7 +412,7 @@ BuildCmd=
 [Unit41]
 FileName=..\sources\Application\views\SongView.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -422,7 +422,7 @@ BuildCmd=
 [Unit42]
 FileName=..\sources\Application\views\ViewData.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -432,7 +432,7 @@ BuildCmd=
 [Unit43]
 FileName=..\sources\Application\views\ChainView.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -700,7 +700,7 @@ BuildCmd=
 [Unit71]
 FileName=..\sources\Application\views\BaseClasses\FieldView.h
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -710,7 +710,7 @@ BuildCmd=
 [Unit72]
 FileName=..\sources\Application\views\BaseClasses\FieldView.cpp
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -720,7 +720,7 @@ BuildCmd=
 [Unit73]
 FileName=..\sources\Application\views\BaseClasses\UIIntField.h
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -730,7 +730,7 @@ BuildCmd=
 [Unit74]
 FileName=..\sources\Application\views\BaseClasses\UIField.h
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -740,7 +740,7 @@ BuildCmd=
 [Unit75]
 FileName=..\sources\Application\views\BaseClasses\UIIntField.cpp
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -750,7 +750,7 @@ BuildCmd=
 [Unit76]
 FileName=..\sources\Application\views\BaseClasses\UIField.cpp
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -900,7 +900,7 @@ BuildCmd=
 [Unit88]
 FileName=..\sources\Application\views\BaseClasses\View.cpp
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -910,7 +910,7 @@ BuildCmd=
 [Unit89]
 FileName=..\sources\Application\views\BaseClasses\View.h
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -1010,7 +1010,7 @@ BuildCmd=
 [Unit102]
 FileName=..\sources\Application\views\UIController.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -1020,7 +1020,7 @@ BuildCmd=
 [Unit103]
 FileName=..\sources\Application\views\UIController.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -1080,7 +1080,7 @@ CompileCpp=1
 [Unit109]
 FileName=..\sources\Application\views\InstrumentView.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -1090,7 +1090,7 @@ BuildCmd=
 [Unit110]
 FileName=..\sources\Application\views\InstrumentView.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -1340,7 +1340,7 @@ BuildCmd=
 [Unit135]
 FileName=..\sources\Application\views\BaseClasses\UIIntVarField.h
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -1350,7 +1350,7 @@ BuildCmd=
 [Unit136]
 FileName=..\sources\Application\views\BaseClasses\UIIntVarField.cpp
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -1360,7 +1360,7 @@ BuildCmd=
 [Unit137]
 FileName=..\sources\Application\views\BaseClasses\UINoteVarField.cpp
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -1370,7 +1370,7 @@ BuildCmd=
 [Unit138]
 FileName=..\sources\Application\views\BaseClasses\UINoteVarField.h
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -1380,7 +1380,7 @@ BuildCmd=
 [Unit139]
 FileName=..\sources\Application\views\BaseClasses\UIActionField.h
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -1390,7 +1390,7 @@ BuildCmd=
 [Unit140]
 FileName=..\sources\Application\views\BaseClasses\UIActionField.cpp
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -1400,7 +1400,7 @@ BuildCmd=
 [Unit141]
 FileName=..\sources\Application\views\BaseClasses\UIBigHexVarField.cpp
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -1410,7 +1410,7 @@ BuildCmd=
 [Unit142]
 FileName=..\sources\Application\views\BaseClasses\UIBigHexVarField.h
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -1620,7 +1620,7 @@ BuildCmd=
 [Unit164]
 FileName=..\sources\Application\views\InstrumentView.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -1630,7 +1630,7 @@ BuildCmd=
 [Unit163]
 FileName=..\sources\Application\views\InstrumentView.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -1800,7 +1800,7 @@ BuildCmd=
 [Unit179]
 FileName=..\sources\Application\views\ListSelectView.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -1810,7 +1810,7 @@ BuildCmd=
 [Unit180]
 FileName=..\sources\Application\views\ListSelectView.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -1880,7 +1880,7 @@ BuildCmd=
 [Unit185]
 FileName=..\sources\Application\views\TableView.h
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000
@@ -1900,7 +1900,7 @@ BuildCmd=
 [Unit189]
 FileName=..\sources\Application\views\BaseClasses\UIIntVarOffField.h
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -2060,7 +2060,7 @@ BuildCmd=
 [Unit190]
 FileName=..\sources\Application\views\BaseClasses\UIIntVarOffField.cpp
 CompileCpp=1
-Folder=Application/Views/BaseClasses
+Folder=Application/UI/Views/BaseClasses
 Compile=1
 Link=1
 Priority=1000
@@ -2740,7 +2740,7 @@ BuildCmd=
 [Unit186]
 FileName=..\sources\Application\views\TableView.cpp
 CompileCpp=1
-Folder=Application/Views
+Folder=Application/UI/Views
 Compile=1
 Link=1
 Priority=1000

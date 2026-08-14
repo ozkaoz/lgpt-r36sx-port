@@ -30,6 +30,25 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <pthread.h>
+/* ASRC FIR selector: 8-tap Lanczos-4 (default, deployed behavior) or
+ * 16-tap Lanczos-8 (maximum quality) via -DASRC_FIR_TAPS=16. */
+#ifndef ASRC_FIR_TAPS
+#define ASRC_FIR_TAPS 8
+#endif
+#if ASRC_FIR_TAPS == 16
+#include "h36_14_fir16_q14.h"
+#define kASRC_FIR_TABLE kTreeFrogFrontendFir16Q14
+#define ASRC_FIR_HALF 7U
+#define ASRC_FIR_LOOKAHEAD 8U
+#define ASRC_FIR_PRIME 7U
+#else
+#include "h36_14_fir8_q14.h"
+#define kASRC_FIR_TABLE kTreeFrogFrontendFir8Q14
+#define ASRC_FIR_HALF 3U
+#define ASRC_FIR_LOOKAHEAD 4U
+#define ASRC_FIR_PRIME 3U
+#endif
 #include <sound/asound.h>
 
 static const char *ACTIVE_MARKER = "/tmp/r36sx_uac2_usb_active";
@@ -48,12 +67,7 @@ static const char *CAPTURE_LEVEL_R = "/tmp/r36sx_lgpt_usb/usb_capture_level_r";
 static const char *CAPTURE_ELAPSED = "/tmp/r36sx_lgpt_usb/usb_capture_elapsed";
 static const char *CAPTURE_MONITOR = "/tmp/r36sx_lgpt_usb/usb_capture_monitor";
 static const char *CAPTURE_MONITOR_FIFO = "/tmp/r36sx_usb_capture_monitor_fifo";
-/* SD lifecycle U2.54b: runtime-state mirror goes to the RAM log tree; the
- * exit flush posts it to /mnt/sdcard/lgpt/otg/logs/runtime_state (the path
- * collect_logs.sh reads on the host). The card is never touched while the
- * daemon runs. */
-static const char *RUNTIME_MIRROR_DIR = "/tmp/r36sx_lgpt_logs/mirror/runtime_state";
-static const char *CAPTURE_STAGING_DIR = "/mnt/sdcard/lgpt/samples/records";
+static const char *RUNTIME_MIRROR_DIR = "/mnt/sdcard/lgpt/otg/logs/runtime_state";
 static const char *AUDIO_PROFILE = "/tmp/r36sx_lgpt_usb/audio_profile";
 static const char *AUDIO_CHANNELS = "/tmp/r36sx_lgpt_usb/audio_channels";
 static const char *AUDIO_RATE = "/tmp/r36sx_lgpt_usb/audio_rate";
@@ -81,7 +95,14 @@ static unsigned long long monotonic_milliseconds(void) {
            ((unsigned long long)ts.tv_nsec / 1000000ULL);
 }
 
+/* H42: runtime_state mirroring to SD is compiled out by default: the daemon
+ * must perform zero SD writes during normal operation (tmpfs-only runtime).
+ * Re-enable with -DLGPT_SD_RUNTIME_MIRROR=1 for field debugging. */
+#ifndef LGPT_SD_RUNTIME_MIRROR
+#define LGPT_SD_RUNTIME_MIRROR 0
+#endif
 static void mirror_runtime_state(const char *path, const char *text) {
+#if LGPT_SD_RUNTIME_MIRROR
     const char *base = path ? strrchr(path, '/') : 0;
     base = base ? base + 1 : path;
     if (!base || !base[0]) return;
@@ -90,6 +111,10 @@ static void mirror_runtime_state(const char *path, const char *text) {
     snprintf(out, sizeof(out), "%s/%s", RUNTIME_MIRROR_DIR, base);
     int fd = open(out, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) { if (text) write(fd, text, strlen(text)); close(fd); }
+#else
+    (void)path;
+    (void)text;
+#endif
 }
 
 static int file_contains(const char *p, const char *needle) {
@@ -135,7 +160,8 @@ static void write_text_file(const char *path, const char *text) {
      * Meter values are consumed live from tmpfs by the core. Mirroring L/R,
      * aggregate level and elapsed time to the SD on every 480-frame read caused
      * dozens of synchronous writes per second while Record was open. Keep those
-     * values volatile; status, metadata, ABI and profile state remain mirrored.
+     * values volatile; since H42 the SD mirror itself is compiled out (zero
+     * SD writes at runtime) unless LGPT_SD_RUNTIME_MIRROR=1.
      */
     if (path &&
         strstr(path, RUNTIME_DIR) == path &&
@@ -146,24 +172,13 @@ static void write_text_file(const char *path, const char *text) {
 static void mark_active(void) { char b[64]; snprintf(b, sizeof(b), "%ld\n", (long)time(NULL)); write_text_file(ACTIVE_MARKER, b); }
 static void mark_inactive(void) { unlink(ACTIVE_MARKER); }
 
-static void ensure_capture_staging_dir(void) {
-    mkdir("/mnt/sdcard", 0777);
-    mkdir("/mnt/sdcard/lgpt", 0777);
-    mkdir("/mnt/sdcard/lgpt/samples", 0777);
-    mkdir(CAPTURE_STAGING_DIR, 0777);
-}
-
-static void basename_from_path(const char *path, char *dst, int len) {
-    const char *b = path ? strrchr(path, '/') : 0;
-    b = b ? b + 1 : path;
-    if (!b || !b[0]) b = "USBREC.wav";
-    snprintf(dst, len, "%s", b);
-}
-
+/* H42: the capture WAV is always written to the tmpfs path requested by the
+ * core (/tmp/r36sx_lgpt_record/). The old fallback to the SD staging dir is
+ * removed: a failed tmpfs open is a clean, logged error (the core surfaces
+ * it in the Record modal) instead of a silent SD write. */
 static int open_capture_wav_with_fallback(const char *requested, const char *name, char *actual, int actual_len) {
-    ensure_capture_staging_dir();
     if (requested && requested[0]) snprintf(actual, actual_len, "%s", requested);
-    else snprintf(actual, actual_len, "%s/%s", CAPTURE_STAGING_DIR, name && name[0] ? name : "USBREC.wav");
+    else snprintf(actual, actual_len, "%s/%s", "/tmp/r36sx_lgpt_record", name && name[0] ? name : "USBREC.wav");
     int fd = open(actual, O_WRONLY | O_CREAT | O_EXCL, 0666);
     if (fd >= 0) return fd;
     int first_errno = errno;
@@ -172,14 +187,6 @@ static int open_capture_wav_with_fallback(const char *requested, const char *nam
         return -1;
     }
     fprintf(stderr, "CAPTURE_OPEN_REQUESTED_FAILED path=%s errno=%d (%s)\n", actual, first_errno, strerror(first_errno));
-    char safe_name[128]; basename_from_path(name && name[0] ? name : requested, safe_name, sizeof(safe_name));
-    snprintf(actual, actual_len, "%s/%s", CAPTURE_STAGING_DIR, safe_name);
-    fd = open(actual, O_WRONLY | O_CREAT | O_EXCL, 0666);
-    if (fd >= 0) {
-        fprintf(stderr, "CAPTURE_OPEN_FALLBACK_OK path=%s from_errno=%d\n", actual, first_errno);
-        return fd;
-    }
-    fprintf(stderr, "CAPTURE_OPEN_FALLBACK_FAILED path=%s errno=%d (%s)\n", actual, errno, strerror(errno));
     return -1;
 }
 
@@ -315,7 +322,9 @@ static int pcm_prepare_common(
     sw.avail_min = period_frames;
     sw.xfer_align = period_frames;
     sw.start_threshold =
-        is_capture ? 1 : period_frames * periods;
+        is_capture ? 1 : period_frames; /* U2.63: ASRC clock-hold never stops
+                                           writing, so auto-start after one
+                                           period instead of the full buffer. */
     sw.stop_threshold =
         period_frames * periods;
     sw.boundary =
@@ -527,6 +536,206 @@ static unsigned ring_drop_oldest_samples(unsigned n) {
     return dropped;
 }
 static void drain_fifo(int in, long *dropped) { int16_t inbuf[4096]; for (;;) { ssize_t r = read(in, inbuf, sizeof(inbuf)); if (r > 0) { unsigned samples = (unsigned)(r / 2); unsigned pushed = ring_push_samples(inbuf, samples); if (pushed < samples && dropped) *dropped += (long)(samples - pushed); continue; } if (r == 0) break; if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) break; loge("read fifo"); break; } }
+static void flush_input_fifo(int in) {
+    if (in < 0) return;
+    int16_t junk[2048];
+    long discarded = 0;
+    for (;;) {
+        ssize_t r = read(in, junk, sizeof(junk));
+        if (r > 0) {
+            discarded += (long)(r / 2);
+            continue;
+        }
+        break;
+    }
+    if (discarded > 0)
+        fprintf(stderr, "PCM_FIFO_FLUSH discarded_samples=%ld\n", discarded);
+}
+/* ---- ABI7 ASRC engine (ported from H38.1 FIR8, feed-ratio 1.0, 48 kHz). ----
+ * The ABI7 ring keeps the SPSC FIFO backlog in S16_LE interleaved samples.
+ * The ASRC consumes it as stereo/mono frames into a stage and renders each
+ * ALSA period through an 8-tap, 160-phase Lanczos-4 FIR. The PI backlog
+ * controller adjusts step_ppm silently so drift is absorbed with an exact
+ * feed ratio: no latency trims, no source-level silence inserts, no close-
+ * reopen churn. Behaviour on starvation is a zero period with no phase
+ * advance and no ALSA prepare (clock hold), matching H36.16. */
+#define ASRC_STAGE_FRAMES 8192U
+/* U2.63 QUALITY_TUNE: lower steady latency (1600 = 33 ms), faster first
+ * sound (prime 2080 = 43 ms, one producer burst inside), and a much softer
+ * correction envelope. The previous 4000 ppm swings plus the hard saturate
+ * branches caused audible pitch jumps ("saltos") and shimmer; a dead band of
+ * target/8 stops the controller from chasing the 800-frame producer bursts. */
+#define ASRC_TARGET_BACKLOG_FRAMES 2400U
+#define ASRC_PRIME_BACKLOG_FRAMES 2400U
+#define ASRC_MAX_CORRECTION_PPM 1200
+#define ASRC_INTEGRAL_LIMIT_PPM 1000
+#define ASRC_PROPORTIONAL_GAIN 1200
+#define ASRC_INTEGRAL_GAIN 3
+static int16_t asrc_stage[ASRC_STAGE_FRAMES * 2U];
+static unsigned asrc_stage_frames = 0U;
+static uint64_t asrc_phase_q32 = 0ULL;
+static int asrc_stage_primed = 0;
+static int asrc_step_ppm = 0;
+static int asrc_integral_ppm = 0;
+static unsigned asrc_backlog_min = 0xffffffffU;
+static unsigned asrc_backlog_max = 0U;
+static unsigned long long asrc_output_frames = 0ULL;
+static unsigned long long asrc_clock_hold_periods = 0ULL;
+static unsigned long long asrc_clock_hold_frames = 0ULL;
+static unsigned long long asrc_periods_rendered = 0ULL;
+
+static void asrc_source_reset(void) {
+    asrc_stage_frames = 0U;
+    asrc_phase_q32 = 0ULL;
+    asrc_stage_primed = 0;
+    asrc_step_ppm = 0;
+    asrc_integral_ppm = 0;
+    asrc_backlog_min = 0xffffffffU;
+    asrc_backlog_max = 0U;
+}
+static unsigned asrc_total_backlog(void) {
+    unsigned stage_available;
+    unsigned idx = (unsigned)(asrc_phase_q32 >> 32);
+    unsigned source_frames = g_audio_channels ? rfill / g_audio_channels : 0U;
+    if (asrc_stage_frames > idx) stage_available = asrc_stage_frames - idx;
+    else stage_available = 0U;
+    return source_frames + stage_available;
+}
+static unsigned asrc_stage_append(void) {
+    int16_t tmp[2048U * 2U];
+    unsigned room = ASRC_STAGE_FRAMES - asrc_stage_frames;
+    unsigned want = room < 2048U ? room : 2048U;
+    unsigned got = 0U;
+    unsigned n;
+    while (got < want && rfill >= g_audio_channels) {
+        if (g_audio_channels == 2U) {
+            ring_pop_samples(tmp + got * 2U, 2U);
+        } else {
+            ring_pop_samples(tmp + got * 2U, 1U);
+            if (got * 2U + 1U < want * 2U)
+                tmp[got * 2U + 1U] = tmp[got * 2U];
+        }
+        ++got;
+    }
+    if (got == 0U) return 0U;
+    if (!asrc_stage_primed) {
+        for (n = 0U; n < ASRC_FIR_PRIME; ++n) {
+            asrc_stage[n * 2U] = tmp[0];
+            asrc_stage[n * 2U + 1U] = tmp[1];
+        }
+        asrc_stage_frames = ASRC_FIR_PRIME;
+        asrc_phase_q32 = (uint64_t)ASRC_FIR_PRIME << 32;
+        asrc_stage_primed = 1;
+    }
+    memcpy(asrc_stage + asrc_stage_frames * 2U,
+           tmp, (size_t)got * 2U * sizeof(int16_t));
+    asrc_stage_frames += got;
+    return got;
+}
+static uint64_t asrc_nominal_step_q32(void) {
+    return ((uint64_t)g_audio_rate << 32) / 48000U;
+}
+static void asrc_update_step(void) {
+    const unsigned target = ASRC_TARGET_BACKLOG_FRAMES;
+    const unsigned backlog = asrc_total_backlog();
+    const int error = (int)backlog - (int)target;
+    const int dead = (int)(target / 8U);
+    int proportional;
+    int desired;
+    proportional = (error * ASRC_PROPORTIONAL_GAIN) / (int)target;
+    if (error > dead || error < -dead) {
+        asrc_integral_ppm += (error * ASRC_INTEGRAL_GAIN) / (int)target;
+        if (asrc_integral_ppm > ASRC_INTEGRAL_LIMIT_PPM) asrc_integral_ppm = ASRC_INTEGRAL_LIMIT_PPM;
+        if (asrc_integral_ppm < -ASRC_INTEGRAL_LIMIT_PPM) asrc_integral_ppm = -ASRC_INTEGRAL_LIMIT_PPM;
+    }
+    desired = proportional + asrc_integral_ppm;
+    if (desired > ASRC_MAX_CORRECTION_PPM) desired = ASRC_MAX_CORRECTION_PPM;
+    if (desired < -ASRC_MAX_CORRECTION_PPM) desired = -ASRC_MAX_CORRECTION_PPM;
+    asrc_step_ppm = (asrc_step_ppm * 7 + desired) / 8;
+    if (backlog < asrc_backlog_min) asrc_backlog_min = backlog;
+    if (backlog > asrc_backlog_max) asrc_backlog_max = backlog;
+}
+static uint64_t asrc_step_q32(void) {
+    const uint64_t nominal = asrc_nominal_step_q32();
+    int64_t delta = ((int64_t)nominal * (int64_t)asrc_step_ppm) / 1000000LL;
+    return (uint64_t)((int64_t)nominal + delta);
+}
+static void asrc_filter_stereo(unsigned idx, unsigned phase,
+                               int16_t *out_l, int16_t *out_r) {
+    int64_t acc_l = 0, acc_r = 0;
+    const int16_t *coef = kASRC_FIR_TABLE[phase];
+    unsigned t;
+    for (t = 0U; t < ASRC_FIR_TAPS; ++t) {
+        unsigned fi = idx - ASRC_FIR_HALF + t;
+        acc_l += (int64_t)asrc_stage[fi * 2U] * (int64_t)coef[t];
+        acc_r += (int64_t)asrc_stage[fi * 2U + 1U] * (int64_t)coef[t];
+    }
+    acc_l = (acc_l + (acc_l >= 0 ? 8192 : -8192)) / 16384;
+    acc_r = (acc_r + (acc_r >= 0 ? 8192 : -8192)) / 16384;
+    if (acc_l > 32767) acc_l = 32767;
+    if (acc_l < -32768) acc_l = -32768;
+    if (acc_r > 32767) acc_r = 32767;
+    if (acc_r < -32768) acc_r = -32768;
+    *out_l = (int16_t)acc_l;
+    *out_r = (int16_t)acc_r;
+}
+/* H41: no passthrough shortcut. At 48000->48000 the step would degenerate to
+ * identity, but the UAC2 sink is clocked by the PC/Android host, an
+ * independent clock domain from the console crystal. The PI-governed ASRC
+ * (with phase-0 impulse taps) is sample-exact at 1:1 step and corrects the
+ * small cross-clock drift; the old shortcut silently played 2 s of backlog
+ * or starvation per minute of host-clock skew. */
+static int asrc_prepare_period(unsigned out_frames, uint64_t *step_out) {
+    uint64_t step, final_phase;
+    unsigned required_index;
+    if (!step_out || out_frames == 0U) return 0;
+
+    if (!asrc_stage_primed) {
+        if (asrc_stage_append() == 0U || asrc_stage_frames <= ASRC_FIR_LOOKAHEAD)
+            return 0;
+    }
+    asrc_update_step();
+    step = asrc_step_q32();
+    final_phase = asrc_phase_q32 + step * (uint64_t)(out_frames - 1U);
+    required_index = (unsigned)(final_phase >> 32) + ASRC_FIR_LOOKAHEAD;
+    while (asrc_stage_frames <= required_index) {
+        if (asrc_stage_append() == 0U) return 0;
+    }
+    *step_out = step;
+    return 1;
+}
+static void asrc_render_exact(int16_t *out, unsigned out_frames, uint64_t step) {
+    unsigned produced;
+
+    for (produced = 0U; produced < out_frames; ++produced) {
+        unsigned idx = (unsigned)(asrc_phase_q32 >> 32);
+        uint32_t frac = (uint32_t)asrc_phase_q32;
+        unsigned phase = (unsigned)(((uint64_t)frac * 160ULL) >> 32);
+        int16_t l = 0, r = 0;
+        asrc_filter_stereo(idx, phase, &l, &r);
+        if (g_audio_channels == 2U) {
+            out[produced * 2U] = l;
+            out[produced * 2U + 1U] = r;
+        } else {
+            out[produced] = (int16_t)(((int32_t)l + (int32_t)r) / 2);
+        }
+        asrc_phase_q32 += step;
+    }
+    {
+        unsigned idx = (unsigned)(asrc_phase_q32 >> 32);
+        if (idx > ASRC_FIR_HALF) {
+            unsigned drop = idx - ASRC_FIR_HALF;
+            if (drop > asrc_stage_frames) drop = asrc_stage_frames;
+            memmove(asrc_stage, asrc_stage + drop * 2U,
+                    (size_t)(asrc_stage_frames - drop) * 2U * sizeof(int16_t));
+            asrc_stage_frames -= drop;
+            asrc_phase_q32 -= (uint64_t)drop << 32;
+        }
+    }
+    asrc_output_frames += out_frames;
+    ++asrc_periods_rendered;
+}
+
 
 static void write_wav_header(int fd, uint32_t data_bytes, uint32_t rate, uint16_t channels) {
     uint8_t h[44]; memset(h, 0, sizeof(h));
@@ -1495,7 +1704,6 @@ int main(int argc, char **argv) {
     const int lowlat = path_exists(LOWLAT_SENTINEL);
     const int period_frames = lowlat ? 240 : 480;
     const int periods = 4;
-    const unsigned producer_burst_frames = 800U;
     const int starvation_grace_ms = 24;
 
     setvbuf(stderr, 0, _IOLBF, 4096);
@@ -1541,21 +1749,19 @@ int main(int argc, char **argv) {
     long period_writes = 0;
     long signal_periods = 0;
     long source_silence_periods = 0;
-    long starvation_silence_periods = 0;
     long starvation_events = 0;
     long poll_timeouts = 0;
     long xruns = 0;
     long dropped = 0;
     long reconnects = 0;
     long playback_prepare_failures = 0;
-    long latency_trimmed_samples = 0;
-    long latency_trim_events = 0;
     long short_write_events = 0;
     int good_write_streak = 0;
     int last_conf = -1;
     int play_peak = 0;
     int stream_primed = 0;
-    unsigned long long starvation_since_ms = 0;
+    unsigned sustained_overflow_periods = 0;
+    unsigned long long asrc_resync_events = 0;
 
     for (;;) {
         int conf = usb_configured_cached();
@@ -1582,7 +1788,6 @@ int main(int argc, char **argv) {
             }
             ring_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             good_write_streak = 0;
             mark_inactive();
             sleep_ms(80);
@@ -1600,7 +1805,6 @@ int main(int argc, char **argv) {
             mark_inactive();
             ring_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             sleep_ms(20);
             continue;
         }
@@ -1663,70 +1867,71 @@ int main(int argc, char **argv) {
             }
             good_write_streak = 0;
             stream_primed = 0;
-            starvation_since_ms = 0;
             ++reconnects;
             fprintf(stderr,
                     "PCM_PLAY_OPENED reconnects=%ld period_frames=%d channels=%u start_threshold_frames=%d\n",
                     reconnects, active_period_frames, g_audio_channels,
                     active_period_frames * periods);
+            /* U2.63.1: the core keeps filling the fifo while we were in
+             * waiting-for-usb; opening with that stale backlog behind the
+             * ASRC stage produces the initial ~7 s of latency + huge ring.
+             * Drop the fifo content on every fresh open. */
+            flush_input_fifo(in);
+            fprintf(stderr,
+                    "U2517_PCM_PLAY_FIFO_FLUSHED_ON_OPEN ring_fill=%u\n",
+                    rfill);
         }
 
         const unsigned required_samples =
             (unsigned)active_period_frames * g_audio_channels;
-        const unsigned hardware_buffer_samples =
-            required_samples * (unsigned)periods;
-        const unsigned producer_burst_samples =
-            producer_burst_frames * g_audio_channels;
-        /* Fill exactly the hardware buffer before auto-start. Once ALSA
-         * starts, POLLOUT is the consumer clock and the 24 ms grace window
-         * bridges the 16.67 ms libretro producer cadence. An extra producer
-         * burst here only adds latency and is not required for continuity. */
-        const unsigned prime_target = hardware_buffer_samples;
-        const unsigned latency_limit =
-            prime_target + (producer_burst_samples * 2U);
+        const unsigned hw_period_frames = (unsigned)active_period_frames;
 
-        if (rfill > latency_limit) {
-            unsigned trim = rfill - prime_target;
-            trim -= trim % g_audio_channels;
-            latency_trimmed_samples +=
-                (long)ring_drop_oldest_samples(trim);
-            ++latency_trim_events;
-            if (latency_trim_events <= 4 ||
-                (latency_trim_events % 50) == 0) {
-                fprintf(stderr,
-                        "PLAYBACK_LATENCY_TRIM event=%ld trimmed_samples=%u total_trimmed=%ld ring_fill=%u target=%u limit=%u\n",
-                        latency_trim_events, trim,
-                        latency_trimmed_samples, rfill,
-                        prime_target, latency_limit);
-            }
-        }
-
+        /* ---- ASRC clocked write path ---- */
         if (!stream_primed) {
-            if (rfill < prime_target) {
+            if (asrc_total_backlog() < ASRC_PRIME_BACKLOG_FRAMES) {
+                asrc_stage_append();
                 sleep_ms(1);
                 continue;
             }
             stream_primed = 1;
-            starvation_since_ms = 0;
             fprintf(stderr,
-                    "PLAYBACK_CLOCKED_PRIMED ring_fill=%u target=%u hw_buffer_samples=%u producer_burst_samples=%u period_frames=%d channels=%u\n",
-                    rfill, prime_target, hardware_buffer_samples,
-                    producer_burst_samples, active_period_frames,
-                    g_audio_channels);
+                    "PLAYBACK_ASRC_PRIMED backlog=%u target=%u prime=%u "
+                    "channels=%u period=%u\n",
+                    asrc_total_backlog(), ASRC_TARGET_BACKLOG_FRAMES,
+                    ASRC_PRIME_BACKLOG_FRAMES, g_audio_channels,
+                    hw_period_frames);
+        }
+
+        /* U2.63.1: if the producer outpaced us beyond 4x target for a full
+         * second, the PI can take minutes to bleed that backlog off. Force a
+         * clean re-prime instead of limping with multi-hundred-ms latency. */
+        if (asrc_total_backlog() > 3U * ASRC_STAGE_FRAMES) {
+            if (++sustained_overflow_periods >= 8) {
+                ++asrc_resync_events;
+                ring_reset();
+                asrc_source_reset();
+                stream_primed = 0;
+                sustained_overflow_periods = 0;
+                fprintf(stderr,
+                        "U2517_ASRC_BACKLOG_RESYNC event=%llu backlog=%u target=%u\n",
+                        asrc_resync_events, asrc_total_backlog(),
+                        ASRC_TARGET_BACKLOG_FRAMES);
+                continue;
+            }
+        } else {
+            sustained_overflow_periods = 0;
         }
 
         int playback_poll_timeout_ms =
-            (active_period_frames * 1000) / (int)g_audio_rate;
+            (int)((hw_period_frames * 1000U) / g_audio_rate);
         if (playback_poll_timeout_ms < 2) playback_poll_timeout_ms = 2;
-        int writable =
-            wait_playback_writable(pcm, playback_poll_timeout_ms);
+        int writable = wait_playback_writable(pcm, playback_poll_timeout_ms);
         if (writable < 0) {
             ++xruns;
             close(pcm);
             pcm = -1;
-            ring_reset();
+            asrc_source_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             good_write_streak = 0;
             mark_inactive();
             sleep_ms(100);
@@ -1737,47 +1942,31 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        /* Capture data may have arrived while poll waited. */
         drain_fifo(in, &dropped);
 
-        int used_starvation_silence = 0;
-        if (rfill >= required_samples) {
-            unsigned got = ring_pop_samples(out, required_samples);
-            if (got != required_samples) {
-                fprintf(stderr,
-                        "INTERNAL_RING_SHORT_READ got=%u required=%u\n",
-                        got, required_samples);
-                stream_primed = 0;
-                continue;
-            }
-            starvation_since_ms = 0;
+        uint64_t period_step = 0ULL;
+        int used_clock_hold = 0;
+        if (asrc_prepare_period(hw_period_frames, &period_step)) {
+            asrc_render_exact(out, hw_period_frames, period_step);
         } else {
-            unsigned long long now_ms = monotonic_milliseconds();
-            if (starvation_since_ms == 0)
-                starvation_since_ms = now_ms;
-            if (now_ms >= starvation_since_ms &&
-                (now_ms - starvation_since_ms) <
-                    (unsigned long long)starvation_grace_ms) {
-                sleep_ms(1);
-                continue;
-            }
-
             memset(out, 0, required_samples * sizeof(int16_t));
-            used_starvation_silence = 1;
+            used_clock_hold = 1;
             ++starvation_events;
-            ++starvation_silence_periods;
-            starvation_since_ms = 0;
+            ++asrc_clock_hold_periods;
+            asrc_clock_hold_frames += hw_period_frames;
             if (starvation_events <= 4 ||
                 (starvation_events % 100) == 0) {
                 fprintf(stderr,
-                        "PLAYBACK_SOURCE_STARVATION event=%ld ring_fill=%u required=%u grace_ms=%d action=full-silence-period-no-reset\n",
-                        starvation_events, rfill,
-                        required_samples, starvation_grace_ms);
+                        "PLAYBACK_ASRC_CLOCK_HOLD event=%ld backlog=%u "
+                        "stage=%u require_index=%u action=zero-period-no-phase-advance-no-prepare\n",
+                        starvation_events, asrc_total_backlog(),
+                        asrc_stage_frames,
+                        (unsigned)((asrc_phase_q32 >> 32) + ASRC_FIR_LOOKAHEAD));
             }
         }
 
         int local_peak = 0;
-        if (!used_starvation_silence) {
+        if (!used_clock_hold) {
             unsigned i;
             for (i = 0; i < required_samples; ++i) {
                 int value = out[i];
@@ -1792,49 +1981,52 @@ int main(int argc, char **argv) {
         }
 
         int wr = write_frames_exact(
-            pcm, out, active_period_frames, g_audio_channels);
+            pcm, out, (int)hw_period_frames, g_audio_channels);
         if (wr < 0) {
             ++xruns;
             good_write_streak = 0;
             mark_inactive();
             stream_primed = 0;
-            starvation_since_ms = 0;
             if (wr == -EIO || wr == -ENODEV || wr == -ESHUTDOWN ||
                 wr == -EPIPE || wr == -ESTRPIPE) {
                 close(pcm);
                 pcm = -1;
+                asrc_source_reset();
                 sleep_ms(100);
                 continue;
             }
-        } else if (wr != active_period_frames) {
+        } else if (wr != (int)hw_period_frames) {
             ++short_write_events;
             good_write_streak = 0;
             stream_primed = 0;
             mark_inactive();
             fprintf(stderr,
-                    "PLAYBACK_SHORT_WRITE event=%ld wrote=%d expected=%d\n",
-                    short_write_events, wr, active_period_frames);
+                    "PLAYBACK_SHORT_WRITE event=%ld wrote=%d expected=%u\n",
+                    short_write_events, wr, hw_period_frames);
         } else {
             if (good_write_streak < 1000) ++good_write_streak;
             if (good_write_streak >= 8) mark_active();
         }
 
-        total_frames += active_period_frames;
+        total_frames += hw_period_frames;
         ++period_writes;
         if ((period_writes % 200) == 0) {
             fprintf(stderr,
-                    "BRIDGE_PROGRESS_U2517 frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld starvation_silence=%ld starvation_events=%ld xruns=%ld dropped=%ld ring_fill=%u reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%d channels=%u prepare_failures=%ld latency_trim_events=%ld latency_trimmed_samples=%ld poll_timeouts=%ld short_writes=%ld primed=%d\n",
+                    "BRIDGE_PROGRESS_U2517_ASRC frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld clock_hold=%llu starvation_events=%ld asrc_hold_frames=%llu output_frames=%llu periods_rendered=%llu backlog=%u backlog_min=%u backlog_max=%u step_ppm=%d xruns=%ld dropped=%ld reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%u channels=%u prepare_failures=%ld poll_timeouts=%ld short_writes=%ld primed=%d phase_ms=%.1f\n",
                     total_frames, (double)total_frames / 48000.0,
                     period_writes, signal_periods,
-                    source_silence_periods, starvation_silence_periods,
-                    starvation_events, xruns, dropped, rfill,
-                    reconnects, conf, good_write_streak,
+                    source_silence_periods, asrc_clock_hold_periods,
+                    starvation_events, asrc_clock_hold_frames,
+                    asrc_output_frames, asrc_periods_rendered,
+                    asrc_total_backlog(), asrc_backlog_min,
+                    asrc_backlog_max, asrc_step_ppm,
+                    xruns, dropped, reconnects, conf, good_write_streak,
                     cap.active, cap.frames, mon_enabled, play_peak,
                     play_xrun_recoveries, cap_xrun_recoveries,
-                    active_period_frames, g_audio_channels,
-                    playback_prepare_failures, latency_trim_events,
-                    latency_trimmed_samples, poll_timeouts,
-                    short_write_events, stream_primed);
+                    hw_period_frames, g_audio_channels,
+                    playback_prepare_failures, poll_timeouts,
+                    short_write_events, stream_primed,
+                    (double)(asrc_phase_q32 >> 32) * 1000.0 / 48000.0);
             play_peak = 0;
         }
     }

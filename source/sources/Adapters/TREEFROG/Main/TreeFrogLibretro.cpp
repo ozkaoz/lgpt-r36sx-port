@@ -11,6 +11,7 @@
 #include "Adapters/TREEFROG/GUI/TreeFrogEventManager.h"
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
 #include "Adapters/TREEFROG/Main/TreeFrogSamplerInput.h"
+#include "Adapters/TREEFROG/Main/CrashTrap.h"
 #include "Adapters/TREEFROG/System/TreeFrogSystem.h"
 #include "Adapters/TREEFROG/Timer/TreeFrogTimer.h"
 #include "Application/Application.h"
@@ -99,28 +100,14 @@ static uint32_t last_phys_for_combo = 0;
 static unsigned long treefrog_v11_frame_counter = 0;
 
 /*
- * SD lifecycle U2.54b SHUTDOWN_VISIBLE: when the game exits, picoarch returns
- * to TreeFrogUI and the launcher then flushes the RAM log tree to the card.
- * The core still renders frames between the quit request and
- * RETRO_ENVIRONMENT_SHUTDOWN, so we hold that transition open for ~1s with
- * on-screen toasts: users see that the SD is being processed and learn the
- * safe power-off protocol instead of yanking the switch blindly.
- */
-#define U254B_QUIT_SYNCING_TICKS 60
-#define U254B_QUIT_DONE_TICKS 45
-static int g_quit_flush_phase = 0;
-static int g_quit_flush_ticks = 0;
-
-/*
  * TREEFROG_BOOT_DIAG (Bacon 1.1.1 V17-diagnostico): boot-stage marker log.
- * SD lifecycle U2.54b: written to the RAM log tree (/tmp/r36sx_lgpt_logs)
- * like every other session log; the launcher flushes that tree to
- * /mnt/sdcard/LGPT_OTG_LOGS (one contiguous copy + sync) when picoarch
- * returns, so the SD is never written to while the core is running.  Pure
- * diagnostics: it does not change the audio driver, the input path or any
- * view logic.
+ * U2.57: written to tmpfs /tmp/r36sx_lgpt_logs/boot_debug.log so the core
+ * never writes the SD card directly; the shutdown flush moves it to
+ * /mnt/sdcard/LGPT_OTG_LOGS once per power-off.  Pure diagnostics: it does
+ * not change the audio driver, the input path or any view logic.
  */
 static void boot_diag_log(const char *stage) {
+    mkdir("/tmp/r36sx_lgpt_logs", 0777);
     FILE *f = fopen("/tmp/r36sx_lgpt_logs/boot_debug.log", "a");
     if (!f) return;
     fprintf(f, "%lu BOOTDIAG %s\n", treefrog_v11_frame_counter, stage);
@@ -1166,13 +1153,19 @@ static void TreeFrogV51LogProjectRoot(const char *) {}
 
 void retro_init(void) {
     boot_diag_log("retro_init.enter");
-    /* U2.54b FIFO_WRITER_SIGPIPE_HARDEN: the USB bridge opens the audio fifo
-     * O_WRONLY|O_NONBLOCK and the daemon may vanish/restart while a mode
-     * switch is in flight (Sampler/SP404 host-role). A write to a fifo with
-     * no reader then raises SIGPIPE and kills picoarch (exit 141) unless it
-     * is ignored; the bridge already recovers on EPIPE/ENXIO by closing and
-     * re-opening the fifo, so the signal must never reach the process. */
+    /*
+     * H43 CRASH FIX: the USB bridge writes to the SP404/UAC2 FIFOs with a
+     * plain O_WRONLY fd.  Whenever the owning daemon is torn down between
+     * reads (mode switch, supervisor handover, device re-enumeration) the
+     * first write to a reader-less FIFO raises SIGPIPE and kills the core
+     * unless the signal is ignored.  The write() error paths already handle
+     * EPIPE/ENXIO/EBADF; disabling the signal turns the fatal race into a
+     * handled error, matching the daemons (which ignore SIGPIPE).
+     */
     signal(SIGPIPE, SIG_IGN);
+    /* U2.53.0: diagnostic crash trap (dumps registers to tmpfs, then
+     * re-raises).  Pure diagnostics; normal operation is unchanged. */
+    LgptCrashTrapInstall();
     memset(framebuffer, 0, sizeof(framebuffer));
     memset(audio_buffer, 0, sizeof(audio_buffer));
     reset_runtime_state(false);
@@ -1292,15 +1285,30 @@ void retro_run(void) {
     int frames = (int)audio_accum;
     audio_accum -= frames;
     if (frames < 0) frames = 0;
-    if (frames > 2048) frames = 2048;
+    /* U2.71 H39: never discard wall-clock audio budget. The single-shot
+       2048-frame cap threw away ~2.3% of the stream whenever the frontend
+       stalled longer than a 2048-frame render (retro_run gap > ~43 ms);
+       the SP-404 host ASRC then had to stretch that deficit, which is the
+       residual lag/aliasing. Render the full budget in <=2048-frame chunks;
+       the UAC2 fifo and the host ring absorb the burst. Cap at 1 s so a
+       pathological stall cannot dump an unbounded backlog (the host ASRC
+       resync already handles multi-second floods). */
+    if (frames > 48000) frames = 48000;
 
     if ((treefrog_v11_frame_counter % 60) == 0) v11_log_retro("retro.audio.render.enter");
-    TreeFrogAudioDriver *drv = TreeFrogGetAudioDriver();
-    if (drv) drv->Render(audio_buffer, frames);
-    else memset(audio_buffer, 0, frames * 2 * sizeof(int16_t));
+    {
+        int remaining = frames;
+        while (remaining > 0) {
+            int chunk = remaining > 2048 ? 2048 : remaining;
+            TreeFrogAudioDriver *drv = TreeFrogGetAudioDriver();
+            if (drv) drv->Render(audio_buffer, chunk);
+            else memset(audio_buffer, 0, chunk * 2 * sizeof(int16_t));
+            if (audio_batch_cb) audio_batch_cb(audio_buffer, chunk);
+            remaining -= chunk;
+        }
+    }
 
     if ((treefrog_v11_frame_counter % 60) == 0) v11_log_retro("retro.audio.render.leave");
-    if (audio_batch_cb && frames > 0) audio_batch_cb(audio_buffer, frames);
     if (video_cb) {
         unsigned vw, vh; size_t vp;
         uint16_t *vf = make_video_output(TreeFrogGetFramebuffer(), &vw, &vh, &vp);

@@ -136,12 +136,14 @@ def check_vdef_in_range_semantics():
 
 
 def check_src_guards():
-    mv = (ROOT / "source/sources/Application/Views/MixerView.cpp").read_text()
-    mh = (ROOT / "source/sources/Application/Views/MixerView.h").read_text()
-    iv = (ROOT / "source/sources/Application/Views/InstrumentView.cpp").read_text()
-    for token in ("fxResetRow", "vdef", "FX_PAGE_EQ", "FX_PAGE_COMP",
-                  "CMP BYP"):
+    mv = (ROOT / "source/sources/Application/UI/Views/MixerView.cpp").read_text()
+    mh = (ROOT / "source/sources/Application/UI/Views/MixerView.h").read_text()
+    iv = (ROOT / "source/sources/Application/UI/Views/InstrumentView.cpp").read_text()
+    for token in ("fxResetRow", "vdef", "FX_PAGE_EQ", "FX_PAGE_COMP"):
         assert token in mv, token
+    # F3-4a: the table rows moved to FxPages.h.
+    fxp = (ROOT / "source/sources/Application/Mixer/FxPages.h").read_text()
+    assert "CMP BYP" in fxp
     assert "fxResetRow" in mh
     for token in ("TREEFROG_FX_NAV_A_B_DEFAULT_V1",
                   "v.Reset()", "cutInstrument", "EPBM_L2"):

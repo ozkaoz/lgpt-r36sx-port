@@ -25,6 +25,8 @@ LOCK="${LGPT_H38_DETECT_LOCK:-/tmp/r36sx_h38_host_detect.lock}"
 mkdir -p "$RUNTIME" "$LOGROOT" 2>/dev/null || true
 log(){ printf '%s H38_DETECT %s\n' "$(date 2>/dev/null || echo no-date)" "$*" >>"$LOG" 2>/dev/null || true; }
 atomic_write(){ p="$1"; v="$2"; d="$(dirname "$p")"; mkdir -p "$d" 2>/dev/null || true; t="${p}.h38tmp.$$"; rm -f "$t" 2>/dev/null || true; printf '%s\n' "$v" >"$t" 2>/dev/null && mv -f "$t" "$p" 2>/dev/null; }
+# Monotonic uptime clock (RTC is untrusted on this hardware - strays at epoch).
+now_uptime(){ set -- $(cat /proc/uptime 2>/dev/null); echo "${1%%.*}"; }
 
 # ---- helpers -----------------------------------------------------------
 card_index_of(){ p="$1"; echo "${p##*/card}" ; }
@@ -189,9 +191,65 @@ detect_host(){
       fi
     done
   fi
+
+  # ---- U2.55b DETECT_HYSTERESIS -------------------------------------
+  # A re-probe can transiently find nothing while the device is
+  # mid-enumeration or the procfs layout flickers (cardN pcm dirs not yet
+  # created while /dev nodes already exist). Never regress a previously
+  # matched card to "none" while its PCM nodes still exist on disk; the next
+  # successful probe refreshes the details. A real unplug removes the nodes,
+  # so hysteresis releases naturally.
+  if [ "$sp404_card" = "none" ]; then
+    prev_play="$(cat "$RUNTIME/sp404_playback_pcm" 2>/dev/null || echo none)"
+    prev_cap="$(cat "$RUNTIME/sp404_capture_pcm" 2>/dev/null || echo none)"
+    case "$prev_play" in none|''|FAILED|/dev/snd/pcmCnoneD*) prev_play=none;; esac
+    case "$prev_cap" in none|''|FAILED|/dev/snd/pcmCnoneD*) prev_cap=none;; esac
+    if [ "$prev_play" != "none" ] && [ "$prev_cap" != "none" ] \
+       && [ -e "$prev_play" ] && [ -e "$prev_cap" ]; then
+      prev_card="$(cat "$RUNTIME/sp404_card" 2>/dev/null || echo none)"
+      case "$prev_card" in ''|none|FAILED) prev_card=none;; esac
+      if [ "$prev_card" != "none" ]; then
+        sp404_card="$prev_card"
+        sp404_play="$prev_play"
+        sp404_cap="$prev_cap"
+        sp404_caps="$(cat "$RUNTIME/sp404_stream_caps" 2>/dev/null || echo none)"
+        sp404_usbid="$(cat "$RUNTIME/sp404_usb_id" 2>/dev/null || echo none)"
+        sp404_syspath="$(cat "$RUNTIME/sp404_syspath" 2>/dev/null || echo none)"
+        log "SP404_KEEP_HYSTERESIS card=$prev_card play=$prev_play cap=$prev_cap"
+      fi
+    fi
+    # ---- U2.56 REENUM_HOLD ---------------------------------------------
+    # A musb host controller glitch can unenumerate the SP404 for a few
+    # seconds (cards vanish from asound AND /dev). The daemon reconnects
+    # through it with gap-fill; holding the previous marker for a short
+    # window lets the core keep out=1 so the stream resumes seamless.
+    if [ "$sp404_card" = "none" ]; then
+      last_good="$(cat "$RUNTIME/sp404_last_good" 2>/dev/null || echo 0)"
+      age=""
+      if [ "$last_good" -gt 0 ] 2>/dev/null; then
+        age=$(($(now_uptime) - last_good))
+        if [ "$age" -le 20 ]; then
+          prev_card="$(cat "$RUNTIME/sp404_card" 2>/dev/null || echo none)"
+          case "$prev_card" in ''|none|FAILED) prev_card=none;; esac
+          if [ "$prev_card" != "none" ]; then
+            sp404_card="$prev_card"
+            sp404_play="$(cat "$RUNTIME/sp404_playback_pcm" 2>/dev/null || echo none)"
+            sp404_cap="$(cat "$RUNTIME/sp404_capture_pcm" 2>/dev/null || echo none)"
+            sp404_caps="$(cat "$RUNTIME/sp404_stream_caps" 2>/dev/null || echo none)"
+            sp404_usbid="$(cat "$RUNTIME/sp404_usb_id" 2>/dev/null || echo none)"
+            sp404_syspath="$(cat "$RUNTIME/sp404_syspath" 2>/dev/null || echo none)"
+            log "SP404_HOLD_REENUM age=${age}s card=$prev_card play=$sp404_play cap=$sp404_cap"
+          fi
+        fi
+      fi
+    fi
+  fi
   [ "$sp404_card" = "none" ] && log "SP404_NONE card_not_matched"
 
   # ---- Persist markers ------------------------------------------------
+  if [ "$sp404_card" != "none" ]; then
+    atomic_write "$RUNTIME/sp404_last_good" "$(now_uptime)" || true
+  fi
   atomic_write "$RUNTIME/sp404_card" "$sp404_card" || true
   atomic_write "$RUNTIME/sp404_playback_pcm" "$sp404_play" || true
   atomic_write "$RUNTIME/sp404_capture_pcm" "$sp404_cap" || true

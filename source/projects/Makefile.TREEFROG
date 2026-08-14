@@ -93,6 +93,7 @@ TREEFROGDIRS := \
 
 TREEFROGFILES := \
 	TreeFrogLibretro.o \
+	CrashTrap.o \
 	TreeFrogSystem.o \
 	TreeFrogGUIFactory.o \
 	TreeFrogGUIWindowImp.o \
@@ -100,7 +101,6 @@ TREEFROGFILES := \
 	TreeFrogAudio.o \
 	TreeFrogAudioDriver.o \
 	TreeFrogUac2Bridge.o \
-	TreeFrogWindowsSpscTransport.o \
 	TreeFrogTimer.o \
 	UnixFileSystem.o \
 	UnixProcess.o \

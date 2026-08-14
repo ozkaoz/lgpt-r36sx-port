@@ -17,7 +17,7 @@ Verifies the RC4 P7 deliverables:
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VIEWS = ROOT / "source/sources/Application/Views"
+VIEWS = ROOT / "source/sources/Application/UI/Views"
 DOCS = ROOT / "docs"
 
 UIDRAW_CPP = (VIEWS / "BaseClasses/UiDraw.cpp").read_text()
