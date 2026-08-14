@@ -1,8 +1,6 @@
 #!/bin/sh
 BASE=/mnt/sdcard/lgpt/otg
-# SD lifecycle U2.54: the shutdown runner itself logs to tmpfs too; at the end
-# it flushes the entire /tmp/r36sx_lgpt_logs tree to the card once (+ sync).
-LOGROOT=/tmp/r36sx_lgpt_logs
+LOGROOT=/mnt/sdcard/LGPT_OTG_LOGS
 mkdir -p "$LOGROOT" 2>/dev/null || true
 # v14.1: RO-proof logging - if the SD log cannot be opened (dirty FAT
 # mounted read-only) fall back to /tmp so the shutdown always runs before
@@ -45,17 +43,3 @@ for G in /sys/kernel/config/usb_gadget/r36sx_lgpt_*; do
 done
 
 echo "U2517_SHUTDOWN_DONE"
-
-# SD lifecycle U2.54: after every writer above has stopped, flush the RAM log
-# tree to the card once and sync. This converts many hours of byte-at-a-time
-# log appends into a single contiguous copy per power cycle - the core,
-# daemons and scripts never touch the NAND while running.
-if [ -f "$BASE/bin/otg_u241_common.sh" ]; then
-    . "$BASE/bin/otg_u241_common.sh"
-fi
-if command -v u2414_flush_logs_to_sd >/dev/null 2>&1; then
-    u2414_flush_logs_to_sd
-fi
-sync
-
-echo "U2517_SHUTDOWN_FLUSH_DONE"

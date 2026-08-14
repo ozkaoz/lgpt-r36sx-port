@@ -6,9 +6,7 @@
 set -u
 BASE=/mnt/sdcard/lgpt/otg
 BIN=$BASE/bin
-# SD lifecycle U2.54: runtime log churn goes to tmpfs while running; only the
-# clean-shutdown flush writes LGPT_OTG_LOGS on the card.
-LOGROOT=/tmp/r36sx_lgpt_logs
+LOGROOT=/mnt/sdcard/LGPT_OTG_LOGS
 RUNTIME=/tmp/r36sx_lgpt_usb
 mkdir -p "$LOGROOT" "$RUNTIME" 2>/dev/null || true
 

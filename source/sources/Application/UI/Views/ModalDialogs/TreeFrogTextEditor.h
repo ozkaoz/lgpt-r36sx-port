@@ -40,13 +40,9 @@ public:
 protected:
     // Re-seeds the edited text (used by NewProjectDialog::SetInitialName).
     void setInitialText(const char *text);
-    void setStatus(const char *text);
-    // RANDOM_NAME_V1: called when the user presses SELECT in the editor.
-    // Base implementation is a no-op; NewProjectDialog overrides it to
-    // generate a random project name (djdiskmachine LGPT behaviour).
-    virtual void OnRandomize();
 
 private:
+    void setStatus(const char *text);
     void moveCursor(int delta);
     void cycleCharacter(int delta);
     void toggleCase();

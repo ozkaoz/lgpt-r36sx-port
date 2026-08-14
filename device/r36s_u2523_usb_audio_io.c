@@ -106,7 +106,9 @@ static void mirror_runtime_state(const char *path, const char *text) {
     const char *base = path ? strrchr(path, '/') : 0;
     base = base ? base + 1 : path;
     if (!base || !base[0]) return;
-    mkdir("/tmp/r36sx_lgpt_logs/mirror/runtime_state", 0777);
+    mkdir("/mnt/sdcard/lgpt/otg", 0777);
+    mkdir("/mnt/sdcard/lgpt/otg/logs", 0777);
+    mkdir(RUNTIME_MIRROR_DIR, 0777);
     char out[256];
     snprintf(out, sizeof(out), "%s/%s", RUNTIME_MIRROR_DIR, base);
     int fd = open(out, O_WRONLY | O_CREAT | O_TRUNC, 0666);

@@ -15,7 +15,6 @@
 #include "Adapters/TREEFROG/System/TreeFrogSystem.h"
 #include "Adapters/TREEFROG/Timer/TreeFrogTimer.h"
 #include "Application/Application.h"
-#include "Application/AppWindow.h"
 #include "System/System/System.h"
 
 extern "C" void TreeFrogAppWindow_SynchronizeInputMask(
@@ -1319,40 +1318,8 @@ void retro_run(void) {
         TreeFrogSetQuitRequested(true);
     }
 
-    if (TreeFrogQuitRequested()) {
-        /* SD lifecycle U2.54b: pace the retro shutdown call so the user can
-         * see the SD-sync notice while the core still owns the screen. */
-        switch (g_quit_flush_phase) {
-        case 0:
-            g_quit_flush_phase = 1;
-            g_quit_flush_ticks = 0;
-            if (AppWindow::GetInstance()) {
-                AppWindow::GetInstance()->ShowShutdownNotice(
-                    "Syncing SD... don't power off");
-            }
-            break;
-        case 1:
-            ++g_quit_flush_ticks;
-            if (g_quit_flush_ticks >= U254B_QUIT_SYNCING_TICKS) {
-                g_quit_flush_phase = 2;
-                g_quit_flush_ticks = 0;
-                if (AppWindow::GetInstance()) {
-                    AppWindow::GetInstance()->ShowShutdownNotice(
-                        "SD synced. Power off from the menu");
-                }
-            }
-            break;
-        default:
-            ++g_quit_flush_ticks;
-            if (g_quit_flush_ticks >= U254B_QUIT_DONE_TICKS) {
-                g_quit_flush_phase = 0;
-                g_quit_flush_ticks = 0;
-                if (environ_cb) {
-                    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, 0);
-                }
-            }
-            break;
-        }
+    if (TreeFrogQuitRequested() && environ_cb) {
+        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, 0);
     }
 }
 

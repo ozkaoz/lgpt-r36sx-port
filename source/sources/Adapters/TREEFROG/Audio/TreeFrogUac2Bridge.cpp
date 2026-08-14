@@ -1110,12 +1110,8 @@ static void ensure_setup_started(void) {
 
     const pid_t pid = fork();
     if (pid == 0) {
-        /* SD lifecycle U2.54b: setup log goes to the RAM mirror dir; the
-         * exit flush posts it to /mnt/sdcard/lgpt/otg/logs (the path
-         * collect_logs.sh reads from the host). /tmp fallback kept for
-         * RO-FAT / no-tmpfs safety. */
         int fd = open(
-            "/tmp/r36sx_lgpt_logs/mirror/u241_setup_from_lgpt.log",
+            "/mnt/sdcard/lgpt/otg/logs/u241_setup_from_lgpt.log",
             O_WRONLY | O_CREAT | O_TRUNC,
             0666);
         if (fd < 0)

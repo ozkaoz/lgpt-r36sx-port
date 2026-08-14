@@ -39,9 +39,6 @@ class AppWindow : public GUIWindow, I_Observer, Status {
     // (master), 2 = stems (multitrack). The render state machine in
     // H35PollExternalExport consumes the request once the project is loaded.
     void RequestExportRender(int mode);
-    // SD lifecycle U2.54b SHUTDOWN_VISIBLE: shows the current-view toast
-    // (View::SetNotification) during the core's exit sequence.
-    void ShowShutdownNotice(const char *msg);
 
     virtual void Clear(bool all = false);
     virtual void ClearRect(GUIRect &rect);

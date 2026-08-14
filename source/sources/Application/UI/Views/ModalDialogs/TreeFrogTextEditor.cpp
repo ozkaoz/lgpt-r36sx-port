@@ -99,9 +99,8 @@ void TreeFrogTextEditor::DrawView() {
     DrawString(1, 5, "UP/DOWN char   X+UP/DOWN +/-5", props);
     DrawString(1, 6, "LEFT/RIGHT cursor   L1+X case", props);
     DrawString(1, 7, "A confirm  B erase  R1+LEFT cancel", props);
-    DrawString(1, 8, "SELECT random name", props);
     SetColor(CD_HILITE1);
-    DrawString(1, 9, status_, props);
+    DrawString(1, 8, status_, props);
 }
 
 void TreeFrogTextEditor::OnFocus() {
@@ -196,12 +195,6 @@ void TreeFrogTextEditor::eraseCharacter() {
     isDirty_ = true;
 }
 
-// RANDOM_NAME_V1: base no-op. Dialogs that support random names override
-// this (NewProjectDialog fills the stem with getRandomName()).
-void TreeFrogTextEditor::OnRandomize() {
-    setStatus("Random name not available here");
-}
-
 void TreeFrogTextEditor::processPhysicalInput() {
     TreeFrogSamplerInputSnapshot snapshot;
     memset(&snapshot, 0, sizeof(snapshot));
@@ -231,13 +224,6 @@ void TreeFrogTextEditor::processPhysicalInput() {
     }
     if ((current & TFSP_L1) && (newBits & TFSP_X)) {
         toggleCase();
-        return;
-    }
-    /* RANDOM_NAME_V1: R1+A generates a random name in dialogs that
-     * support it (NewProjectDialog). Checked before the single-action
-     * gate so it works even while other buttons are held. */
-    if ((current & TFSP_R1) && (newBits & TFSP_A)) {
-        OnRandomize();
         return;
     }
     if (current & TFSP_X) {

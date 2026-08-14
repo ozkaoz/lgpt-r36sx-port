@@ -361,10 +361,10 @@ void SelectProjectDialog::OnFocus() {
 void SelectProjectDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
 	if (!pressed) return ;
 
-    // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): SELECT on the startup menu
-    // opens a project actions menu (Rename / Export / Delete). Must be
-    // checked before the plain A branch below (Load/New/Exit).
-    if (mask & EPBM_SELECT) {
+    // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): R1+A on the startup menu opens
+    // a project actions menu (Rename / Export / Delete). Must be checked
+    // before the plain A branch below (Load/New/Exit).
+    if ((mask & EPBM_R) && (mask & EPBM_A)) {
         if (currentProject_ >= 0 && currentProject_ < content_.Size()) {
             static const char *actionItems[] = {"Rename", "Export", "Delete"};
             TreeFrogMenuModal *menu =
