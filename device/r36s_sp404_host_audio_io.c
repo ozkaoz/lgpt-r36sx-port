@@ -254,6 +254,7 @@ static void mirror_runtime_state(const char *path, const char *text) {
 #else
     (void)path;
     (void)text;
+    (void)RUNTIME_MIRROR_DIR;
 #endif
 }
 
@@ -2806,7 +2807,6 @@ int main(int argc, char **argv) {
     int last_conf = -1;
     int play_peak = 0;
     int stream_primed = 0;
-    unsigned long long starvation_since_ms = 0;
     long fifo_samples_last = 0;
     unsigned sustained_overflow_periods = 0;
     unsigned long long asrc_resync_events = 0;
@@ -2856,7 +2856,6 @@ int main(int argc, char **argv) {
             playback_parked = 1;
             ring_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             good_write_streak = 0;
             mark_inactive();
             write_text_file(PLAYBACK_PCM_STATUS, "parked-for-capture\n");
@@ -2880,7 +2879,6 @@ int main(int argc, char **argv) {
             ring_reset();
             asrc_source_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             good_write_streak = 0;
             mark_inactive();
             sleep_ms(80);
@@ -2900,7 +2898,6 @@ int main(int argc, char **argv) {
             ring_reset();
             asrc_source_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             sleep_ms(20);
             continue;
         }
@@ -3032,7 +3029,6 @@ int main(int argc, char **argv) {
             }
             good_write_streak = 0;
             stream_primed = 0;
-            starvation_since_ms = 0;
             ++reconnects;
             fprintf(stderr,
                     "PCM_PLAY_OPENED reconnects=%ld period_frames=%d channels=%u start_threshold_frames=%d\n",
@@ -3062,7 +3058,6 @@ int main(int argc, char **argv) {
                 continue;
             }
             stream_primed = 1;
-            starvation_since_ms = 0;
             fprintf(stderr,
                     "PLAYBACK_ASRC_PRIMED backlog=%u target=%u prime=%u "
                     "period=%u gain=%.2f\n",
@@ -3111,7 +3106,6 @@ int main(int argc, char **argv) {
             ring_reset();
             asrc_source_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             good_write_streak = 0;
             mark_inactive();
             eio_backoff_sleep();
@@ -3140,14 +3134,12 @@ int main(int argc, char **argv) {
                 for (pd = 0U; pd < hw_period_frames; ++pd)
                     fifo_dump_write(out + pd * 2U);
             }
-            starvation_since_ms = 0;
         } else {
             memset(out, 0, required_samples * sizeof(int16_t));
             used_starvation_silence = 1;
             ++starvation_events;
             ++asrc_clock_hold_periods;
             asrc_clock_hold_frames += hw_period_frames;
-            starvation_since_ms = 0;
             if (starvation_events <= 4 ||
                 (starvation_events % 100) == 0) {
                 fprintf(stderr,
@@ -3190,7 +3182,6 @@ int main(int argc, char **argv) {
             good_write_streak = 0;
             mark_inactive();
             stream_primed = 0;
-            starvation_since_ms = 0;
             if (xruns <= 4 || (xruns % 10) == 0) {
                 fprintf(stderr,
                         "PLAY_XRUN_DETAIL rc=%d errno=%d (%s) ring_fill=%u reconnects=%ld\n",

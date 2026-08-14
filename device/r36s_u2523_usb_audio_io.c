@@ -116,6 +116,7 @@ static void mirror_runtime_state(const char *path, const char *text) {
 #else
     (void)path;
     (void)text;
+    (void)RUNTIME_MIRROR_DIR;
 #endif
 }
 
@@ -542,12 +543,6 @@ static unsigned rpos = 0, wpos = 0, rfill = 0;
 static void ring_reset(void) { rpos = wpos = rfill = 0; }
 static unsigned ring_push_samples(const int16_t *s, unsigned n) { unsigned pushed = 0; while (pushed < n && rfill < RING_SAMPLES) { ring[wpos] = s[pushed++]; wpos = (wpos + 1) % RING_SAMPLES; rfill++; } return pushed; }
 static unsigned ring_pop_samples(int16_t *d, unsigned n) { unsigned popped = 0; while (popped < n && rfill > 0) { d[popped++] = ring[rpos]; rpos = (rpos + 1) % RING_SAMPLES; rfill--; } return popped; }
-static unsigned ring_drop_oldest_samples(unsigned n) {
-    unsigned dropped = n < rfill ? n : rfill;
-    rpos = (rpos + dropped) % RING_SAMPLES;
-    rfill -= dropped;
-    return dropped;
-}
 /* T7 BACON14: the fifo is a byte stream; a read can return any byte
  * count, and one PCM frame is 2 (mono) or 4 (stereo) bytes. The old
  * r/2 truncation silently discarded an odd trailing byte, shifting the
@@ -1818,6 +1813,7 @@ int main(int argc, char **argv) {
     long reconnects = 0;
     long playback_prepare_failures = 0;
     long short_write_events = 0;
+    long long pcm_down_since_ms = 0;
     int good_write_streak = 0;
     int last_conf = -1;
     int play_peak = 0;
@@ -1859,6 +1855,7 @@ int main(int argc, char **argv) {
             if (pcm >= 0) {
                 close(pcm);
                 pcm = -1;
+                pcm_down_since_ms = monotonic_milliseconds();
                 fprintf(stderr, "PCM_PLAY_CLOSED_USB_DISCONNECTED\n");
             }
             active_period_frames = period_frames;
@@ -1937,11 +1934,29 @@ int main(int argc, char **argv) {
             /* U2.63.1: the core keeps filling the fifo while we were in
              * waiting-for-usb; opening with that stale backlog behind the
              * ASRC stage produces the initial ~7 s of latency + huge ring.
-             * Drop the fifo content on every fresh open. */
-            flush_input_fifo(in);
-            fprintf(stderr,
-                    "U2517_PCM_PLAY_FIFO_FLUSHED_ON_OPEN ring_fill=%u\n",
-                    rfill);
+             * Drop the fifo content ONLY when the downtime was long enough
+             * for the content to be stale (T10 BACON14: Windows UAC2
+             * re-enumerates the endpoint on transport resets; flushing on
+             * every quick reopen cut ~50-100 ms of fresh audio and caused
+             * the choppy playback).  A quick reopen keeps the fifo and the
+             * ring (which kept draining), so playback resumes instantly. */
+            {
+                const long long now_ms = monotonic_milliseconds();
+                const int stale_backlog =
+                    (pcm_down_since_ms <= 0) ||
+                    ((now_ms - pcm_down_since_ms) >= 250LL);
+                if (stale_backlog) {
+                    flush_input_fifo(in);
+                    fprintf(stderr,
+                            "U2517_PCM_PLAY_FIFO_FLUSHED_ON_OPEN ring_fill=%u\n",
+                            rfill);
+                } else {
+                    fprintf(stderr,
+                            "PCM_PLAY_REOPEN_KEEP_FIFO down_ms=%lld ring_fill=%u\n",
+                            (long long)(now_ms - pcm_down_since_ms), rfill);
+                }
+                pcm_down_since_ms = 0;
+            }
         }
 
         const unsigned required_samples =
@@ -1992,6 +2007,7 @@ int main(int argc, char **argv) {
             ++xruns;
             close(pcm);
             pcm = -1;
+            pcm_down_since_ms = monotonic_milliseconds();
             asrc_source_reset();
             stream_primed = 0;
             good_write_streak = 0;

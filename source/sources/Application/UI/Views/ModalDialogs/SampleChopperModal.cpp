@@ -1980,7 +1980,11 @@ bool SampleChopperModal::restoreLastDestructiveEdit(bool redo) {
 void SampleChopperModal::togglePitchMode() {
     stopSamplePreview();
     if (!hasAssignedSample()) { setStatus("No sample for pitch"); return; }
-    if (!hasWaveform_) { setStatus("No waveform loaded"); return; }
+    /* BACON14: the pitch menu must stay accessible even when the
+     * sample is stopped (hasWaveform_ only reflects the last
+     * waveform build and can be false without playback).  All
+     * pitch operations re-validate the sample buffers below, so
+     * removing the waveform gate is safe. */
     if (sourceSize_ <= 1 || sourceChannels_ <= 0 || sourceRate_ <= 0) { setStatus("Sample not ready for pitch"); return; }
     // Safety: verify sample data is accessible before entering pitch mode
     SamplePool *pool = SamplePool::GetInstance();
