@@ -34,6 +34,20 @@ assert "stale_backlog" in daemon
 # 4. Daemon: el flush sigue existiendo para el caso stale (U2.63.1).
 assert "flush_input_fifo(in);" in daemon
 
+# 7. Daemon: estabilidad del stream (diagnostico de la SD del 14-08-2026).
+#    El print BRIDGE_PROGRESS cada 200 periodos (2 s, ~510 B a la SD)
+#    detenia el daemon y underflowaba el buffer ALSA (secuencia print ->
+#    POLLERR -> close+reopen cada 2 s en el log U2517_USB_AUDIO_DAEMON.log:
+#    121 reopens en 24 s, down_ms=132-140, xruns=14, backlog oscilando
+#    350<->24000, clock_hold=160).  Fixes: print a 2000 periodos (20 s),
+#    buffer ALSA 8 periodos (80 ms), y recuperacion IN PLACE (PREPARE) en
+#    el poll error antes de close+reopen.
+assert re.search(r"const int periods = 8;", daemon), "buffer ALSA 8 periodos"
+assert re.search(r"period_writes % 2000\) == 0", daemon), "progreso a 2000 periodos"
+assert "recover_xrun_in_place(pcm, 0, EPIPE);" in daemon, "recuperacion in-place"
+assert re.search(r"if \(inplace == 0\) \{\n\s+good_write_streak = 0;\n\s+continue;\n\s+\}", daemon), "continuar sin close en recuperacion in-place"
+assert "(disconnect real)" in daemon, "comentario BACON14 del poll-error"
+
 # 5. Chopper: togglePitchMode sin el gate hasWaveform_ (el sample detenido
 #    no bloquea la entrada al menu Pitch/Envelope).
 togg = chopper[chopper.index("void SampleChopperModal::togglePitchMode()"):]

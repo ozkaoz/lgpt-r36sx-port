@@ -1758,7 +1758,7 @@ int main(int argc, char **argv) {
     g_audio_rate = 48000;
     const int lowlat = path_exists(LOWLAT_SENTINEL);
     const int period_frames = lowlat ? 240 : 480;
-    const int periods = 4;
+    const int periods = 8;
     const int starvation_grace_ms = 24;
 
     setvbuf(stderr, 0, _IOLBF, 4096);
@@ -2004,6 +2004,19 @@ int main(int argc, char **argv) {
         if (playback_poll_timeout_ms < 2) playback_poll_timeout_ms = 2;
         int writable = wait_playback_writable(pcm, playback_poll_timeout_ms);
         if (writable < 0) {
+            /* BACON14: el poll error del gadget UAC2 es casi siempre un
+             * underflow provocado por un stall del propio daemon (el print
+             * grande a la SD, trafico del mismo SD).  El close+reopen
+             * anterior cortaba 130-150 ms de audio y realimentaba el ciclo
+             * (re-prime con ring enorme, PI saturado, segundo underflow).
+             * Recuperar IN PLACE con un PREPARE conserva el stream y el
+             * stage: el buffer se rellena al instante, sin corte audible.
+             * Solo si el PREPARE falla se cierra y reabre (disconnect real). */
+            int inplace = recover_xrun_in_place(pcm, 0, EPIPE);
+            if (inplace == 0) {
+                good_write_streak = 0;
+                continue;
+            }
             ++xruns;
             close(pcm);
             pcm = -1;
@@ -2096,7 +2109,7 @@ int main(int argc, char **argv) {
 
         total_frames += hw_period_frames;
         ++period_writes;
-        if ((period_writes % 200) == 0) {
+        if ((period_writes % 2000) == 0) {
             fprintf(stderr,
                     "BRIDGE_PROGRESS_U2517_ASRC frames=%ld seconds=%.2f writes=%ld signal=%ld source_silence=%ld clock_hold=%llu starvation_events=%ld asrc_hold_frames=%llu output_frames=%llu periods_rendered=%llu backlog=%u backlog_min=%u backlog_max=%u step_ppm=%d xruns=%ld dropped=%ld reconnects=%ld configured=%d good_streak=%d cap_active=%d cap_frames=%ld monitor=%d play_peak=%d play_xrun_recoveries=%ld cap_xrun_recoveries=%ld period=%u channels=%u prepare_failures=%ld poll_timeouts=%ld short_writes=%ld primed=%d phase_ms=%.1f avail_min=%ld avail_max=%ld\n",
                     total_frames, (double)total_frames / 48000.0,
