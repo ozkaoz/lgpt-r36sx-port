@@ -107,9 +107,6 @@ h35_insmod_with_diag(){
   err="$(insmod "$p" 2>&1 || true)"
   rc=$?
   [ "$rc" -eq 0 ] && return 0
-  # rc=17 (EEXIST / "File exists"): module already built-in or loaded on this
-  # kernel. Treat as success so the host stack does not abort a working mode.
-  [ "$rc" -eq 17 ] && return 0
   {
     echo "insmod FAILED rc=$rc path=$p"
     echo "  stderr: $err"
@@ -172,33 +169,6 @@ h35_load_host_stack(){
   return 0
 }
 
-# U2.55b FIFO-GUARDIAN v2: between runtime teardown and the new daemon opening
-# its fifo, the core may open/write the target fifo with no reader -> EPIPE ->
-# SIGPIPE (PICO_EXIT=141 in the 2026-08-11 field test, both mode switches).
-# Hold an O_RDWR handle on the target fifo (re-opened every 150 ms to track
-# node recreation by the setup script) until the new daemon proves alive with
-# the expected ABI marker; then release. The handle is closed before streaming
-# starts (daemon_version is written only after the daemon opened the fifo), so
-# it never splits steady-state audio. Cap 45 s covers full gadget rebuilds.
-guardian_hold(){
-  FIFO="$1"; MARK="$2"; NAME="$3"
-  (
-    end=$(( $(date +%s 2>/dev/null || echo 0) + 45 ))
-    while :; do
-      exec 9<>"$FIFO" 2>/dev/null || true
-      dp="$(cat "$RUNTIME/daemon_pid" 2>/dev/null || echo 0)"
-      if kill -0 "$dp" 2>/dev/null && grep -q "$MARK" "$RUNTIME/daemon_version" 2>/dev/null; then
-        exec 9<&- 2>/dev/null || true
-        exit 0
-      fi
-      now="$(date +%s 2>/dev/null || echo 0)"
-      [ "$now" -ge "$end" ] && { exec 9<&- 2>/dev/null || true; exit 0; }
-      sleep 0.15
-    done
-  ) >/dev/null 2>&1 &
-  log "GUARDIAN_HOLD name=$NAME fifo=$FIFO pid=$!"
-}
-
 case "$MODE" in
   WINDOWS) atomic_write "$RUNTIME/audio_usb_profile" "STEREO_48K"; atomic_write "$BASE/audio_usb_profile" "STEREO_48K" ;;
   ANDROID) atomic_write "$RUNTIME/audio_usb_profile" "STEREO_44K1_AOA_BULK";;
@@ -215,7 +185,6 @@ case "$MODE" in
     log MODE_APPLY_READY
     ;;
   WINDOWS)
-    guardian_hold /tmp/r36sx_uac2_bridge_fifo 'R36SX_USB_AUDIO_DAEMON_ABI=7' windows
     stop_android_runtime
     [ -r "$BIN/otg_u241_setup_once.sh" ] || { atomic_write "$STATUS" "ERROR mode=WINDOWS missing=setup" || true; exit 31; }
     /bin/sh "$BIN/otg_u241_setup_once.sh" >>"$LOG" 2>&1 & p=$!
@@ -228,7 +197,6 @@ case "$MODE" in
     # mode file and runs capture-only). The ALSA host stack is MANDATORY: if
     # the essential modules fail to load, abort with ERROR instead of
     # switching to host role and reporting a phantom "STARTED" without a card.
-    guardian_hold /tmp/r36sx_sp404_pcm_fifo 'R36SX_SP404_AUDIO_DAEMON_ABI=1' sp404
     stop_windows_runtime
     stop_android_runtime
     h35_clear_transient_state
@@ -245,7 +213,6 @@ case "$MODE" in
     ;;
   MIDI)
     # USB-MIDI piano/controller. The ALSA host stack is mandatory.
-    guardian_hold /tmp/r36sx_midi_pcm_fifo 'R36SX_MIDI_DAEMON_ABI=1' midi
     stop_windows_runtime
     stop_android_runtime
     h35_clear_transient_state

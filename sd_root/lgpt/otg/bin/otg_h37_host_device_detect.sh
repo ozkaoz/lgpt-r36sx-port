@@ -31,29 +31,6 @@ now_uptime(){ set -- $(cat /proc/uptime 2>/dev/null); echo "${1%%.*}"; }
 # ---- helpers -----------------------------------------------------------
 card_index_of(){ p="$1"; echo "${p##*/card}" ; }
 is_audio_card(){ c="$1"; [ -e "/proc/asound/$c/pcm0c" ] || [ -e "/proc/asound/$c/pcm0p" ]; }
-# H38.6 GADGET_GUARD: reject ALSA cards owned by the console's own UAC2 gadget
-# (configfs function bound to musb-hdrc.0.auto) instead of an external USB
-# device. In host role the gadget card can linger with stale /dev/snd nodes
-# after a role switch; adopting it as the SP404 streams the core into its OWN
-# local PCM (2026-08-12 field test: SP404 daemon opened pcmC0D0p = UAC2Gadget
-# whose stream was already RUNNING -> port crash, sampler silent).
-card_is_gadget(){
-  idx="$1"
-  case "$idx" in ''|*[!0-9]*) return 1;; esac
-  # A real SP404 card is NEVER named UAC2Gadget (it uses the product string),
-  # while the console's own gadget function registers exactly this name.
-  if grep -q "^[[:space:]]*$idx \[UAC2Gadget" /proc/asound/cards 2>/dev/null; then
-    return 0
-  fi
-  # The console gadget lives on the PERIPHERAL side of the controller
-  # (usb0/configfs). A real USB device on the host side (usb1/x-x) is a true
-  # SP404 - do NOT reject on musb-hdrc.0.auto alone.
-  rl="$(readlink -f "/sys/class/sound/card$idx/device" 2>/dev/null || true)"
-  case "$rl" in
-    */usb0/*|*/gadget/*|*configfs*) return 0;;
-  esac
-  return 1
-}
 sysfs_usb_id(){ d="$1"; v="$(cat "$d/idVendor" 2>/dev/null || true)"; i="$(cat "$d/idProduct" 2>/dev/null || true)"; [ -n "$v" ] && [ -n "$i" ] && echo "$v:$i"; }
 usb_tree_dump(){
   log "--- USB BUS DUMP ---"
@@ -135,10 +112,6 @@ detect_host(){
       log "SP404_CARD_SKIP idx=$idx reason=no_pcm_dir"
       continue
     fi
-    if card_is_gadget "$idx"; then
-      log "SP404_CARD_SKIP idx=$idx reason=local_gadget"
-      continue
-    fi
     syslink="/sys/class/sound/card$idx/device"
     if [ ! -e "$syslink" ]; then
       log "SP404_CARD_SKIP idx=$idx reason=no_syslink path=$syslink"
@@ -198,12 +171,6 @@ detect_host(){
   # layout can differ), adopt the single PCM card that exposes a matched PLAY
   # + CAPTURE pair on the same D index. In host role the only ALSA audio card
   # is the connected USB device, so a sole duplex card IS the SP404.
-  # H38.6 GADGET_GUARD: the fallback must NEVER adopt the console's own
-  # UAC2Gadget card. The gadget registers a real ALSA card (idx 0) with
-  # /dev/snd/pcmC0D0p+c nodes - after a WINDOWS session the gadget can stay
-  # bound/armed, and in host role its PCM still exists (RUNNING, owned by the
-  # local uac2 daemon). Adopting it made the SP404 daemon stream into the
-  # console's OWN PCM (2026-08-12 field test crash).
   if [ "$sp404_card" = "none" ]; then
     for p in /dev/snd/pcmC*D*p; do
       [ -e "$p" ] || continue
@@ -212,15 +179,6 @@ detect_host(){
         idx="$(echo "$dev" | sed -n 's/^pcmC\([0-9]*\)D.*/\1/p')"
         pdev="$(echo "$dev" | sed -n 's/^pcm\(C[0-9]*D[0-9]*\)p/\1/p')"
         [ -n "$idx" ] && [ -n "$pdev" ] || continue
-        # Never adopt the console's own UAC2 gadget card, even if its PCM
-        # nodes still exist under /dev/snd in host role.
-        if card_is_gadget "$idx"; then
-          log "SP404_FALLBACK_SKIP idx=$idx dev=$dev reason=local_gadget"
-          continue
-        fi
-        # The card must also be present in /proc/asound (a stale /dev node
-        # with no live ALSA card must not be adopted).
-        [ -d "/proc/asound/card$idx" ] || { log "SP404_FALLBACK_SKIP idx=$idx dev=$dev reason=no_live_card"; continue; }
         sp404_card="$idx"
         sp404_pcm="$pdev"
         sp404_play="/dev/snd/${dev%p}p"
@@ -250,7 +208,7 @@ detect_host(){
        && [ -e "$prev_play" ] && [ -e "$prev_cap" ]; then
       prev_card="$(cat "$RUNTIME/sp404_card" 2>/dev/null || echo none)"
       case "$prev_card" in ''|none|FAILED) prev_card=none;; esac
-      if [ "$prev_card" != "none" ] && ! card_is_gadget "$prev_card"; then
+      if [ "$prev_card" != "none" ]; then
         sp404_card="$prev_card"
         sp404_play="$prev_play"
         sp404_cap="$prev_cap"
@@ -273,7 +231,7 @@ detect_host(){
         if [ "$age" -le 20 ]; then
           prev_card="$(cat "$RUNTIME/sp404_card" 2>/dev/null || echo none)"
           case "$prev_card" in ''|none|FAILED) prev_card=none;; esac
-          if [ "$prev_card" != "none" ] && ! card_is_gadget "$prev_card"; then
+          if [ "$prev_card" != "none" ]; then
             sp404_card="$prev_card"
             sp404_play="$(cat "$RUNTIME/sp404_playback_pcm" 2>/dev/null || echo none)"
             sp404_cap="$(cat "$RUNTIME/sp404_capture_pcm" 2>/dev/null || echo none)"
@@ -317,14 +275,9 @@ detect_host(){
 
 if ! mkdir "$LOCK" 2>/dev/null; then log "DETECT_BUSY"; exit 40; fi
 trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT INT TERM
-# H38.8: the diagnostics dump (dmesg grep + sysfs walk) takes 2-4 s on the R36S
-# and ran synchronously BEFORE the SP404 daemon downstream - the supervisor's
-# first detect_now delayed daemon start ~5 s (field measurement 00:00:37 ->
-# 00:00:42) which is most of the perceived 7 s initial lag. The dump is
-# diagnostics-only, so run it detached: detect_host persists the markers
-# immediately and the supervisor starts streaming without waiting.
 if [ ! -e /tmp/r36sx_h38_usb_diag_done ]; then
-  ( usb_tree_dump; : > /tmp/r36sx_h38_usb_diag_done ) >/dev/null 2>&1 &
+  usb_tree_dump
+  touch /tmp/r36sx_h38_usb_diag_done
 fi
 detect_host
 log "HOST_DETECT_DONE"

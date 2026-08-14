@@ -8,11 +8,7 @@ PICO="${LGPT_PICO:-$ROOT/cubegm/picoarch}"
 CORE="${LGPT_CORE:-$ROOT/cubegm/cores/lgpt_r36sx_port_libretro.so}"
 ROM="${1:-${LGPT_ROM:-$ROOT/roms/lgpt/start.lgpt}}"
 DATA="${LGPT_DATA:-$ROOT/lgpt}"
-# SD lifecycle U2.54: the launcher log captures ALL of picoarch/core stdout
-# (continuous) - it must live in RAM during the session, not on the SD. The
-# clean-shutdown script flushes /tmp/r36sx_lgpt_logs to LGPT_OTG_LOGS once.
-# LGPT_LOGROOT still overrides for host tests/install flows.
-LOGROOT="${LGPT_LOGROOT:-/tmp/r36sx_lgpt_logs}"
+LOGROOT="${LGPT_LOGROOT:-$ROOT/LGPT_OTG_LOGS}"
 LOG="$LOGROOT/LGPT_U2524_COPYROOT_UAC2_LAUNCHER.log"
 CONFIG="$DATA/config.xml"
 CONFIG_TEMPLATE="$DATA/config.stock.xml"
@@ -51,18 +47,6 @@ log "PICO=$PICO"
 log "CORE=$CORE"
 log "ROM=$ROM"
 log "DATA=$DATA"
-
-# SD lifecycle U2.54: quiet the card. A FAT/exFAT mount keeps updating atime
-# on every read (the whole rom/launcher scan), which wears the NAND for
-# nothing. Remount noatime best-effort (arkOS already uses noatime). This is
-# host-test safe: the remount target must be a real mountpoint, else skip.
-if [ -f /proc/self/mounts ] && grep -q " $ROOT " /proc/self/mounts 2>/dev/null; then
-    if mount -o remount,noatime "$ROOT" 2>>"$LOG"; then
-        log "SD_NOATIME=1 TARGET=$ROOT"
-    else
-        log "SD_NOATIME_REMOUNT_NOOP=1 TARGET=$ROOT"
-    fi
-fi
 
 # Restore a known-good configuration only when config.xml is absent or empty.
 if [ ! -s "$CONFIG" ]; then
@@ -150,23 +134,4 @@ fi
 
 cd "$DATA" 2>>"$LOG" || fail 34 "Cannot enter LGPT data directory: $DATA"
 log "EXEC=$PICO $CORE $ROM"
-
-# SD lifecycle U2.54b: run picoarch instead of exec'ing it, so the moment the
-# core/game exits we can flush the RAM log tree to the card once and sync.
-# Every writer (core, bridge, daemons, scripts) only touches /tmp while the
-# game runs; returning to TreeFrogUI is the single safe SD-write point per
-# power cycle. Best-effort: a dirty FAT mounted read-only must not block the
-# return to the menu (the RAM copy survives for the next session).
-"$PICO" "$CORE" "$ROM" >>"$LOG" 2>&1
-PICO_RC=$?
-log "PICO_EXIT=$PICO_RC"
-
-if [ -f "$DATA/otg/bin/otg_u241_common.sh" ]; then
-    . "$DATA/otg/bin/otg_u241_common.sh" 2>>"$LOG" || true
-fi
-if command -v u2414_flush_logs_to_sd >/dev/null 2>&1; then
-    u2414_flush_logs_to_sd >>"$LOG" 2>&1 || true
-fi
-sync
-log "LAUNCHER_FLUSH_DONE=1"
-exit "$PICO_RC"
+exec "$PICO" "$CORE" "$ROM" >>"$LOG" 2>&1
