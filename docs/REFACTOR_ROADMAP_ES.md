@@ -444,6 +444,23 @@ terminan ademas con validacion en consola real.
   marcadas o limpiadas con justificacion.
 - Unificar utilidades duplicadas (hex2char, mixVULevel, layouts) en UiDraw.
 
+### F7 [IMPLEMENTADO] (ver docs/F7_TECH_DEBT_ES.md)
+- TreeFrogWindowsSpscTransport.{cpp,h} eliminado (0 callers vivos; el
+  unico consumidor se migro a fifos en H38) + su .o fuera del
+  Makefile.TREEFROG.  El core ya no exporta simbolos SPSC (0 vs 8).
+  **Primer tramo que altera el binario deliberadamente**: nuevo golden
+  `ea7a80e4` (antes `7709b665`).
+- Daemon r36s_u2523_usb_audio_io.c: eliminadas 5 variables muertas
+  (producer_burst_frames, starvation_silence_periods,
+  latency_trimmed_samples, latency_trim_events, starvation_since_ms y
+  sus 6 asignaciones) con justificacion; -Wall/-Wextra limpio salvo 2
+  warnings preexistentes documentados (534 y 70).
+- Utilidades duplicadas verificadas sin duplicados: hex2char en
+  Utils/char.h, mixVULevel en FxPages.h, layouts en UiDraw.h.
+- Audit `AUDIT_CLEAN_MAIN_U2523_OK`; core `ea7a80e4` + daemon
+  `4be71632` desplegados en SD == build; backup
+  `LGPT_BEFORE_U2523_20260813_231021`.
+
 ## F8 - Harness de regresion funcional en host
 - Core compilable en x86_64 (make X64) con salida a null/SDL; runner que
   inyecta inputs EPBM_* y compara secuencias de acciones (ActionId) contra el

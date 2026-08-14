@@ -101,7 +101,6 @@ TREEFROGFILES := \
 	TreeFrogAudio.o \
 	TreeFrogAudioDriver.o \
 	TreeFrogUac2Bridge.o \
-	TreeFrogWindowsSpscTransport.o \
 	TreeFrogTimer.o \
 	UnixFileSystem.o \
 	UnixProcess.o \

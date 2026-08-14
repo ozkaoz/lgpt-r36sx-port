@@ -1706,7 +1706,6 @@ int main(int argc, char **argv) {
     const int lowlat = path_exists(LOWLAT_SENTINEL);
     const int period_frames = lowlat ? 240 : 480;
     const int periods = 4;
-    const unsigned producer_burst_frames = 800U;
     const int starvation_grace_ms = 24;
 
     setvbuf(stderr, 0, _IOLBF, 4096);
@@ -1752,21 +1751,17 @@ int main(int argc, char **argv) {
     long period_writes = 0;
     long signal_periods = 0;
     long source_silence_periods = 0;
-    long starvation_silence_periods = 0;
     long starvation_events = 0;
     long poll_timeouts = 0;
     long xruns = 0;
     long dropped = 0;
     long reconnects = 0;
     long playback_prepare_failures = 0;
-    long latency_trimmed_samples = 0;
-    long latency_trim_events = 0;
     long short_write_events = 0;
     int good_write_streak = 0;
     int last_conf = -1;
     int play_peak = 0;
     int stream_primed = 0;
-    unsigned long long starvation_since_ms = 0;
     unsigned sustained_overflow_periods = 0;
     unsigned long long asrc_resync_events = 0;
 
@@ -1795,7 +1790,6 @@ int main(int argc, char **argv) {
             }
             ring_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             good_write_streak = 0;
             mark_inactive();
             sleep_ms(80);
@@ -1813,7 +1807,6 @@ int main(int argc, char **argv) {
             mark_inactive();
             ring_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             sleep_ms(20);
             continue;
         }
@@ -1876,7 +1869,6 @@ int main(int argc, char **argv) {
             }
             good_write_streak = 0;
             stream_primed = 0;
-            starvation_since_ms = 0;
             ++reconnects;
             fprintf(stderr,
                     "PCM_PLAY_OPENED reconnects=%ld period_frames=%d channels=%u start_threshold_frames=%d\n",
@@ -1904,7 +1896,6 @@ int main(int argc, char **argv) {
                 continue;
             }
             stream_primed = 1;
-            starvation_since_ms = 0;
             fprintf(stderr,
                     "PLAYBACK_ASRC_PRIMED backlog=%u target=%u prime=%u "
                     "channels=%u period=%u\n",
@@ -1943,7 +1934,6 @@ int main(int argc, char **argv) {
             pcm = -1;
             asrc_source_reset();
             stream_primed = 0;
-            starvation_since_ms = 0;
             good_write_streak = 0;
             mark_inactive();
             sleep_ms(100);
@@ -1999,7 +1989,6 @@ int main(int argc, char **argv) {
             good_write_streak = 0;
             mark_inactive();
             stream_primed = 0;
-            starvation_since_ms = 0;
             if (wr == -EIO || wr == -ENODEV || wr == -ESHUTDOWN ||
                 wr == -EPIPE || wr == -ESTRPIPE) {
                 close(pcm);
