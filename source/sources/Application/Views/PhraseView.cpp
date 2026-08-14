@@ -3,6 +3,7 @@
 #include "Application/Instruments/CommandList.h"
 #include "Application/Model/Scale.h"
 #include "Application/Model/Table.h"
+#include "Application/Phrase/PhraseGridEdit.h"
 #include "Application/Utils/HelpLegend.h"
 #include "Application/Utils/char.h"
 #include "Application/Views/BaseClasses/UiColors.h"
@@ -30,15 +31,9 @@ const int PhraseView::kColX[kColCount] = {5, 8, 11, 14, 19, 23, 27, 31};
 // P1(23-27)->24, FX2(27-31)->28, P2(31-35)->32. Parameter columns are blank.
 const int PhraseView::kColHeaderX[kColCount] = {6, 9, 12, 15, 20, 24, 28, 32};
 
-// Offsets for note(0), volume(1), pitch(2) and instrument(3) value stepping:
-// L, R, U, D. TREEFROG_PHRASE_VOL_EDIT_V1: volume steps by 1 in every
-// direction (A+UP/DOWN steps by 10 inside updateCursorValue). Pitch follows
-// the same scheme.
-short PhraseView::offsets_[4][4] = {{-1, 1, 12, -12},
-                                    {-1, 1, 1, -1},
-                                    {-1, 1, 1, -1},
-                                    {-1, 1, 16, -16}};
-
+// Offsets de patron/step y limites/geometria del grid viven en la capa pura
+// PhraseGridEdit.h (F3-5a).  kColX/kColHeaderX quedan en la vista porque el
+// dibujo las usa directamente; kPhraseStepOffsets se consume via la capa.
 static void CommandSelectorCallback(View &v, ModalView &d) {
     ((PhraseView &)v).onCommandSelectorResult(d);
 }
@@ -229,32 +224,20 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
     pushPhraseUndo();
 
     unsigned char *c = 0;
-    unsigned char limit = 0;
-    bool wrap = false;
     FourCC *cc;
 
     switch (col_ + xOffset) {
     case 0:
         c = phrase_->note_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
-        limit = 119;
-        wrap = true;
         break;
     case 1:
         c = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
-        // TREEFROG_PHRASE_VOL_V3: row volume is 0..100 (0x64), 0xFF = empty.
-        // 100 = full scale (100%), linear mapping.
-        limit = 0x64;
-        wrap = false;
         break;
     case 2:
         c = phrase_->pitch_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
-        limit = 24;
-        wrap = false;
         break;
     case 3:
         c = phrase_->instr_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
-        limit = MAX_INSTRUMENT_COUNT - 1;
-        wrap = true;
         break;
     case 4:
         cc = phrase_->cmd1_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
@@ -335,80 +318,35 @@ void PhraseView::updateCursorValue(ViewUpdateDirection direction, int xOffset,
     }
     if (c) {
         int editCol = col_ + xOffset;
-        if (editCol == 0 && updateChopNoteValueForRow(row_ + yOffset, direction)) {
+        if (editCol == 0 && updateChopNoteValueForRow(row_ + yOffset,
+                                                      direction)) {
             lastNote_ = *c;
         } else {
-            // TREEFROG_PHRASE_PITCH_COLUMN_V2 (H38.7): the pitch column stores
-            // -24..+24 semitones with an offset so that -1 (0xFF) does not
-            // collide with the "no pitch" marker. 0x00 = none, values 0x28..0x58
-            // map to -24..+24. Steps by 1 per direction, A+UP/DOWN by 10.
-            if (editCol == 2) {
-                int p = phrasePitchStoredToInt(*c);
-                int step = (direction == VUD_UP || direction == VUD_DOWN) && bigStep
-                               ? 10
-                               : 1;
-                int offset = 0;
-                switch (direction) {
-                case VUD_LEFT:
-                    offset = -1;
-                    break;
-                case VUD_RIGHT:
-                    offset = 1;
-                    break;
-                case VUD_UP:
-                    offset = step;
-                    break;
-                case VUD_DOWN:
-                    offset = -step;
-                    break;
-                }
-                p += offset;
-                if (p < -24) p = -24;
-                if (p > 24) p = 24;
-                *c = phrasePitchIntToStored(p);
-                lastPitch_ = p;
-            } else {
-                bool noteWasEmpty = (editCol == 0) && (*c == 0xFF);
-                if ((editCol == 1) && (*c == 0xFF)) {
-                    *c = 0x64;
-                    isDirty_ = true;
-                }
-                int offset = offsets_[editCol == 3 ? 3 : (editCol == 1 ? 1 : 0)][direction];
-                if (editCol == 1 && (direction == VUD_UP || direction == VUD_DOWN)) {
-                    int step = bigStep ? 10 : 1;
-                    offset = (direction == VUD_UP) ? step : -step;
-                }
-                // If note column apply the selected musical scale only for normal, non-chopped instruments.
-                if (editCol == 0) {
-                    int scale = viewData_->project_->GetScale();
-                    while (!scaleSteps[scale][(*c + offset) % 12]) {
-                        offset > 0 ? offset++ : offset--;
-                    }
-                }
-                updateData(c, offset, limit, wrap);
-                if (noteWasEmpty && (*c != 0xFF)) {
-                    uchar *vc = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
-                    if (*vc == 0xFF) {
-                        *vc = 0x64;
-                        isDirty_ = true;
-                    }
-                    uchar *pc = phrase_->pitch_ + (16 * viewData_->currentPhrase_ + row_ + yOffset);
-                    if (*pc == PITCH_STORED_NONE) {
-                        *pc = PITCH_STORED_ZERO;
-                        isDirty_ = true;
-                    }
-                }
-                switch (editCol) {
-                case 0:
-                    lastNote_ = *c;
-                    break;
-                case 1:
-                    lastVol_ = *c;
-                    break;
-                case 3:
-                    lastInstr_ = *c;
-                    break;
-                }
+            // F3-5a: paso de valor de las columnas de datos (N/V/P/I)
+            // delegado a la capa pura PhraseGridEdit.h (matematica golden
+            // byte-identica: limites, wrap, scale-snap, encoding de pitch y
+            // auto-fill).  Las columnas de comando (4/6) y los parametros
+            // hex (5/7) se editan mas abajo con CommandList/cmdEdit_.
+            uchar *vc = phrase_->vol_ + (16 * viewData_->currentPhrase_ +
+                                         row_ + yOffset);
+            uchar *pc = phrase_->pitch_ + (16 * viewData_->currentPhrase_ +
+                                           row_ + yOffset);
+            PhraseCellStepResult r = PhraseStepCell(
+                editCol, c, vc, pc, viewData_->project_->GetScale(),
+                (PhraseEditDirection)direction, bigStep != 0);
+            switch (editCol) {
+            case 0:
+                lastNote_ = *c;
+                break;
+            case 1:
+                lastVol_ = *c;
+                break;
+            case 2:
+                lastPitch_ = phrasePitchStoredToInt(*c);
+                break;
+            case 3:
+                lastInstr_ = *c;
+                break;
             }
         }
     }
@@ -446,12 +384,14 @@ void PhraseView::pasteLast() {
 
     switch (col_) {
     case 0:
+        // F3-5a: fila compuesta nota+instr+vol+pitch con hook de chop;
+        // la celda simple de nota usa la capa pura (relleno o captura).
         c = phrase_->note_ + (16 * viewData_->currentPhrase_ + row_);
         if ((*c == 0xFF)) {
             if (pasteDefaultChopForRow(row_)) break;
-            *c = lastNote_;
+            PhrasePasteLast(kPhraseColNote, c, &lastNote_);
             c = phrase_->instr_ + (16 * viewData_->currentPhrase_ + row_);
-            *c = lastInstr_;
+            *c = (uchar)lastInstr_;
             // Auto-set volume to full scale (100) when placing a note in empty row
             c = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_);
             if (*c == 0xFF) {
@@ -464,46 +404,34 @@ void PhraseView::pasteLast() {
             }
             isDirty_ = true;
         } else {
-            lastNote_ = *c;
+            PhrasePasteLast(kPhraseColNote, c, &lastNote_);
             c = phrase_->instr_ + (16 * viewData_->currentPhrase_ + row_);
             lastInstr_ = *c;
         }
         break;
     case 1:
         c = phrase_->vol_ + (16 * viewData_->currentPhrase_ + row_);
-        if ((*c == 0xFF)) {
-            *c = lastVol_;
+        if (PhrasePasteLast(kPhraseColVol, c, &lastVol_)) {
             isDirty_ = true;
-        } else {
-            lastVol_ = *c;
         }
         break;
     case 2:
         c = phrase_->pitch_ + (16 * viewData_->currentPhrase_ + row_);
-        if (*c == PITCH_STORED_NONE) {
-            *c = phrasePitchIntToStored(lastPitch_);
+        if (PhrasePasteLast(kPhraseColPitch, c, &lastPitch_)) {
             isDirty_ = true;
-        } else {
-            lastPitch_ = phrasePitchStoredToInt(*c);
         }
         break;
     case 3:
         c = phrase_->instr_ + (16 * viewData_->currentPhrase_ + row_);
-        if ((*c == 0xFF)) {
-            *c = lastInstr_;
+        if (PhrasePasteLast(kPhraseColInstr, c, &lastInstr_)) {
             isDirty_ = true;
-        } else {
-            lastInstr_ = *c;
         }
         break;
 
     case 4:
         i = phrase_->cmd1_ + (16 * viewData_->currentPhrase_ + row_);
-        if (*i == I_CMD_NONE) {
-            *i = lastCmd_;
+        if (PhrasePasteLastCommand(i, &lastCmd_)) {
             isDirty_ = true;
-        } else {
-            lastCmd_ = *i;
         }
         break;
 
@@ -519,11 +447,8 @@ void PhraseView::pasteLast() {
 
     case 6:
         i = phrase_->cmd2_ + (16 * viewData_->currentPhrase_ + row_);
-        if (*i == I_CMD_NONE) {
-            *i = lastCmd_;
+        if (PhrasePasteLastCommand(i, &lastCmd_)) {
             isDirty_ = true;
-        } else {
-            lastCmd_ = *i;
         }
         break;
 
@@ -629,9 +554,12 @@ void PhraseView::warpToNeighbour(int offset) {
  ******************************************************/
 
 GUIRect PhraseView::getSelectionRect() {
-    GUIRect r(clipboard_.col_, clipboard_.row_, col_, row_);
-    r.Normalize();
-    return r;
+    // F3-5a: normalizacion delegada a la capa pura; devuelve GUIRect para
+    // el dibujo.
+    PhraseRect r = PhraseNormalizeRect(clipboard_.col_, clipboard_.row_, col_,
+                                       row_);
+    GUIRect g(r.left, r.top, r.right, r.bottom);
+    return g;
 };
 
 /******************************************************
@@ -646,54 +574,19 @@ GUIRect PhraseView::getSelectionRect() {
 
 void PhraseView::fillClipboardData() {
 
-    // Get Current normalized selection rect
+    // F3-5a: delegada a la capa pura (misma golden: rect normalizado desde
+    // el ancla del portapapeles hasta el cursor y copia de las 8 columnas).
 
-    GUIRect selRect = getSelectionRect();
-
-    // Get size & store in clipboard
-
-    clipboard_.width_ = selRect.Width() + 1;
-    clipboard_.height_ = selRect.Height() + 1;
-    clipboard_.row_ = selRect.Top();
-    clipboard_.col_ = selRect.Left();
-
-    // Copy the data
-
-    uchar *src1 =
-        viewData_->song_->phrase_->note_ + 16 * viewData_->currentPhrase_;
-    uchar *dst1 = clipboard_.note_;
-    uchar *src2 =
-        viewData_->song_->phrase_->vol_ + 16 * viewData_->currentPhrase_;
-    uchar *dst2 = clipboard_.vol_;
-    uchar *src3 =
-        viewData_->song_->phrase_->pitch_ + 16 * viewData_->currentPhrase_;
-    uchar *dst3 = clipboard_.pitch_;
-    uchar *src4 =
-        viewData_->song_->phrase_->instr_ + 16 * viewData_->currentPhrase_;
-    uchar *dst4 = clipboard_.instr_;
-    uint *src5 =
-        viewData_->song_->phrase_->cmd1_ + 16 * viewData_->currentPhrase_;
-    uint *dst5 = clipboard_.cmd1_;
-    ushort *src6 =
-        viewData_->song_->phrase_->param1_ + 16 * viewData_->currentPhrase_;
-    ushort *dst6 = clipboard_.param1_;
-    uint *src7 =
-        viewData_->song_->phrase_->cmd2_ + 16 * viewData_->currentPhrase_;
-    uint *dst7 = clipboard_.cmd2_;
-    ushort *src8 =
-        viewData_->song_->phrase_->param2_ + 16 * viewData_->currentPhrase_;
-    ushort *dst8 = clipboard_.param2_;
-
-    for (int i = 0; i < clipboard_.height_; i++) {
-        dst1[i] = src1[clipboard_.row_ + i];
-        dst2[i] = src2[clipboard_.row_ + i];
-        dst3[i] = src3[clipboard_.row_ + i];
-        dst4[i] = src4[clipboard_.row_ + i];
-        dst5[i] = src5[clipboard_.row_ + i];
-        dst6[i] = src6[clipboard_.row_ + i];
-        dst7[i] = src7[clipboard_.row_ + i];
-        dst8[i] = src8[clipboard_.row_ + i];
-    };
+    PhraseFillClipboard(
+        clipboard_, col_, row_,
+        phrase_->note_ + 16 * viewData_->currentPhrase_,
+        phrase_->vol_ + 16 * viewData_->currentPhrase_,
+        phrase_->pitch_ + 16 * viewData_->currentPhrase_,
+        phrase_->instr_ + 16 * viewData_->currentPhrase_,
+        phrase_->cmd1_ + 16 * viewData_->currentPhrase_,
+        phrase_->param1_ + 16 * viewData_->currentPhrase_,
+        phrase_->cmd2_ + 16 * viewData_->currentPhrase_,
+        phrase_->param2_ + 16 * viewData_->currentPhrase_);
     updateCursor(0, 0);
 };
 
@@ -718,26 +611,18 @@ void PhraseView::updateSelectionValue(ViewUpdateDirection direction) { // HERE
 }
 
 void PhraseView::extendSelection() {
-    GUIRect rect = getSelectionRect();
-    if (rect.Left() > 0 || rect.Right() < 7) {
-        if (col_ < clipboard_.col_) {
-            col_ = 0;
-            clipboard_.col_ = 7;
-        } else {
-            col_ = 7;
-            clipboard_.col_ = 0;
-        }
-        isDirty_ = true;
-    } else {
-        if (row_ < clipboard_.row_) {
-            row_ = 0;
-            clipboard_.row_ = 15;
-        } else {
-            clipboard_.row_ = 0;
-            row_ = 15;
-        }
-        isDirty_ = true;
-    }
+    // F3-5a: delegada a la capa pura (misma golden).
+    PhraseSelectionState s;
+    s.col = col_;
+    s.row = row_;
+    s.clipCol = clipboard_.col_;
+    s.clipRow = clipboard_.row_;
+    PhraseExtendSelection(s);
+    col_ = s.col;
+    row_ = s.row;
+    clipboard_.col_ = s.clipCol;
+    clipboard_.row_ = s.clipRow;
+    isDirty_ = true;
 }
 
 /******************************************************
@@ -748,81 +633,21 @@ void PhraseView::interpolateSelection() {
 
     pushPhraseUndo();
 
-    if (!clipboard_.active_) {
+    // F3-5a: delegada a la capa pura (misma golden: col 0/2/5/7, >= 2 filas,
+    // nota lineal sin clamp, pitch stored con clamp -24..24, params lineales).
+    PhraseInterpResult result = PhraseInterpolateSelection(
+        clipboard_, col_, row_,
+        phrase_->note_ + 16 * viewData_->currentPhrase_,
+        phrase_->pitch_ + 16 * viewData_->currentPhrase_,
+        phrase_->param1_ + 16 * viewData_->currentPhrase_,
+        phrase_->param2_ + 16 * viewData_->currentPhrase_);
+    if (result == PINTERP_NO_NOTE_INFO) {
+        View::SetNotification("No note info");
         return;
     }
-
-    GUIRect rect = getSelectionRect();
-    // Only interpolate if we're in note (0), pitch (2) or param (5, 7) columns
-    int col = rect.Left();
-    if (col != rect.Right() || (col != 0 && col != 2 && col != 5 && col != 7)) {
-        return;
+    if (result == PINTERP_OK) {
+        isDirty_ = true;
     }
-
-    int startRow = rect.Top();
-    int endRow = rect.Bottom();
-    // Need at least 2 rows to interpolate
-    if (endRow - startRow < 1) {
-        return;
-    }
-
-    // Select the appropriate data array based on column
-    if (col == 0) {
-        // Note column
-        uchar *noteData = phrase_->note_ + (16 * viewData_->currentPhrase_);
-
-        uchar startNote = noteData[startRow];
-        uchar endNote = noteData[endRow];
-
-        if (startNote == 0xFF || endNote == 0xFF) {
-            View::SetNotification("No note info");
-            return;
-        }
-
-        int numSteps = endRow - startRow;
-        int noteDiff = (int)endNote - (int)startNote;
-
-        for (int step = 0; step <= numSteps; step++) {
-            int row = startRow + step;
-            int value = startNote + (noteDiff * step) / (numSteps);
-            noteData[row] = (uchar)value;
-        }
-    } else if (col == 2) {
-        // Pitch column
-        uchar *pitchData = phrase_->pitch_ + (16 * viewData_->currentPhrase_);
-
-        int startPitch = phrasePitchStoredToInt(pitchData[startRow]);
-        int endPitch = phrasePitchStoredToInt(pitchData[endRow]);
-
-        int numSteps = endRow - startRow;
-        int pitchDiff = endPitch - startPitch;
-
-        for (int step = 0; step <= numSteps; step++) {
-            int row = startRow + step;
-            int value = startPitch + (pitchDiff * step) / (numSteps);
-            if (value < -24) value = -24;
-            if (value > 24) value = 24;
-            pitchData[row] = phrasePitchIntToStored(value);
-        }
-    } else {
-        // Parameter columns (5 or 7)
-        ushort *paramData = (col == 5)
-                                ? phrase_->param1_ + (16 * viewData_->currentPhrase_)
-                                : phrase_->param2_ + (16 * viewData_->currentPhrase_);
-
-        ushort startParam = paramData[startRow];
-        ushort endParam = paramData[endRow];
-
-        int numSteps = endRow - startRow;
-        int paramDiff = (int)endParam - (int)startParam;
-
-        for (int step = 0; step <= numSteps; step++) {
-            int row = startRow + step;
-            int value = startParam + (paramDiff * step) / (numSteps);
-            paramData[row] = (ushort)value;
-        }
-    }
-    isDirty_ = true;
 }
 
 /******************************************************
@@ -861,55 +686,17 @@ void PhraseView::cutSelection() {
 
     fillClipboardData();
 
-    // Loop over selection col, row & clear data inside it
+    // F3-5a: bucle de limpieza delegado a la capa pura (misma golden).
 
-    uchar *dst1 =
-        viewData_->song_->phrase_->note_ + 16 * viewData_->currentPhrase_;
-    uchar *dst2 =
-        viewData_->song_->phrase_->vol_ + 16 * viewData_->currentPhrase_;
-    uchar *dst3 =
-        viewData_->song_->phrase_->pitch_ + 16 * viewData_->currentPhrase_;
-    uchar *dst4 =
-        viewData_->song_->phrase_->instr_ + 16 * viewData_->currentPhrase_;
-    uint *dst5 =
-        viewData_->song_->phrase_->cmd1_ + 16 * viewData_->currentPhrase_;
-    ushort *dst6 =
-        viewData_->song_->phrase_->param1_ + 16 * viewData_->currentPhrase_;
-    uint *dst7 =
-        viewData_->song_->phrase_->cmd2_ + 16 * viewData_->currentPhrase_;
-    ushort *dst8 =
-        viewData_->song_->phrase_->param2_ + 16 * viewData_->currentPhrase_;
-
-    for (int i = 0; i < clipboard_.width_; i++) {
-        for (int j = 0; j < clipboard_.height_; j++) {
-            switch (i + clipboard_.col_) {
-            case 0:
-                dst1[j + clipboard_.row_] = 0xFF;
-                break;
-            case 1:
-                dst2[j + clipboard_.row_] = 0xFF;
-                break;
-            case 2:
-                dst3[j + clipboard_.row_] = PITCH_STORED_NONE;
-                break;
-            case 3:
-                dst4[j + clipboard_.row_] = 0xFF;
-                break;
-            case 4:
-                dst5[j + clipboard_.row_] = I_CMD_NONE;
-                break;
-            case 5:
-                dst6[j + clipboard_.row_] = 0x0000;
-                break;
-            case 6:
-                dst7[j + clipboard_.row_] = I_CMD_NONE;
-                break;
-            case 7:
-                dst8[j + clipboard_.row_] = 0x0000;
-                break;
-            }
-        }
-    }
+    PhraseCutSelectionCells(
+        clipboard_, phrase_->note_ + 16 * viewData_->currentPhrase_,
+        phrase_->vol_ + 16 * viewData_->currentPhrase_,
+        phrase_->pitch_ + 16 * viewData_->currentPhrase_,
+        phrase_->instr_ + 16 * viewData_->currentPhrase_,
+        phrase_->cmd1_ + 16 * viewData_->currentPhrase_,
+        phrase_->param1_ + 16 * viewData_->currentPhrase_,
+        phrase_->cmd2_ + 16 * viewData_->currentPhrase_,
+        phrase_->param2_ + 16 * viewData_->currentPhrase_);
 
     // Clear selection, end selection process & reposition cursor
 
@@ -930,89 +717,21 @@ void PhraseView::pasteClipboard() {
 
     pushPhraseUndo();
 
-    // Get number of row to paste
+    // F3-5a: copia del portapapeles delegada a la capa pura (misma golden:
+    // guard de columnas de comando contra columnas de datos).
 
-    int height = clipboard_.height_;
-    /*    if (row_+height>16) {
-            height=16-row_ ;
-        }
-      */
-    uchar *dst1 =
-        viewData_->song_->phrase_->note_ + 16 * viewData_->currentPhrase_;
-    uchar *src1 = clipboard_.note_;
-    uchar *dst2 =
-        viewData_->song_->phrase_->vol_ + 16 * viewData_->currentPhrase_;
-    uchar *src2 = clipboard_.vol_;
-    uchar *dst3 =
-        viewData_->song_->phrase_->pitch_ + 16 * viewData_->currentPhrase_;
-    uchar *src3 = clipboard_.pitch_;
-    uchar *dst4 =
-        viewData_->song_->phrase_->instr_ + 16 * viewData_->currentPhrase_;
-    uchar *src4 = clipboard_.instr_;
-    uint *dst5 =
-        viewData_->song_->phrase_->cmd1_ + 16 * viewData_->currentPhrase_;
-    uint *src5 = clipboard_.cmd1_;
-    ushort *dst6 =
-        viewData_->song_->phrase_->param1_ + 16 * viewData_->currentPhrase_;
-    ushort *src6 = clipboard_.param1_;
-    uint *dst7 =
-        viewData_->song_->phrase_->cmd2_ + 16 * viewData_->currentPhrase_;
-    uint *src7 = clipboard_.cmd2_;
-    ushort *dst8 =
-        viewData_->song_->phrase_->param2_ + 16 * viewData_->currentPhrase_;
-    ushort *src8 = clipboard_.param2_;
+    bool wasUpdated = PhrasePasteClipboard(
+        clipboard_, phrase_->note_ + 16 * viewData_->currentPhrase_,
+        phrase_->vol_ + 16 * viewData_->currentPhrase_,
+        phrase_->pitch_ + 16 * viewData_->currentPhrase_,
+        phrase_->instr_ + 16 * viewData_->currentPhrase_,
+        phrase_->cmd1_ + 16 * viewData_->currentPhrase_,
+        phrase_->param1_ + 16 * viewData_->currentPhrase_,
+        phrase_->cmd2_ + 16 * viewData_->currentPhrase_,
+        phrase_->param2_ + 16 * viewData_->currentPhrase_, col_, row_);
 
-    uint *noCmd = (uint *)-1;
-    ushort *noPrm = (ushort *)-1;
-    uint *srcCmd[8] = {noCmd, noCmd, noCmd, noCmd, src5, noCmd, src7, noCmd};
-    ushort *srcPrm[8] = {noPrm, noPrm, noPrm, noPrm, noPrm, src6, noPrm, src8};
-    uint *dstCmd[8] = {noCmd, noCmd, noCmd, noCmd, dst5, noCmd, dst7, noCmd};
-    ushort *dstPrm[8] = {noPrm, noPrm, noPrm, noPrm, noPrm, dst6, noPrm, dst8};
-
-    bool wasUpdated = false;
-
-    for (int i = 0; i < clipboard_.width_; i++) {
-        for (int j = 0; j < height; j++) {
-            int pasteCol = col_ + i;
-            switch (i + clipboard_.col_) {
-            case 0:
-                dst1[(j + row_) % 16] = src1[j];
-                wasUpdated = true;
-                break;
-            case 1:
-                dst2[(j + row_) % 16] = src2[j];
-                wasUpdated = true;
-                break;
-            case 2:
-                dst3[(j + row_) % 16] = src3[j];
-                wasUpdated = true;
-                break;
-            case 3:
-                dst4[(j + row_) % 16] = src4[j];
-                wasUpdated = true;
-                break;
-            case 4:
-            case 6:
-                if (pasteCol == 4 || pasteCol == 6) {
-                    // Don't allow commands in notes, etc
-                    dstCmd[pasteCol][(row_ + j) % 16] =
-                        srcCmd[clipboard_.col_ + i][j];
-                    wasUpdated = true;
-                }
-                break;
-            case 5:
-            case 7:
-                if (pasteCol == 5 || pasteCol == 7) {
-                    dstPrm[pasteCol][(row_ + j) % 16] =
-                        srcPrm[clipboard_.col_ + i][j];
-                    wasUpdated = true;
-                }
-                break;
-            }
-        }
-    }
     if (wasUpdated) {
-        updateCursor(0x00, ((row_ + height) % 16 - row_));
+        updateCursor(0x00, ((row_ + clipboard_.height_) % 16 - row_));
         isDirty_ = true;
     }
 };

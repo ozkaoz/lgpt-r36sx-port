@@ -105,7 +105,16 @@ Ver tercer tramo F3 (no se toca en este commit; inventario completo alla).
   `MixerMeters`, `MixerMenu` (menu L1+A declarado como datos puros) y
   `FxNavigator` (estado del cursor pagina/fila/editTarget + matematica de
   pasos).  IMPLEMENTADO en F3-4a/b/c/d.
-- F3-5 Phrase: separar logica de grid/edicion del dibujo.
+- F3-5 Phrase: separar logica de grid/edicion del dibujo.  IMPLEMENTADO
+  F3-5a (PhraseGridEdit, Application/Phrase/PhraseGridEdit.h): constantes
+  de columnas/limites/offsets de paso, clamp/wrap golden, paso de celda
+  con scale-snap normalizado y auto-fill, pasteLast por columna, seleccion
+  (normalize/extend), portapapeles (fill/cut/paste) e interpolacion, todos
+  puros (Types/Phrase/Scale/CommandList).  Queda en la vista la politica
+  de undo, el hex editor de comandos (cols 5/7), chop, audition/Player y
+  DrawView.  F3-5b (PENDIENTE): PhraseUndo - historia snapshot/restore
+  (PhraseEdit 16 pasos + 16 slots) con GlobalUndo/Redo delegados; la
+  politica de push se queda en la vista.
 - Cada tramo: host test + test estatico + audit + build + deploy + commit
   antes de pasar al siguiente.
 

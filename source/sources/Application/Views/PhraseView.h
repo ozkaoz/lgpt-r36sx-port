@@ -5,6 +5,7 @@
 #include "BaseClasses/UIBigHexVarField.h"
 #include "BaseClasses/View.h"
 #include "ViewData.h"
+#include "Application/Phrase/PhraseGridEdit.h"
 
 #define FCC_EDIT MAKE_FOURCC('V', 'O', 'L', 'M')
 
@@ -87,23 +88,9 @@ class PhraseView : public View {
     void formatPtchParam(ushort value, char *buffer, int bufferLen) const;
     bool isPtchParamCell(int row, int col) const;
     bool assignChopFromPhrase(int delta, bool advanceRow);
-    struct clipboard {
-        bool active_;
-        int col_;
-        int row_;
-        int width_;
-        int height_;
-        uchar note_[16];
-        uchar instr_[16];
-        uchar vol_[16];
-        uchar pitch_[16];
-        uint cmd1_[16];
-        ushort param1_[16];
-        uint cmd2_[16];
-        ushort param2_[16];
-        uint cmd3_[16];
-        ushort param3_[16];
-    } clipboard_;
+    // F3-5a: el portapapeles es el struct puro de PhraseGridEdit.h (mismo
+    // layout golden que el struct clipboard original de la vista).
+    PhraseClipboard clipboard_;
 
     // TREEFROG_GLOBAL_UNDO_V2 (Bacon 1.1.1): undo/redo history.  A PhraseEdit
     // snapshots all 16 steps of the edited phrase plus the editor cursor.
@@ -135,7 +122,6 @@ class PhraseView : public View {
     int saveCol_;
     int saveRow_;
 
-    static short offsets_[4][4];
     static const int kColCount = 8;
     static const int kColX[kColCount];
     // Header center X per column (headers centered over their column).

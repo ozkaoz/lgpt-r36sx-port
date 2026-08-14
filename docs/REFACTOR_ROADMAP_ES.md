@@ -251,6 +251,51 @@ terminan ademas con validacion en consola real.
   sin diagnosticos en MixerView/FxPages (gate solo con deuda F7 pre-existente
   de device/*.c).  Desplegado en SD (backup LGPT_BEFORE_U2523_20260813_180608;
   core en consola = build SHA b17d07bd).
+- [IMPLEMENTADO] F3-5a: PhraseGridEdit - logica de grid/edicion de la Phrase
+  extraida a capa pura (Application/Phrase/PhraseGridEdit.h, header-only
+  con static const a nivel de archivo igual que FxPages para evitar ODR
+  en C++03).  Constantes golden (kPhraseColCount=8, kPhraseCol{Note,Vol,
+  Pitch,Instr,Cmd1,Param1,Cmd2,Param2}, kPhraseNoteLimit=119,
+  kPhraseVolLimit=0x64, kPhrasePitchLimit=24, kPhraseInstrLimit=143,
+  kPhraseVolFull=0x64, kPhraseStepOffsets[4][4] con N=+/-1/+/-12, V/P=+/-1,
+  I=+/-1/+/-16) y toda la matematica golden: PhraseClampWrap (replica de
+  View::updateData: nota wrap 119, vol clamp 0x64, pitch clamp 24, instr
+  wrap 143), PhraseLimitFor/PhraseWrapFor, PhraseStepCell (paso fina 1 /
+  gruesa 10, pitch en stored +-24, escala acustica con scale-snap de
+  modulo normalizado [0..11] -el modulo sin normalizar del golden era UB-
+  y auto-fill de nota vacia a vol 0x64 + pitch ZERO), PhrasePasteLast/
+  PhrasePasteLastCommand (paran como golden cuando el campo origen es
+  vacio), PhraseNormalizeRect/PhraseExtendSelection (anchor y cursor,
+  extend desde cursor hasta anchor inclusive), PhraseClipboard/FillClipboard
+  (layout identical al struct original, captura el valor bajo el cursor y
+  avanza ---- por filas), PhraseCutSelectionCells, PhrasePasteClipboard
+  (paste selectivo: comandos solo si el destino de cmd1 no esta vacio,
+  params siempre, guard I_CMD_NONE) y PhraseInterpolateSelection (nota
+  lineal sin clamp, pitch stored con clamp +/-24, params lineales,
+  skip de filas sin nota, estados PINTERP_OK/SKIPPED/NO_NOTE_INFO).
+  PhraseView migrado: offsets_ estatico y struct clipboard eliminados del
+  header (miembro PhraseClipboard clipboard_), updateCursorValue pasa
+  cols 0-3 por PhraseStepCell y conserva lastNote_/lastVol_/lastPitch_/
+  lastInstr_ y el hook chop, pasteLast/extendSelection/getSelectionRect/
+  fillClipboardData/cutSelection/pasteClipboard/interpolateSelection son
+  delegados one-line.  Se quedan en la vista (acoplado, igual que golden):
+  audition/Player, cmdEditField_ hex (cols 5/7), CommandSelector, chop,
+  mute/solo (UIController), navegacion/updateCursor y DrawView.  Evidencia:
+  tests/host/phrase_grid_edit_host_test.cpp (116 checks golden con
+  ASAN/UBSAN incluyendo Scale.cpp, runner tests/run_host_phrase_grid_edit.sh
+  en audit.sh) + test_f3_5a_baseline.py (capa pura sin GUI/audio/Player/
+  viewData_/GUIRect, vista sin offsets_, delegados y math movido fuera).
+  Baselines existentes (ui_centered, fx_phase17) pasan sin cambios.
+  Audit completo verde (AUDIT_CLEAN_MAIN_U2523_OK).  Build MIPS del core OK
+  sin diagnosticos en PhraseView/PhraseGridEdit (gate solo con deuda F7
+  pre-existente de device/*.c).  Desplegado en SD (backup
+  LGPT_BEFORE_U2523_20260813_190916; core en consola = build SHA
+  9892f230).
+- [PENDIENTE] F3-5b: PhraseUndo - historia snapshot/restore de la Phrase
+  (PhraseEdit 16 pasos + historia 16 slots) extraida de PhraseView junto
+  con el refactor de GlobalUndo/Redo hacia la capa; se queda en la vista
+  solo la politica de push (cuando se captura un snapshot, incluyendo
+  PasteChop/InsertPhraseGuidedPlan).
 - [PENDIENTE] F3-5: Phrase (baseline en docs/F3_ARCHITECTURE_ES.md):
   grid/edicion separados del dibujo.
 
