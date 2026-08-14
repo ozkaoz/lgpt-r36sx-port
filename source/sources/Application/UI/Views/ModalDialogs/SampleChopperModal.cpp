@@ -838,6 +838,8 @@ static int g_chopperPitchSelected = 0;
 static char g_chopperPitchHeader[40];
 static char g_chopperPitchLabels[6][24];
 static char g_chopperPitchValues[6][20];
+static char g_chopperPitchHints[2][40];
+static char g_chopperPitchStatus[40];
 
 static unsigned short tf_rgb565(unsigned char r, unsigned char g, unsigned char b) {
     return (unsigned short)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
@@ -875,7 +877,7 @@ static void tf_text(int x, int y, const char *s, unsigned short fg, unsigned sho
             for (int b = 0; b < 8; b++) {
                 int px = x + b;
                 if (px < 0 || px >= TF_W) continue;
-                int bit = (g[r * FONT_WIDTH] >> (7 - b)) & 1;
+                int bit = (g[r * FONT_WIDTH + b] != 0);
                 fb[py * TF_W + px] = (bit ^ invert) ? fg : bg;
             }
         }
@@ -894,21 +896,27 @@ extern "C" void TreeFrogChopperOverlayDraw(void) {
         const unsigned short pnorm  = tf_rgb565(0xE8, 0xE4, 0xF8);
         const unsigned short ph1    = tf_rgb565(0x5B, 0x8C, 0xFF);
         const unsigned short ph2    = tf_rgb565(0x9D, 0x5B, 0xFF);
-        tf_rect(0, 60, 320, 116, pbg);
-        tf_rect(0, 59, 320, 1, pframe);
-        tf_rect(0, 176, 320, 1, pframe);
-        tf_rect(0, 60, 1, 116, pframe);
-        tf_rect(319, 60, 1, 116, pframe);
-        {
-            const char *title = "PITCH/ENV";
-            tf_text((40 - (int)strlen(title)) * 4, 88, title, ph1, pbg, 0);
-        }
-        tf_text(64, 96, g_chopperPitchHeader, pnorm, pbg, 0);
+        /* U2.53 FULLSCREEN: el menu ocupa toda la pantalla (320x240)
+           y tapa la cabecera del chopper (graphical chopper, inst,
+           sampl, zoom, name, frame, chop), el status y las hints del
+           char screen; hints y status se redibujan dentro del panel. */
+        tf_rect(0, 0, 320, 240, pbg);
+        tf_rect(0, 0, 320, 1, pframe);
+        tf_rect(0, 239, 320, 1, pframe);
+        tf_rect(0, 1, 1, 238, pframe);
+        tf_rect(319, 1, 1, 238, pframe);
+        tf_text(((40 - (int)strlen("PITCH/ENV")) / 2) * 8, 16, "PITCH/ENV", ph1, pbg, 0);
+        tf_text(((40 - (int)strlen(g_chopperPitchHeader)) / 2) * 8, 32, g_chopperPitchHeader, pnorm, pbg, 0);
         for (int i = 0; i < 6; i++) {
-            int y = 104 + i * 8;
+            int y = 80 + i * 8;
             int sel = (g_chopperPitchSelected == i);
             tf_text(64, y, g_chopperPitchLabels[i], pnorm, pbg, 0);
             tf_text(168, y, g_chopperPitchValues[i], sel ? ph2 : ph1, pbg, sel);
+        }
+        tf_text(((40 - (int)strlen(g_chopperPitchHints[0])) / 2) * 8, 208, g_chopperPitchHints[0], pnorm, pbg, 0);
+        tf_text(((40 - (int)strlen(g_chopperPitchHints[1])) / 2) * 8, 216, g_chopperPitchHints[1], pnorm, pbg, 0);
+        if (g_chopperPitchStatus[0]) {
+            tf_text(((40 - (int)strlen(g_chopperPitchStatus)) / 2) * 8, 224, g_chopperPitchStatus, ph1, pbg, 0);
         }
         return;
     }
@@ -2744,6 +2752,9 @@ void SampleChopperModal::publishOverlayState() {
                                            pitchEnvTool_.Params().scope,
                                            sampleIndex_);
         }
+        snprintf(g_chopperPitchHints[0], sizeof(g_chopperPitchHints[0]), "%s", "UP/DN Item | L/R Value | B Preview");
+        snprintf(g_chopperPitchHints[1], sizeof(g_chopperPitchHints[1]), "%s", "A Apply | L1+R1 Exit | R2+LR Target");
+        snprintf(g_chopperPitchStatus, sizeof(g_chopperPitchStatus), "%s", statusMessage_[0] ? statusMessage_ : "");
     }
 #endif
 }

@@ -76,18 +76,24 @@ assert "static int g_chopperPitchSelected = 0;" in chopper
 assert "static char g_chopperPitchHeader[40];" in chopper
 assert "static char g_chopperPitchLabels[6][24];" in chopper
 assert "static char g_chopperPitchValues[6][20];" in chopper
+assert "static char g_chopperPitchHints[2][40];" in chopper, "hints del panel full-screen"
+assert "static char g_chopperPitchStatus[40];" in chopper, "status del panel full-screen"
 assert re.search(r"static void tf_text\(int x, int y, const char \*s, unsigned short fg, unsigned short bg, int invert\) \{\n", chopper), "render de texto a pixeles"
 assert "&font[*c * 8];" in chopper, "glifos de la fuente global 8x8"
-assert "g[r * FONT_WIDTH]" in chopper, "stride FONT_WIDTH entre filas del glifo"
+assert "g[r * FONT_WIDTH + b] != 0" in chopper, "1 byte por pixel (0/1), scanline-major (DrawCharInternal)"
 ov = chopper[chopper.index("extern \"C\" void TreeFrogChopperOverlayDraw(void) {"):]
 ov = ov[:ov.index("static void SampleChopperModal::clearOverlayState")] if "static void SampleChopperModal::clearOverlayState" in ov else ov[:6000]
 assert "if (g_chopperPitchActive) {" in ov, "rama del panel en el overlay"
-assert 'const char *title = "PITCH/ENV";' in ov
-assert "tf_text((40 - (int)strlen(title)) * 4, 88, title, ph1, pbg, 0);" in ov, "titulo centrado fila 11"
-assert "tf_text(64, 96, g_chopperPitchHeader, pnorm, pbg, 0);" in ov, "header fila 12"
+assert "tf_rect(0, 0, 320, 240, pbg);" in ov, "panel a pantalla completa"
+assert "tf_rect(0, 239, 320, 1, pframe);" in ov, "marco inferior"
+assert 'tf_text(((40 - (int)strlen("PITCH/ENV")) / 2) * 8, 16, "PITCH/ENV", ph1, pbg, 0);' in ov, "titulo centrado fila 2"
+assert "tf_text(((40 - (int)strlen(g_chopperPitchHeader)) / 2) * 8, 32, g_chopperPitchHeader, pnorm, pbg, 0);" in ov, "header centrado fila 4"
+assert "int y = 80 + i * 8;" in ov, "items filas 10..15"
 assert "tf_text(64, y, g_chopperPitchLabels[i], pnorm, pbg, 0);" in ov
 assert "tf_text(168, y, g_chopperPitchValues[i], sel ? ph2 : ph1, pbg, sel);" in ov, "valor seleccionado invertido (HILITE2)"
-assert "return;" in ov
+assert "tf_text(((40 - (int)strlen(g_chopperPitchHints[0])) / 2) * 8, 208, g_chopperPitchHints[0], pnorm, pbg, 0);" in ov, "hint 1 fila 26"
+assert "tf_text(((40 - (int)strlen(g_chopperPitchHints[1])) / 2) * 8, 216, g_chopperPitchHints[1], pnorm, pbg, 0);" in ov, "hint 2 fila 27"
+assert "tf_text(((40 - (int)strlen(g_chopperPitchStatus)) / 2) * 8, 224, g_chopperPitchStatus, ph1, pbg, 0);" in ov, "status fila 28"
 pub = chopper[chopper.index("void SampleChopperModal::publishOverlayState()"):]
 pub = pub[:pub.index("void SampleChopperModal::clearOverlayState()")]
 assert "g_chopperPitchActive = (!suspended_ && !operationActive_ && pitchMode_) ? 1 : 0;" in pub, "gate del panel (suspended/operation)"
@@ -95,6 +101,9 @@ assert "g_chopperPitchSelected = pitchEnvTool_.EditParam();" in pub
 assert "ChopperView::ComposeHeaderLine(g_chopperPitchHeader, sizeof(g_chopperPitchHeader)," in pub
 assert "ChopperView::PitchLabel(i)" in pub
 assert "ChopperView::ComposePitchValue(g_chopperPitchValues[i], sizeof(g_chopperPitchValues[i]), i," in pub
+assert 'snprintf(g_chopperPitchHints[0], sizeof(g_chopperPitchHints[0]), "%s", "UP/DN Item | L/R Value | B Preview");' in pub, "hint 1 publicado"
+assert 'snprintf(g_chopperPitchHints[1], sizeof(g_chopperPitchHints[1]), "%s", "A Apply | L1+R1 Exit | R2+LR Target");' in pub, "hint 2 publicado"
+assert 'snprintf(g_chopperPitchStatus, sizeof(g_chopperPitchStatus), "%s", statusMessage_[0] ? statusMessage_ : "");' in pub, "status publicado"
 clr = chopper[chopper.index("void SampleChopperModal::clearOverlayState()"):]
 clr = clr[:clr.index("void SampleChopperModal::setPreviewPlaybackRange")]
 assert "g_chopperPitchActive = 0;" in clr, "clearOverlayState apaga el panel"
