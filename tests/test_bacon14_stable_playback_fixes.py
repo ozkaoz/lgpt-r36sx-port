@@ -80,7 +80,8 @@ assert "static char g_chopperPitchHints[2][40];" in chopper, "hints del panel fu
 assert "static char g_chopperPitchStatus[40];" in chopper, "status del panel full-screen"
 assert re.search(r"static void tf_text\(int x, int y, const char \*s, unsigned short fg, unsigned short bg, int invert\) \{\n", chopper), "render de texto a pixeles"
 assert "&font[*c * 8];" in chopper, "glifos de la fuente global 8x8"
-assert "g[r * FONT_WIDTH + b] != 0" in chopper, "1 byte por pixel (0/1), scanline-major (DrawCharInternal)"
+assert "g[r * FONT_WIDTH + b] == 0" in chopper, "ZERO_IS_INK: tinta = byte 0 (TreeFrogGUIWindowImp.cpp:13)"
+assert "ZERO_IS_INK (TreeFrogGUIWindowImp.cpp:13)" in chopper
 ov = chopper[chopper.index("extern \"C\" void TreeFrogChopperOverlayDraw(void) {"):]
 ov = ov[:ov.index("static void SampleChopperModal::clearOverlayState")] if "static void SampleChopperModal::clearOverlayState" in ov else ov[:6000]
 assert "if (g_chopperPitchActive) {" in ov, "rama del panel en el overlay"

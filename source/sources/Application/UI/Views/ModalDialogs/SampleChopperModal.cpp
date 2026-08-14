@@ -877,7 +877,9 @@ static void tf_text(int x, int y, const char *s, unsigned short fg, unsigned sho
             for (int b = 0; b < 8; b++) {
                 int px = x + b;
                 if (px < 0 || px >= TF_W) continue;
-                int bit = (g[r * FONT_WIDTH + b] != 0);
+                /* ZERO_IS_INK (TreeFrogGUIWindowImp.cpp:13):
+                   tinta = byte 0, fondo = byte != 0. */
+                int bit = (g[r * FONT_WIDTH + b] == 0);
                 fb[py * TF_W + px] = (bit ^ invert) ? fg : bg;
             }
         }
