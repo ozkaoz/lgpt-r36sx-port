@@ -222,4 +222,56 @@ politica no cambio.
 - Audit completo: `AUDIT_CLEAN_MAIN_U2523_OK`.
 - Build MIPS byte-identico `7709b665` desplegado en SD (== build); backup
   `LGPT_BEFORE_U2523_20260813_221336`.
-- Commit: <sha F4c>.
+- Commit: `8962ce6`.
+
+## F4d - AudioBackend (registro declarativo de clases de backend)
+
+### Que se hizo
+
+`Application/Audio/AudioBackend.h` (capa pura header-only C++03): el
+registro de clases de backend del objetivo 6 como datos puros, alineado
+con los daemons reales del port:
+
+| clase              | modos que sirve      | daemon real               |
+|--------------------|----------------------|---------------------------|
+| LocalAudioBackend  | LOCAL_CONSOLE        | (consola, sin USB)        |
+| WindowsUac2Backend | WINDOWS              | r36s_u2523 (gadget UAC2)  |
+| AndroidBackend     | ANDROID              | host-role AOA input-only  |
+| Sp404Backend       | USB_OUT, SP404_IN    | r36s_sp404_host_audio_io  |
+| MidiBackend        | MIDI                 | r36s_midi_host_io         |
+
+Declara tambien:
+
+- Contrato de operaciones de la interfaz `AudioBackend` (objetivo 6):
+  `open`, `start`, `caps`, `stream`, `write`, `close` (nombres como
+  fuente de verdad unica).
+- `AudioBackendClassForMode(mode)`: mapa modo -> clase (replica del
+  runtime real).
+- `AudioBackendClassName(mode)`: nombre de la clase de backend del modo.
+- `AudioBackendClassCapabilities(class)`: capacidades agregadas de la
+  clase como UNION derivada de las capacidades de sus modos (ambas
+  direcciones del sampler), nunca declarada a mano — misma fuente de
+  verdad que AudioDriverModeCapabilities.
+
+### Por que el bridge no se toca
+
+El registro es la declaracion de arquitectura: el puente UAC2 (ruta
+estable) no lo consume todavia.  AudioEngine (F4e) sera quien envuelva el
+puente y use AudioBackend + AudioRouter + AudioCapabilities sin cambiar
+datos ni timings.  El core MIPS resultante es byte-identico (sha256
+`7709b665`).
+
+### Evidencia del tramo
+
+- Host test `tests/host/audio_backend_host_test.cpp`, runner
+  `tests/run_host_audio_backend.sh` en `scripts/audit.sh`:
+  `AUDIO_BACKEND_HOST_ALL_OK (48 checks)` ASAN/UBSAN (registro, mapa
+  modo->clase, contrato de ops, capacidades por clase, consistencia
+  subset-ALL).
+- Baseline `tests/test_f4d_baseline.py`: `F4D_BASELINE_OK` (capa pura con
+  solo los 3 includes hermanos; capacidades derivadas, sin literales de
+  mascara; bridge sin consumir AudioBackend).
+- Audit completo: `AUDIT_CLEAN_MAIN_U2523_OK`.
+- Build MIPS byte-identico `7709b665` desplegado en SD (== build); backup
+  `LGPT_BEFORE_U2523_20260813_223016`.
+- Commit: <sha F4d>.

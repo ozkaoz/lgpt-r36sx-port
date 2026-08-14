@@ -369,6 +369,16 @@ terminan ademas con validacion en consola real.
   `F4C_BASELINE_OK`.  Audit `AUDIT_CLEAN_MAIN_U2523_OK`; core MIPS
   byte-identico `7709b665` (la delegacion inline compila al mismo codigo);
   deploy SD == build; backup `LGPT_BEFORE_U2523_20260813_221336`.
+- **F4d [IMPLEMENTADO]** (ver docs/F4_ARCHITECTURE_ES.md): `AudioBackend.h`
+  — registro declarativo de clases de backend (LocalAudioBackend,
+  WindowsUac2Backend, AndroidBackend, Sp404Backend, MidiBackend) con el
+  contrato de operaciones (open/start/caps/stream/write/close) y el mapa
+  modo driver -> clase (daemons reales del port); las capacidades por clase
+  se derivan de los modos (union), nunca se declaran.  El bridge no
+  consume AudioBackend (lo conecta AudioEngine/F4e); core MIPS byte-
+  identico `7709b665`.  Host test `AUDIO_BACKEND_HOST_ALL_OK` (48 checks
+  ASAN/UBSAN); baseline `F4D_BASELINE_OK`; audit `AUDIT_CLEAN_MAIN_U2523_OK`;
+  deploy SD == build; backup `LGPT_BEFORE_U2523_20260813_223016`.
 
 ## F5 - Politica de storage/SD estricta (Service/Storage)
 - StorageService clasifica: Volatile (cache, tmp), Persistent (config.xml,
