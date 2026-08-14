@@ -65,4 +65,37 @@ assert "void SampleChopperModal::drawPitchScreen" in chopper
 dv = chopper[chopper.index("void SampleChopperModal::DrawView"):]
 dv = dv[:dv.index("void SampleChopperModal::ProcessButtonMask")]
 assert "if (!hasWaveform_ && !pitchMode_)" in dv, "DrawView: pitch prevalece sobre waveform"
+
+# 8. Chopper: BACON14 PITCH OVERLAY (U2.52).  Con el proyecto detenido el
+#    char screen no se refresca de forma fiable en R36S (el toggle solo
+#    actualiza el status), asi que el panel Pitch/Env se renderiza en el
+#    overlay direct-FB cada frame (mismo mecanismo que el waveform).
+assert '#include "UIFramework/BasicDatas/FontConfig.h"' in chopper, "fuente global disponible"
+assert "static int g_chopperPitchActive = 0;" in chopper
+assert "static int g_chopperPitchSelected = 0;" in chopper
+assert "static char g_chopperPitchHeader[40];" in chopper
+assert "static char g_chopperPitchLabels[6][24];" in chopper
+assert "static char g_chopperPitchValues[6][20];" in chopper
+assert re.search(r"static void tf_text\(int x, int y, const char \*s, unsigned short fg, unsigned short bg, int invert\) \{\n", chopper), "render de texto a pixeles"
+assert "&font[*c * 8];" in chopper, "glifos de la fuente global 8x8"
+assert "g[r * FONT_WIDTH]" in chopper, "stride FONT_WIDTH entre filas del glifo"
+ov = chopper[chopper.index("extern \"C\" void TreeFrogChopperOverlayDraw(void) {"):]
+ov = ov[:ov.index("static void SampleChopperModal::clearOverlayState")] if "static void SampleChopperModal::clearOverlayState" in ov else ov[:6000]
+assert "if (g_chopperPitchActive) {" in ov, "rama del panel en el overlay"
+assert 'const char *title = "PITCH/ENV";' in ov
+assert "tf_text((40 - (int)strlen(title)) * 4, 88, title, ph1, pbg, 0);" in ov, "titulo centrado fila 11"
+assert "tf_text(64, 96, g_chopperPitchHeader, pnorm, pbg, 0);" in ov, "header fila 12"
+assert "tf_text(64, y, g_chopperPitchLabels[i], pnorm, pbg, 0);" in ov
+assert "tf_text(168, y, g_chopperPitchValues[i], sel ? ph2 : ph1, pbg, sel);" in ov, "valor seleccionado invertido (HILITE2)"
+assert "return;" in ov
+pub = chopper[chopper.index("void SampleChopperModal::publishOverlayState()"):]
+pub = pub[:pub.index("void SampleChopperModal::clearOverlayState()")]
+assert "g_chopperPitchActive = (!suspended_ && !operationActive_ && pitchMode_) ? 1 : 0;" in pub, "gate del panel (suspended/operation)"
+assert "g_chopperPitchSelected = pitchEnvTool_.EditParam();" in pub
+assert "ChopperView::ComposeHeaderLine(g_chopperPitchHeader, sizeof(g_chopperPitchHeader)," in pub
+assert "ChopperView::PitchLabel(i)" in pub
+assert "ChopperView::ComposePitchValue(g_chopperPitchValues[i], sizeof(g_chopperPitchValues[i]), i," in pub
+clr = chopper[chopper.index("void SampleChopperModal::clearOverlayState()"):]
+clr = clr[:clr.index("void SampleChopperModal::setPreviewPlaybackRange")]
+assert "g_chopperPitchActive = 0;" in clr, "clearOverlayState apaga el panel"
 print("TEST_BC14_STABLE_PLAYBACK_OK")

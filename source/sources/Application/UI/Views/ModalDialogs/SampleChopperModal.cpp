@@ -13,6 +13,7 @@
 #include <unistd.h>
 #if defined(PLATFORM_TREEFROG)
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
+#include "UIFramework/BasicDatas/FontConfig.h"
 extern "C" void TreeFrogForceVideoRefresh(void);
 #endif
 #include <stdio.h>
@@ -832,6 +833,11 @@ static int g_chopperPreviewStartFrame = 0;
 static int g_chopperPreviewEndFrame = 0;
 static int g_chopperOperationActive = 0;
 static int g_chopperOperationPercent = 0;
+static int g_chopperPitchActive = 0;
+static int g_chopperPitchSelected = 0;
+static char g_chopperPitchHeader[40];
+static char g_chopperPitchLabels[6][24];
+static char g_chopperPitchValues[6][20];
 
 static unsigned short tf_rgb565(unsigned char r, unsigned char g, unsigned char b) {
     return (unsigned short)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
@@ -857,7 +863,55 @@ static void tf_vline(int x, int y0, int y1, unsigned short color) {
     tf_rect(x, y0, 1, y1 - y0 + 1, color);
 }
 
+static void tf_text(int x, int y, const char *s, unsigned short fg, unsigned short bg, int invert) {
+    uint16_t *fb = TreeFrogGetFramebuffer();
+    if (!fb || !s) return;
+    for (const unsigned char *c = (const unsigned char *)s; *c && x < TF_W; ++c, x += 8) {
+        if (x + 8 <= 0 || *c >= 128) continue;
+        const unsigned char *g = &font[*c * 8];
+        for (int r = 0; r < 8; r++) {
+            int py = y + r;
+            if (py < 0 || py >= TF_H) continue;
+            for (int b = 0; b < 8; b++) {
+                int px = x + b;
+                if (px < 0 || px >= TF_W) continue;
+                int bit = (g[r * FONT_WIDTH] >> (7 - b)) & 1;
+                fb[py * TF_W + px] = (bit ^ invert) ? fg : bg;
+            }
+        }
+    }
+}
+
 extern "C" void TreeFrogChopperOverlayDraw(void) {
+    /* BACON14 PITCH OVERLAY (U2.52): panel Pitch/Env directo al
+       framebuffer, cada frame, igual que el waveform.  Con el proyecto
+       detenido el char screen no se refresca de forma fiable en R36S
+       (el toggle si actualiza el status), asi que el panel se pinta
+       aqui en vez de depender del flush del GUI. */
+    if (g_chopperPitchActive) {
+        const unsigned short pbg    = tf_rgb565(10, 10, 24);
+        const unsigned short pframe = tf_rgb565(63, 95, 191);
+        const unsigned short pnorm  = tf_rgb565(0xE8, 0xE4, 0xF8);
+        const unsigned short ph1    = tf_rgb565(0x5B, 0x8C, 0xFF);
+        const unsigned short ph2    = tf_rgb565(0x9D, 0x5B, 0xFF);
+        tf_rect(0, 60, 320, 116, pbg);
+        tf_rect(0, 59, 320, 1, pframe);
+        tf_rect(0, 176, 320, 1, pframe);
+        tf_rect(0, 60, 1, 116, pframe);
+        tf_rect(319, 60, 1, 116, pframe);
+        {
+            const char *title = "PITCH/ENV";
+            tf_text((40 - (int)strlen(title)) * 4, 88, title, ph1, pbg, 0);
+        }
+        tf_text(64, 96, g_chopperPitchHeader, pnorm, pbg, 0);
+        for (int i = 0; i < 6; i++) {
+            int y = 104 + i * 8;
+            int sel = (g_chopperPitchSelected == i);
+            tf_text(64, y, g_chopperPitchLabels[i], pnorm, pbg, 0);
+            tf_text(168, y, g_chopperPitchValues[i], sel ? ph2 : ph1, pbg, sel);
+        }
+        return;
+    }
     if (!g_chopperOverlayActive) return;
 
     const unsigned short bg       = tf_rgb565(10, 10, 24);
@@ -2664,12 +2718,40 @@ void SampleChopperModal::publishOverlayState() {
             g_chopperSelectedRangeEndPx = frameToPixel(clipEnd);
         }
     }
+    /* BACON14 PITCH OVERLAY (U2.52): publicar el contenido del panel
+       Pitch/Env para el overlay direct-FB (misma geometria que
+       drawPitchScreen: titulo fila 11, header fila 12, items filas
+       13..18, labels col 8, valores col 21). */
+    g_chopperPitchActive = (!suspended_ && !operationActive_ && pitchMode_) ? 1 : 0;
+    g_chopperPitchSelected = pitchEnvTool_.EditParam();
+    if (g_chopperPitchActive) {
+        if (hasAssignedSample() && sourceSize_ > 1) {
+            ChopperView::ComposeHeaderLine(g_chopperPitchHeader, sizeof(g_chopperPitchHeader),
+                                           instrumentIndex_, sampleIndex_,
+                                           chopModel_.selected + 1,
+                                           (chopModel_.boundaryCount > 1 ? chopModel_.boundaryCount - 1 : 1));
+        } else {
+            snprintf(g_chopperPitchHeader, sizeof(g_chopperPitchHeader), "%s", "No sample loaded");
+        }
+        for (int i = 0; i < 6; i++) {
+            strncpy(g_chopperPitchLabels[i], ChopperView::PitchLabel(i), sizeof(g_chopperPitchLabels[i]) - 1);
+            g_chopperPitchLabels[i][sizeof(g_chopperPitchLabels[i]) - 1] = 0;
+            ChopperView::ComposePitchValue(g_chopperPitchValues[i], sizeof(g_chopperPitchValues[i]), i,
+                                           pitchEnvTool_.Params().semitones,
+                                           pitchEnvTool_.Params().attackMs,
+                                           pitchEnvTool_.Params().sustainPercent,
+                                           pitchEnvTool_.Params().releaseMs,
+                                           pitchEnvTool_.Params().scope,
+                                           sampleIndex_);
+        }
+    }
 #endif
 }
 
 void SampleChopperModal::clearOverlayState() {
 #if defined(PLATFORM_TREEFROG)
     g_chopperOverlayActive = 0;
+    g_chopperPitchActive = 0;
     g_chopperSelectedRangeStartPx = -1;
     g_chopperSelectedRangeEndPx = -1;
     g_chopperTrimMode = 0;
