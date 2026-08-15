@@ -94,8 +94,11 @@ public:
     static fixed SyncDivisionToMs(int division, int bpm);
 
     // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
-    fixed GetDelayMsTarget() const { return delayTarget_; }
-    fixed GetDelayMs() const { return delaySamples_; }
+    // bacon-1.5 item 5: GetDelayMsTarget returns the time in ms (Q15); the
+    // internal glide state is 64-bit fractional samples so the full 2000 ms
+    // range (96000 samples at 48 kHz) never overflows 32-bit Q15.
+    fixed GetDelayMsTarget() const { return delayTargetMs_; }
+    fixed GetDelayMs() const { return fl2fp(fp2fl(delayTargetMs_)); }
     fixed GetFeedback() const { return fb_; }
     fixed GetMix() const { return mix_; }
     fixed GetWidth() const { return width_; }
@@ -122,8 +125,9 @@ private:
     int rate_;
     int maxSamples_;
     int writePos_;
-    fixed delaySamples_;     // current smoothed delay in samples (Q15)
-    fixed delayTarget_;      // target delay in samples (Q15)
+    long long delaySamples_;  // current smoothed delay in fractional samples (Q15, 64-bit)
+    long long delayTarget_;   // target delay in fractional samples (Q15, 64-bit)
+    fixed delayTargetMs_;     // target delay in ms (Q15, for UI/persistence)
     fixed fb_;
     fixed width_;
     bool pingPong_;

@@ -147,10 +147,12 @@ static inline std::string* getHelpLegend(FourCC command) {
 			result[2].assign("");
 			break;
 		// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4) /
-		// TREEFROG_SEND_LIVE_V1 (Fase 15):
+		// TREEFROG_SEND_LIVE_V1 (Fase 15) / bacon-1.5 item 5:
 		// DLYS/RVBS modulate the LIVE per-channel instrument send override
 		// (never the persisted base nor the per-track Mixer send).  The rest
-		// are master-bus FX, monotonic 00-FF on the low byte (0=min, FF=max).
+		// are master-bus FX, monotonic 00-FF on the low byte (0=min, FF=max),
+		// converted with the SAME curve as the Mixer UI (log for time:
+		// DLYT/RVDC; linear for gains: DLYF/RVSZ/CMPT).
 		case I_CMD_DLYS:
 			result[0].assign("Delay Send:--bb");
 			result[1].assign("instrument delay send bb");
@@ -163,7 +165,7 @@ static inline std::string* getHelpLegend(FourCC command) {
 			break;
 		case I_CMD_DLYT:
 			result[0].assign("Delay TiMe:--bb");
-			result[1].assign("master delay time");
+			result[1].assign("master delay time (log curve)");
 			result[2].assign("00-FF -> 10-2000 ms");
 			break;
 		case I_CMD_DLYF:
@@ -173,7 +175,7 @@ static inline std::string* getHelpLegend(FourCC command) {
 			break;
 		case I_CMD_RVDC:
 			result[0].assign("ReveRb DeCay:--bb");
-			result[1].assign("master reverb RT60");
+			result[1].assign("master reverb RT60 (log curve)");
 			result[2].assign("00-FF -> 0.2-8 s");
 			break;
 		case I_CMD_RVSZ:

@@ -42,7 +42,14 @@ public:
     //   10 = REVERB return bus tap
     enum SidechainSource {
         SC_OFF = 0,
-        SC_TRACK_1 = 1,       // ... SC_TRACK_8 = 8
+        SC_TRACK_1 = 1,
+        SC_TRACK_2 = 2,
+        SC_TRACK_3 = 3,
+        SC_TRACK_4 = 4,
+        SC_TRACK_5 = 5,
+        SC_TRACK_6 = 6,
+        SC_TRACK_7 = 7,
+        SC_TRACK_8 = 8,
         SC_DELAY_RETURN = 9,
         SC_REVERB_RETURN = 10,
         SC_SOURCE_COUNT = 11

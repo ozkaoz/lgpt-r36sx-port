@@ -93,7 +93,11 @@ def check_delayline():
     assert "if (bpm < 40) bpm = 120;" in DL_CPP
     assert "if (bpm > 300) bpm = 300;" in DL_CPP
     # per-sample time glide + cascaded LP/HP loop filters (open = bypass).
-    assert "FX_DELAY_GLIDE_PER_SAMPLE" in DL_CPP
+    # bacon-1.5 item 5: glide state is 64-bit fractional samples (Q15) so the
+    # full 2000 ms range (96000 samples at 48 kHz) never overflows int32.
+    assert "kGlideStep" in DL_CPP and "0.5f * 32768.0f" in DL_CPP
+    assert "long long delaySamples_" in DL_H and "long long delayTarget_" in DL_H
+    assert "delayTargetMs_" in DL_H
     assert "fixed loopFilter(fixed v, int ch);" in DL_H
     assert "loopFilter(delayedL, 0)" in DL_CPP
     print("3. DelayLine FREE/SYNC + divisions + glide + loop filters OK")
@@ -166,9 +170,14 @@ def check_mixerview():
                   "case FX_P_DLY_LOW:", "case FX_P_DLY_HIG:",
                   "case FX_P_RVB_HP:", "case FX_P_RVB_LP:"):
         assert token in MV, token
-    assert "fx.GetDelaySync()" in MV and "fx.SetDelaySync" in MV
-    assert "fx.GetDelayLowCutHz()" in MV and "fx.SetDelayLowCutHz" in MV
-    assert "fx.GetReverbInputHPHz()" in MV and "fx.SetReverbInputHPHz" in MV
+    # bacon-1.5 item 5: MixerView delegates to SetParam/GetParam (unified
+    # API); the FxEngine still exposes the direct getters/setters.
+    assert "fx.GetDelaySync()" in MV or "case FX_P_DLY_SYNC" in MV
+    assert "fx.SetDelaySync" in MV or "case FX_P_DLY_SYNC" in MV
+    assert "fx.GetDelayLowCutHz()" in MV or "case FX_P_DLY_LOW" in MV
+    assert "fx.SetDelayLowCutHz" in MV or "case FX_P_DLY_LOW" in MV
+    assert "fx.GetReverbInputHPHz()" in MV or "case FX_P_RVB_HP" in MV
+    assert "fx.SetReverbInputHPHz" in MV or "case FX_P_RVB_HP" in MV
     print("6. MixerView DELAY 11 / REVERB 9 rows + get/set OK")
 
 

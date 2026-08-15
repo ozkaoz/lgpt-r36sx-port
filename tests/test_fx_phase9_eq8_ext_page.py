@@ -156,10 +156,13 @@ def check_mixerview():
     assert "drawEqExtRow(FX_P_EQX_BYP,ml.labelX,ml.valueX,ml.startY)" in MV
     assert "FX_P_EQX_B3_FRQ+4*b" in MV
     assert "MakeCenteredMenuLayout(21,6,13,2)" in MV
-    assert "fx.SetEqExtBypass(v>=0.5f)" in MV
-    assert "fx.GetEqExtBypass()" in MV
-    assert "fx.GetEqBandType(7)" in MV
-    assert "fx.SetEqBandType(7,(int)v)" in MV
+    # bacon-1.5 item 5: MixerView delegates to the unified fxGet/fxSet API
+    # (SetParam/GetParam); the switch wiring lives in FxEngine::SetParam.
+    assert "id==FX_P_EQX_BYP" in MV and "drawEqExtRow(FX_P_EQX_BYP" in MV
+    assert "case FX_P_EQX_BYP:" in FE_CPP or "SetEqExtBypass" in FE_CPP
+    assert "fx.GetEqBandType(7)" in MV or "eqExtTypeName" in MV
+    assert "fx.SetEqBandType(7,(int)v)" in MV or "case FX_P_EQX_B7_TYP" in FE_CPP
+    assert "SetEqBandType" in FE_CPP
     assert '"MASTER EQ EXT [%d/6]"' in MV
     assert "DELAY MASTER [%d/6]" in MV and "REVERB MASTER [%d/6]" in MV
     print("8. MixerView EQ EXT page + titles OK")

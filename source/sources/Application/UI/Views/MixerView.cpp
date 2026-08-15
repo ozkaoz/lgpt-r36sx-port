@@ -1161,159 +1161,16 @@ void MixerView::fxResetRow() {
 // (Fase 9) nudgeDelayReturn/nudgeReverbReturn defined above; see MixerView.h.
 
 float MixerView::fxGet(int id) const {
-	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
-	switch(id) {
-	case FX_P_DLY_TIME: return fp2fl(fx.GetDelayTimeMs()) ;
-	case FX_P_DLY_FBK:  return fp2fl(fx.GetDelayFeedback()) ;
-	case FX_P_DLY_MIX:  return fp2fl(fx.GetDelayMix()) ;
-	case FX_P_DLY_WID:  return fp2fl(fx.GetDelayWidth()) ;
-	case FX_P_DLY_PP:   return fx.GetDelayPingPong()?1.0f:0.0f ;
-	case FX_P_DLY_SAT:  return fx.GetDelaySaturation()?1.0f:0.0f ;
-	case FX_P_DLY_BYP:  return fx.GetDelayBypass()?1.0f:0.0f ;
-	case FX_P_RVB_PRE:  return fp2fl(fx.GetReverbPredelayMs()) ;
-	case FX_P_RVB_DEC:  return fp2fl(fx.GetReverbDecay()) ;
-	case FX_P_RVB_SIZ:  return fp2fl(fx.GetReverbSize()) ;
-	case FX_P_RVB_DMP:  return fp2fl(fx.GetReverbDamping()) ;
-	case FX_P_RVB_WID:  return fp2fl(fx.GetReverbWidth()) ;
-	case FX_P_RVB_MODE: return (float)fx.GetReverbMode() ;
-	case FX_P_RVB_BYP:  return fx.GetReverbBypass()?1.0f:0.0f ;
-	case FX_P_EQ_BYP:   return fx.GetEqBypass()?1.0f:0.0f ;
-	case FX_P_EQ_LOW_FRQ: return fp2fl(fx.GetEqBandFreq(0)) ;
-	case FX_P_EQ_LOW_GAI: return fp2fl(fx.GetEqBandGainDb(0)) ;
-	case FX_P_EQ_LOW_Q:   return fp2fl(fx.GetEqBandQ(0)) ;
-	case FX_P_EQ_LOW_EN:  return fx.GetEqBandEnabled(0)?1.0f:0.0f ;
-	case FX_P_EQ_MID_FRQ: return fp2fl(fx.GetEqBandFreq(1)) ;
-	case FX_P_EQ_MID_GAI: return fp2fl(fx.GetEqBandGainDb(1)) ;
-	case FX_P_EQ_MID_Q:   return fp2fl(fx.GetEqBandQ(1)) ;
-	case FX_P_EQ_MID_EN:  return fx.GetEqBandEnabled(1)?1.0f:0.0f ;
-	case FX_P_EQ_HI_FRQ:  return fp2fl(fx.GetEqBandFreq(2)) ;
-	case FX_P_EQ_HI_GAI:  return fp2fl(fx.GetEqBandGainDb(2)) ;
-	case FX_P_EQ_HI_Q:    return fp2fl(fx.GetEqBandQ(2)) ;
-	case FX_P_EQ_HI_EN:   return fx.GetEqBandEnabled(2)?1.0f:0.0f ;
-	case FX_P_EQX_BYP:    return fx.GetEqExtBypass()?1.0f:0.0f ;
-	case FX_P_EQX_B3_FRQ: return fp2fl(fx.GetEqBandFreq(3)) ;
-	case FX_P_EQX_B3_GAI: return fp2fl(fx.GetEqBandGainDb(3)) ;
-	case FX_P_EQX_B3_Q:   return fp2fl(fx.GetEqBandQ(3)) ;
-	case FX_P_EQX_B3_TYP: return (float)fx.GetEqBandType(3) ;
-	case FX_P_EQX_B4_FRQ: return fp2fl(fx.GetEqBandFreq(4)) ;
-	case FX_P_EQX_B4_GAI: return fp2fl(fx.GetEqBandGainDb(4)) ;
-	case FX_P_EQX_B4_Q:   return fp2fl(fx.GetEqBandQ(4)) ;
-	case FX_P_EQX_B4_TYP: return (float)fx.GetEqBandType(4) ;
-	case FX_P_EQX_B5_FRQ: return fp2fl(fx.GetEqBandFreq(5)) ;
-	case FX_P_EQX_B5_GAI: return fp2fl(fx.GetEqBandGainDb(5)) ;
-	case FX_P_EQX_B5_Q:   return fp2fl(fx.GetEqBandQ(5)) ;
-	case FX_P_EQX_B5_TYP: return (float)fx.GetEqBandType(5) ;
-	case FX_P_EQX_B6_FRQ: return fp2fl(fx.GetEqBandFreq(6)) ;
-	case FX_P_EQX_B6_GAI: return fp2fl(fx.GetEqBandGainDb(6)) ;
-	case FX_P_EQX_B6_Q:   return fp2fl(fx.GetEqBandQ(6)) ;
-	case FX_P_EQX_B6_TYP: return (float)fx.GetEqBandType(6) ;
-	case FX_P_EQX_B7_FRQ: return fp2fl(fx.GetEqBandFreq(7)) ;
-	case FX_P_EQX_B7_GAI: return fp2fl(fx.GetEqBandGainDb(7)) ;
-	case FX_P_EQX_B7_Q:   return fp2fl(fx.GetEqBandQ(7)) ;
-	case FX_P_EQX_B7_TYP: return (float)fx.GetEqBandType(7) ;
-	case FX_P_DLY_SYNC:   return fx.GetDelaySync()?1.0f:0.0f ;
-	case FX_P_DLY_DIV:    return (float)fx.GetDelayDivision() ;
-	case FX_P_DLY_LOW:    return fp2fl(fx.GetDelayLowCutHz()) ;
-	case FX_P_DLY_HIG:    return fp2fl(fx.GetDelayHighCutHz()) ;
-	case FX_P_RVB_HP:     return fp2fl(fx.GetReverbInputHPHz()) ;
-	case FX_P_RVB_LP:     return fp2fl(fx.GetReverbInputLPHz()) ;
-	case FX_P_CMP_THR:    return fp2fl(fx.GetCompThresholdDb()) ;
-	case FX_P_CMP_RAT:    return fp2fl(fx.GetCompRatio()) ;
-	case FX_P_CMP_KNE:    return fp2fl(fx.GetCompKneeDb()) ;
-	case FX_P_CMP_ATK:    return fx.GetCompAttackMs() ;
-	case FX_P_CMP_REL:    return fx.GetCompReleaseMs() ;
-	case FX_P_CMP_MKU:    return fp2fl(fx.GetCompMakeupDb()) ;
-	case FX_P_CMP_LINK:   return fx.GetCompStereoLink()?1.0f:0.0f ;
-	case FX_P_CMP_SC:     return fx.GetCompSoftClip()?1.0f:0.0f ;
-	case FX_P_CMP_BYP:    return fx.GetCompBypass()?1.0f:0.0f ;
-	case FX_P_CMP_MIX:    return fp2fl(fx.GetCompMix()) ;
-	case FX_P_CMP_SCSRC:  return (float)fx.GetCompSidechainSource() ;
-	case FX_P_CMP_SCFLT:  return fp2fl(fx.GetCompSidechainHpfHz()) ;
-	case FX_P_CMP_SCAMT:  return fp2fl(fx.GetCompSidechainAmount()) ;
-	}
-	return 0.0f ;
+	// bacon-1.5 item 5: la lectura unica del motor vive en la API unificada
+	// FxEngine::GetParam (UI, automatizacion y persistencia comparten el
+	// mismo mapeo y clamp por id de kFxParams_).
+	return FxEngine::FxEngine::GetInstance().GetParam(id) ;
 }
 
 void MixerView::fxSet(int id,float v) {
-	FxEngine::FxEngine &fx=FxEngine::FxEngine::GetInstance() ;
-	const FxParamSpec &spec=kFxParams_[id] ;
-	if (v<spec.vmin) v=spec.vmin ;
-	if (v>spec.vmax) v=spec.vmax ;
-	switch(id) {
-	case FX_P_DLY_TIME: fx.SetDelayTimeMs(fl2fp(v)) ; break ;
-	case FX_P_DLY_FBK:  fx.SetDelayFeedback(fl2fp(v)) ; break ;
-	case FX_P_DLY_MIX:  fx.SetDelayMix(fl2fp(v)) ; break ;
-	case FX_P_DLY_WID:  fx.SetDelayWidth(fl2fp(v)) ; break ;
-	case FX_P_DLY_PP:   fx.SetDelayPingPong(v>=0.5f) ; break ;
-	case FX_P_DLY_SAT:  fx.SetDelaySaturation(v>=0.5f) ; break ;
-	case FX_P_DLY_BYP:  fx.SetDelayBypass(v>=0.5f) ; break ;
-	case FX_P_RVB_PRE:  fx.SetReverbPredelayMs(fl2fp(v)) ; break ;
-	case FX_P_RVB_DEC:  fx.SetReverbDecay(fl2fp(v)) ; break ;
-	case FX_P_RVB_SIZ:  fx.SetReverbSize(fl2fp(v)) ; break ;
-	case FX_P_RVB_DMP:  fx.SetReverbDamping(fl2fp(v)) ; break ;
-	case FX_P_RVB_WID:  fx.SetReverbWidth(fl2fp(v)) ; break ;
-	case FX_P_RVB_MODE: fx.SetReverbMode((int)v) ; break ;
-	case FX_P_RVB_BYP:  fx.SetReverbBypass(v>=0.5f) ; break ;
-	case FX_P_EQ_BYP:   fx.SetEqBypass(v>=0.5f) ; break ;
-	case FX_P_EQ_LOW_FRQ: fx.SetEqBandFreq(0,fl2fp(v)) ; break ;
-	case FX_P_EQ_LOW_GAI: fx.SetEqBandGainDb(0,fl2fp(v)) ;
-	                     fx.SetEqBandEnabled(0,true) ; fx.SetEqBypass(false) ; break ;
-	case FX_P_EQ_LOW_Q:   fx.SetEqBandQ(0,fl2fp(v)) ; break ;
-	case FX_P_EQ_LOW_EN:  fx.SetEqBandEnabled(0,v>=0.5f) ; break ;
-	case FX_P_EQ_MID_FRQ: fx.SetEqBandFreq(1,fl2fp(v)) ; break ;
-	case FX_P_EQ_MID_GAI: fx.SetEqBandGainDb(1,fl2fp(v)) ;
-	                     fx.SetEqBandEnabled(1,true) ; fx.SetEqBypass(false) ; break ;
-	case FX_P_EQ_MID_Q:   fx.SetEqBandQ(1,fl2fp(v)) ; break ;
-	case FX_P_EQ_MID_EN:  fx.SetEqBandEnabled(1,v>=0.5f) ; break ;
-	case FX_P_EQ_HI_FRQ:  fx.SetEqBandFreq(2,fl2fp(v)) ; break ;
-	case FX_P_EQ_HI_GAI:  fx.SetEqBandGainDb(2,fl2fp(v)) ;
-	                     fx.SetEqBandEnabled(2,true) ; fx.SetEqBypass(false) ; break ;
-	case FX_P_EQX_BYP:    fx.SetEqExtBypass(v>=0.5f) ; break ;
-	case FX_P_EQX_B3_FRQ: fx.SetEqBandFreq(3,fl2fp(v)) ; break ;
-	case FX_P_EQX_B3_GAI: fx.SetEqBandGainDb(3,fl2fp(v)) ;
-	                     fx.SetEqBypass(false) ; break ;
-	case FX_P_EQX_B3_Q:   fx.SetEqBandQ(3,fl2fp(v)) ; break ;
-	case FX_P_EQX_B3_TYP: fx.SetEqBandType(3,(int)v) ; break ;
-	case FX_P_EQX_B4_FRQ: fx.SetEqBandFreq(4,fl2fp(v)) ; break ;
-	case FX_P_EQX_B4_GAI: fx.SetEqBandGainDb(4,fl2fp(v)) ;
-	                     fx.SetEqBypass(false) ; break ;
-	case FX_P_EQX_B4_Q:   fx.SetEqBandQ(4,fl2fp(v)) ; break ;
-	case FX_P_EQX_B4_TYP: fx.SetEqBandType(4,(int)v) ; break ;
-	case FX_P_EQX_B5_FRQ: fx.SetEqBandFreq(5,fl2fp(v)) ; break ;
-	case FX_P_EQX_B5_GAI: fx.SetEqBandGainDb(5,fl2fp(v)) ;
-	                     fx.SetEqBypass(false) ; break ;
-	case FX_P_EQX_B5_Q:   fx.SetEqBandQ(5,fl2fp(v)) ; break ;
-	case FX_P_EQX_B5_TYP: fx.SetEqBandType(5,(int)v) ; break ;
-	case FX_P_EQX_B6_FRQ: fx.SetEqBandFreq(6,fl2fp(v)) ; break ;
-	case FX_P_EQX_B6_GAI: fx.SetEqBandGainDb(6,fl2fp(v)) ;
-	                     fx.SetEqBypass(false) ; break ;
-	case FX_P_EQX_B6_Q:   fx.SetEqBandQ(6,fl2fp(v)) ; break ;
-	case FX_P_EQX_B6_TYP: fx.SetEqBandType(6,(int)v) ; break ;
-	case FX_P_EQX_B7_FRQ: fx.SetEqBandFreq(7,fl2fp(v)) ; break ;
-	case FX_P_EQX_B7_GAI: fx.SetEqBandGainDb(7,fl2fp(v)) ;
-	                     fx.SetEqBypass(false) ; break ;
-	case FX_P_EQX_B7_Q:   fx.SetEqBandQ(7,fl2fp(v)) ; break ;
-	case FX_P_EQX_B7_TYP: fx.SetEqBandType(7,(int)v) ; break ;
-	case FX_P_DLY_SYNC:   fx.SetDelaySync(v>=0.5f) ; break ;
-	case FX_P_DLY_DIV:    fx.SetDelayDivision((int)v) ; break ;
-	case FX_P_DLY_LOW:    fx.SetDelayLowCutHz(fl2fp(v)) ; break ;
-	case FX_P_DLY_HIG:    fx.SetDelayHighCutHz(fl2fp(v)) ; break ;
-	case FX_P_RVB_HP:     fx.SetReverbInputHPHz(fl2fp(v)) ; break ;
-	case FX_P_RVB_LP:     fx.SetReverbInputLPHz(fl2fp(v)) ; break ;
-	case FX_P_CMP_THR:    fx.SetCompThresholdDb(fl2fp(v)) ; break ;
-	case FX_P_CMP_RAT:    fx.SetCompRatio(fl2fp(v)) ; break ;
-	case FX_P_CMP_KNE:    fx.SetCompKneeDb(fl2fp(v)) ; break ;
-	case FX_P_CMP_ATK:    fx.SetCompAttackMs(fl2fp(v)) ; break ;
-	case FX_P_CMP_REL:    fx.SetCompReleaseMs(fl2fp(v)) ; break ;
-	case FX_P_CMP_MKU:    fx.SetCompMakeupDb(fl2fp(v)) ; break ;
-	case FX_P_CMP_LINK:   fx.SetCompStereoLink(v>=0.5f) ; break ;
-	case FX_P_CMP_SC:     fx.SetCompSoftClip(v>=0.5f) ; break ;
-	case FX_P_CMP_BYP:    fx.SetCompBypass(v>=0.5f) ; break ;
-	case FX_P_CMP_MIX:    fx.SetCompMix(fl2fp(v)) ; break ;
-	case FX_P_CMP_SCSRC:  fx.SetCompSidechainSource((int)v) ; break ;
-	case FX_P_CMP_SCFLT:  fx.SetCompSidechainHpfHz(fl2fp(v)) ; break ;
-	case FX_P_CMP_SCAMT:  fx.SetCompSidechainAmount(fl2fp(v)) ; break ;
-	}
+	// bacon-1.5 item 5: la escritura unica del motor vive en la API unificada
+	// FxEngine::SetParam (clamp al rango de la tabla incluido).
+	FxEngine::FxEngine::GetInstance().SetParam(id,v) ;
 }
 
 void MixerView::drawFxParamRow(int id,int x,int y,int col) {

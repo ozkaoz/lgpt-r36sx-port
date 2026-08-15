@@ -21,6 +21,7 @@ extern bool LGPTChopperGetChopRangeForSampleIndex(int sampleIndex, int chopIndex
 #include "Application/Player/SyncMaster.h"
 #include "Application/Model/Mixer.h"
 #include "Application/Audio/FxEngine/FxEngine.h"
+#include "Application/Mixer/FxPages.h" // bacon-1.5 item 5: fxParamFromByte
 #include "Application/Audio/SpectrumAnalyzer.h"
 
 // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: per-instrument 8-band EQ synced from the
@@ -1659,13 +1660,17 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 			}
 			break ;
 
-		// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4):
+		// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4) / bacon-1.5 item 5:
 		// Master-bus FX automation.  All use a monotonic 00-FF mapping of the
 		// low param byte (value&0xFF): 0x00 = minimum, 0xFF = maximum.  The
-		// high byte (speed) is reserved and ignored.  Sends are per-track
-		// (Mixer model); time/feedback/decay/size/threshold are master-bus
-		// (FxEngine).  All writes happen at control rate (audio callback), are
-		// pure fixed-point assignments, and never allocate.
+		// high byte (speed) is reserved and ignored.  Sends are live
+		// per-channel overrides (Fase 15); time/feedback/decay/size/threshold
+		// are master-bus (FxEngine) and go through the UNIFIED API
+		// FxEngine::SetParam + fxParamFromByte, so a phrase byte and a UI
+		// percent produce the same natural value (same descriptor curve:
+		// LOG2 for time, LINEAR for gains).  All writes happen at control
+		// rate (audio callback), are pure fixed-point assignments, and never
+		// allocate.
 		case I_CMD_DLYS:
 			{
 				// TREEFROG_SEND_LIVE_V1 (Fase 15): DLYS modulates the LIVE
@@ -1686,42 +1691,40 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 			break ;
 		case I_CMD_DLYT:
 			{
-				// 00-FF -> 10..2000 ms (monotonic).
-				float v=(float)(value&0xFF)/255.0f ;
-				FxEngine::FxEngine::GetInstance().SetDelayTimeMs(
-				    fl2fp(10.0f+(2000.0f-10.0f)*v)) ;
+				// 00-FF -> 10..2000 ms on the UI curve (LOG2): equal bytes =
+				// equal octaves, identical to editing DLY TIM in percent.
+				FxEngine::FxEngine::GetInstance().SetParam(
+				    FX_P_DLY_TIME, fxParamFromByte(FX_P_DLY_TIME, value&0xFF)) ;
 			}
 			break ;
 		case I_CMD_DLYF:
 			{
-				// 00-FF -> 0..0.98 feedback (monotonic).
-				float v=(float)(value&0xFF)/255.0f ;
-				FxEngine::FxEngine::GetInstance().SetDelayFeedback(
-				    fl2fp(0.98f*v)) ;
+				// 00-FF -> 0..0.98 feedback (LINEAR, same as the UI).
+				FxEngine::FxEngine::GetInstance().SetParam(
+				    FX_P_DLY_FBK, fxParamFromByte(FX_P_DLY_FBK, value&0xFF)) ;
 			}
 			break ;
 		case I_CMD_RVDC:
 			{
-				// 00-FF -> 0.2..8.0 s RT60 (monotonic).
-				float v=(float)(value&0xFF)/255.0f ;
-				FxEngine::FxEngine::GetInstance().SetReverbDecay(
-				    fl2fp(0.2f+(8.0f-0.2f)*v)) ;
+				// 00-FF -> 0.2..8.0 s RT60 on the UI curve (LOG2): equal
+				// bytes = equal octaves, identical to editing RVB DEC in
+				// percent.
+				FxEngine::FxEngine::GetInstance().SetParam(
+				    FX_P_RVB_DEC, fxParamFromByte(FX_P_RVB_DEC, value&0xFF)) ;
 			}
 			break ;
 		case I_CMD_RVSZ:
 			{
-				// 00-FF -> 0.5..1.5 size (monotonic).
-				float v=(float)(value&0xFF)/255.0f ;
-				FxEngine::FxEngine::GetInstance().SetReverbSize(
-				    fl2fp(0.5f+(1.5f-0.5f)*v)) ;
+				// 00-FF -> 0.5..1.5 size (LINEAR, same as the UI).
+				FxEngine::FxEngine::GetInstance().SetParam(
+				    FX_P_RVB_SIZ, fxParamFromByte(FX_P_RVB_SIZ, value&0xFF)) ;
 			}
 			break ;
 		case I_CMD_CMPT:
 			{
-				// 00-FF -> -60..0 dB threshold (monotonic).
-				float v=(float)(value&0xFF)/255.0f ;
-				FxEngine::FxEngine::GetInstance().SetCompThresholdDb(
-				    fl2fp(-60.0f+60.0f*v)) ;
+				// 00-FF -> -60..0 dB threshold (LINEAR, same as the UI).
+				FxEngine::FxEngine::GetInstance().SetParam(
+				    FX_P_CMP_THR, fxParamFromByte(FX_P_CMP_THR, value&0xFF)) ;
 			}
 			break ;
 		default:

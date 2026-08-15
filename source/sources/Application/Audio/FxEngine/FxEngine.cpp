@@ -1,5 +1,6 @@
 #include "FxEngine.h"
 #include "Application/Player/SyncMaster.h"
+#include "Application/Mixer/FxPages.h"
 
 namespace FxEngine {
 
@@ -273,7 +274,7 @@ void FxEngine::AccumulateChannelSend(int channel, const fixed *buffer,
     // bacon-1.5 item 4: sidechain tap of the selected track (pre-master, so
     // the compressor sees the source before the master EQ/returns).
     if (comp_.GetSidechainSource() == Compressor::SC_TRACK_1 + channel) {
-        accumulateSidechainTap(channel, buffer, samplecount);
+        accumulateSidechainTap(buffer, samplecount);
     }
 }
 
@@ -281,7 +282,7 @@ void FxEngine::AccumulateChannelSend(int channel, const fixed *buffer,
 // the track's rendered audio (int16<<15 scale) normalized to Q15, summed over
 // the whole block so every note of the track participates (a track may render
 // several voices in one block).  RT-safe: static buffer, pure accumulation.
-void FxEngine::accumulateSidechainTap(int channel, const fixed *buffer,
+void FxEngine::accumulateSidechainTap(const fixed *buffer,
                                       int samplecount) {
     if (!scTapValid_) {
         for (int i = 0; i < samplecount * 2; i++) scTap_[i] = 0;
@@ -308,6 +309,164 @@ void FxEngine::fillSidechainTapFromBus(int samplecount) {
     }
     for (int i = 0; i < samplecount * 2; i++) scTap_[i] = srcBuf[i];
     scTapValid_ = true;
+}
+
+// bacon-1.5 item 5: API unificada de parametros FX.  Unico punto de
+// escritura/lectura del motor por id de kFxParams_ (UI, automatizacion
+// Phrase/Table y persistencia FXMASTER comparten la misma conversion y el
+// mismo clamp).  El switch fue movido de MixerView::fxSet/fxGet sin cambiar
+// ninguna conversion ni efecto lateral (p. ej. el enable/desbypass automatico
+// al editar ganancia de banda EQ).
+void FxEngine::SetParam(int id, float v) {
+    if (id < 0 || id >= FX_PARAM_COUNT) return;
+    const FxParamSpec &spec = kFxParams_[id];
+    if (v < spec.vmin) v = spec.vmin;
+    if (v > spec.vmax) v = spec.vmax;
+    switch (id) {
+    case FX_P_DLY_TIME: SetDelayTimeMs(fl2fp(v)); break;
+    case FX_P_DLY_FBK:  SetDelayFeedback(fl2fp(v)); break;
+    case FX_P_DLY_MIX:  SetDelayMix(fl2fp(v)); break;
+    case FX_P_DLY_WID:  SetDelayWidth(fl2fp(v)); break;
+    case FX_P_DLY_PP:   SetDelayPingPong(v >= 0.5f); break;
+    case FX_P_DLY_SAT:  SetDelaySaturation(v >= 0.5f); break;
+    case FX_P_DLY_BYP:  SetDelayBypass(v >= 0.5f); break;
+    case FX_P_RVB_PRE:  SetReverbPredelayMs(fl2fp(v)); break;
+    case FX_P_RVB_DEC:  SetReverbDecay(fl2fp(v)); break;
+    case FX_P_RVB_SIZ:  SetReverbSize(fl2fp(v)); break;
+    case FX_P_RVB_DMP:  SetReverbDamping(fl2fp(v)); break;
+    case FX_P_RVB_WID:  SetReverbWidth(fl2fp(v)); break;
+    case FX_P_RVB_MODE: SetReverbMode((int)v); break;
+    case FX_P_RVB_BYP:  SetReverbBypass(v >= 0.5f); break;
+    case FX_P_EQ_BYP:   SetEqBypass(v >= 0.5f); break;
+    case FX_P_EQ_LOW_FRQ: SetEqBandFreq(0, fl2fp(v)); break;
+    case FX_P_EQ_LOW_GAI: SetEqBandGainDb(0, fl2fp(v));
+        SetEqBandEnabled(0, true); SetEqBypass(false); break;
+    case FX_P_EQ_LOW_Q:   SetEqBandQ(0, fl2fp(v)); break;
+    case FX_P_EQ_LOW_EN:  SetEqBandEnabled(0, v >= 0.5f); break;
+    case FX_P_EQ_MID_FRQ: SetEqBandFreq(1, fl2fp(v)); break;
+    case FX_P_EQ_MID_GAI: SetEqBandGainDb(1, fl2fp(v));
+        SetEqBandEnabled(1, true); SetEqBypass(false); break;
+    case FX_P_EQ_MID_Q:   SetEqBandQ(1, fl2fp(v)); break;
+    case FX_P_EQ_MID_EN:  SetEqBandEnabled(1, v >= 0.5f); break;
+    case FX_P_EQ_HI_FRQ:  SetEqBandFreq(2, fl2fp(v)); break;
+    case FX_P_EQ_HI_GAI:  SetEqBandGainDb(2, fl2fp(v));
+        SetEqBandEnabled(2, true); SetEqBypass(false); break;
+    case FX_P_EQ_HI_Q:    SetEqBandQ(2, fl2fp(v)); break;
+    case FX_P_EQ_HI_EN:   SetEqBandEnabled(2, v >= 0.5f); break;
+    case FX_P_EQX_BYP:    SetEqExtBypass(v >= 0.5f); break;
+    case FX_P_EQX_B3_FRQ: SetEqBandFreq(3, fl2fp(v)); break;
+    case FX_P_EQX_B3_GAI: SetEqBandGainDb(3, fl2fp(v)); SetEqBypass(false); break;
+    case FX_P_EQX_B3_Q:   SetEqBandQ(3, fl2fp(v)); break;
+    case FX_P_EQX_B3_TYP: SetEqBandType(3, (int)v); break;
+    case FX_P_EQX_B4_FRQ: SetEqBandFreq(4, fl2fp(v)); break;
+    case FX_P_EQX_B4_GAI: SetEqBandGainDb(4, fl2fp(v)); SetEqBypass(false); break;
+    case FX_P_EQX_B4_Q:   SetEqBandQ(4, fl2fp(v)); break;
+    case FX_P_EQX_B4_TYP: SetEqBandType(4, (int)v); break;
+    case FX_P_EQX_B5_FRQ: SetEqBandFreq(5, fl2fp(v)); break;
+    case FX_P_EQX_B5_GAI: SetEqBandGainDb(5, fl2fp(v)); SetEqBypass(false); break;
+    case FX_P_EQX_B5_Q:   SetEqBandQ(5, fl2fp(v)); break;
+    case FX_P_EQX_B5_TYP: SetEqBandType(5, (int)v); break;
+    case FX_P_EQX_B6_FRQ: SetEqBandFreq(6, fl2fp(v)); break;
+    case FX_P_EQX_B6_GAI: SetEqBandGainDb(6, fl2fp(v)); SetEqBypass(false); break;
+    case FX_P_EQX_B6_Q:   SetEqBandQ(6, fl2fp(v)); break;
+    case FX_P_EQX_B6_TYP: SetEqBandType(6, (int)v); break;
+    case FX_P_EQX_B7_FRQ: SetEqBandFreq(7, fl2fp(v)); break;
+    case FX_P_EQX_B7_GAI: SetEqBandGainDb(7, fl2fp(v)); SetEqBypass(false); break;
+    case FX_P_EQX_B7_Q:   SetEqBandQ(7, fl2fp(v)); break;
+    case FX_P_EQX_B7_TYP: SetEqBandType(7, (int)v); break;
+    case FX_P_DLY_SYNC:   SetDelaySync(v >= 0.5f); break;
+    case FX_P_DLY_DIV:    SetDelayDivision((int)v); break;
+    case FX_P_DLY_LOW:    SetDelayLowCutHz(fl2fp(v)); break;
+    case FX_P_DLY_HIG:    SetDelayHighCutHz(fl2fp(v)); break;
+    case FX_P_RVB_HP:     SetReverbInputHPHz(fl2fp(v)); break;
+    case FX_P_RVB_LP:     SetReverbInputLPHz(fl2fp(v)); break;
+    case FX_P_CMP_THR:    SetCompThresholdDb(fl2fp(v)); break;
+    case FX_P_CMP_RAT:    SetCompRatio(fl2fp(v)); break;
+    case FX_P_CMP_KNE:    SetCompKneeDb(fl2fp(v)); break;
+    case FX_P_CMP_ATK:    SetCompAttackMs(fl2fp(v)); break;
+    case FX_P_CMP_REL:    SetCompReleaseMs(fl2fp(v)); break;
+    case FX_P_CMP_MKU:    SetCompMakeupDb(fl2fp(v)); break;
+    case FX_P_CMP_LINK:   SetCompStereoLink(v >= 0.5f); break;
+    case FX_P_CMP_SC:     SetCompSoftClip(v >= 0.5f); break;
+    case FX_P_CMP_BYP:    SetCompBypass(v >= 0.5f); break;
+    case FX_P_CMP_MIX:    SetCompMix(fl2fp(v)); break;
+    case FX_P_CMP_SCSRC:  SetCompSidechainSource((int)v); break;
+    case FX_P_CMP_SCFLT:  SetCompSidechainHpfHz(fl2fp(v)); break;
+    case FX_P_CMP_SCAMT:  SetCompSidechainAmount(fl2fp(v)); break;
+    }
+}
+
+float FxEngine::GetParam(int id) const {
+    switch (id) {
+    case FX_P_DLY_TIME: return fp2fl(GetDelayTimeMs());
+    case FX_P_DLY_FBK:  return fp2fl(GetDelayFeedback());
+    case FX_P_DLY_MIX:  return fp2fl(GetDelayMix());
+    case FX_P_DLY_WID:  return fp2fl(GetDelayWidth());
+    case FX_P_DLY_PP:   return GetDelayPingPong() ? 1.0f : 0.0f;
+    case FX_P_DLY_SAT:  return GetDelaySaturation() ? 1.0f : 0.0f;
+    case FX_P_DLY_BYP:  return GetDelayBypass() ? 1.0f : 0.0f;
+    case FX_P_RVB_PRE:  return fp2fl(GetReverbPredelayMs());
+    case FX_P_RVB_DEC:  return fp2fl(GetReverbDecay());
+    case FX_P_RVB_SIZ:  return fp2fl(GetReverbSize());
+    case FX_P_RVB_DMP:  return fp2fl(GetReverbDamping());
+    case FX_P_RVB_WID:  return fp2fl(GetReverbWidth());
+    case FX_P_RVB_MODE: return (float)GetReverbMode();
+    case FX_P_RVB_BYP:  return GetReverbBypass() ? 1.0f : 0.0f;
+    case FX_P_EQ_BYP:   return GetEqBypass() ? 1.0f : 0.0f;
+    case FX_P_EQ_LOW_FRQ: return fp2fl(GetEqBandFreq(0));
+    case FX_P_EQ_LOW_GAI: return fp2fl(GetEqBandGainDb(0));
+    case FX_P_EQ_LOW_Q:   return fp2fl(GetEqBandQ(0));
+    case FX_P_EQ_LOW_EN:  return GetEqBandEnabled(0) ? 1.0f : 0.0f;
+    case FX_P_EQ_MID_FRQ: return fp2fl(GetEqBandFreq(1));
+    case FX_P_EQ_MID_GAI: return fp2fl(GetEqBandGainDb(1));
+    case FX_P_EQ_MID_Q:   return fp2fl(GetEqBandQ(1));
+    case FX_P_EQ_MID_EN:  return GetEqBandEnabled(1) ? 1.0f : 0.0f;
+    case FX_P_EQ_HI_FRQ:  return fp2fl(GetEqBandFreq(2));
+    case FX_P_EQ_HI_GAI:  return fp2fl(GetEqBandGainDb(2));
+    case FX_P_EQ_HI_Q:    return fp2fl(GetEqBandQ(2));
+    case FX_P_EQ_HI_EN:   return GetEqBandEnabled(2) ? 1.0f : 0.0f;
+    case FX_P_EQX_BYP:    return GetEqExtBypass() ? 1.0f : 0.0f;
+    case FX_P_EQX_B3_FRQ: return fp2fl(GetEqBandFreq(3));
+    case FX_P_EQX_B3_GAI: return fp2fl(GetEqBandGainDb(3));
+    case FX_P_EQX_B3_Q:   return fp2fl(GetEqBandQ(3));
+    case FX_P_EQX_B3_TYP: return (float)GetEqBandType(3);
+    case FX_P_EQX_B4_FRQ: return fp2fl(GetEqBandFreq(4));
+    case FX_P_EQX_B4_GAI: return fp2fl(GetEqBandGainDb(4));
+    case FX_P_EQX_B4_Q:   return fp2fl(GetEqBandQ(4));
+    case FX_P_EQX_B4_TYP: return (float)GetEqBandType(4);
+    case FX_P_EQX_B5_FRQ: return fp2fl(GetEqBandFreq(5));
+    case FX_P_EQX_B5_GAI: return fp2fl(GetEqBandGainDb(5));
+    case FX_P_EQX_B5_Q:   return fp2fl(GetEqBandQ(5));
+    case FX_P_EQX_B5_TYP: return (float)GetEqBandType(5);
+    case FX_P_EQX_B6_FRQ: return fp2fl(GetEqBandFreq(6));
+    case FX_P_EQX_B6_GAI: return fp2fl(GetEqBandGainDb(6));
+    case FX_P_EQX_B6_Q:   return fp2fl(GetEqBandQ(6));
+    case FX_P_EQX_B6_TYP: return (float)GetEqBandType(6);
+    case FX_P_EQX_B7_FRQ: return fp2fl(GetEqBandFreq(7));
+    case FX_P_EQX_B7_GAI: return fp2fl(GetEqBandGainDb(7));
+    case FX_P_EQX_B7_Q:   return fp2fl(GetEqBandQ(7));
+    case FX_P_EQX_B7_TYP: return (float)GetEqBandType(7);
+    case FX_P_DLY_SYNC:   return GetDelaySync() ? 1.0f : 0.0f;
+    case FX_P_DLY_DIV:    return (float)GetDelayDivision();
+    case FX_P_DLY_LOW:    return fp2fl(GetDelayLowCutHz());
+    case FX_P_DLY_HIG:    return fp2fl(GetDelayHighCutHz());
+    case FX_P_RVB_HP:     return fp2fl(GetReverbInputHPHz());
+    case FX_P_RVB_LP:     return fp2fl(GetReverbInputLPHz());
+    case FX_P_CMP_THR:    return fp2fl(GetCompThresholdDb());
+    case FX_P_CMP_RAT:    return fp2fl(GetCompRatio());
+    case FX_P_CMP_KNE:    return fp2fl(GetCompKneeDb());
+    case FX_P_CMP_ATK:    return GetCompAttackMs();
+    case FX_P_CMP_REL:    return GetCompReleaseMs();
+    case FX_P_CMP_MKU:    return fp2fl(GetCompMakeupDb());
+    case FX_P_CMP_LINK:   return GetCompStereoLink() ? 1.0f : 0.0f;
+    case FX_P_CMP_SC:     return GetCompSoftClip() ? 1.0f : 0.0f;
+    case FX_P_CMP_BYP:    return GetCompBypass() ? 1.0f : 0.0f;
+    case FX_P_CMP_MIX:    return fp2fl(GetCompMix());
+    case FX_P_CMP_SCSRC:  return (float)GetCompSidechainSource();
+    case FX_P_CMP_SCFLT:  return fp2fl(GetCompSidechainHpfHz());
+    case FX_P_CMP_SCAMT:  return fp2fl(GetCompSidechainAmount());
+    }
+    return 0.0f;
 }
 
 } // namespace FxEngine

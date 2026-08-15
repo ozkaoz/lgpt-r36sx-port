@@ -35,14 +35,18 @@
 #define I_CMD_SLCE MAKE_FOURCC('S','L','C','E')
 #define I_CMD_STOP MAKE_FOURCC('S','T','O','P')
 
-// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4) / TREEFROG_SEND_LIVE_V1 (Fase 15):
+// TREEFROG_FX_ENGINE_COMMANDS_V1 (Fase 4) / TREEFROG_SEND_LIVE_V1 (Fase 15)
+// / bacon-1.5 item 5:
 // New phrase commands driving the FxEngine.  DLYS/RVBS modulate the LIVE
 // per-channel instrument send override (the per-track Mixer send survives only
 // as the legacy inheritance layer; the persisted instrument base is never
 // written by automation).  time/feedback/decay/size/comp-threshold are global
 // master FX. All use a monotonic 00-FF mapping of the low param byte
 // (value&0xFF): 0x00 = minimum, 0xFF = maximum. The high byte (speed) is
-// reserved (not used by these commands).
+// reserved (not used by these commands).  Item 5: the master-FX commands
+// convert byte -> percent -> natural with the SAME descriptor curve as the
+// Mixer UI (fxParamFromByte: LOG2 for time/frequency, LINEAR for gains), so
+// a phrase byte and a UI percent produce identical values.
 #define I_CMD_DLYS MAKE_FOURCC('D','L','Y','S')  // delay send (instrument, live)
 #define I_CMD_RVBS MAKE_FOURCC('R','V','B','S')  // reverb send (instrument, live)
 #define I_CMD_DLYT MAKE_FOURCC('D','L','Y','T')  // delay time (master)

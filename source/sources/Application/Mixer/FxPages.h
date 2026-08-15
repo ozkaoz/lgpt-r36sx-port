@@ -365,6 +365,25 @@ inline int fxDspToPercentId(int id,float v) {
 	return fxDspToPercent(fxDescForId(id),v) ;
 }
 
+// bacon-1.5 item 5: automatizacion Phrase/Table unificada.  Los comandos
+// FX (DLYT/DLYF/RVDC/RVSZ/CMPT y los futuros) llevan el valor en el byte
+// bajo (0x00 = minimo, 0xFF = maximo, monotono).  La conversion byte ->
+// percent -> dsp usa la MISMA curva del descriptor que la UI (LOG2 para
+// tiempo/frecuencia, LINEAL para ganancias/mezclas), de modo que un byte
+// 0x80 y un 50 % de la UI producen exactamente el mismo valor natural.
+inline int fxByteToPercent(int byte) {
+	int b = byte & 0xFF ;
+	return (b * 100 + 127) / 255 ;   // monotono: 0x00->0, 0xFF->100
+}
+
+inline float fxParamFromByte(int id, int byte) {
+	return fxPercentToDspId(id, fxByteToPercent(byte)) ;
+}
+
+inline int fxParamToByte(int id, float v) {
+	return (fxDspToPercentId(id, v) * 255 + 50) / 100 ;
+}
+
 // True si el parametro es continuo (editable en %); false para switches.
 inline bool fxIsPercentParam(int id) {
 	return kFxParamMeta_[id].kind_!=FX_PARAM_SWITCH ;

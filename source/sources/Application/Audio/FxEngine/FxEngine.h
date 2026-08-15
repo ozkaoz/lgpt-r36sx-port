@@ -196,6 +196,15 @@ public:
     fixed GetCompSidechainAmount() const { return comp_.GetSidechainAmount(); }
     fixed GetCompMix() const { return comp_.GetMix(); }
 
+    // bacon-1.5 item 5: API unificada de parametros FX.  Cualquier
+    // escritura/lectura del motor pasa por aqui (UI via MixerView::fxGet/
+    // fxSet, automatizacion Phrase/Table via fxParamFromByte y persistencia
+    // FXMASTER).  El id es un FX_P_* de kFxParams_ y el valor se expresa en
+    // unidades naturales (ms, dB, Hz, s, ratio, 0/1).  SetParam clampa al
+    // rango de la tabla; GetParam devuelve 0.0f para ids fuera de rango.
+    void SetParam(int id, float v);
+    float GetParam(int id) const;
+
     // RT telemetry.  rtViolations_ must stay 0; it is incremented only if
     // Process() would have needed a dynamic allocation or a syscall.
     unsigned long GetCallCount() const { return callCount_; }
@@ -217,8 +226,7 @@ private:
     void processSendReturns(fixed *buffer, int samplecount);
     // bacon-1.5 item 4: accumulate the sidechain tap for the selected track
     // during channel rendering (pre-master, Q15).
-    void accumulateSidechainTap(int channel, const fixed *buffer,
-                                int samplecount);
+    void accumulateSidechainTap(const fixed *buffer, int samplecount);
     // Fill scTap_ from the selected bus (delay/reverb return), pre-master.
     void fillSidechainTapFromBus(int samplecount);
 

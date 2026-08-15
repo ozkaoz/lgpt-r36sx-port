@@ -624,7 +624,9 @@ def check_source_guards():
                   "SetBypass"):
         assert token in src, token
     dsrc = (ROOT / "source/sources/Application/Audio/FxEngine/DelayLine.cpp").read_text()
-    for token in ("0.98f", "FX_DELAY_GLIDE_PER_SAMPLE", "readPos", "buf_[",
+    # bacon-1.5 item 5: the glide step is now a 64-bit fractional-sample step
+    # (0.5f * 32768.0f) so the full 2000 ms range never overflows int32.
+    for token in ("0.98f", "kGlideStep", "0.5f * 32768.0f", "readPos", "buf_[",
                   "loopFilter", "SyncDivisionToMs", "kSyncDivisions"):
         assert token in dsrc, token
     print("source guards OK")

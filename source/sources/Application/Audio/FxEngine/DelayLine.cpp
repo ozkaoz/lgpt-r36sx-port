@@ -6,18 +6,12 @@
 
 namespace FxEngine {
 
-// Loop gain must stay < 1.0 for a stable feedback loop.  Documented max.
-#define FX_DELAY_MAX_FEEDBACK fl2fp(0.98f)
-// Time-change glide: max delay movement per sample (Q15).  Applied once per
-// sample inside Process (bacon-1.5 item 3) so the transition speed does not
-// depend on the audio buffer size.
-#define FX_DELAY_GLIDE_PER_SAMPLE fl2fp(0.5f)
 // One-pole mix crossfade coefficient per sample (Q15), ~40 ms at 48 kHz.
 #define FX_DELAY_MIX_SMOOTH fl2fp(0.0005f)
 
 DelayLine::DelayLine()
     : rate_(44100), maxSamples_(0), writePos_(0), delaySamples_(0),
-      delayTarget_(0), fb_(0), width_(i2fp(1)), pingPong_(false),
+      delayTarget_(0), delayTargetMs_(0), fb_(0), width_(i2fp(1)), pingPong_(false),
       sat_(false), bypass_(false), mix_(i2fp(1)), mixCur_(i2fp(1)),
       lpCoeff_(0), hpCoeff_(0), lpHz_(fl2fp(20000.0f)),
       hpHz_(fl2fp(20.0f)), syncOn_(false), division_(SDIV_1_16),
@@ -34,6 +28,7 @@ void DelayLine::Reset() {
     writePos_ = 0;
     delaySamples_ = 0;
     delayTarget_ = 0;
+    delayTargetMs_ = 0;
     mixCur_ = mix_;
     lpState_[0] = lpState_[1] = 0;
     hpState_[0] = hpState_[1] = 0;
@@ -52,13 +47,16 @@ void DelayLine::SetSampleRate(int rate) {
 }
 
 void DelayLine::SetDelayMs(fixed ms) {
-    // ms in [0, kMaxMs]; convert to fractional samples (Q15).
+    // ms in [0, kMaxMs]; convert to fractional samples (Q15).  The glide
+    // state is kept in 64-bit samples so the full 0..96000 sample range
+    // (2000 ms at 48 kHz) never overflows 32-bit Q15 (96000*32768 > INT_MAX).
     float m = fp2fl(ms);
     if (m < 0.0f) m = 0.0f;
     if (m > (float)kMaxMs) m = (float)kMaxMs;
+    delayTargetMs_ = fl2fp(m);
     float samples = m * (float)rate_ / 1000.0f;
     if (samples > (float)maxSamples_ - 1.0f) samples = (float)maxSamples_ - 1.0f;
-    delayTarget_ = fl2fp(samples);
+    delayTarget_ = (long long)(samples * 32768.0f + 0.5f);
 }
 
 void DelayLine::SetFeedback(fixed fb) {
@@ -170,16 +168,17 @@ void DelayLine::Process(const fixed *in, fixed *out, int frames) {
     fixed targetMix = bypass_ ? 0 : mix_;
     fixed wetMix = mixCur_;
     fixed dryMix = i2fp(1) - wetMix;
-    fixed glideStep = FX_DELAY_GLIDE_PER_SAMPLE;
+    // Fixed glide of 0.5 samples/frame (Q15, matches the pre-item-5 step).
+    const long long kGlideStep = (long long)(0.5f * 32768.0f);
 
     int idx = 0;
     for (int i = 0; i < frames; i++) {
         // Per-sample glide toward the target delay (click-free time changes).
         if (delaySamples_ < delayTarget_) {
-            delaySamples_ += glideStep;
+            delaySamples_ += kGlideStep;
             if (delaySamples_ > delayTarget_) delaySamples_ = delayTarget_;
         } else if (delaySamples_ > delayTarget_) {
-            delaySamples_ -= glideStep;
+            delaySamples_ -= kGlideStep;
             if (delaySamples_ < delayTarget_) delaySamples_ = delayTarget_;
         }
         // Per-sample mix crossfade (bypass/mix changes are click-free).
@@ -187,8 +186,8 @@ void DelayLine::Process(const fixed *in, fixed *out, int frames) {
         wetMix = mixCur_;
         dryMix = i2fp(1) - wetMix;
 
-        int delay = fp2i(delaySamples_);
-        fixed frac = delaySamples_ - i2fp(delay);
+        int delay = (int)(delaySamples_ >> FIXED_SHIFT);
+        fixed frac = (fixed)(delaySamples_ - ((long long)delay << FIXED_SHIFT));
 
         // Delay must leave room for one interpolation tap ahead.
         if (delay < 0) delay = 0;
