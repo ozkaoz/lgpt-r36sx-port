@@ -40,13 +40,20 @@ COMP_PARAMS = [
     (34, "CMP MKU", 0.0, 24.0, 0.0),
     (35, "CMP LNK", 0.0, 1.0, 1.0),
     (36, "CMP SCL", 0.0, 1.0, 1.0),
+    # bacon-1.5 item 4: sidechain + dry/wet mix appended AFTER the golden rows.
+    (64, "CMP MIX", 0.0, 1.0, 1.0),
+    (65, "SC SRC", 0.0, 10.0, 0.0),
+    (66, "SC FLT", 20.0, 20000.0, 30.0),
+    (67, "SC AMT", 0.0, 1.0, 1.0),
 ]
 
 BYP, THR, RAT, KNE, ATK, REL, MKU, LNK, SCL = range(9)
+CMIX, CSCSRC, CSCFLT, CSCAMT = range(9, 13)
+MIX_ID, SCSRC, SCFLT, SCAMT = 64, 65, 66, 67
 
 
 def check_comp_order_and_defaults():
-    assert [p[0] for p in COMP_PARAMS] == list(range(28, 37))
+    assert [p[0] for p in COMP_PARAMS] == list(range(28, 37)) + [64, 65, 66, 67]
     assert COMP_PARAMS[BYP][1] == "CMP BYP"
     assert COMP_PARAMS[THR][1] == "CMP THR"
     assert COMP_PARAMS[RAT][1] == "CMP RAT"
@@ -65,6 +72,10 @@ def check_comp_order_and_defaults():
     assert COMP_PARAMS[MKU][4] == 0.0
     assert COMP_PARAMS[LNK][4] == 1.0
     assert COMP_PARAMS[SCL][4] == 1.0
+    assert COMP_PARAMS[CMIX][1] == "CMP MIX" and COMP_PARAMS[CMIX][4] == 1.0
+    assert COMP_PARAMS[CSCSRC][1] == "SC SRC" and COMP_PARAMS[CSCSRC][4] == 0.0
+    assert COMP_PARAMS[CSCFLT][1] == "SC FLT" and COMP_PARAMS[CSCFLT][4] == 30.0
+    assert COMP_PARAMS[CSCAMT][1] == "SC AMT" and COMP_PARAMS[CSCAMT][4] == 1.0
     print("COMP param order and defaults OK")
 
 
@@ -84,14 +95,28 @@ def check_source_guards():
     assert byp < thr
     # BYP is the first COMP enum entry.
     assert fxp.index("FX_P_CMP_BYP") < fxp.index("FX_P_CMP_THR")
+    # bacon-1.5 item 4: the four appended rows live AFTER the golden section.
+    scsrc = fxp.index("{ \"SC SRC\"")
+    assert scsrc > fxp.index("{ \"CMP SCL\"")
+    assert fxp.index("FX_P_CMP_MIX") > fxp.index("FX_P_RVB_LP")
     # Centered labels + value column; the BYP row is at the top of the menu.
     assert "Bypass" in MIX and "Threshold" in MIX and "Ratio" in MIX
     assert "Stereo Link" in MIX and "Soft Clip" in MIX
+    assert "Mix" in MIX and "SC Source" in MIX and "SC HPF" in MIX
+    assert "SC Amount" in MIX
     # Units and ratio/boolean rendering.
     assert "%3.1f:1" in MIX            # ratio x:1
     assert "%5.1f ms" in MIX
     assert "%+5.1f dB" in MIX
     assert '"ON"' in MIX and '"OFF"' in MIX
+    # Sidechain renderings: discrete source text + percent mix/amount + OPEN.
+    assert "TRK %d" in MIX and '"%s DLY RET"' in MIX and '"%s RVB RET"' in MIX
+    assert "OPEN" in MIX
+    assert "%5.0f%%" in MIX
+    # The COMP page grows to 13 rows: MIX / SC SRC / SC HPF / SC AMT are
+    # dispatched through the unified row id (fxIdForRow), not BYP+p.
+    assert "MakeCenteredMenuLayout(13,11,13,3)" in MIX
+    assert "fxIdForRow(p)" in MIX
     # GR meter visible below the parameters (readout row).
     assert "Gain Reduction" in MIX
     assert "GetCompGainReductionDb" in MIX
@@ -103,6 +128,33 @@ def check_source_guards():
     print("source guards OK")
 
 
+def check_item4_wiring():
+    # API: FxEngine exposes the sidechain + mix setters/readbacks.
+    fe = (ROOT / "source/sources/Application/Audio/FxEngine/FxEngine.h").read_text()
+    for tok in ("SetCompSidechainSource", "SetCompSidechainHpfHz",
+                "SetCompSidechainAmount", "SetCompMix",
+                "GetCompSidechainSource", "GetCompSidechainAmount"):
+        assert tok in fe
+    # Persistence: the four attrs round-trip with the CMP block.
+    mm = (ROOT / "source/sources/Application/Model/Mixer.cpp").read_text()
+    for attr in ("CMPMIX", "CMPSCR", "CMPSCH", "CMPSCA"):
+        assert mm.count('"%s"' % attr) >= 1
+        assert mm.count('"%s"' % attr) >= 2  # save + load
+    # DSP: Compressor has the SC state + HPF + dry/wet mix.
+    cc = (ROOT / "source/sources/Application/Audio/FxEngine/Compressor.cpp").read_text()
+    for tok in ("SetSidechainSource", "SetSidechainInput",
+                "SetSidechainHpfHz", "SetSidechainAmount", "SetMix"):
+        assert tok in cc
+    assert "SC_TRACK_1" in cc or "SC_TRACK_1" in (ROOT / "source/sources/Application/Audio/FxEngine/Compressor.h").read_text()
+    # Sidechain tap fed through FxEngine (track sends + delay/reverb buses).
+    fecpp = (ROOT / "source/sources/Application/Audio/FxEngine/FxEngine.cpp").read_text()
+    assert "accumulateSidechainTap" in fecpp
+    assert "fillSidechainTapFromBus" in fecpp
+    assert "SetSidechainInput" in fecpp
+    print("item 4 wiring OK")
+
+
 check_comp_order_and_defaults()
 check_source_guards()
+check_item4_wiring()
 print("FX_COMP_MENU_PHASE13_OK")

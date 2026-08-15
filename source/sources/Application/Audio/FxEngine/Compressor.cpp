@@ -3,7 +3,7 @@
 
 namespace FxEngine {
 
-// Bypass crossfade and GR meter smoothing (one-pole per Process call).
+// Bypass crossfade, GR meter and dry/wet mix smoothing (one-pole per frame).
 #define FX_COMP_MIX_SMOOTH fl2fp(0.005f)
 #define FX_COMP_GR_SMOOTH  fl2fp(0.005f)
 
@@ -12,8 +12,13 @@ Compressor::Compressor()
       grMeter_(0), threshDb_(fl2fp(-24.0f)), ratio_(fl2fp(4.0f)),
       kneeDb_(fl2fp(6.0f)), makeupDb_(0),
       attackMs_(15.0f), releaseMs_(200.0f), rate_(44100),
-      stereoLink_(true), bypass_(true), softClip_(true), rtViolations_(0) {
+      stereoLink_(true), bypass_(true), softClip_(true),
+      scSource_(SC_OFF), scHpfHz_(0), scHpfCoeff_(0),
+      scAmount_(i2fp(1)), mix_(i2fp(1)), mixCur_(i2fp(1)),
+      scTap_(0), scFrames_(0), rtViolations_(0) {
     level_[0] = level_[1] = 0;
+    scHpfState_[0] = scHpfState_[1] = 0;
+    scLevel_[0] = scLevel_[1] = 0;
     recomputeSmoothing();
     recomputeTable();
 }
@@ -21,6 +26,9 @@ Compressor::Compressor()
 void Compressor::Reset() {
     level_[0] = level_[1] = 0;
     grMeter_ = 0;
+    scHpfState_[0] = scHpfState_[1] = 0;
+    scLevel_[0] = scLevel_[1] = 0;
+    mixCur_ = mix_;
     recomputeSmoothing();
     recomputeTable();
 }
@@ -86,6 +94,54 @@ void Compressor::SetMakeupDb(fixed db) {
 void Compressor::SetStereoLink(bool on) { stereoLink_ = on; }
 void Compressor::SetBypass(bool on) { bypass_ = on; }
 void Compressor::SetSoftClip(bool on) { softClip_ = on; }
+
+// --- bacon-1.5 item 4 (V2): sidechain ---
+
+void Compressor::SetSidechainSource(int src) {
+    if (src < SC_OFF) src = SC_OFF;
+    if (src >= SC_SOURCE_COUNT) src = SC_OFF;
+    scSource_ = src;
+}
+
+void Compressor::SetSidechainHpfHz(fixed hz) {
+    float f = fp2fl(hz);
+    if (f <= 30.0f) f = 0.0f;      // open: SC HPF disabled
+    if (f > 20000.0f) f = 20000.0f;
+    scHpfHz_ = fl2fp(f);
+    if (f > 0.0f) {
+        // One-pole HPF: y = x - s; s' = s + k*(x - s); k = 1 - exp(-2*pi*f/fs).
+        scHpfCoeff_ = fl2fp(1.0f - expf(-2.0f * 3.14159265f * f / (float)rate_));
+    } else {
+        scHpfCoeff_ = 0;
+    }
+}
+
+void Compressor::SetSidechainAmount(fixed amt) {
+    float a = fp2fl(amt);
+    if (a < 0.0f) a = 0.0f;
+    if (a > 1.0f) a = 1.0f;
+    scAmount_ = fl2fp(a);
+}
+
+void Compressor::SetMix(fixed mix) {
+    float m = fp2fl(mix);
+    if (m < 0.0f) m = 0.0f;
+    if (m > 1.0f) m = 1.0f;
+    mix_ = fl2fp(m);
+}
+
+void Compressor::SetSidechainInput(const fixed *tap, int frames) {
+    // The tap is only referenced during the following Process() call; the
+    // caller guarantees the buffer lives until then (FxEngine static buses).
+    if (frames <= 0 || !tap) {
+        ++rtViolations_;
+        scTap_ = 0;
+        scFrames_ = 0;
+        return;
+    }
+    scTap_ = tap;
+    scFrames_ = frames;
+}
 
 fixed Compressor::saturate(fixed x) {
     if (x > i2fp(1)) return i2fp(1);
@@ -167,24 +223,68 @@ void Compressor::Process(const fixed *in, fixed *out, int frames) {
     if (bypass_) {
         for (int i = 0; i < frames * 2; i++) out[i] = in[i];
         grMeter_ = grMeter_ + fp_mul(FX_COMP_GR_SMOOTH, 0 - grMeter_);
+        scTap_ = 0;
+        scFrames_ = 0;
         return;
     }
+
+    // Sidechain active for this call?  The tap must cover at least the whole
+    // block (FxEngine always provides the full accumulated bus).
+    bool scActive = (scSource_ != SC_OFF) && scTap_ && scFrames_ >= frames;
+    bool scHpf = scHpfCoeff_ != 0;
 
     int idx = 0;
     for (int i = 0; i < frames; i++) {
         fixed xL = in[idx];
         fixed xR = in[idx + 1];
 
-        // Detector: stereo link = max(|L|,|R|), else per-channel.
+        // Detector per channel: program peak merged with the sidechain tap
+        // (HPF, scaled by SC AMOUNT).  One shared envelope: the maximum wins
+        // and attack/release apply to the merged level, so a kick on the SC
+        // bus ducks the program with the same timing as the program peaks.
         fixed detL = (xL > 0) ? xL : -xL;
         fixed detR = (xR > 0) ? xR : -xR;
-        fixed det = detL;
+        if (scActive) {
+            fixed tL = scTap_[idx];
+            fixed tR = scTap_[idx + 1];
+            if (scHpf) {
+                fixed s = scHpfState_[0] + fp_mul(scHpfCoeff_, tL - scHpfState_[0]);
+                tL = tL - s;
+                scHpfState_[0] = s;
+                s = scHpfState_[1] + fp_mul(scHpfCoeff_, tR - scHpfState_[1]);
+                tR = tR - s;
+                scHpfState_[1] = s;
+            }
+            fixed sL = (tL > 0) ? tL : -tL;
+            fixed sR = (tR > 0) ? tR : -tR;
+            sL = fp_mul(sL, scAmount_);
+            sR = fp_mul(sR, scAmount_);
+            if (sL > detL) detL = sL;
+            if (sR > detR) detR = sR;
+        }
+
+        // Envelope update (attack = rise, release = fall).  Stereo link
+        // shares one envelope; otherwise each channel keeps its own.
         if (stereoLink_) {
+            fixed det = detL;
             if (detR > det) det = detR;
+            if (det > level_[0]) {
+                level_[0] = level_[0] + fp_mul(attK_, det - level_[0]);
+            } else {
+                level_[0] = level_[0] + fp_mul(relK_, det - level_[0]);
+            }
+            level_[1] = level_[0];
         } else {
-            // process both channels separately; keep det = detL for now and
-            // handle R below with its own envelope/table lookup.
-            det = detL;
+            if (detL > level_[0]) {
+                level_[0] = level_[0] + fp_mul(attK_, detL - level_[0]);
+            } else {
+                level_[0] = level_[0] + fp_mul(relK_, detL - level_[0]);
+            }
+            if (detR > level_[1]) {
+                level_[1] = level_[1] + fp_mul(attK_, detR - level_[1]);
+            } else {
+                level_[1] = level_[1] + fp_mul(relK_, detR - level_[1]);
+            }
         }
 
         // Table index from envelope level (Q15 [0,1]).
@@ -201,33 +301,22 @@ void Compressor::Process(const fixed *in, fixed *out, int frames) {
         fixed gainL = gainTable_[idxL];
         fixed gainR = (stereoLink_) ? gainL : gainTable_[idxR];
 
-        // Update envelopes (attack = rise, release = fall).
-        if (stereoLink_) {
-            if (det > level_[0]) {
-                level_[0] = level_[0] + fp_mul(attK_, det - level_[0]);
-            } else {
-                level_[0] = level_[0] + fp_mul(relK_, det - level_[0]);
-            }
-            level_[1] = level_[0];
-        } else {
-            if (det > level_[0]) {
-                level_[0] = level_[0] + fp_mul(attK_, det - level_[0]);
-            } else {
-                level_[0] = level_[0] + fp_mul(relK_, det - level_[0]);
-            }
-            if (detR > level_[1]) {
-                level_[1] = level_[1] + fp_mul(attK_, detR - level_[1]);
-            } else {
-                level_[1] = level_[1] + fp_mul(relK_, detR - level_[1]);
-            }
-        }
-
         fixed outL = fp_mul(xL, gainL);
         fixed outR = fp_mul(xR, gainR);
         if (softClip_) { outL = cubicClip(outL); outR = cubicClip(outR); }
 
-        out[idx] = saturate(outL);
-        out[idx + 1] = saturate(outR);
+        // Dry/wet mix: wet = compressed, dry = program.  Smooth per-frame so
+        // MIX changes never click.
+        fixed mixStep = fp_mul(FX_COMP_MIX_SMOOTH, mix_ - mixCur_);
+        if (mixStep == 0) {
+            if (mixCur_ < mix_) mixStep = 1;
+            else if (mixCur_ > mix_) mixStep = -1;
+        }
+        mixCur_ = mixCur_ + mixStep;
+        fixed dryGain = i2fp(1) - mixCur_;
+
+        out[idx] = saturate(fp_mul(xL, dryGain) + fp_mul(outL, mixCur_));
+        out[idx + 1] = saturate(fp_mul(xR, dryGain) + fp_mul(outR, mixCur_));
         idx += 2;
     }
 
@@ -237,6 +326,10 @@ void Compressor::Process(const fixed *in, fixed *out, int frames) {
     if (g >= kTableSize) g = kTableSize - 1;
     fixed targetGr = grTable_[g];
     grMeter_ = grMeter_ + fp_mul(FX_COMP_GR_SMOOTH, targetGr - grMeter_);
+
+    // The tap is single-use per Process() call.
+    scTap_ = 0;
+    scFrames_ = 0;
 }
 
 } // namespace FxEngine

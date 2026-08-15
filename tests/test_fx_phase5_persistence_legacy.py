@@ -16,7 +16,7 @@ Acceptance:
 - editing a master param (delay time, reverb decay, EQ band, comp thr...) engages
 - editing a per-track send engages; clearing all sends can re-engage legacy
 - returning every master param to default re-engages legacy
-- FXMASTER round-trips all 41 params exactly (Q15)
+- FXMASTER round-trips all 47 params exactly (Q15)
 - legacy project without FXMASTER restores to defaults = legacy
 """
 from pathlib import Path
@@ -63,6 +63,11 @@ DEFAULTS = {
     "cmp_thr": fl2fp(-24.0), "cmp_rat": fl2fp(4.0), "cmp_kne": fl2fp(6.0),
     "cmp_atk": fl2fp(15.0), "cmp_rel": fl2fp(200.0), "cmp_mku": 0,
     "cmp_lnk": True, "cmp_sc": True,
+    # bacon-1.5 item 3: DELAY FREE/SYNC + division + LOW/HIGH CUT, REVERB
+    # input HP/LP (defaults = legacy: FREE, 1/16 inert, filters open).
+    "dly_sync": False, "dly_div": 3,
+    "dly_low": fl2fp(20000.0), "dly_hig": fl2fp(20.0),
+    "rvb_inhp": fl2fp(20.0), "rvb_inlp": fl2fp(20000.0),
 }
 
 
@@ -192,6 +197,13 @@ def check_roundtrip():
     fx.set_param("cmp_mku", fl2fp(4.0))
     fx.set_param("cmp_lnk", False)
     fx.set_param("cmp_sc", False)
+    # bacon-1.5 item 3: sync + division + loop cuts + reverb input filters.
+    fx.set_param("dly_sync", True)
+    fx.set_param("dly_div", 9)  # 1/4
+    fx.set_param("dly_low", fl2fp(400.0))
+    fx.set_param("dly_hig", fl2fp(8000.0))
+    fx.set_param("rvb_inhp", fl2fp(300.0))
+    fx.set_param("rvb_inlp", fl2fp(6000.0))
     fx2 = FxEngineModel.from_xml(fx.to_xml())
     for k in DEFAULTS:
         assert fx2.p[k] == fx.p[k], k
@@ -223,6 +235,10 @@ def check_source_guards():
     for token in ("FXMASTER", "NotifyFxSends", "NotifyChannelSendActive",
                   "DLYSEND", "DLYTIME", "RVBDEC", "EQ%dGAI", "CMPTHR",
                   "GetCompAttackMsFixed"):
+        assert token in msrc, token
+    # bacon-1.5 item 3 attrs appended to the FXMASTER element.
+    for token in ("DLYSYNC", "DLYDIV", "DLYLOW", "DLYHIG",
+                  "RVBINHP", "RVBINLP"):
         assert token in msrc, token
     # Every public FxEngine setter must re-evaluate the legacy flag, except
     # the explicit SetLegacyMode override itself.

@@ -1,21 +1,27 @@
 #include "DelayLine.h"
+#ifdef DL_TRACE
+#include <stdio.h>
+#endif
 #include <math.h>
 
 namespace FxEngine {
 
 // Loop gain must stay < 1.0 for a stable feedback loop.  Documented max.
 #define FX_DELAY_MAX_FEEDBACK fl2fp(0.98f)
-// Time-change glide: max delay movement per sample (Q15).  ~1 sample / sample
-// keeps the interpolation smooth and click-free.
+// Time-change glide: max delay movement per sample (Q15).  Applied once per
+// sample inside Process (bacon-1.5 item 3) so the transition speed does not
+// depend on the audio buffer size.
 #define FX_DELAY_GLIDE_PER_SAMPLE fl2fp(0.5f)
-// One-pole mix crossfade coefficient per sample (Q15).
-#define FX_DELAY_MIX_SMOOTH fl2fp(0.001f)
+// One-pole mix crossfade coefficient per sample (Q15), ~40 ms at 48 kHz.
+#define FX_DELAY_MIX_SMOOTH fl2fp(0.0005f)
 
 DelayLine::DelayLine()
     : rate_(44100), maxSamples_(0), writePos_(0), delaySamples_(0),
       delayTarget_(0), fb_(0), width_(i2fp(1)), pingPong_(false),
       sat_(false), bypass_(false), mix_(i2fp(1)), mixCur_(i2fp(1)),
-      lpCoeff_(0), hpCoeff_(0), rtViolations_(0) {
+      lpCoeff_(0), hpCoeff_(0), lpHz_(fl2fp(20000.0f)),
+      hpHz_(fl2fp(20.0f)), syncOn_(false), division_(SDIV_1_16),
+      rtViolations_(0) {
     lpState_[0] = lpState_[1] = 0;
     hpState_[0] = hpState_[1] = 0;
     maxSamples_ = (kMaxMs * rate_) / 1000;
@@ -78,44 +84,61 @@ void DelayLine::SetMix(fixed mix) {
     if (m < 0.0f) m = 0.0f;
     if (m > 1.0f) m = 1.0f;
     mix_ = fl2fp(m);
+    mixCur_ = mix_; // snap: setter applies immediately (legacy behaviour)
 }
 
-void DelayLine::SetLoopLPHz(fixed hz) {
-    float f = fp2fl(hz);
-    if (f <= 0.0f) {
+// bacon-1.5 item 3: LOW CUT / HIGH CUT in the feedback loop.  The current
+// frequency is stored (UI/persistence); the one-pole coefficient is computed
+// at control rate only (setters, never per-sample).  Frequencies at or beyond
+// the open thresholds (>= 19000 Hz LP, <= 30 Hz HP) disable the filter so the
+// default open state matches the legacy (no filter) path.
+void DelayLine::setLoopLPCoeff(float hz) {
+    if (hz <= 0.0f || hz >= 19000.0f) {
         lpCoeff_ = 0;
     } else {
         // one-pole LP: a = 1 - exp(-2*pi*fc/fs)
-        float a = 1.0f - expf(-2.0f * 3.14159265f * f / (float)rate_);
+        float a = 1.0f - expf(-2.0f * 3.14159265f * hz / (float)rate_);
         lpCoeff_ = fl2fp(a);
     }
 }
 
-void DelayLine::SetLoopHPHz(fixed hz) {
-    float f = fp2fl(hz);
-    if (f <= 0.0f) {
+void DelayLine::setLoopHPCoeff(float hz) {
+    if (hz <= 0.0f || hz <= 30.0f) {
         hpCoeff_ = 0;
     } else {
         // one-pole HP: a = exp(-2*pi*fc/fs) (complement of LP)
-        float a = expf(-2.0f * 3.14159265f * f / (float)rate_);
+        float a = expf(-2.0f * 3.14159265f * hz / (float)rate_);
         hpCoeff_ = fl2fp(a);
     }
+}
+
+void DelayLine::SetLoopLPHz(fixed hz) {
+    float f = fp2fl(hz);
+    if (f < 0.0f) f = 0.0f;
+    if (f > 20000.0f) f = 20000.0f;
+    lpHz_ = fl2fp(f);
+    setLoopLPCoeff(f);
+}
+
+void DelayLine::SetLoopHPHz(fixed hz) {
+    float f = fp2fl(hz);
+    if (f < 0.0f) f = 0.0f;
+    if (f > 20000.0f) f = 20000.0f;
+    hpHz_ = fl2fp(f);
+    setLoopHPCoeff(f);
+}
+
+void DelayLine::SetSync(bool on) { syncOn_ = on; }
+
+void DelayLine::SetDivision(int division) {
+    if (division < 0 || division >= SDIV_COUNT) division = SDIV_1_16;
+    division_ = division;
 }
 
 fixed DelayLine::saturate(fixed x) {
     if (x > i2fp(1)) return i2fp(1);
     if (x < -i2fp(1)) return -i2fp(1);
     return x;
-}
-
-void DelayLine::glideDelay() {
-    if (delaySamples_ < delayTarget_) {
-        delaySamples_ += FX_DELAY_GLIDE_PER_SAMPLE;
-        if (delaySamples_ > delayTarget_) delaySamples_ = delayTarget_;
-    } else if (delaySamples_ > delayTarget_) {
-        delaySamples_ -= FX_DELAY_GLIDE_PER_SAMPLE;
-        if (delaySamples_ < delayTarget_) delaySamples_ = delayTarget_;
-    }
 }
 
 // Applies the optional one-pole LP then HP in the feedback loop (series).
@@ -141,37 +164,51 @@ void DelayLine::Process(const fixed *in, fixed *out, int frames) {
         return;
     }
 
-    glideDelay();
-
-    int delay = fp2i(delaySamples_);
-    fixed frac = delaySamples_ - i2fp(delay);
-
-    // Delay must leave room for one interpolation tap ahead.
-    if (delay < 0) delay = 0;
-    if (delay > maxSamples_ - 1) delay = maxSamples_ - 1;
-
-    // Effective wet mix: bypass crossfades to dry but the tail keeps running.
+    // bacon-1.5 item 3: time glide and mix crossfade are applied per sample
+    // inside the loop below (buffer-size independent).  The effective wet mix
+    // targets 0 while bypassed but the tail keeps running internally.
     fixed targetMix = bypass_ ? 0 : mix_;
-    // Smooth mix toward target (one-pole) for click-free bypass/mix changes.
-    mixCur_ = mixCur_ + fp_mul(FX_DELAY_MIX_SMOOTH, targetMix - mixCur_);
     fixed wetMix = mixCur_;
     fixed dryMix = i2fp(1) - wetMix;
+    fixed glideStep = FX_DELAY_GLIDE_PER_SAMPLE;
 
     int idx = 0;
     for (int i = 0; i < frames; i++) {
+        // Per-sample glide toward the target delay (click-free time changes).
+        if (delaySamples_ < delayTarget_) {
+            delaySamples_ += glideStep;
+            if (delaySamples_ > delayTarget_) delaySamples_ = delayTarget_;
+        } else if (delaySamples_ > delayTarget_) {
+            delaySamples_ -= glideStep;
+            if (delaySamples_ < delayTarget_) delaySamples_ = delayTarget_;
+        }
+        // Per-sample mix crossfade (bypass/mix changes are click-free).
+        mixCur_ = mixCur_ + fp_mul(FX_DELAY_MIX_SMOOTH, targetMix - mixCur_);
+        wetMix = mixCur_;
+        dryMix = i2fp(1) - wetMix;
+
+        int delay = fp2i(delaySamples_);
+        fixed frac = delaySamples_ - i2fp(delay);
+
+        // Delay must leave room for one interpolation tap ahead.
+        if (delay < 0) delay = 0;
+        if (delay > maxSamples_ - 1) delay = maxSamples_ - 1;
+
         fixed xL = in[idx];
         fixed xR = in[idx + 1];
 
         // Read delayed samples with linear interpolation (stereo interleaved).
         // Buffer is interleaved L/R; delay is in frames, so step 2*delay.
+        // L tap interpolates buf[readPos] with buf[readPos+2] (next frame's L),
+        // R tap interpolates buf[readPos+1] with buf[readPos+3] (next R).
         int readPos = writePos_ - 2 * delay;
         while (readPos < 0) readPos += kBufferSize;
         int readPosB = readPos + 2;
         if (readPosB >= kBufferSize) readPosB -= kBufferSize;
 
         fixed d0 = buf_[readPos];
-        fixed d1 = buf_[readPos + 1];
-        fixed d0B = buf_[readPosB];
+        fixed d1 = buf_[readPosB];
+        fixed d0B = buf_[readPos + 1];
         fixed d1B = buf_[readPosB + 1];
 
         fixed delayedL = d0 + fp_mul(d1 - d0, frac);
@@ -208,6 +245,13 @@ void DelayLine::Process(const fixed *in, fixed *out, int frames) {
 
         out[idx] = fp_mul(xL, dryMix) + fp_mul(wetOutL, wetMix);
         out[idx + 1] = fp_mul(xR, dryMix) + fp_mul(wetOutR, wetMix);
+#ifdef DL_TRACE
+        if (idx >= 980 || idx <= 34) {
+            printf("t=%d xL=%.4f wetL=%.4f mix=%.4f out=%.4f\n",
+                   idx / 2, xL / 32768.0f, wetOutL / 32768.0f,
+                   wetMix / 32768.0f, out[idx] / 32768.0f);
+        }
+#endif
 
         writePos_ += 2;
         if (writePos_ >= kBufferSize) writePos_ = 0;
@@ -216,12 +260,15 @@ void DelayLine::Process(const fixed *in, fixed *out, int frames) {
 }
 
 fixed DelayLine::SyncDivisionToMs(int division, int bpm) {
-    if (division <= 0) division = 1;
-    if (bpm <= 0) bpm = 120;
-    // 1 whole note = 4 beats = 4 * (60/bpm) seconds.
-    float wholeMs = 4.0f * 60000.0f / (float)bpm;
-    float divMs = wholeMs / (float)division;
-    return fl2fp(divMs);
+    if (division < 0 || division >= SDIV_COUNT) division = SDIV_1_16;
+    if (bpm < 40) bpm = 120;
+    if (bpm > 300) bpm = 300;
+    // 1 whole note = 4 beats = 4 * (60/bpm) seconds = 240000/bpm ms.
+    // Division = num/den of a whole note; pure integer math (no floats).
+    long long ms = (240000LL * (long long)kSyncDivisions[division].num)
+                   / ((long long)bpm * (long long)kSyncDivisions[division].den);
+    if (ms > (long long)kMaxMs) ms = kMaxMs;
+    return fl2fp((float)ms);
 }
 
 } // namespace FxEngine

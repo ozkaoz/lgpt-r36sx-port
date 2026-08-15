@@ -28,13 +28,15 @@ static int countPage(FxPage page) {
 }
 
 int main() {
-    // ---- Table shape: 57 params (36 golden + 21 EQ EXT), pages match ----
-    check(FX_PARAM_COUNT == 57, "FX_PARAM_COUNT == 57") ;
-    check(countPage(FX_PAGE_DELAY) == 7, "DELAY page has 7 rows") ;
-    check(countPage(FX_PAGE_REVERB) == 7, "REVERB page has 7 rows") ;
+    // ---- Table shape: 67 params (36 golden + 21 EQ EXT + 6 bacon-1.5
+    // item 3: DLY SYN/DIV/LOW/HIG + RVB HP/LP + 4 bacon-1.5 item 4:
+    // CMP MIX/SCSRC/SCFLT/SCAMT), pages match ----
+    check(FX_PARAM_COUNT == 67, "FX_PARAM_COUNT == 67") ;
+    check(countPage(FX_PAGE_DELAY) == 11, "DELAY page has 11 rows") ;
+    check(countPage(FX_PAGE_REVERB) == 9, "REVERB page has 9 rows") ;
     check(countPage(FX_PAGE_EQ) == 13, "EQ page has 13 rows") ;
     check(countPage(FX_PAGE_EQ_EXT) == 21, "EQ_EXT page has 21 rows") ;
-    check(countPage(FX_PAGE_COMP) == 9, "COMP page has 9 rows") ;
+    check(countPage(FX_PAGE_COMP) == 13, "COMP page has 13 rows") ;
     check(countPage(FX_PAGE_MIX) == 0, "MIX page has no param rows") ;
     check(kFxParams_[FX_P_DLY_TIME].page == FX_PAGE_DELAY, "DLY TIME on DELAY") ;
     check(kFxParams_[FX_P_CMP_SC].page == FX_PAGE_COMP, "CMP SC on COMP") ;
@@ -49,6 +51,40 @@ int main() {
           "CMP THR range -60..0") ;
     check(kFxParams_[FX_P_EQX_B3_TYP].vmax == 6.0f, "B3 TYP max 6") ;
     check(kFxParams_[FX_P_EQX_B6_FRQ].vdef == 16000.0f, "B6 FRQ default 16000") ;
+
+    // ---- bacon-1.5 item 3: DELAY/REVERB new rows (appended ids 57..62) ----
+    check(kFxParams_[FX_P_DLY_SYNC].page == FX_PAGE_DELAY, "DLY SYN on DELAY") ;
+    check(kFxParams_[FX_P_DLY_DIV].page == FX_PAGE_DELAY, "DLY DIV on DELAY") ;
+    check(kFxParams_[FX_P_DLY_LOW].page == FX_PAGE_DELAY, "DLY LOW on DELAY") ;
+    check(kFxParams_[FX_P_DLY_HIG].page == FX_PAGE_DELAY, "DLY HIG on DELAY") ;
+    check(kFxParams_[FX_P_RVB_HP].page == FX_PAGE_REVERB, "RVB HP on REVERB") ;
+    check(kFxParams_[FX_P_RVB_LP].page == FX_PAGE_REVERB, "RVB LP on REVERB") ;
+    check(strcmp(kFxParams_[FX_P_DLY_SYNC].label, "DLY SYN") == 0, "DLY SYN label") ;
+    check(strcmp(kFxParams_[FX_P_DLY_DIV].label, "DLY DIV") == 0, "DLY DIV label") ;
+    check(strcmp(kFxParams_[FX_P_DLY_LOW].label, "DLY LOW") == 0, "DLY LOW label") ;
+    check(strcmp(kFxParams_[FX_P_RVB_LP].label, "RVB LP ") == 0, "RVB LP label") ;
+    check(kFxParams_[FX_P_DLY_SYNC].vmin == 0.0f && kFxParams_[FX_P_DLY_SYNC].vmax == 1.0f
+          && kFxParams_[FX_P_DLY_SYNC].vdef == 0.0f, "DLY SYN range 0..1 default FREE") ;
+    check(kFxParams_[FX_P_DLY_DIV].vmin == 0.0f && kFxParams_[FX_P_DLY_DIV].vmax == 15.0f
+          && kFxParams_[FX_P_DLY_DIV].vdef == 3.0f, "DLY DIV 0..15 default 1/16") ;
+    check(kFxParams_[FX_P_DLY_LOW].vmin == 20.0f && kFxParams_[FX_P_DLY_LOW].vmax == 20000.0f
+          && kFxParams_[FX_P_DLY_LOW].vdef == 20.0f, "DLY LOW 20..20000 default open") ;
+    check(kFxParams_[FX_P_DLY_HIG].vmin == 20.0f && kFxParams_[FX_P_DLY_HIG].vmax == 20000.0f
+          && kFxParams_[FX_P_DLY_HIG].vdef == 20000.0f, "DLY HIG 20..20000 default open") ;
+    check(kFxParams_[FX_P_RVB_HP].vmin == 20.0f && kFxParams_[FX_P_RVB_HP].vmax == 20000.0f
+          && kFxParams_[FX_P_RVB_HP].vdef == 20.0f, "RVB HP 20..20000 default open") ;
+    check(kFxParams_[FX_P_RVB_LP].vmin == 20.0f && kFxParams_[FX_P_RVB_LP].vmax == 20000.0f
+          && kFxParams_[FX_P_RVB_LP].vdef == 20000.0f, "RVB LP 20..20000 default open") ;
+    check(kFxParamMeta_[FX_P_DLY_SYNC].kind_ == FX_PARAM_SWITCH, "DLY SYN switch") ;
+    check(kFxParamMeta_[FX_P_DLY_DIV].kind_ == FX_PARAM_SWITCH, "DLY DIV switch (discrete)") ;
+    check(kFxParamMeta_[FX_P_DLY_LOW].kind_ == FX_PARAM_CONTINUOUS
+          && kFxParamMeta_[FX_P_DLY_LOW].curve_ == FX_CURVE_LOG2, "DLY LOW log2 continuous") ;
+    check(kFxParamMeta_[FX_P_RVB_LP].kind_ == FX_PARAM_CONTINUOUS
+          && kFxParamMeta_[FX_P_RVB_LP].curve_ == FX_CURVE_LOG2, "RVB LP log2 continuous") ;
+    check(fxRowForId(FX_P_DLY_SYNC) == 7 && fxRowForId(FX_P_DLY_HIG) == 10,
+          "DLY SYN row 7, DLY HIG row 10") ;
+    check(fxRowForId(FX_P_RVB_HP) == 7 && fxRowForId(FX_P_RVB_LP) == 8,
+          "RVB HP row 7, RVB LP row 8") ;
 
     // ---- Bypass rows first ----
     check(fxBypassId(FX_PAGE_DELAY) == FX_P_DLY_BYP, "DELAY bypass id") ;
@@ -75,7 +111,11 @@ int main() {
     check(fxRowForId(FX_P_DLY_BYP) == 0, "DLY BYP row 0") ;
     check(fxRowForId(FX_P_DLY_TIME) == 1, "DLY TIME row 1") ;
     check(fxRowForId(FX_P_EQ_LOW_EN) == 1, "EQ LOW EN row 1") ;
-    check(fxRowForId(FX_P_CMP_SC) == fxCountOnPage(FX_PAGE_COMP) - 1, "CMP SC last row") ;
+    check(fxRowForId(FX_P_CMP_SC) == fxCountOnPage(FX_PAGE_COMP) - 1 - 4, "CMP SC row 8 (9 params before the appended item-4 rows)") ;
+    check(fxRowForId(FX_P_CMP_MIX) == fxCountOnPage(FX_PAGE_COMP) - 4, "CMP MIX row 9") ;
+    check(fxRowForId(FX_P_CMP_SCSRC) == fxCountOnPage(FX_PAGE_COMP) - 3, "SC SRC row 10") ;
+    check(fxRowForId(FX_P_CMP_SCFLT) == fxCountOnPage(FX_PAGE_COMP) - 2, "SC FLT row 11") ;
+    check(fxRowForId(FX_P_CMP_SCAMT) == fxCountOnPage(FX_PAGE_COMP) - 1, "SC AMT last row") ;
     check(!fxIdOnPage(FX_P_DLY_TIME, FX_PAGE_COMP), "DLY TIME not on COMP") ;
 
     // ---- Curve params ----
@@ -86,6 +126,12 @@ int main() {
     check(fxUsesCurve(FX_P_CMP_RAT), "CMP RAT curve") ;
     check(fxUsesCurve(FX_P_EQX_B3_FRQ), "EQX B3 FRQ curve") ;
     check(fxUsesCurve(FX_P_EQX_B7_FRQ), "EQX B7 FRQ curve") ;
+    check(fxUsesCurve(FX_P_DLY_LOW), "DLY LOW curve") ;
+    check(fxUsesCurve(FX_P_DLY_HIG), "DLY HIG curve") ;
+    check(fxUsesCurve(FX_P_RVB_HP), "RVB HP curve") ;
+    check(fxUsesCurve(FX_P_RVB_LP), "RVB LP curve") ;
+    check(!fxUsesCurve(FX_P_DLY_SYNC), "DLY SYN not curve") ;
+    check(!fxUsesCurve(FX_P_DLY_DIV), "DLY DIV not curve") ;
     check(!fxUsesCurve(FX_P_DLY_FBK), "DLY FBK not curve") ;
     check(!fxUsesCurve(FX_P_EQ_LOW_GAI), "EQ gain not curve") ;
     check(!fxUsesCurve(FX_P_CMP_BYP), "CMP BYP not curve") ;
@@ -94,11 +140,20 @@ int main() {
     // ---- Discrete params (bacon-1.5 item 2) ----
     check(fxIsDiscreteParam(FX_P_EQX_B3_TYP), "B3 TYP discrete") ;
     check(fxIsDiscreteParam(FX_P_EQX_B7_TYP), "B7 TYP discrete") ;
+    check(fxIsDiscreteParam(FX_P_DLY_DIV), "DLY DIV discrete (bacon-1.5 item 3)") ;
     check(fxIsDiscreteParam(FX_P_CMP_BYP), "CMP BYP discrete (switch)") ;
     check(!fxIsDiscreteParam(FX_P_EQX_B3_FRQ), "B3 FRQ not discrete") ;
+    check(fxIsDiscreteParam(FX_P_DLY_SYNC), "DLY SYN discrete (switch)") ;
+    check(fxIsDiscreteParam(FX_P_CMP_SCSRC), "SC SRC discrete (bacon-1.5 item 4)") ;
+    check(FxNavigator::EditValue(FX_P_CMP_SCSRC, 4.0f, 1, true) == 5.0f, "SCSRC coarse steps by 1") ;
+    check(FxNavigator::EditValue(FX_P_CMP_SCSRC, 10.0f, 1, true) == 10.0f, "SCSRC clamps at 10 (RVB RET)") ;
+    check(FxNavigator::EditValue(FX_P_CMP_SCSRC, 0.0f, -1, true) == 0.0f, "SCSRC clamps at 0 (OFF)") ;
     check(FxNavigator::EditValue(FX_P_EQX_B3_TYP, 1.0f, 1, true) == 2.0f, "TYP coarse steps by 1") ;
     check(FxNavigator::EditValue(FX_P_EQX_B3_TYP, 6.0f, 1, false) == 6.0f, "TYP clamps at 6") ;
     check(FxNavigator::EditValue(FX_P_EQX_B3_TYP, 0.0f, -1, false) == 0.0f, "TYP clamps at 0") ;
+    check(FxNavigator::EditValue(FX_P_DLY_DIV, 4.0f, 1, true) == 5.0f, "DIV coarse steps by 1") ;
+    check(FxNavigator::EditValue(FX_P_DLY_DIV, 15.0f, 1, true) == 15.0f, "DIV clamps at 15") ;
+    check(FxNavigator::EditValue(FX_P_DLY_DIV, 0.0f, -1, true) == 0.0f, "DIV clamps at 0") ;
 
     // ---- Curve edit math (golden from Bacon 1.2.1) ----
     const FxParamSpec &dly = kFxParams_[FX_P_DLY_TIME] ;

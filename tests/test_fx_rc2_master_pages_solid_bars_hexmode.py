@@ -83,26 +83,28 @@ def check_master_hierarchy_colors():
 
 
 def check_master_page_rows():
-    # DELAY: TIME/FEEDBACK/MIX/WIDTH/PING/PONG/SATURATE/BYPASS (7 rows).
-    # REVERB: PREDELAY/DECAY/SIZE/DAMPING/WIDTH/MODE/BYPASS (7 rows, no MIX).
+    # bacon-1.5 item 3: DELAY = TIME/FEEDBACK/MIX/WIDTH/PING/PONG/SATURATE/
+    # SYNC/DIVISION/LOW CUT/HIGH CUT/BYPASS (11 rows).  REVERB = PREDELAY/
+    # DECAY/SIZE/DAMPING/WIDTH/MODE/IN HP/IN LP/BYPASS (9 rows, no MIX).
     dl = MV_CPP[MV_CPP.index("void MixerView::drawDelayPage"):
                MV_CPP.index("void MixerView::drawReverbPage")]
     rv = MV_CPP[MV_CPP.index("void MixerView::drawReverbPage"):
                MV_CPP.index("void MixerView::drawEqPage")]
     dlabels = ['"TIME"', '"FEEDBACK"', '"MIX"', '"WIDTH"',
-               '"PING/PONG"', '"SATURATE"', '"BYPASS"']
+               '"PING/PONG"', '"SATURATE"', '"SYNC"', '"DIVISION"',
+               '"LOW CUT"', '"HIGH CUT"', '"BYPASS"']
     rlabels = ['"PREDELAY"', '"DECAY"', '"SIZE"', '"DAMPING"',
-               '"WIDTH"', '"MODE"', '"BYPASS"']
+               '"WIDTH"', '"MODE"', '"IN HP"', '"IN LP"', '"BYPASS"']
     for lbl in dlabels:
         assert lbl in dl, lbl
     for lbl in rlabels:
         assert lbl in rv, lbl
     # no RVB MIX anywhere on the reverb page
     assert "MIX" not in rv.replace('"MODE"', '').replace('"DAMPING"', '')
-    # 7 rows each: the labels/ids arrays are size 7.
-    assert "[7]=" in dl.split("labels")[1] or "static const char *labels[7]" in dl
-    assert "[7]=" in rv.split("labels")[1] or "static const char *labels[7]" in rv
-    print("DELAY/REVERB page rows (7 each, reverb without MIX) OK")
+    # 11 rows (DELAY) / 9 rows (REVERB): the labels arrays are sized 11/9.
+    assert "[11]=" in dl.split("labels")[1] or "static const char *labels[11]" in dl
+    assert "[9]=" in rv.split("labels")[1] or "static const char *labels[9]" in rv
+    print("DELAY/REVERB page rows (11/9, reverb without MIX) OK")
 
 
 def check_master_page_formats():
@@ -115,9 +117,13 @@ def check_master_page_formats():
     # the natural units (ms, s) and the ON/OFF / ECO-NORMAL strings survive.
     assert '"%s %4.0f ms"' in dl                      # delay time: % + ms
     assert '"%s",v>=0.5f?"ON":"OFF"' in dl            # ping-pong/sat
+    assert '"%s",v>=0.5f?"SYNC":"FREE"' in dl         # bacon-1.5 item 3
+    assert '"%s %4.0f Hz"' in dl                      # LOW CUT / HIGH CUT
+    assert "kSyncDivisions[div].name" in dl           # division names
     assert '"%s %4.0f ms"' in rv                      # predelay: % + ms
     assert '"%s %.2f s"' in rv                        # decay: % + seconds
     assert 'v>=0.5f?"NORMAL":"ECO"' in rv             # reverb mode
+    assert '"%s %4.0f Hz"' in rv                      # IN HP / IN LP
     assert "fxPctBuffer(pct,id,v)" in dl              # percent helper wired
     assert "fxPctBuffer(pct,id,v)" in rv
     # RC4 P2: reverb bypass renders through the unified UiDraw bypass row

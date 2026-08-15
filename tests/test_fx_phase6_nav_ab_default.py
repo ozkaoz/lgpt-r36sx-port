@@ -60,6 +60,14 @@ PARAMS = [
     ("CMP MKU", "COMP", 0.0, 24.0, 0.0),
     ("CMP LNK", "COMP", 0.0, 1.0, 1.0),
     ("CMP SCL", "COMP", 0.0, 1.0, 1.0),
+    # bacon-1.5 item 3 (appended): DELAY FREE/SYNC + division + LOW/HIGH CUT,
+    # REVERB input HP/LP.  Defaults = legacy (FREE, 1/16 inert, filters open).
+    ("DLY SYN", "DELAY", 0.0, 1.0, 0.0),
+    ("DLY DIV", "DELAY", 0.0, 15.0, 3.0),
+    ("DLY LOW", "DELAY", 20.0, 20000.0, 20000.0),
+    ("DLY HIG", "DELAY", 20.0, 20000.0, 20.0),
+    ("RVB HP", "REVERB", 20.0, 20000.0, 20.0),
+    ("RVB LP", "REVERB", 20.0, 20000.0, 20000.0),
 ]
 
 
@@ -74,10 +82,10 @@ def reset_row(row, vdef):
 
 def check_count_and_pages():
     from collections import Counter
-    assert len(PARAMS) == 36, len(PARAMS)
+    assert len(PARAMS) == 42, len(PARAMS)
     counts = Counter(p[1] for p in PARAMS)
-    assert counts == {"DELAY": 7, "REVERB": 7, "EQ": 13, "COMP": 9}, counts
-    print("36 params / 5 pages (DELAY 7, REVERB 7, EQ 13, COMP 9) OK")
+    assert counts == {"DELAY": 11, "REVERB": 9, "EQ": 13, "COMP": 9}, counts
+    print("42 params / 5 pages (DELAY 11, REVERB 9, EQ 13, COMP 9) OK")
 
 
 def check_legacy_defaults():
@@ -113,6 +121,14 @@ def check_legacy_defaults():
     assert PARAMS[33][4] == 0.0   # CMP MKU
     assert PARAMS[34][4] == 1.0   # CMP LNK
     assert PARAMS[35][4] == 1.0   # CMP SCL
+    # bacon-1.5 item 3: sync off (FREE), division 1/16 (index 4), LOW CUT open
+    # at 20000, HIGH CUT open at 20, reverb input HP 20 / LP 20000 (open).
+    assert PARAMS[36][4] == 0.0
+    assert PARAMS[37][4] == 3.0
+    assert PARAMS[38][4] == 20000.0
+    assert PARAMS[39][4] == 20.0
+    assert PARAMS[40][4] == 20.0
+    assert PARAMS[41][4] == 20000.0
     print("legacy defaults match AllParamsAtLegacyDefault OK")
 
 

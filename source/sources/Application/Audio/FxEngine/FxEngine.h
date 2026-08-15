@@ -96,6 +96,11 @@ public:
     void SetDelaySaturation(bool on) { delay_.SetSaturation(on); RefreshLegacy(); }
     void SetDelayLoopLPHz(fixed hz) { delay_.SetLoopLPHz(hz); RefreshLegacy(); }
     void SetDelayLoopHPHz(fixed hz) { delay_.SetLoopHPHz(hz); RefreshLegacy(); }
+    // bacon-1.5 item 3: FREE/SYNC + musical division + LOW CUT / HIGH CUT.
+    void SetDelaySync(bool on) { delay_.SetSync(on); RefreshLegacy(); }
+    void SetDelayDivision(int div) { delay_.SetDivision(div); RefreshLegacy(); }
+    void SetDelayLowCutHz(fixed hz) { delay_.SetLoopLPHz(hz); RefreshLegacy(); }
+    void SetDelayHighCutHz(fixed hz) { delay_.SetLoopHPHz(hz); RefreshLegacy(); }
 
     // --- Reverb send/return (Fase 2) ---
     void SetReverbSend(fixed send) { reverbSend_ = send; RefreshLegacy(); }
@@ -121,6 +126,13 @@ public:
     bool GetDelayPingPong() const { return delay_.GetPingPong(); }
     bool GetDelayBypass() const { return delay_.GetBypass(); }
     bool GetDelaySaturation() const { return delay_.GetSaturation(); }
+    // bacon-1.5 item 3 readbacks (FREE/SYNC, division, LOW/HIGH CUT).
+    bool GetDelaySync() const { return delay_.GetSync(); }
+    int GetDelayDivision() const { return delay_.GetDivision(); }
+    fixed GetDelayLowCutHz() const { return delay_.GetLoopLPHz(); }
+    fixed GetDelayHighCutHz() const { return delay_.GetLoopHPHz(); }
+    fixed GetReverbInputHPHz() const { return reverb_.GetInputHPHz(); }
+    fixed GetReverbInputLPHz() const { return reverb_.GetInputLPHz(); }
     fixed GetReverbSend() const { return reverbSend_; }
     fixed GetReverbReturn() const { return reverbReturn_; }
     fixed GetReverbPredelayMs() const { return reverb_.GetPredelayMs(); }
@@ -152,6 +164,11 @@ public:
     void SetCompMakeupDb(fixed db) { comp_.SetMakeupDb(db); RefreshLegacy(); }
     void SetCompStereoLink(bool on) { comp_.SetStereoLink(on); RefreshLegacy(); }
     void SetCompSoftClip(bool on) { comp_.SetSoftClip(on); RefreshLegacy(); }
+    // bacon-1.5 item 4 (V2): sidechain + dry/wet mix.
+    void SetCompSidechainSource(int src) { comp_.SetSidechainSource(src); RefreshLegacy(); }
+    void SetCompSidechainHpfHz(fixed hz) { comp_.SetSidechainHpfHz(hz); RefreshLegacy(); }
+    void SetCompSidechainAmount(fixed amt) { comp_.SetSidechainAmount(amt); RefreshLegacy(); }
+    void SetCompMix(fixed mix) { comp_.SetMix(mix); RefreshLegacy(); }
     fixed GetCompGainReductionDb() const { return comp_.GetGainReductionDb(); }
 
     // Control-rate readbacks for the UI (PLAN_FX_REDESIGN_ES.md, Fase 4.3).
@@ -173,6 +190,11 @@ public:
     bool GetCompStereoLink() const { return comp_.GetStereoLink(); }
     bool GetCompSoftClip() const { return comp_.GetSoftClip(); }
     bool GetCompBypass() const { return comp_.GetBypass(); }
+    // bacon-1.5 item 4 readbacks.
+    int GetCompSidechainSource() const { return comp_.GetSidechainSource(); }
+    fixed GetCompSidechainHpfHz() const { return comp_.GetSidechainHpfHz(); }
+    fixed GetCompSidechainAmount() const { return comp_.GetSidechainAmount(); }
+    fixed GetCompMix() const { return comp_.GetMix(); }
 
     // RT telemetry.  rtViolations_ must stay 0; it is incremented only if
     // Process() would have needed a dynamic allocation or a syscall.
@@ -193,6 +215,12 @@ private:
     FxEngine &operator=(const FxEngine &);
 
     void processSendReturns(fixed *buffer, int samplecount);
+    // bacon-1.5 item 4: accumulate the sidechain tap for the selected track
+    // during channel rendering (pre-master, Q15).
+    void accumulateSidechainTap(int channel, const fixed *buffer,
+                                int samplecount);
+    // Fill scTap_ from the selected bus (delay/reverb return), pre-master.
+    void fillSidechainTapFromBus(int samplecount);
 
     Buses buses_;
     bool legacyMode_;
@@ -207,6 +235,10 @@ private:
     fixed delayReturn_;
     fixed reverbSend_;
     fixed reverbReturn_;
+    // bacon-1.5 item 4: zero-latency sidechain tap for the compressor
+    // (static, single-use per Process() call).
+    fixed scTap_[FX_ENGINE_MAX_FIXED];
+    bool scTapValid_;
     DelayLine delay_;
     Reverb reverb_;
     ParametricEQ eq_;

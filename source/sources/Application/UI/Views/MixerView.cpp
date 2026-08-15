@@ -1211,6 +1211,12 @@ float MixerView::fxGet(int id) const {
 	case FX_P_EQX_B7_GAI: return fp2fl(fx.GetEqBandGainDb(7)) ;
 	case FX_P_EQX_B7_Q:   return fp2fl(fx.GetEqBandQ(7)) ;
 	case FX_P_EQX_B7_TYP: return (float)fx.GetEqBandType(7) ;
+	case FX_P_DLY_SYNC:   return fx.GetDelaySync()?1.0f:0.0f ;
+	case FX_P_DLY_DIV:    return (float)fx.GetDelayDivision() ;
+	case FX_P_DLY_LOW:    return fp2fl(fx.GetDelayLowCutHz()) ;
+	case FX_P_DLY_HIG:    return fp2fl(fx.GetDelayHighCutHz()) ;
+	case FX_P_RVB_HP:     return fp2fl(fx.GetReverbInputHPHz()) ;
+	case FX_P_RVB_LP:     return fp2fl(fx.GetReverbInputLPHz()) ;
 	case FX_P_CMP_THR:    return fp2fl(fx.GetCompThresholdDb()) ;
 	case FX_P_CMP_RAT:    return fp2fl(fx.GetCompRatio()) ;
 	case FX_P_CMP_KNE:    return fp2fl(fx.GetCompKneeDb()) ;
@@ -1220,6 +1226,10 @@ float MixerView::fxGet(int id) const {
 	case FX_P_CMP_LINK:   return fx.GetCompStereoLink()?1.0f:0.0f ;
 	case FX_P_CMP_SC:     return fx.GetCompSoftClip()?1.0f:0.0f ;
 	case FX_P_CMP_BYP:    return fx.GetCompBypass()?1.0f:0.0f ;
+	case FX_P_CMP_MIX:    return fp2fl(fx.GetCompMix()) ;
+	case FX_P_CMP_SCSRC:  return (float)fx.GetCompSidechainSource() ;
+	case FX_P_CMP_SCFLT:  return fp2fl(fx.GetCompSidechainHpfHz()) ;
+	case FX_P_CMP_SCAMT:  return fp2fl(fx.GetCompSidechainAmount()) ;
 	}
 	return 0.0f ;
 }
@@ -1284,6 +1294,12 @@ void MixerView::fxSet(int id,float v) {
 	                     fx.SetEqBypass(false) ; break ;
 	case FX_P_EQX_B7_Q:   fx.SetEqBandQ(7,fl2fp(v)) ; break ;
 	case FX_P_EQX_B7_TYP: fx.SetEqBandType(7,(int)v) ; break ;
+	case FX_P_DLY_SYNC:   fx.SetDelaySync(v>=0.5f) ; break ;
+	case FX_P_DLY_DIV:    fx.SetDelayDivision((int)v) ; break ;
+	case FX_P_DLY_LOW:    fx.SetDelayLowCutHz(fl2fp(v)) ; break ;
+	case FX_P_DLY_HIG:    fx.SetDelayHighCutHz(fl2fp(v)) ; break ;
+	case FX_P_RVB_HP:     fx.SetReverbInputHPHz(fl2fp(v)) ; break ;
+	case FX_P_RVB_LP:     fx.SetReverbInputLPHz(fl2fp(v)) ; break ;
 	case FX_P_CMP_THR:    fx.SetCompThresholdDb(fl2fp(v)) ; break ;
 	case FX_P_CMP_RAT:    fx.SetCompRatio(fl2fp(v)) ; break ;
 	case FX_P_CMP_KNE:    fx.SetCompKneeDb(fl2fp(v)) ; break ;
@@ -1293,6 +1309,10 @@ void MixerView::fxSet(int id,float v) {
 	case FX_P_CMP_LINK:   fx.SetCompStereoLink(v>=0.5f) ; break ;
 	case FX_P_CMP_SC:     fx.SetCompSoftClip(v>=0.5f) ; break ;
 	case FX_P_CMP_BYP:    fx.SetCompBypass(v>=0.5f) ; break ;
+	case FX_P_CMP_MIX:    fx.SetCompMix(fl2fp(v)) ; break ;
+	case FX_P_CMP_SCSRC:  fx.SetCompSidechainSource((int)v) ; break ;
+	case FX_P_CMP_SCFLT:  fx.SetCompSidechainHpfHz(fl2fp(v)) ; break ;
+	case FX_P_CMP_SCAMT:  fx.SetCompSidechainAmount(fl2fp(v)) ; break ;
 	}
 }
 
@@ -1407,17 +1427,20 @@ static void fxPctBuffer(char *out,int id,float v) {
 
 void MixerView::drawDelayPage(const char *title) {
 	char buffer[16] ;
-	static const char *labels[7]={"BYPASS","TIME","FEEDBACK","MIX",
-	                              "WIDTH","PING/PONG","SATURATE"} ;
-	static const int ids[7]={FX_P_DLY_BYP,FX_P_DLY_TIME,FX_P_DLY_FBK,
-	                         FX_P_DLY_MIX,FX_P_DLY_WID,FX_P_DLY_PP,
-	                         FX_P_DLY_SAT} ;
+	// bacon-1.5 item 3: FREE/SYNC + DIVISION + LOW/HIGH CUT (11 rows).
+	static const char *labels[11]={"BYPASS","TIME","FEEDBACK","MIX",
+	                               "WIDTH","PING/PONG","SATURATE",
+	                               "SYNC","DIVISION","LOW CUT","HIGH CUT"} ;
+	static const int ids[11]={FX_P_DLY_BYP,FX_P_DLY_TIME,FX_P_DLY_FBK,
+	                          FX_P_DLY_MIX,FX_P_DLY_WID,FX_P_DLY_PP,
+	                          FX_P_DLY_SAT,FX_P_DLY_SYNC,FX_P_DLY_DIV,
+	                          FX_P_DLY_LOW,FX_P_DLY_HIG} ;
 	// FXP_DESCRIPTORS_V1: value column widened to 12 to carry the percent
 	// (primary) plus the natural value (secondary) on the same row.
-	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,9,12,2) ;
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(11,9,12,2) ;
 	// RC6: the page title sits on the row just above the centered block.
 	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
-	for (int p=0;p<7;p++) {
+	for (int p=0;p<11;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
 		bool selected=(fxRowForId(id)==navigator_.Row()) ;
@@ -1432,6 +1455,15 @@ void MixerView::drawDelayPage(const char *title) {
 		case FX_P_DLY_TIME: sprintf(buffer,"%s %4.0f ms",pct,v) ; break ;
 		case FX_P_DLY_PP:
 		case FX_P_DLY_SAT:  sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ; break ;
+		case FX_P_DLY_SYNC: sprintf(buffer,"%s",v>=0.5f?"SYNC":"FREE") ; break ;
+		case FX_P_DLY_DIV: {
+			int div=(int)v ;
+			if (div<0) div=0 ;
+			if (div>=FxEngine::SDIV_COUNT) div=0 ;
+			sprintf(buffer,"%s",FxEngine::kSyncDivisions[div].name) ;
+		} break ;
+		case FX_P_DLY_LOW:
+		case FX_P_DLY_HIG:  sprintf(buffer,"%s %4.0f Hz",pct,v) ; break ;
 		default:            sprintf(buffer,"%s %.2f",pct,v) ; break ;  // FBK/MIX/WID
 		}
 		drawMasterFxRow(labels[p],buffer,selected,ml.labelX,y,ml.valueX) ;
@@ -1440,16 +1472,17 @@ void MixerView::drawDelayPage(const char *title) {
 
 void MixerView::drawReverbPage(const char *title) {
 	char buffer[16] ;
-	static const char *labels[7]={"BYPASS","PREDELAY","DECAY","SIZE",
-	                              "DAMPING","WIDTH","MODE"} ;
-	static const int ids[7]={FX_P_RVB_BYP,FX_P_RVB_PRE,FX_P_RVB_DEC,
+	// bacon-1.5 item 3: input HP/LP (9 rows).
+	static const char *labels[9]={"BYPASS","PREDELAY","DECAY","SIZE",
+	                              "DAMPING","WIDTH","MODE","IN HP","IN LP"} ;
+	static const int ids[9]={FX_P_RVB_BYP,FX_P_RVB_PRE,FX_P_RVB_DEC,
 	                         FX_P_RVB_SIZ,FX_P_RVB_DMP,FX_P_RVB_WID,
-	                         FX_P_RVB_MODE} ;
+	                         FX_P_RVB_MODE,FX_P_RVB_HP,FX_P_RVB_LP} ;
 	// FXP_DESCRIPTORS_V1: value column widened to 12 (percent + natural).
-	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,8,12,2) ;
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(9,8,12,2) ;
 	// RC6: the page title sits on the row just above the centered block.
 	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
-	for (int p=0;p<7;p++) {
+	for (int p=0;p<9;p++) {
 		int id=ids[p] ;
 		float v=fxGet(id) ;
 		bool selected=(fxRowForId(id)==navigator_.Row()) ;
@@ -1464,6 +1497,8 @@ void MixerView::drawReverbPage(const char *title) {
 		case FX_P_RVB_PRE:  sprintf(buffer,"%s %4.0f ms",pct,v) ; break ;
 		case FX_P_RVB_DEC:  sprintf(buffer,"%s %.2f s",pct,v) ; break ;
 		case FX_P_RVB_MODE: sprintf(buffer,"%s",v>=0.5f?"NORMAL":"ECO") ; break ;
+		case FX_P_RVB_HP:
+		case FX_P_RVB_LP:   sprintf(buffer,"%s %4.0f Hz",pct,v) ; break ;
 		default:            sprintf(buffer,"%s %.2f",pct,v) ; break ;  // SIZ/DMP/WID
 		}
 		drawMasterFxRow(labels[p],buffer,selected,ml.labelX,y,ml.valueX) ;
@@ -1629,14 +1664,15 @@ void MixerView::drawCompPage(const char *title) {
 	// three-cell spacing so the 14-cell "Gain Reduction" line below fits
 	// beside its value); the GR meter stays visible one row below the last
 	// parameter.
-	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(9,11,13,3) ;
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(13,11,13,3) ;
 	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
 	GUITextProperties props ;
 	char buffer[20] ;
-	const char *labels[9]={"Bypass","Threshold","Ratio","Knee",
-	                       "Attack","Release","Makeup","Stereo Link","Soft Clip"} ;
-	for (int p=0;p<9;p++) {
-		int id=FX_P_CMP_BYP+p ;  // enum is BYP first, contiguous
+	const char *labels[13]={"Bypass","Threshold","Ratio","Knee",
+	                        "Attack","Release","Makeup","Stereo Link","Soft Clip",
+	                        "Mix","SC Source","SC HPF","SC Amount"} ;
+	for (int p=0;p<13;p++) {
+		int id=fxIdForRow(p) ;  // rows map via the unified table (F3-4a)
 		const FxParamSpec &spec=kFxParams_[id] ;
 		bool selected=(fxRowForId(id)==navigator_.Row()) ;
 		float v=fxGet(id) ;
@@ -1651,7 +1687,7 @@ void MixerView::drawCompPage(const char *title) {
 		}
 		SetColor(selected?CD_HILITE2:CD_NORMAL) ;
 		props.invert_=selected ;
-		if (spec.vmax-spec.vmin<=1.5f) {
+		if (spec.vmax-spec.vmin<=1.5f && id!=FX_P_CMP_MIX && id!=FX_P_CMP_SCAMT) {
 			sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ;
 		} else {
 			char pct[8] ;
@@ -1661,6 +1697,23 @@ void MixerView::drawCompPage(const char *title) {
 			case FX_P_CMP_KNE: sprintf(buffer,"%s %5.1f dB",pct,v) ; break ;
 			case FX_P_CMP_ATK: sprintf(buffer,"%s %5.1f ms",pct,v) ; break ;
 			case FX_P_CMP_REL: sprintf(buffer,"%s %5.1f ms",pct,v) ; break ;
+			case FX_P_CMP_MIX:
+			case FX_P_CMP_SCAMT: sprintf(buffer,"%s %5.0f%%",pct,v*100.0f) ; break ;
+			case FX_P_CMP_SCSRC: {
+				// Discrete sidechain source: OFF / TRK n / DLY / RVB.
+				int src=(int)(v+0.5f) ;
+				if (src==0) sprintf(buffer,"%s OFF",pct) ;
+				else if (src>=1 && src<=8) sprintf(buffer,"%s TRK %d",pct,src) ;
+				else if (src==9) sprintf(buffer,"%s DLY RET",pct) ;
+				else if (src==10) sprintf(buffer,"%s RVB RET",pct) ;
+				else sprintf(buffer,"%s --",pct) ;
+				break ;
+			}
+			case FX_P_CMP_SCFLT: {
+				if (v<=30.0f) sprintf(buffer,"%s OPEN",pct) ;
+				else sprintf(buffer,"%s %5.0f Hz",pct,v) ;
+				break ;
+			}
 			default:           sprintf(buffer,"%s %+5.1f dB",pct,v) ; break ;  // THR, MKU
 			}
 		}
@@ -1675,7 +1728,7 @@ void MixerView::drawCompPage(const char *title) {
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
 	sprintf(buffer,"-%05.1f dB",mag) ;
-	int grY=ml.startY+9 ;
+	int grY=ml.startY+13 ;
 	DrawString(ml.labelX,grY,"Gain Reduction",props) ;
 	DrawString(ml.valueX,grY,buffer,props) ;
 }

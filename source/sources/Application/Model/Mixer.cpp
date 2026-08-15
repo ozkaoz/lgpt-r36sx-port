@@ -210,6 +210,19 @@ void Mixer::SaveContent(TiXmlNode *node) {
 	fxMaster.SetAttribute("CMPLNK",fx.GetCompStereoLink()?1:0) ;
 	fxMaster.SetAttribute("CMPSC",fx.GetCompSoftClip()?1:0) ;
 	fxMaster.SetAttribute("CMPBYP",fx.GetCompBypass()?1:0) ;
+	fxMaster.SetAttribute("CMPMIX",(int)fx.GetCompMix()) ;
+	fxMaster.SetAttribute("CMPSCR",fx.GetCompSidechainSource()) ;
+	fxMaster.SetAttribute("CMPSCH",(int)fx.GetCompSidechainHpfHz()) ;
+	fxMaster.SetAttribute("CMPSCA",(int)fx.GetCompSidechainAmount()) ;
+	// bacon-1.5 item 3 (appended after the golden attrs, bit-identical
+	// persistence): DELAY FREE/SYNC + division + LOW/HIGH CUT, REVERB
+	// input HP/LP.
+	fxMaster.SetAttribute("DLYSYNC",fx.GetDelaySync()?1:0) ;
+	fxMaster.SetAttribute("DLYDIV",fx.GetDelayDivision()) ;
+	fxMaster.SetAttribute("DLYLOW",(int)fx.GetDelayLowCutHz()) ;
+	fxMaster.SetAttribute("DLYHIG",(int)fx.GetDelayHighCutHz()) ;
+	fxMaster.SetAttribute("RVBINHP",(int)fx.GetReverbInputHPHz()) ;
+	fxMaster.SetAttribute("RVBINLP",(int)fx.GetReverbInputLPHz()) ;
 	node->InsertEndChild(fxMaster) ;
 } ;
 
@@ -305,6 +318,19 @@ void Mixer::RestoreContent(TiXmlElement *element) {
 		if (fxMaster->Attribute("CMPLNK",&value)) fx.SetCompStereoLink(value!=0) ;
 		if (fxMaster->Attribute("CMPSC",&value)) fx.SetCompSoftClip(value!=0) ;
 		if (fxMaster->Attribute("CMPBYP",&value)) fx.SetCompBypass(value!=0) ;
+		if (fxMaster->Attribute("CMPMIX",&value)) fx.SetCompMix((fixed)value) ;
+		if (fxMaster->Attribute("CMPSCR",&value)) fx.SetCompSidechainSource((int)value) ;
+		if (fxMaster->Attribute("CMPSCH",&value)) fx.SetCompSidechainHpfHz((fixed)value) ;
+		if (fxMaster->Attribute("CMPSCA",&value)) fx.SetCompSidechainAmount((fixed)value) ;
+		// bacon-1.5 item 3: DELAY FREE/SYNC + division + LOW/HIGH CUT,
+		// REVERB input HP/LP (appended, optional: old files fall back to the
+		// legacy defaults below).
+		if (fxMaster->Attribute("DLYSYNC",&value)) fx.SetDelaySync(value!=0) ;
+		if (fxMaster->Attribute("DLYDIV",&value)) fx.SetDelayDivision(value) ;
+		if (fxMaster->Attribute("DLYLOW",&value)) fx.SetDelayLowCutHz((fixed)value) ;
+		if (fxMaster->Attribute("DLYHIG",&value)) fx.SetDelayHighCutHz((fixed)value) ;
+		if (fxMaster->Attribute("RVBINHP",&value)) fx.SetReverbInputHPHz((fixed)value) ;
+		if (fxMaster->Attribute("RVBINLP",&value)) fx.SetReverbInputLPHz((fixed)value) ;
 	} else {
 		// Legacy project: reset the engine to its default (bypass) state so
 		// old songs load with the exact original behaviour.
@@ -324,6 +350,14 @@ void Mixer::RestoreContent(TiXmlElement *element) {
 		fx.SetReverbMode((int)FxEngine::Reverb::NORMAL) ;
 		fx.SetReverbMix(i2fp(1)) ;
 		fx.SetReverbBypass(false) ;
+		// bacon-1.5 item 3: legacy files reset to the legacy state (FREE,
+		// division 1/16 inert, filters open).
+		fx.SetDelaySync(false) ;
+		fx.SetDelayDivision((int)FxEngine::SDIV_1_16) ;
+		fx.SetDelayLowCutHz(fl2fp(20000.0f)) ;
+		fx.SetDelayHighCutHz(fl2fp(20.0f)) ;
+		fx.SetReverbInputHPHz(fl2fp(20.0f)) ;
+		fx.SetReverbInputLPHz(fl2fp(20000.0f)) ;
 		fx.SetEqBypass(true) ;
 		for (int b=0;b<3;b++) {
 			fx.SetEqBandEnabled(b,false) ;

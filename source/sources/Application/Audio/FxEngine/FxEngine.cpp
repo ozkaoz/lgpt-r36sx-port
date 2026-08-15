@@ -1,4 +1,5 @@
 #include "FxEngine.h"
+#include "Application/Player/SyncMaster.h"
 
 namespace FxEngine {
 
@@ -7,7 +8,7 @@ FxEngine::FxEngine()
       callCount_(0), frames_(0), maxFrames_(0),
       rtViolations_(0), sampleRate_(44100),
       delaySend_(0), delayReturn_(fl2fp(0.5f)),
-      reverbSend_(0), reverbReturn_(fl2fp(0.5f)) {
+      reverbSend_(0), reverbReturn_(fl2fp(0.5f)), scTapValid_(false) {
     delay_.SetSampleRate(sampleRate_);
     delay_.SetMix(i2fp(1)); // send/return: full wet return
     reverb_.SetSampleRate(sampleRate_);
@@ -29,6 +30,7 @@ void FxEngine::Reset() {
     maxFrames_ = 0;
     rtViolations_ = 0;
     sendsAccumulated_ = false;
+    scTapValid_ = false;
     delay_.Reset();
     reverb_.Reset();
     eq_.Reset();
@@ -66,6 +68,12 @@ bool FxEngine::AllParamsAtLegacyDefault() const {
     if (delay_.GetPingPong()) return false;
     if (delay_.GetSaturation()) return false;
     if (delay_.GetBypass()) return false;
+    // bacon-1.5 item 3: defaults are FREE mode, division 1/16 (inert in FREE),
+    // LOW CUT 20 Hz and HIGH CUT 20000 Hz (open filters, legacy state).
+    if (delay_.GetSync()) return false;
+    if (delay_.GetDivision() != SDIV_1_16) return false;
+    if (delay_.GetLoopLPHz() != fl2fp(20000.0f)) return false;
+    if (delay_.GetLoopHPHz() != fl2fp(20.0f)) return false;
     // Reverb: default predelay 0, decay 1.0 s, size 1, damping 0.5, width 1.
     if (reverb_.GetPredelayMs() != 0) return false;
     if (reverb_.GetDecayTarget() != fl2fp(1.0f)) return false;
@@ -75,6 +83,9 @@ bool FxEngine::AllParamsAtLegacyDefault() const {
     if (reverb_.GetMode() != Reverb::NORMAL) return false;
     if (reverb_.GetMix() != i2fp(1)) return false;
     if (reverb_.GetBypass()) return false;
+    // bacon-1.5 item 3: input HP 20 Hz / LP 20000 Hz = open filters (legacy).
+    if (reverb_.GetInputHPHz() != fl2fp(20.0f)) return false;
+    if (reverb_.GetInputLPHz() != fl2fp(20000.0f)) return false;
     // Master EQ: global bypass on (dry) by default, all bands disabled.
     if (!eq_.GetBypass()) return false;
     // FXP_MASTER_EQ8 (bacon-1.5, item 2): EXT bands (BAND3..BAND7) default to
@@ -159,6 +170,16 @@ void FxEngine::processSendReturns(fixed *buffer, int samplecount) {
     }
     sendsAccumulated_ = false;
 
+    // bacon-1.5 item 3: SYNC mode recomputes the delay time from the song
+    // tempo and the musical division every callback.  Pure integer math at
+    // control rate (no trascendentals); the target glides per-sample inside
+    // DelayLine::Process.
+    if (delay_.GetSync()) {
+        int bpm = SyncMaster::GetInstance()->GetTempo();
+        delay_.SetDelayMs(DelayLine::SyncDivisionToMs(delay_.GetDivision(),
+                                                      bpm));
+    }
+
     // Process returns (wet).
     delay_.Process(buses_.send_[0], buses_.returnDelay_, samplecount);
     reverb_.Process(buses_.send_[1], buses_.returnReverb_, samplecount);
@@ -172,7 +193,24 @@ void FxEngine::processSendReturns(fixed *buffer, int samplecount) {
 
     // Master chain (Fase 3): EQ then compressor/limiter, in place.
     eq_.Process(buses_.master_, buses_.master_, samplecount);
+    // bacon-1.5 item 4: zero-latency sidechain.  TRACK taps were accumulated
+    // during channel rendering; BUS taps are sampled from the returns right
+    // now (pre-master-sum).  The tap is single-use: the compressor consumes
+    // it inside this Process() call.
+    int scSrc = comp_.GetSidechainSource();
+    if (scSrc >= Compressor::SC_TRACK_1 && scSrc <= Compressor::SC_TRACK_8) {
+        if (scTapValid_) {
+            comp_.SetSidechainInput(scTap_, samplecount);
+        }
+    } else if (scSrc == Compressor::SC_DELAY_RETURN ||
+               scSrc == Compressor::SC_REVERB_RETURN) {
+        fillSidechainTapFromBus(samplecount);
+        if (scTapValid_) {
+            comp_.SetSidechainInput(scTap_, samplecount);
+        }
+    }
     comp_.Process(buses_.master_, buses_.master_, samplecount);
+    scTapValid_ = false;
 
     // Expand back to the int16<<15 scale that AudioMixer / clipToMix expect,
     // with the same hard clip the mixer uses so full-scale DSP output (Q15
@@ -232,6 +270,44 @@ void FxEngine::AccumulateChannelSend(int channel, const fixed *buffer,
             dst[i] += fp_mul(buffer[i] >> FIXED_SHIFT, reverbGain);
         }
     }
+    // bacon-1.5 item 4: sidechain tap of the selected track (pre-master, so
+    // the compressor sees the source before the master EQ/returns).
+    if (comp_.GetSidechainSource() == Compressor::SC_TRACK_1 + channel) {
+        accumulateSidechainTap(channel, buffer, samplecount);
+    }
+}
+
+// bacon-1.5 item 4: accumulate the zero-latency sidechain tap.  The tap is
+// the track's rendered audio (int16<<15 scale) normalized to Q15, summed over
+// the whole block so every note of the track participates (a track may render
+// several voices in one block).  RT-safe: static buffer, pure accumulation.
+void FxEngine::accumulateSidechainTap(int channel, const fixed *buffer,
+                                      int samplecount) {
+    if (!scTapValid_) {
+        for (int i = 0; i < samplecount * 2; i++) scTap_[i] = 0;
+        scTapValid_ = true;
+    }
+    for (int i = 0; i < samplecount * 2; i++) {
+        scTap_[i] += buffer[i] >> FIXED_SHIFT;
+    }
+}
+
+// bacon-1.5 item 4: the compressor can also duck from a bus tap: the delay or
+// reverb return (post-return-gain, pre-master-sum).  Kept in Q15.
+void FxEngine::fillSidechainTapFromBus(int samplecount) {
+    int src = comp_.GetSidechainSource();
+    const fixed *srcBuf = 0;
+    if (src == Compressor::SC_DELAY_RETURN) {
+        srcBuf = buses_.returnDelay_;
+    } else if (src == Compressor::SC_REVERB_RETURN) {
+        srcBuf = buses_.returnReverb_;
+    }
+    if (!srcBuf) {
+        scTapValid_ = false;
+        return;
+    }
+    for (int i = 0; i < samplecount * 2; i++) scTap_[i] = srcBuf[i];
+    scTapValid_ = true;
 }
 
 } // namespace FxEngine

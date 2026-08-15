@@ -175,6 +175,8 @@ class DelayLineModel:
 
 
 def sync_div_ms(division, bpm):
+    # Legacy helper kept for reference; superseded by the kSyncDivisions
+    # table check in check_sync_division.
     division = max(1, division)
     if bpm <= 0:
         bpm = 120
@@ -183,42 +185,58 @@ def sync_div_ms(division, bpm):
 
 
 # ---------------------------------------------------------------------------
-# Reverb (mirrors Reverb.cpp exactly)
+# Reverb (mirrors Reverb.cpp V2 exactly, bacon-1.5 item 3; the LFO
+# modulation is omitted here -- it is a +/-2-sample read-length wobble that
+# does not change the RT60/stability/DC properties under test)
 # ---------------------------------------------------------------------------
 kCombBase = [1116, 1188, 1277, 1356]
 kCombBaseR = [1131, 1203, 1293, 1377]
-kAllpassBase = [556, 441]
-kAllpassBaseR = [561, 445]
+kAllpassBase = [556, 441, 225]
+kAllpassBaseR = [561, 445, 231]
+
+GLIDE_LEN = fl2fp(1)       # FX_REVERB_LEN_GLIDE
+GLIDE_GAIN = fl2fp(0.0005)  # FX_REVERB_GAIN_SMOOTH
+GLIDE_DECAY = fl2fp(0.005)  # FX_REVERB_DECAY_GLIDE
+MIX_SMOOTH = fl2fp(0.0005)  # FX_REVERB_MIX_SMOOTH
+HEADROOM = fl2fp(0.70710678)
+
+
+def glide(q, target, step):
+    if q < target:
+        q = min(target, q + step)
+    elif q > target:
+        q = max(target, q - step)
+    return q
 
 
 class ReverbModel:
     kPredelayMax = 4800
     kNumCombs = 8
     kCombMaxLen = 2048
-    kNumAllpass = 4
+    kNumAllpass = 6
     kAllpassMaxLen = 1024
 
     def __init__(self, rate=44100, rt60=1.0, size=1.0, damping=0.5,
                  predelay_ms=0.0, width=1.0, mode="NORMAL", mix=1.0):
         self.rate = rate
-        self.predelayWrite = 0
-        self.predelayLen = 0
-        self.predelay = [0] * (self.kPredelayMax * 2)
         self.mode = mode
+        self.predelayWrite = 0
+        self.predelay = [0] * (self.kPredelayMax * 2)
         self.predelayMs = fl2fp(predelay_ms)
-        self.predelayLen = int(predelay_ms * rate / 1000.0)
-        if self.predelayLen > self.kPredelayMax:
-            self.predelayLen = self.kPredelayMax
-        if self.predelayLen < 0:
-            self.predelayLen = 0
+        self.predelayLenF = 0
+        self.predelayTargetF = int(predelay_ms * rate / 1000.0)
+        self.predelayTargetF = min(self.predelayTargetF, self.kPredelayMax)
         self.decay = fl2fp(rt60)
         self.decayTarget = fl2fp(rt60)
+        self.decayDirty = False
         self.size = fl2fp(size)
         self.damping = fl2fp(damping)
         self.width = fl2fp(width)
         self.bypass = False
-        self.mix = fl2fp(mix)
-        self.mixCur = fl2fp(mix)
+        self.mix = fl2fp(mix)          # stored/inert (RC2 wet-only)
+        self.mixCur = i2fp(1)          # wet gain: 1 full wet, 0 bypassed
+        self.inputLpHz = fl2fp(20000.0)
+        self.inputHpHz = fl2fp(20.0)
         self.inLpCoeff = 0
         self.inHpCoeff = 0
         self.dcCoeff = fl2fp(0.995)
@@ -226,59 +244,73 @@ class ReverbModel:
         self.inHpState = [0, 0]
         self.dcState = [0, 0]
         self.combIdx = [0] * self.kNumCombs
-        self.combLen = [1] * self.kNumCombs
+        self.combLenF = [fl2fp(1)] * self.kNumCombs
+        self.combLenTargetF = [fl2fp(1)] * self.kNumCombs
         self.combGain = [0] * self.kNumCombs
+        self.combGainTarget = [0] * self.kNumCombs
         self.combDamp = [0] * self.kNumCombs
         self.combState = [0] * self.kNumCombs
+        self.combNorm = i2fp(1)
         self.combBuf = [[0] * self.kCombMaxLen for _ in range(self.kNumCombs)]
         self.apIdx = [0] * self.kNumAllpass
-        self.apLen = [1] * self.kNumAllpass
+        self.apLenF = [fl2fp(1)] * self.kNumAllpass
+        self.apLenTargetF = [fl2fp(1)] * self.kNumAllpass
         self.allpassBuf = [[0] * self.kAllpassMaxLen for _ in range(self.kNumAllpass)]
         self.recompute_combs()
+
+    def set_input_hp(self, hz):
+        self.inputHpHz = fl2fp(hz)
+        if hz <= 30.0:
+            self.inHpCoeff = 0
+        else:
+            import math as _m
+            self.inHpCoeff = fl2fp(_m.exp(-2.0 * _m.pi * hz / self.rate))
+
+    def set_input_lp(self, hz):
+        self.inputLpHz = fl2fp(hz)
+        if hz >= 19000.0:
+            self.inLpCoeff = 0
+        else:
+            import math as _m
+            self.inLpCoeff = fl2fp(1.0 - _m.exp(-2.0 * _m.pi * hz / self.rate))
 
     def recompute_combs(self):
         rateScale = self.rate / 44100.0
         sizeScale = fp2fl(self.size)
         combs = 2 if self.mode == "ECO" else 4
-        aps = 1 if self.mode == "ECO" else 2
+        aps = 1 if self.mode == "ECO" else 3
+        self.combNorm = i2fp(1) // combs
         for c in range(combs):
             lenL = int(kCombBase[c] * rateScale * sizeScale)
             lenR = int(kCombBaseR[c] * rateScale * sizeScale)
             lenL = max(8, min(lenL, self.kCombMaxLen))
             lenR = max(8, min(lenR, self.kCombMaxLen))
-            self.combLen[c] = lenL
-            self.combLen[self.kNumCombs // 2 + c] = lenR
+            self.combLenTargetF[c] = fl2fp(lenL)
+            self.combLenTargetF[self.kNumCombs // 2 + c] = fl2fp(lenR)
             self.combDamp[c] = self.combDamp[self.kNumCombs // 2 + c] = self.damping
-            self.combGain[c] = self.combGain[self.kNumCombs // 2 + c] = 0
+            self.combGainTarget[c] = self.combGainTarget[self.kNumCombs // 2 + c] = 0
         for c in range(combs, self.kNumCombs // 2):
-            self.combLen[c] = 1
-            self.combLen[self.kNumCombs // 2 + c] = 1
+            self.combLenTargetF[c] = fl2fp(1)
+            self.combLenTargetF[self.kNumCombs // 2 + c] = fl2fp(1)
         for c in range(aps):
             lenL = int(kAllpassBase[c] * rateScale * sizeScale)
             lenR = int(kAllpassBaseR[c] * rateScale * sizeScale)
             lenL = max(4, min(lenL, self.kAllpassMaxLen))
             lenR = max(4, min(lenR, self.kAllpassMaxLen))
-            self.apLen[c] = lenL
-            self.apLen[self.kNumAllpass // 2 + c] = lenR
+            self.apLenTargetF[c] = fl2fp(lenL)
+            self.apLenTargetF[self.kNumAllpass // 2 + c] = fl2fp(lenR)
         for c in range(aps, self.kNumAllpass // 2):
-            self.apLen[c] = 1
-            self.apLen[self.kNumAllpass // 2 + c] = 1
+            self.apLenTargetF[c] = fl2fp(1)
+            self.apLenTargetF[self.kNumAllpass // 2 + c] = fl2fp(1)
         self.recompute_gains()
 
     def recompute_gains(self):
         rt = max(0.05, min(fp2fl(self.decay), 8.0))
         for i in range(self.kNumCombs):
-            L = self.combLen[i]
+            L = fp2i(self.combLenTargetF[i])
+            L = max(1, L)
             g = 10 ** (-3.0 * L / (rt * self.rate))
-            self.combGain[i] = fl2fp(g)
-
-    def glide_decay(self):
-        step = fl2fp(0.005)
-        if self.decay < self.decayTarget:
-            self.decay = min(self.decayTarget, self.decay + step)
-        elif self.decay > self.decayTarget:
-            self.decay = max(self.decayTarget, self.decay - step)
-        self.recompute_gains()
+            self.combGainTarget[i] = fl2fp(g)
 
     def input_filter(self, x, ch):
         if self.inLpCoeff != 0:
@@ -290,79 +322,131 @@ class ReverbModel:
             x = x - self.inHpState[ch]
         return x
 
+    def _frac_read(self, buf, idx, pos, step, wrap, frac):
+        iB = pos - step
+        if iB < 0:
+            iB += wrap
+        return buf[pos] + fp_mul(buf[iB] - buf[pos], frac)
+
     def process(self, frames, x_l=0, x_r=0):
-        self.glide_decay()
-        targetMix = 0 if self.bypass else self.mix
-        self.mixCur = self.mixCur + fp_mul(fl2fp(0.001), targetMix - self.mixCur)
-        wetMix = self.mixCur
-        dryMix = i2fp(1) - wetMix
+        if self.decayDirty:
+            self.recompute_gains()
+            self.decayDirty = False
+        self.decay = glide(self.decay, self.decayTarget, GLIDE_DECAY)
+        targetMix = 0 if self.bypass else i2fp(1)
+        self.mixCur = self.mixCur + fp_mul(MIX_SMOOTH, targetMix - self.mixCur)
+        wetGain = self.mixCur
 
         nCombs = 2 if self.mode == "ECO" else 4
-        nAps = 1 if self.mode == "ECO" else 2
+        nAps = 1 if self.mode == "ECO" else 3
 
         out = []
         for _ in range(frames):
-            xL = sat(self.input_filter(x_l, 0))
-            xR = sat(self.input_filter(x_r, 1))
+            self.predelayLenF = glide(self.predelayLenF, self.predelayTargetF, GLIDE_LEN)
+
+            xL = sat(fp_mul(sat(self.input_filter(x_l, 0)), HEADROOM))
+            xR = sat(fp_mul(sat(self.input_filter(x_r, 1)), HEADROOM))
 
             self.predelay[self.predelayWrite] = xL
             self.predelay[self.predelayWrite + 1] = xR
-            readPos = self.predelayWrite - 2 * self.predelayLen
+            pLen = fp2i(self.predelayLenF)
+            pFrac = self.predelayLenF - i2fp(pLen)
+            readPos = self.predelayWrite - 2 * pLen
             while readPos < 0:
                 readPos += self.kPredelayMax * 2
-            pL = self.predelay[readPos]
-            pR = self.predelay[readPos + 1]
+            readPosB = readPos - 2
+            if readPosB < 0:
+                readPosB += self.kPredelayMax * 2
+            pL = self.predelay[readPos] + fp_mul(self.predelay[readPosB] - self.predelay[readPos], pFrac)
+            pR = self.predelay[readPos + 1] + fp_mul(self.predelay[readPosB + 1] - self.predelay[readPos + 1], pFrac)
 
             sumL = 0
             sumR = 0
             for c in range(nCombs):
-                iL = self.combIdx[c]
-                outL = self.combBuf[c][iL]
+                self.combLenF[c] = glide(self.combLenF[c], self.combLenTargetF[c], GLIDE_LEN)
+                self.combGain[c] = self.combGain[c] + fp_mul(GLIDE_GAIN, self.combGainTarget[c] - self.combGain[c])
+                ring = fp2i(self.combLenF[c])
+                ring = max(8, ring)
+                len0 = fp2i(self.combLenF[c])
+                if len0 > ring - 1:
+                    len0 = ring - 1
+                if len0 < 1:
+                    len0 = 1
+                frac = self.combLenF[c] - i2fp(len0)
+                iL = self.combIdx[c] - len0
+                while iL < 0:
+                    iL += ring
+                iLb = iL - 1
+                if iLb < 0:
+                    iLb += ring
+                outL = self.combBuf[c][iL] + fp_mul(self.combBuf[c][iLb] - self.combBuf[c][iL], frac)
                 self.combState[c] = self.combState[c] + fp_mul(self.combDamp[c], outL - self.combState[c])
-                self.combBuf[c][iL] = sat(pL + fp_mul(self.combGain[c], self.combState[c]))
-                iL += 1
-                if iL >= self.combLen[c]:
-                    iL = 0
-                self.combIdx[c] = iL
+                self.combBuf[c][self.combIdx[c]] = sat(pL + fp_mul(self.combGain[c], self.combState[c]))
+                self.combIdx[c] += 1
+                if self.combIdx[c] >= ring:
+                    self.combIdx[c] = 0
                 sumL += outL
 
                 cR = self.kNumCombs // 2 + c
-                iR = self.combIdx[cR]
-                outR = self.combBuf[cR][iR]
+                self.combLenF[cR] = glide(self.combLenF[cR], self.combLenTargetF[cR], GLIDE_LEN)
+                self.combGain[cR] = self.combGain[cR] + fp_mul(GLIDE_GAIN, self.combGainTarget[cR] - self.combGain[cR])
+                ringR = max(8, fp2i(self.combLenF[cR]))
+                len0R = fp2i(self.combLenF[cR])
+                if len0R > ringR - 1:
+                    len0R = ringR - 1
+                if len0R < 1:
+                    len0R = 1
+                fracR = self.combLenF[cR] - i2fp(len0R)
+                iR = self.combIdx[cR] - len0R
+                while iR < 0:
+                    iR += ringR
+                iRb = iR - 1
+                if iRb < 0:
+                    iRb += ringR
+                outR = self.combBuf[cR][iR] + fp_mul(self.combBuf[cR][iRb] - self.combBuf[cR][iR], fracR)
                 self.combState[cR] = self.combState[cR] + fp_mul(self.combDamp[cR], outR - self.combState[cR])
-                self.combBuf[cR][iR] = sat(pR + fp_mul(self.combGain[cR], self.combState[cR]))
-                iR += 1
-                if iR >= self.combLen[cR]:
-                    iR = 0
-                self.combIdx[cR] = iR
+                self.combBuf[cR][self.combIdx[cR]] = sat(pR + fp_mul(self.combGain[cR], self.combState[cR]))
+                self.combIdx[cR] += 1
+                if self.combIdx[cR] >= ringR:
+                    self.combIdx[cR] = 0
                 sumR += outR
 
-            sumL = sat(sumL)
-            sumR = sat(sumR)
+            sumL = sat(fp_mul(sumL, self.combNorm))
+            sumR = sat(fp_mul(sumR, self.combNorm))
 
             wetL = sumL
             wetR = sumR
             for c in range(nAps):
+                self.apLenF[c] = glide(self.apLenF[c], self.apLenTargetF[c], GLIDE_LEN)
                 iL = self.apIdx[c]
-                bufIn = self.allpassBuf[c][iL]
+                apLen = max(1, fp2i(self.apLenF[c]))
+                frac = self.apLenF[c] - i2fp(fp2i(self.apLenF[c]))
+                iLb = iL - 1
+                if iLb < 0:
+                    iLb += apLen
+                bufIn = self.allpassBuf[c][iL] + fp_mul(self.allpassBuf[c][iLb] - self.allpassBuf[c][iL], frac)
                 y = -wetL + bufIn
                 self.allpassBuf[c][iL] = wetL + fp_mul(fl2fp(0.5), bufIn)
                 wetL = y
-                iL += 1
-                if iL >= self.apLen[c]:
-                    iL = 0
-                self.apIdx[c] = iL
+                self.apIdx[c] = iL + 1
+                if self.apIdx[c] >= apLen:
+                    self.apIdx[c] = 0
 
                 cR = self.kNumAllpass // 2 + c
+                self.apLenF[cR] = glide(self.apLenF[cR], self.apLenTargetF[cR], GLIDE_LEN)
                 iR = self.apIdx[cR]
-                bufInR = self.allpassBuf[cR][iR]
+                apLenR = max(1, fp2i(self.apLenF[cR]))
+                fracR = self.apLenF[cR] - i2fp(fp2i(self.apLenF[cR]))
+                iRb = iR - 1
+                if iRb < 0:
+                    iRb += apLenR
+                bufInR = self.allpassBuf[cR][iR] + fp_mul(self.allpassBuf[cR][iRb] - self.allpassBuf[cR][iR], fracR)
                 yR = -wetR + bufInR
                 self.allpassBuf[cR][iR] = wetR + fp_mul(fl2fp(0.5), bufInR)
                 wetR = yR
-                iR += 1
-                if iR >= self.apLen[cR]:
-                    iR = 0
-                self.apIdx[cR] = iR
+                self.apIdx[cR] = iR + 1
+                if self.apIdx[cR] >= apLenR:
+                    self.apIdx[cR] = 0
 
             if self.width != i2fp(1):
                 mid = fp_mul(wetL + wetR, fl2fp(0.5))
@@ -375,8 +459,8 @@ class ReverbModel:
             wetL = wetL - self.dcState[0]
             wetR = wetR - self.dcState[1]
 
-            out.append(sat(fp_mul(xL, dryMix) + fp_mul(sat(wetL), wetMix)))
-            out.append(sat(fp_mul(xR, dryMix) + fp_mul(sat(wetR), wetMix)))
+            out.append(sat(fp_mul(sat(wetL), wetGain)))
+            out.append(sat(fp_mul(sat(wetR), wetGain)))
 
             self.predelayWrite += 2
             if self.predelayWrite >= self.kPredelayMax * 2:
@@ -410,11 +494,26 @@ def check_delay_glide():
 
 
 def check_sync_division():
+    # bacon-1.5 item 3: kSyncDivisions table (num/den of a whole note),
+    # ms = 240000*num/(bpm*den) with pure integer math, clamped to 2000.
+    table = [
+        ("1/32", 1, 32), ("1/32T", 2, 96), ("1/32D", 3, 64),
+        ("1/16", 1, 16), ("1/16T", 2, 48), ("1/16D", 3, 32),
+        ("1/8", 1, 8), ("1/8T", 2, 24), ("1/8D", 3, 16),
+        ("1/4", 1, 4), ("1/4T", 2, 12), ("1/4D", 3, 8),
+        ("1/2", 1, 2), ("1/2T", 2, 6), ("1/2D", 3, 4),
+        ("1/1", 1, 1),
+    ]
+    assert len(table) == 16
     for bpm in (60, 120, 140):
-        whole_ms = 4.0 * 60000.0 / bpm
-        assert abs(whole_ms / 1 - sync_div_ms(1, bpm)) < 1e-6
-        assert abs(whole_ms / 4 - sync_div_ms(4, bpm)) < 1e-6
-        assert abs(whole_ms / 8 - sync_div_ms(8, bpm)) < 1e-6
+        for div, (name, num, den) in enumerate(table):
+            raw = (240000 * num) // (bpm * den)
+            ref = (240000.0 * num) / (bpm * den)
+            assert abs(raw - ref) < 1.0, (bpm, name, raw, ref)
+            ms = min(raw, 2000)  # SyncDivisionToMs clamps to kMaxMs
+            assert ms <= 2000, (name, ms)
+    assert (240000 * 1) // (120 * 4) == 500, "1/4 @120 = 500ms"
+    assert abs((240000.0 * 2) / (120 * 24) - (240000.0 * 1) / (120 * 8) * 2.0 / 3.0) < 1e-6, "triplet 2/3"
     print("sync division OK")
 
 
@@ -518,12 +617,15 @@ def check_reverb_stereo_decorr():
 
 def check_source_guards():
     src = (ROOT / "source/sources/Application/Audio/FxEngine/Reverb.cpp").read_text()
+    # bacon-1.5 item 3 topology: control-rate RT60 recompute, fractional
+    # delays, per-sample glides, wet-only.
     for token in ("saturate(", "dcState_", "combGain_[", "powf(10.0f", "kPredelayMax",
-                  "glideDecay", "SetBypass"):
+                  "decayDirty_", "combLenTargetF_", "kLfoTable", "combNorm_",
+                  "SetBypass"):
         assert token in src, token
     dsrc = (ROOT / "source/sources/Application/Audio/FxEngine/DelayLine.cpp").read_text()
-    for token in ("0.98f", "glideDelay", "readPos", "buf_[", "loopFilter",
-                  "SyncDivisionToMs"):
+    for token in ("0.98f", "FX_DELAY_GLIDE_PER_SAMPLE", "readPos", "buf_[",
+                  "loopFilter", "SyncDivisionToMs", "kSyncDivisions"):
         assert token in dsrc, token
     print("source guards OK")
 

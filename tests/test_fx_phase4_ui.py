@@ -214,17 +214,48 @@ FX_PARAMS = [
     (33, "COMP", "CMP MKU", 0.0, 24.0),
     (34, "COMP", "CMP LNK", 0.0, 1.0),
     (35, "COMP", "CMP SCL", 0.0, 1.0),
+    # EQ EXT (FXP_MASTER_EQ8, bacon-1.5 item 2: 5 bands + bypass, ids 36..56)
+    (36, "EQ_EXT", "EQX BYP", 0.0, 1.0),
+    (37, "EQ_EXT", "B3 FRQ", 20.0, 20000.0),
+    (38, "EQ_EXT", "B3 GAI", -24.0, 24.0),
+    (39, "EQ_EXT", "B3 Q", 0.1, 10.0),
+    (40, "EQ_EXT", "B3 TYP", 0.0, 6.0),
+    (41, "EQ_EXT", "B4 FRQ", 20.0, 20000.0),
+    (42, "EQ_EXT", "B4 GAI", -24.0, 24.0),
+    (43, "EQ_EXT", "B4 Q", 0.1, 10.0),
+    (44, "EQ_EXT", "B4 TYP", 0.0, 6.0),
+    (45, "EQ_EXT", "B5 FRQ", 20.0, 20000.0),
+    (46, "EQ_EXT", "B5 GAI", -24.0, 24.0),
+    (47, "EQ_EXT", "B5 Q", 0.1, 10.0),
+    (48, "EQ_EXT", "B5 TYP", 0.0, 6.0),
+    (49, "EQ_EXT", "B6 FRQ", 20.0, 20000.0),
+    (50, "EQ_EXT", "B6 GAI", -24.0, 24.0),
+    (51, "EQ_EXT", "B6 Q", 0.1, 10.0),
+    (52, "EQ_EXT", "B6 TYP", 0.0, 6.0),
+    (53, "EQ_EXT", "B7 FRQ", 20.0, 20000.0),
+    (54, "EQ_EXT", "B7 GAI", -24.0, 24.0),
+    (55, "EQ_EXT", "B7 Q", 0.1, 10.0),
+    (56, "EQ_EXT", "B7 TYP", 0.0, 6.0),
+    # bacon-1.5 item 3 (ids 57..62): DELAY FREE/SYNC + division + LOW/HIGH
+    # CUT, REVERB input HP/LP (appended, bit-identical persistence).
+    (57, "DELAY", "DLY SYN", 0.0, 1.0),
+    (58, "DELAY", "DLY DIV", 0.0, 15.0),
+    (59, "DELAY", "DLY LOW", 20.0, 20000.0),
+    (60, "DELAY", "DLY HIG", 20.0, 20000.0),
+    (61, "REVERB", "RVB HP", 20.0, 20000.0),
+    (62, "REVERB", "RVB LP", 20.0, 20000.0),
 ]
 
 
 def check_param_table_consistency():
     ids = [p[0] for p in FX_PARAMS]
-    assert ids == list(range(36)), "param ids must be contiguous 0..35"
-    assert len(set(ids)) == 36
+    assert ids == list(range(63)), "param ids must be contiguous 0..62"
+    assert len(set(ids)) == 63
     counts = {}
     for _, page, _, _, _ in FX_PARAMS:
         counts[page] = counts.get(page, 0) + 1
-    assert counts == {"DELAY": 7, "REVERB": 7, "EQ": 13, "COMP": 9}, counts
+    assert counts == {"DELAY": 11, "REVERB": 9, "EQ": 13, "EQ_EXT": 21,
+                      "COMP": 9}, counts
     for _, page, label, lo, hi in FX_PARAMS:
         assert lo <= hi, (label, lo, hi)
     print("param table consistency OK")

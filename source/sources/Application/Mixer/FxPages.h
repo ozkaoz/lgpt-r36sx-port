@@ -121,6 +121,23 @@ enum FxParamId {
     FX_P_EQX_B7_GAI,
     FX_P_EQX_B7_Q,
     FX_P_EQX_B7_TYP,
+    // bacon-1.5 item 3: DELAY FREE/SYNC + musical division + LOW CUT / HIGH
+    // CUT, and REVERB input HP/LP.  Appended AFTER the golden ids so every
+    // existing FX_P_* value is unchanged (bit-identical persistence).
+    FX_P_DLY_SYNC,   // 0=FREE 1=SYNC
+    FX_P_DLY_DIV,    // SyncDivision 0..15 (discrete, steps 1)
+    FX_P_DLY_LOW,    // LOW CUT frequency (Hz)
+    FX_P_DLY_HIG,    // HIGH CUT frequency (Hz)
+    FX_P_RVB_HP,     // reverb input HP frequency (Hz)
+    FX_P_RVB_LP,     // reverb input LP frequency (Hz)
+    // bacon-1.5 item 4: Compressor V2 sidechain + dry/wet mix.  Appended
+    // AFTER the golden ids so every existing FX_P_* value is unchanged
+    // (bit-identical persistence).  CMP rows must stay contiguous from
+    // FX_P_CMP_BYP for the COMP menu loop (MixerView line ~1666).
+    FX_P_CMP_MIX,    // dry/wet 0..1
+    FX_P_CMP_SCSRC,  // sidechain source: 0=OFF 1..8=TRACK n 9=DLY 10=RVB
+    FX_P_CMP_SCFLT,  // sidechain HPF Hz (<=30 = open)
+    FX_P_CMP_SCAMT,  // sidechain amount 0..1
     FX_PARAM_COUNT
 };
 
@@ -215,6 +232,21 @@ static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
     { "B7 GAI",  FX_PAGE_EQ_EXT,  -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQX_B7_GAI
     { "B7 Q",    FX_PAGE_EQ_EXT,    0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQX_B7_Q
     { "B7 TYP",  FX_PAGE_EQ_EXT,    0.0f,   6.0f,    1.0f,   "%5.0f" },  // FX_P_EQX_B7_TYP
+    // bacon-1.5 item 3 (appended after the golden rows, bit-identical
+    // persistence): DELAY FREE/SYNC, musical division, LOW CUT / HIGH CUT
+    // and REVERB input HP/LP.
+    { "DLY SYN", FX_PAGE_DELAY,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_DLY_SYNC (FREE/SYNC)
+    { "DLY DIV", FX_PAGE_DELAY,    0.0f,  15.0f,    3.0f,   "%5.0f" },  // FX_P_DLY_DIV (SyncDivision, 1/16 def)
+    { "DLY LOW", FX_PAGE_DELAY,   20.0f,20000.0f,   20.0f,  "%5.0f" },  // FX_P_DLY_LOW (LOW CUT Hz)
+    { "DLY HIG", FX_PAGE_DELAY,   20.0f,20000.0f,20000.0f, "%5.0f" },  // FX_P_DLY_HIG (HIGH CUT Hz)
+    { "RVB HP ", FX_PAGE_REVERB,  20.0f,20000.0f,   20.0f,  "%5.0f" },  // FX_P_RVB_HP (input HP Hz)
+    { "RVB LP ", FX_PAGE_REVERB,  20.0f,20000.0f,20000.0f, "%5.0f" },  // FX_P_RVB_LP (input LP Hz)
+    // bacon-1.5 item 4: Compressor V2 sidechain + dry/wet mix.  Appended
+    // AFTER the golden rows (bit-identical persistence).
+    { "CMP MIX", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_CMP_MIX (dry/wet)
+    { "SC SRC",  FX_PAGE_COMP,     0.0f,  10.0f,    0.0f,   "%5.0f" },  // FX_P_CMP_SCSRC (0=OFF 1..8=TRK 9=DLY 10=RVB)
+    { "SC FLT",  FX_PAGE_COMP,    20.0f,20000.0f,   30.0f,  "%5.0f" },  // FX_P_CMP_SCFLT (SC HPF Hz)
+    { "SC AMT",  FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.2f" },  // FX_P_CMP_SCAMT (sidechain amount)
 } ;
 
 // FXP_DESCRIPTORS_V1 (bacon-1.5, item 1): metadatos de la capa comun de
@@ -292,6 +324,19 @@ static const FxParamMeta kFxParamMeta_[FX_PARAM_COUNT] = {
     { FX_PARAM_SIGNED,     FX_CURVE_LINEAR, "dB" },  // B7 GAI
     { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Q"  },  // B7 Q
     { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // B7 TYP
+    // bacon-1.5 item 3: DELAY FREE/SYNC + division (discrete), LOW/HIGH CUT
+    // and REVERB input HP/LP (frequencies on the musical log curve).
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // DLY SYN
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // DLY DIV (discrete 0..15)
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // DLY LOW
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // DLY HIG
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // RVB HP
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // RVB LP
+    // bacon-1.5 item 4: Compressor V2 sidechain + dry/wet mix.
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, ""   },  // CMP MIX (0..1)
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // CMP SCSRC (discrete 0..10)
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // CMP SCFLT (SC HPF)
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, ""   },  // CMP SCAMT (0..1)
 } ;
 
 // Descriptor completo (range natural de kFxParams_ + meta de la capa
@@ -336,14 +381,15 @@ inline bool fxIsDiscreteParam(int id) {
 	case FX_P_EQX_B5_TYP:
 	case FX_P_EQX_B6_TYP:
 	case FX_P_EQX_B7_TYP:
+	case FX_P_DLY_DIV: // bacon-1.5 item 3: musical division (steps of 1)
 		return true ;
 	default:
 		return false ;
 	}
 }
-
 // TREEFROG_MIXER_VU_DB_SCALE_V5 (Bacon 1.1.1):
-// DAW/VU-style rebased scale.  The displayed 0 dB row corresponds to the
+// DAW/VU-style rebased scale.
+// The displayed 0 dB row corresponds to the
 // typical loud output at volume 100 (measured ~-12 dBFS real peaks for loud
 // material on the normalized 0..1 peaks), so at volume 100 the bar genuinely
 // reaches the 0 dB row and strong material pushes into the red +3 dB zone
@@ -458,6 +504,10 @@ inline bool fxUsesCurve(int id) {
 	case FX_P_CMP_ATK:
 	case FX_P_CMP_REL:
 	case FX_P_CMP_RAT:
+	case FX_P_DLY_LOW: // bacon-1.5 item 3: LOW CUT (log2)
+	case FX_P_DLY_HIG: // bacon-1.5 item 3: HIGH CUT (log2)
+	case FX_P_RVB_HP:  // bacon-1.5 item 3: reverb input HP (log2)
+	case FX_P_RVB_LP:  // bacon-1.5 item 3: reverb input LP (log2)
 		return true ;
 	default:
 		return false ;

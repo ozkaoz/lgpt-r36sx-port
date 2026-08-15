@@ -59,20 +59,24 @@ int main() {
     nav.CyclePage() ;
     check(nav.Page() == FX_PAGE_MIX, "CyclePage COMP->MIX") ;
 
-    // 4. MoveRow wrap golden por pagina (DELAY 7, REVERB 7, EQ 13, COMP 9).
+    // 4. MoveRow wrap golden por pagina (DELAY 11, REVERB 9, EQ 13, COMP 9,
+    // EQ_EXT 21 -- bacon-1.5 item 3).
     nav.SetPage(FX_PAGE_DELAY) ;
     nav.MoveRow(-1) ;
-    check(nav.Row() == 6, "MoveRow wrap up DELAY") ;
+    check(nav.Row() == 10, "MoveRow wrap up DELAY 11 rows") ;
     nav.MoveRow(1) ;
     check(nav.Row() == 0, "MoveRow wrap down DELAY") ;
     nav.MoveRow(1) ;
     check(nav.Row() == 1, "MoveRow forward") ;
+    nav.SetPage(FX_PAGE_REVERB) ;
+    nav.MoveRow(-1) ;
+    check(nav.Row() == 8, "MoveRow wrap up REVERB 9 rows") ;
     nav.SetPage(FX_PAGE_EQ) ;
     nav.MoveRow(-1) ;
     check(nav.Row() == 12, "MoveRow wrap up EQ 13 rows") ;
     nav.SetPage(FX_PAGE_COMP) ;
     nav.MoveRow(-1) ;
-    check(nav.Row() == 8, "MoveRow wrap up COMP 9 rows") ;
+    check(nav.Row() == 12, "MoveRow wrap up COMP 13 rows") ;
     nav.SetPage(FX_PAGE_EQ_EXT) ;
     nav.MoveRow(-1) ;
     check(nav.Row() == 20, "MoveRow wrap up EQ_EXT 21 rows") ;
@@ -85,8 +89,16 @@ int main() {
     check(nav.IdForRow() == FX_P_DLY_BYP, "DELAY row0 = bypass") ;
     nav.MoveRow(1) ;
     check(nav.IdForRow() == FX_P_DLY_TIME, "DELAY row1 = DLY TIME") ;
+    nav.MoveRow(6) ;
+    check(nav.IdForRow() == FX_P_DLY_SYNC, "DELAY row7 = DLY SYN (bacon-1.5 item 3)") ;
+    nav.MoveRow(3) ;
+    check(nav.IdForRow() == FX_P_DLY_HIG, "DELAY row10 = DLY HIG") ;
     nav.SetPage(FX_PAGE_REVERB) ;
     check(nav.IdForRow() == FX_P_RVB_BYP, "REVERB row0 = bypass") ;
+    nav.MoveRow(7) ;
+    check(nav.IdForRow() == FX_P_RVB_HP, "REVERB row7 = RVB HP (bacon-1.5 item 3)") ;
+    nav.MoveRow(1) ;
+    check(nav.IdForRow() == FX_P_RVB_LP, "REVERB row8 = RVB LP") ;
     nav.SetPage(FX_PAGE_EQ) ;
     check(nav.IdForRow() == FX_P_EQ_BYP, "EQ row0 = bypass") ;
     nav.MoveRow(1) ;
@@ -161,6 +173,18 @@ int main() {
     check(feq(FxNavigator::ResetValue(FX_P_EQ_MID_FRQ), 1000.0f),
           "reset EQ MID FRQ") ;
     check(feq(FxNavigator::ResetValue(FX_P_RVB_BYP), 0.0f), "reset RVB BYP") ;
+    check(feq(FxNavigator::ResetValue(FX_P_DLY_SYNC), 0.0f),
+          "reset DLY SYN -> FREE") ;
+    check(feq(FxNavigator::ResetValue(FX_P_DLY_DIV), 3.0f),
+          "reset DLY DIV -> 1/16 (bacon-1.5 item 3)") ;
+    check(feq(FxNavigator::ResetValue(FX_P_DLY_LOW), 20.0f),
+          "reset DLY LOW -> open") ;
+    check(feq(FxNavigator::ResetValue(FX_P_DLY_HIG), 20000.0f),
+          "reset DLY HIG -> open") ;
+    check(feq(FxNavigator::ResetValue(FX_P_RVB_HP), 20.0f),
+          "reset RVB HP -> open") ;
+    check(feq(FxNavigator::ResetValue(FX_P_RVB_LP), 20000.0f),
+          "reset RVB LP -> open") ;
 
     if (g_failures == 0) {
         printf("ALL OK (%d checks)\n", g_checks) ;
