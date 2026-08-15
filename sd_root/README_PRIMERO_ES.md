@@ -6,10 +6,12 @@ Sampler SP404MKII, frontend-safe y sin escrituras a la SD en runtime).
 
 ## Estado actual (items 6-8, 15/08/2026)
 
-`PENDIENTE BUILD DEL CORE`: el core `cubegm/cores/lgpt_r36sx_port_libretro.so`
-que hay en este paquete sigue siendo el de Bacon 1.4 (U2.54, `e4fbbdc8`) y **NO
-incluye los items 6-8**. Para probarlos hay que compilar el core nuevo y
-reemplazar el `.so` (ver `## Build del core (items 6-8)`).
+Core **compilado e instalado** en esta SD (`cubegm/cores/lgpt_r36sx_port_libretro.so`,
+SHA256 `2288cb5c3a6eb8644402a49618edfe710f8f2ab823aa0f762f8b7c29e3981eb4`).
+Build device: `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`, `BUILD_U2523_OK`; regresión
+host `AUDIT_CLEAN_MAIN_U2523_OK`. Daemons y módulo UAC2 sin cambios (baseline
+Bacon 1.4, hashes `f7140072`/`968dfa61`/`3f0ea7a2`/`e9062ac5`). Commits:
+`a0da94f` (item 7), `ee62202` (item 8), `c59ebc6` (fix DIAGNOSTIC_GATE).
 
 ## Qué incluye esta release (items 6-8)
 

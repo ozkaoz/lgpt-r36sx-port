@@ -1,1 +1,1 @@
-BACON_1.5_ITEMS_6_8_DEV (core pendiente de build, ver README_PRIMERO_ES.md)
+BACON_1.5_ITEMS_6_8 (core 2288cb5c instalado, ver README_PRIMERO_ES.md)
