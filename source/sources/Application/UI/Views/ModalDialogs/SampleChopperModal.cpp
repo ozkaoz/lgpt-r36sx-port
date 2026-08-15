@@ -2754,8 +2754,8 @@ void SampleChopperModal::publishOverlayState() {
                                            pitchEnvTool_.Params().scope,
                                            sampleIndex_);
         }
-        snprintf(g_chopperPitchHints[0], sizeof(g_chopperPitchHints[0]), "%s", "UP/DN Item | L/R Value | B Preview");
-        snprintf(g_chopperPitchHints[1], sizeof(g_chopperPitchHints[1]), "%s", "A Apply | L1+R1 Exit | R2+LR Target");
+        snprintf(g_chopperPitchHints[0], sizeof(g_chopperPitchHints[0]), "%s", ChopperView::PitchHint(0));
+        snprintf(g_chopperPitchHints[1], sizeof(g_chopperPitchHints[1]), "%s", ChopperView::PitchHint(1));
         snprintf(g_chopperPitchStatus, sizeof(g_chopperPitchStatus), "%s", statusMessage_[0] ? statusMessage_ : "");
     }
 #endif

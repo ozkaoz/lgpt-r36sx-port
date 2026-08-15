@@ -1340,6 +1340,17 @@ void MixerView::drawMasterFxRow(const char *label,const char *value,
 	SetColor(CD_NORMAL) ;
 }
 
+// FXP_DESCRIPTORS_V1 (bacon-1.5, item 1): vista comun 0..100 % de una fila
+// master.  Los continuos muestran el percent (primario) mas el valor
+// natural (secundario); los signed con signo explicito; los switches se
+// renderizan aparte (ON/OFF).
+static void fxPctBuffer(char *out,int id,float v) {
+	FxParamDescriptor d=fxDescForId(id) ;
+	int p=fxDspToPercentId(id,v) ;
+	if (d.kind_==FX_PARAM_SIGNED) sprintf(out,"%+3d%%",p) ;
+	else sprintf(out,"%3d%%",p) ;
+}
+
 void MixerView::drawDelayPage(const char *title) {
 	char buffer[16] ;
 	static const char *labels[7]={"BYPASS","TIME","FEEDBACK","MIX",
@@ -1347,9 +1358,9 @@ void MixerView::drawDelayPage(const char *title) {
 	static const int ids[7]={FX_P_DLY_BYP,FX_P_DLY_TIME,FX_P_DLY_FBK,
 	                         FX_P_DLY_MIX,FX_P_DLY_WID,FX_P_DLY_PP,
 	                         FX_P_DLY_SAT} ;
-	// RC5: the whole 7-row block is centered in the safe menu band 3..25
-	// (label column 9 = "PING/PONG", value column 8, two-cell spacing).
-	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,9,8,2) ;
+	// FXP_DESCRIPTORS_V1: value column widened to 12 to carry the percent
+	// (primary) plus the natural value (secondary) on the same row.
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,9,12,2) ;
 	// RC6: the page title sits on the row just above the centered block.
 	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
 	for (int p=0;p<7;p++) {
@@ -1361,11 +1372,13 @@ void MixerView::drawDelayPage(const char *title) {
 			UiDraw::DrawBypassRow(*this,ml.labelX,ml.valueX,y,v>=0.5f,selected) ;
 			continue ;
 		}
+		char pct[8] ;
+		fxPctBuffer(pct,id,v) ;
 		switch(id) {
-		case FX_P_DLY_TIME: sprintf(buffer,"%4.0f ms",v) ; break ;
+		case FX_P_DLY_TIME: sprintf(buffer,"%s %4.0f ms",pct,v) ; break ;
 		case FX_P_DLY_PP:
 		case FX_P_DLY_SAT:  sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ; break ;
-		default:            sprintf(buffer,"%.2f",v) ; break ;  // FBK/MIX/WID
+		default:            sprintf(buffer,"%s %.2f",pct,v) ; break ;  // FBK/MIX/WID
 		}
 		drawMasterFxRow(labels[p],buffer,selected,ml.labelX,y,ml.valueX) ;
 	}
@@ -1378,9 +1391,8 @@ void MixerView::drawReverbPage(const char *title) {
 	static const int ids[7]={FX_P_RVB_BYP,FX_P_RVB_PRE,FX_P_RVB_DEC,
 	                         FX_P_RVB_SIZ,FX_P_RVB_DMP,FX_P_RVB_WID,
 	                         FX_P_RVB_MODE} ;
-	// RC5: centered 7-row block in the safe menu band 3..25 (label column
-	// 8 = "PREDELAY", value column 8, two-cell spacing).
-	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,8,8,2) ;
+	// FXP_DESCRIPTORS_V1: value column widened to 12 (percent + natural).
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(7,8,12,2) ;
 	// RC6: the page title sits on the row just above the centered block.
 	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
 	for (int p=0;p<7;p++) {
@@ -1392,11 +1404,13 @@ void MixerView::drawReverbPage(const char *title) {
 			UiDraw::DrawBypassRow(*this,ml.labelX,ml.valueX,y,v>=0.5f,selected) ;
 			continue ;
 		}
+		char pct[8] ;
+		fxPctBuffer(pct,id,v) ;
 		switch(id) {
-		case FX_P_RVB_PRE:  sprintf(buffer,"%4.0f ms",v) ; break ;
-		case FX_P_RVB_DEC:  sprintf(buffer,"%.2f s",v) ; break ;
+		case FX_P_RVB_PRE:  sprintf(buffer,"%s %4.0f ms",pct,v) ; break ;
+		case FX_P_RVB_DEC:  sprintf(buffer,"%s %.2f s",pct,v) ; break ;
 		case FX_P_RVB_MODE: sprintf(buffer,"%s",v>=0.5f?"NORMAL":"ECO") ; break ;
-		default:            sprintf(buffer,"%.2f",v) ; break ;  // SIZ/DMP/WID
+		default:            sprintf(buffer,"%s %.2f",pct,v) ; break ;  // SIZ/DMP/WID
 		}
 		drawMasterFxRow(labels[p],buffer,selected,ml.labelX,y,ml.valueX) ;
 	}
@@ -1437,12 +1451,16 @@ void MixerView::drawEqRow(int id,int labelX,int valueX,int y) {
 	props.invert_=selected ;
 	if (id==FX_P_EQ_LOW_EN||id==FX_P_EQ_MID_EN||id==FX_P_EQ_HI_EN) {
 		sprintf(buffer,"[ %s ]",on?"ON":"OFF") ;
-	} else if (fxUsesCurve(id)) {
-		sprintf(buffer,"%6.0f Hz",fxGet(id)) ;
-	} else if (id==FX_P_EQ_LOW_GAI||id==FX_P_EQ_MID_GAI||id==FX_P_EQ_HI_GAI) {
-		sprintf(buffer,"%+5.1f dB",fxGet(id)) ;
 	} else {
-		sprintf(buffer,"%5.2f",fxGet(id)) ;
+		char pct[8] ;
+		fxPctBuffer(pct,id,fxGet(id)) ;
+		if (fxUsesCurve(id)) {
+			sprintf(buffer,"%s %6.0f Hz",pct,fxGet(id)) ;
+		} else if (id==FX_P_EQ_LOW_GAI||id==FX_P_EQ_MID_GAI||id==FX_P_EQ_HI_GAI) {
+			sprintf(buffer,"%s %+5.1f dB",pct,fxGet(id)) ;
+		} else {
+			sprintf(buffer,"%s %5.2f",pct,fxGet(id)) ;
+		}
 	}
 	DrawString(labelX,y,eqParamLabel(id),props) ;
 	DrawString(valueX,y,buffer,props) ;
@@ -1457,7 +1475,7 @@ void MixerView::drawEqPage(const char *title) {
 	// RC5 centers the whole 16-row block in the safe menu band 3..25 (label
 	// column 6, value column 9, two-cell spacing) so the full EQ stays on
 	// screen and balanced.
-	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(16,6,9,2) ;
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(16,6,13,2) ;
 	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
 	GUITextProperties props ;
 	drawEqRow(FX_P_EQ_BYP,ml.labelX,ml.valueX,ml.startY) ;
@@ -1482,10 +1500,11 @@ void MixerView::drawEqPage(const char *title) {
 // audio clip reading (GetRtViolations is buffer RT telemetry, must stay 0).
 void MixerView::drawCompPage(const char *title) {
 	// RC5: the whole 9-row block is centered in the safe menu band 3..25
-	// (label column 11 = "Stereo Link", value column 8, three-cell spacing so
-	// the 14-cell "Gain Reduction" line below fits beside its value); the GR
-	// meter stays visible one row below the last parameter.
-	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(9,11,8,3) ;
+	// (label column 11 = "Stereo Link", value column 13 = percent + natural,
+	// three-cell spacing so the 14-cell "Gain Reduction" line below fits
+	// beside its value); the GR meter stays visible one row below the last
+	// parameter.
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(9,11,13,3) ;
 	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
 	GUITextProperties props ;
 	char buffer[20] ;
@@ -1510,12 +1529,14 @@ void MixerView::drawCompPage(const char *title) {
 		if (spec.vmax-spec.vmin<=1.5f) {
 			sprintf(buffer,"%s",v>=0.5f?"ON":"OFF") ;
 		} else {
+			char pct[8] ;
+			fxPctBuffer(pct,id,v) ;
 			switch (id) {
-			case FX_P_CMP_RAT: sprintf(buffer,"%3.1f:1",v) ; break ;
-			case FX_P_CMP_KNE: sprintf(buffer,"%5.1f dB",v) ; break ;
-			case FX_P_CMP_ATK: sprintf(buffer,"%5.1f ms",v) ; break ;
-			case FX_P_CMP_REL: sprintf(buffer,"%5.1f ms",v) ; break ;
-			default:           sprintf(buffer,"%+5.1f dB",v) ; break ;  // THR, MKU
+			case FX_P_CMP_RAT: sprintf(buffer,"%s %3.1f:1",pct,v) ; break ;
+			case FX_P_CMP_KNE: sprintf(buffer,"%s %5.1f dB",pct,v) ; break ;
+			case FX_P_CMP_ATK: sprintf(buffer,"%s %5.1f ms",pct,v) ; break ;
+			case FX_P_CMP_REL: sprintf(buffer,"%s %5.1f ms",pct,v) ; break ;
+			default:           sprintf(buffer,"%s %+5.1f dB",pct,v) ; break ;  // THR, MKU
 			}
 		}
 		DrawString(ml.labelX,y,labels[p],props) ;

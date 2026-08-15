@@ -102,8 +102,8 @@ assert "g_chopperPitchSelected = pitchEnvTool_.EditParam();" in pub
 assert "ChopperView::ComposeHeaderLine(g_chopperPitchHeader, sizeof(g_chopperPitchHeader)," in pub
 assert "ChopperView::PitchLabel(i)" in pub
 assert "ChopperView::ComposePitchValue(g_chopperPitchValues[i], sizeof(g_chopperPitchValues[i]), i," in pub
-assert 'snprintf(g_chopperPitchHints[0], sizeof(g_chopperPitchHints[0]), "%s", "UP/DN Item | L/R Value | B Preview");' in pub, "hint 1 publicado"
-assert 'snprintf(g_chopperPitchHints[1], sizeof(g_chopperPitchHints[1]), "%s", "A Apply | L1+R1 Exit | R2+LR Target");' in pub, "hint 2 publicado"
+assert 'snprintf(g_chopperPitchHints[0], sizeof(g_chopperPitchHints[0]), "%s", ChopperView::PitchHint(0));' in pub, "hint 1 publicado"
+assert 'snprintf(g_chopperPitchHints[1], sizeof(g_chopperPitchHints[1]), "%s", ChopperView::PitchHint(1));' in pub, "hint 2 publicado"
 assert 'snprintf(g_chopperPitchStatus, sizeof(g_chopperPitchStatus), "%s", statusMessage_[0] ? statusMessage_ : "");' in pub, "status publicado"
 clr = chopper[chopper.index("void SampleChopperModal::clearOverlayState()"):]
 clr = clr[:clr.index("void SampleChopperModal::setPreviewPlaybackRange")]

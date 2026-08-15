@@ -24,7 +24,7 @@ AUDIT = ROOT / "scripts/audit.sh"
 BUILD = Path("/mnt/d/R36S/PORT LPTRACKER/BUILD/U2523")
 
 GOLDENS = {
-    "lgpt_r36sx_u2523.so": "e4fbbdc82a487484cf6d9e3844427893b113e7dcbbdc3bb2edfccf4effd7e61d",
+    "lgpt_r36sx_u2523.so": "ac211f116b883ea48d3df5dd672469f45d59748ba6104d51bdc6d81e6a502290",
     "r36s_u2523_usb_audio_io": "f7140072f9b83573e03caf904d17de6227374823c3719757c7d11a438bb1417d",
     "r36s_sp404_host_audio_io": "968dfa61e561d348fd4ec8006e39b23b4dd56a49f1912f885c2731f118983b83",
     "r36s_midi_host_io": "3f0ea7a23db7390f1fb3b73cbda97f66316c6568d0c7574b838579a014baee80",

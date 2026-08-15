@@ -107,15 +107,20 @@ def check_master_page_formats():
                MV_CPP.index("void MixerView::drawReverbPage")]
     rv = MV_CPP[MV_CPP.index("void MixerView::drawReverbPage"):
                MV_CPP.index("void MixerView::drawEqPage")]
-    assert '"%4.0f ms"' in dl                       # delay time ms
-    assert '"%s",v>=0.5f?"ON":"OFF"' in dl          # ping-pong/sat
-    assert '"%4.0f ms"' in rv                       # predelay ms
-    assert '"%.2f s"' in rv                         # decay seconds
-    assert 'v>=0.5f?"NORMAL":"ECO"' in rv           # reverb mode
+    # FXP_DESCRIPTORS_V1 (bacon-1.5 item 1): each continuous row shows the
+    # shared 0..100 % view (primary) plus the natural value (secondary);
+    # the natural units (ms, s) and the ON/OFF / ECO-NORMAL strings survive.
+    assert '"%s %4.0f ms"' in dl                      # delay time: % + ms
+    assert '"%s",v>=0.5f?"ON":"OFF"' in dl            # ping-pong/sat
+    assert '"%s %4.0f ms"' in rv                      # predelay: % + ms
+    assert '"%s %.2f s"' in rv                        # decay: % + seconds
+    assert 'v>=0.5f?"NORMAL":"ECO"' in rv             # reverb mode
+    assert "fxPctBuffer(pct,id,v)" in dl              # percent helper wired
+    assert "fxPctBuffer(pct,id,v)" in rv
     # RC4 P2: reverb bypass renders through the unified UiDraw bypass row
     # (PLAN_RC4 section 12) instead of a raw ON/OFF sprintf.
     assert "DrawBypassRow" in rv               # reverb bypass row
-    print("master page value formats (ms, s, ON/OFF, ECO/NORMAL) OK")
+    print("master page value formats (percent + ms/s, ON/OFF, ECO/NORMAL) OK")
 
 
 # ---------------------------------------------------------------------------

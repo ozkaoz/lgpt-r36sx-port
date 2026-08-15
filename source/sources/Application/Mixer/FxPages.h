@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include "Application/Utils/fixed.h"
+#include "Application/FX/FxParamDescriptor.h"
 
 // F3-4a (docs/F3_ARCHITECTURE_ES.md): capa pura de las paginas FX
 // parametrizadas del Mixer (el "MixerService" del diseno, renombrado a
@@ -161,6 +162,92 @@ static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
     { "CMP LNK", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_LINK
     { "CMP SCL", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_SC (softclip)
 } ;
+
+// FXP_DESCRIPTORS_V1 (bacon-1.5, item 1): metadatos de la capa comun de
+// parametros para cada fila master.  El rango natural sigue viviendo en
+// kFxParams_ (fuente unica de verdad); aqui solo se declaran el tipo
+// (continuo/signed/switch), la curva perceptiva (LOG2 para
+// frecuencia/tiempo, LINEAR para ganancias/mezclas) y la unidad para el
+// display secundario.  El orden coincide 1:1 con kFxParams_.
+struct FxParamMeta {
+    FxParamKind kind_ ;
+    FxParamCurve curve_ ;
+    const char *unit_ ;
+} ;
+
+static const FxParamMeta kFxParamMeta_[FX_PARAM_COUNT] = {
+    // DELAY
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "ms" },  // DLY TIM
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, ""   },  // DLY FBK
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, ""   },  // DLY MIX
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, ""   },  // DLY WID
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // DLY P/P
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // DLY SAT
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // DLY BYP
+    // REVERB
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, "ms" },  // RVB PRE
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "s"  },  // RVB DEC
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, ""   },  // RVB SIZ
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, ""   },  // RVB DMP
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, ""   },  // RVB WID
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // RVB MOD
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // RVB BYP
+    // EQ (3 bands)
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // EQ BYP
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // LO EN
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // LO FRQ
+    { FX_PARAM_SIGNED,     FX_CURVE_LINEAR, "dB" },  // LO GAI
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Q"  },  // LO Q
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // MID EN
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // MID FRQ
+    { FX_PARAM_SIGNED,     FX_CURVE_LINEAR, "dB" },  // MID GAI
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Q"  },  // MID Q
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // HI EN
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // HI FRQ
+    { FX_PARAM_SIGNED,     FX_CURVE_LINEAR, "dB" },  // HI GAI
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Q"  },  // HI Q
+    // COMP
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // CMP BYP
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, "dB" },  // CMP THR
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   ""   },  // CMP RAT
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, "dB" },  // CMP KNE
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "ms" },  // CMP ATK
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "ms" },  // CMP REL
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, "dB" },  // CMP MKU
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // CMP LNK
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // CMP SC
+} ;
+
+// Descriptor completo (range natural de kFxParams_ + meta de la capa
+// comun) para una fila master.  Uso en UI (display percent) y en la
+// edicion pura (FxNavigator::EditValue).
+inline FxParamDescriptor fxDescForId(int id) {
+	FxParamDescriptor d ;
+	d.label_=kFxParams_[id].label ;
+	d.kind_=kFxParamMeta_[id].kind_ ;
+	d.curve_=kFxParamMeta_[id].curve_ ;
+	d.rawMin_=0 ;
+	d.rawMax_=0 ;
+	d.rawDefault_=0 ;
+	d.dspMin_=kFxParams_[id].vmin ;
+	d.dspMax_=kFxParams_[id].vmax ;
+	d.dspDefault_=kFxParams_[id].vdef ;
+	d.unit_=kFxParamMeta_[id].unit_ ;
+	return d ;
+}
+
+inline float fxPercentToDspId(int id,int p) {
+	return fxPercentToDsp(fxDescForId(id),p) ;
+}
+
+inline int fxDspToPercentId(int id,float v) {
+	return fxDspToPercent(fxDescForId(id),v) ;
+}
+
+// True si el parametro es continuo (editable en %); false para switches.
+inline bool fxIsPercentParam(int id) {
+	return kFxParamMeta_[id].kind_!=FX_PARAM_SWITCH ;
+}
 
 // TREEFROG_MIXER_VU_DB_SCALE_V5 (Bacon 1.1.1):
 // DAW/VU-style rebased scale.  The displayed 0 dB row corresponds to the

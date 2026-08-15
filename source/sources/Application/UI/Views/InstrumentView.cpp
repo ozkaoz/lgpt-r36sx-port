@@ -17,6 +17,7 @@ extern "C" void TreeFrogInputTrace_LogView(
 #include "BaseClasses/UIBigHexVarField.h"
 #include "BaseClasses/UIIntVarOffField.h"
 #include "BaseClasses/UINoteVarField.h"
+#include "BaseClasses/UIPercentVarField.h"
 #include "BaseClasses/UiDraw.h"
 #include "BaseClasses/UIStaticField.h"
 #include "Foundation/Variables/Variable.h"
@@ -175,7 +176,7 @@ void InstrumentView::fillSampleParameters() {
 	f1=new UIIntVarField(position,*v,"volume: %d",0,255,1,10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 	v=instrument->FindVariable(SIP_PAN) ;
-	f2=new UIIntVarField(col2,*v,"pan: %2.2X",0,0xFE,1,0x10) ;
+	f2=new UIPercentVarField(col2,*v,kFxInstParams_[FX_INST_PAN],"pan",1,10) ;
 	T_SimpleList<UIField>::Insert(f2) ;
 
 	position._y+=1 ;
@@ -185,7 +186,7 @@ void InstrumentView::fillSampleParameters() {
 	f1=new UINoteVarField(position,*v,"root note: %s",0,0x7F,1,0x0C) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 	v=instrument->FindVariable(SIP_FINETUNE) ;
-	f2=new UIIntVarField(col2,*v,"detune: %2.2X",0,255,1,0x10) ;
+	f2=new UIPercentVarField(col2,*v,kFxInstParams_[FX_INST_DETUNE],"detune",1,10) ;
 	T_SimpleList<UIField>::Insert(f2) ;
 
 	// ----------------------------------------------------------
@@ -195,7 +196,7 @@ void InstrumentView::fillSampleParameters() {
 	col2=position ;
 	col2._x+=16 ;
 	v=instrument->FindVariable(SIP_FILTMIX) ;
-	f1=new UIIntVarField(position,*v,"type: %2.2X",0,0xFF,1,0x10) ;
+	f1=new UIPercentVarField(position,*v,kFxInstParams_[FX_INST_FILTER_MIX],"type",1,10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 	v=instrument->FindVariable(SIP_FILTMODE) ;
 	f2=new UIIntVarField(col2,*v,"mode: %s",0,2,1,1) ;
@@ -205,15 +206,15 @@ void InstrumentView::fillSampleParameters() {
 	col2=position ;
 	col2._x+=16 ;
 	v=instrument->FindVariable(SIP_FILTCUTOFF) ;
-	f1=new UIIntVarField(position,*v,"cutoff: %2.2X",0,0xFF,1,0x10) ;
+	f1=new UIPercentVarField(position,*v,kFxInstParams_[FX_INST_FILTER_CUTOFF],"cutoff",1,10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 	v=instrument->FindVariable(SIP_FILTRESO) ;
-	f2=new UIIntVarField(col2,*v,"reso: %2.2X",0,0xFF,1,0x10) ;
+	f2=new UIPercentVarField(col2,*v,kFxInstParams_[FX_INST_FILTER_RESO],"reso",1,10) ;
 	T_SimpleList<UIField>::Insert(f2) ;
 
 	position._y+=1 ;
 	v=instrument->FindVariable(SIP_ATTENUATE) ;
-	f1=new UIIntVarField(position,*v,"attenuate: %d [%2.2X]",1,0xFF,1,0x10) ;
+	f1=new UIPercentVarField(position,*v,kFxInstParams_[FX_INST_ATTENUATE],"attenuate",1,10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
 	// ----------------------------------------------------------
@@ -227,7 +228,7 @@ void InstrumentView::fillSampleParameters() {
 	f1=new UIIntVarField(position,*v,"bit depth: %d",1,0x10,1,4) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 	v=instrument->FindVariable(SIP_CRUSHVOL) ;
-	f2=new UIIntVarField(col2,*v,"drive: %2.2X",0,0xFF,1,0x10) ;
+	f2=new UIPercentVarField(col2,*v,kFxInstParams_[FX_INST_DRIVE],"drive",1,10) ;
 	T_SimpleList<UIField>::Insert(f2) ;
 
 	position._y+=1 ;

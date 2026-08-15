@@ -142,11 +142,11 @@ def check_delay_reverb_pages():
     # 7 rows each, drawn at ml.startY + p.
     assert "static const char *labels[7]" in dl
     assert "static const char *labels[7]" in rv
-    assert "MakeCenteredMenuLayout(7,9,8,2)" in dl
-    assert "MakeCenteredMenuLayout(7,8,8,2)" in rv
+    assert "MakeCenteredMenuLayout(7,9,12,2)" in dl
+    assert "MakeCenteredMenuLayout(7,8,12,2)" in rv
     assert "ml.startY+p" in dl and "ml.startY+p" in rv
     # Block geometry stays inside the safe band 3..25.
-    for spec in ((7, 9, 8, 2), (7, 8, 8, 2)):
+    for spec in ((7, 9, 12, 2), (7, 8, 12, 2)):
         ml = centered_menu(*spec)
         assert ml["startY"] >= KBAND_TOP
         assert ml["startY"] + ml["blockHeight"] - 1 <= KBAND_BOT
@@ -162,14 +162,14 @@ def check_eq_comp_pages():
                  MIX_CPP.index("void MixerView::drawCompPage")]
     cm = MIX_CPP[MIX_CPP.index("void MixerView::drawCompPage"):
                  MIX_CPP.index("void MixerView::drawMixReturns")]
-    assert "MakeCenteredMenuLayout(16,6,9,2)" in eq
-    assert "MakeCenteredMenuLayout(9,11,8,3)" in cm
+    assert "MakeCenteredMenuLayout(16,6,13,2)" in eq
+    assert "MakeCenteredMenuLayout(9,11,13,3)" in cm
     # Bypass row and headers/params share the centered columns.
     assert "drawEqRow(FX_P_EQ_BYP,ml.labelX,ml.valueX,ml.startY)" in eq
     assert "DrawString(ml.labelX,yHeader" in eq
     # COMP GR meter sits one row below the last parameter, still in band.
     assert "ml.startY+9" in cm
-    ml = centered_menu(9, 11, 8, 3)
+    ml = centered_menu(9, 11, 13, 3)
     assert ml["startY"] + 9 <= KBAND_BOT
     # No fixed columns remain on these pages.
     assert "const int x=13" not in eq and "const int labelX=8" not in cm

@@ -59,21 +59,27 @@ class FxNavigator {
     }
 
     // --- Matematica de edicion pura (fxEditRow/fxEditCurve/fxResetRow) ---
-    // Devuelve el nuevo valor para un paso de edicion del id dado partiendo
-    // de current.  Los parametros wide-range (fxUsesCurve) se editan en
-    // curva musical (fxEditCurveValue); el resto con paso lineal 1/10
-    // (fino/grueso), paso 1 si el rango es bool-ish (<=1.5), clamp final.
+    // FXP_DESCRIPTORS_V1 (bacon-1.5, item 1): los parametros continuos se
+    // editan SIEMPRE en la vista comun 0..100 % (paso fino 1, grueso 10),
+    // convirtiendo al rango natural via la capa FxParamDescriptor (curva
+    // LOG2 para frecuencia/tiempo, LINEAL para ganancias/mezclas).  Los
+    // switches (kind==SWITCH) conservan el paso 0/1 golden.
     static float EditValue(int id, float current, int delta, bool coarse) {
         const FxParamSpec &spec = kFxParams_[id] ;
-        if (fxUsesCurve(id)) {
-            return fxEditCurveValue(spec, current, delta, coarse) ;
+        if (!fxIsPercentParam(id)) {
+            float step = (coarse ? 10.0f : 1.0f) ;
+            if (spec.vmax - spec.vmin <= 1.5f) step = 1.0f ;
+            float v = current + step * (float)delta ;
+            if (v < spec.vmin) v = spec.vmin ;
+            if (v > spec.vmax) v = spec.vmax ;
+            return v ;
         }
-        float step = (coarse ? 10.0f : 1.0f) ;
-        if (spec.vmax - spec.vmin <= 1.5f) step = 1.0f ;
-        float v = current + step * (float)delta ;
-        if (v < spec.vmin) v = spec.vmin ;
-        if (v > spec.vmax) v = spec.vmax ;
-        return v ;
+        int step = coarse ? 10 : 1 ;
+        int p = fxDspToPercentId(id, current) ;
+        p += step * delta ;
+        if (p < 0) p = 0 ;
+        if (p > 100) p = 100 ;
+        return fxPercentToDspId(id, p) ;
     }
 
     // fxResetRow golden (A+B): valor legacy por defecto (vdef).

@@ -5,9 +5,10 @@ Verifica que:
 1. FxNavigator.h (Application/Mixer) declara el estado del cursor (pagina,
    fila y edit target del MIX page) y la matematica golden de pasos:
    SetPage (rango + reset de fila), CyclePage (MIX->...->COMP->MIX),
-   MoveRow (wrap por pagina), CycleEditTarget (VOL->DLY RET->RVB RET),
-   IdForRow (bypass primero) y EditValue/ResetValue (lineal fino/grueso,
-   bool-ish a paso 1, curva musical via fxEditCurveValue, clamps, vdef).
+    MoveRow (wrap por pagina), CycleEditTarget (VOL->DLY RET->RVB RET),
+    IdForRow (bypass primero) y EditValue/ResetValue (vista comun 0..100 %
+    via la capa FxParamDescriptor: paso fino 1, grueso 10, switches 0/1,
+    clamps 0..100, vdef).
 2. FxNavigator.h NO depende de GUI/audio/Player/framebuffer (capa pura:
    solo FxPages.h -> fixed.h + <math.h>).
 3. MixerView.h ya no declara fxPage_/fxRow_/fxEditTarget_: usa el miembro
@@ -29,7 +30,8 @@ TOKENS = [
     "FxNavigator", "Page()", "Row()", "EditTarget()", "SetPage",
     "CyclePage", "MoveRow", "CycleEditTarget", "IdForRow", "EditValue",
     "ResetValue", "FX_PAGE_MIX", "FX_PAGE_COUNT", "fxCountOnPage",
-    "fxIdForRow", "fxUsesCurve", "fxEditCurveValue", "vdef",
+    "fxIdForRow", "fxIsPercentParam", "fxPercentToDspId",
+    "fxDspToPercentId", "vdef",
 ]
 
 FORBIDDEN = [

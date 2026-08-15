@@ -100,46 +100,48 @@ int main() {
     nav.CycleEditTarget() ;
     check(nav.EditTarget() == 0, "edit target wraps to VOL") ;
 
-    // 7. EditValue lineal golden (paso fino 1 / grueso 10, clamps).
-    // DLY FBK (0..0.98): fino +1 -> 1.5 clamp a vmax.
+    // 7. EditValue percent golden (FXP_DESCRIPTORS_V1: los continuos se
+    // editan SIEMPRE en la vista comun 0..100 %; paso fino 1, grueso 10,
+    // clamps 0..100; el rango natural se convierte via el descriptor).
+    // DLY FBK (0..0.98 LINEAR): 0.5 -> p51, +1 fino = p52 -> 0.5096.
     float v = FxNavigator::EditValue(FX_P_DLY_FBK, 0.5f, 1, false) ;
-    check(feq(v, 0.98f), "linear fine +1 DLY FBK clamps vmax") ;
-    // DLY FBK grueso +1 por encima del rango -> clamp vmax.
+    check(feq(v, 0.5096f), "percent fine +1 DLY FBK") ;
+    // DLY FBK grueso +1: p97+10 -> clamp p100 -> vmax.
     v = FxNavigator::EditValue(FX_P_DLY_FBK, 0.95f, 1, true) ;
-    check(feq(v, 0.98f), "linear coarse +1 clamps vmax") ;
-    // DLY FBK fino -1 bajo el rango -> clamp vmin.
+    check(feq(v, 0.98f), "percent coarse +1 clamps vmax") ;
+    // DLY FBK fino -1: p2-1 = p1 -> 0.0098.
     v = FxNavigator::EditValue(FX_P_DLY_FBK, 0.02f, -1, false) ;
-    check(feq(v, 0.0f), "linear fine -1 clamps vmin") ;
-    // CMP THR (-60..0): grueso +1.
+    check(feq(v, 0.0098f), "percent fine -1 DLY FBK") ;
+    // CMP THR (-60..0 LINEAR): -50 -> p17, +10 = p27 -> -43.8.
     v = FxNavigator::EditValue(FX_P_CMP_THR, -50.0f, 1, true) ;
-    check(feq(v, -40.0f), "linear coarse +1 CMP THR") ;
-    // CMP THR grueso -1 bajo el rango -> clamp vmin.
+    check(feq(v, -43.8f), "percent coarse +1 CMP THR") ;
+    // CMP THR grueso -1 bajo el rango: p8-10 -> clamp p0 -> vmin.
     v = FxNavigator::EditValue(FX_P_CMP_THR, -55.0f, -1, true) ;
-    check(feq(v, -60.0f), "linear coarse -1 clamps vmin") ;
+    check(feq(v, -60.0f), "percent coarse -1 clamps vmin") ;
 
-    // 8. Rows bool-ish (rango <=1.5): paso 1 incluso en grueso.
+    // 8. Rows switch (kind==SWITCH): paso 1 incluso en grueso.
     // DLY PP (0..1).
     v = FxNavigator::EditValue(FX_P_DLY_PP, 0.0f, 1, true) ;
-    check(feq(v, 1.0f), "bool row coarse +1 steps 1") ;
+    check(feq(v, 1.0f), "switch row coarse +1 steps 1") ;
     v = FxNavigator::EditValue(FX_P_DLY_PP, 1.0f, -1, true) ;
-    check(feq(v, 0.0f), "bool row coarse -1 steps 1") ;
+    check(feq(v, 0.0f), "switch row coarse -1 steps 1") ;
 
-    // 9. EditValue curva golden (musical/log).
-    // EQ LOW FRQ (20..20000, default 100): semitono x2^(1/12) hacia arriba.
+    // 9. EditValue percent curva LOG2 golden (frecuencia/tiempo).
+    // EQ LOW FRQ (20..20000, default 100): p23 +1 fino = p24 -> 20*10^0.72.
     v = FxNavigator::EditValue(FX_P_EQ_LOW_FRQ, 100.0f, 1, false) ;
-    check(feq(v, 100.0f * 1.05946309436f), "curve semitone up") ;
-    // Octava hacia abajo /2.
+    check(feq(v, 104.9615f), "log2 fine +1 EQ LOW FRQ") ;
+    // Octava hacia abajo (grueso -1): p23-10 = p13 -> 20*1000^0.13.
     v = FxNavigator::EditValue(FX_P_EQ_LOW_FRQ, 100.0f, -1, true) ;
-    check(feq(v, 50.0f), "curve octave down") ;
-    // Desde 0 (default DLY TIM): primer paso parte del 1% del rango.
+    check(feq(v, 49.0943f), "log2 coarse -1 EQ LOW FRQ") ;
+    // Desde 0 (default DLY TIM): clamp a vmin -> p0 +1 = p1 -> 10.54.
     v = FxNavigator::EditValue(FX_P_DLY_TIME, 0.0f, 1, false) ;
-    check(feq(v, 10.0f * 1.05946309436f), "curve from 0 starts at vmin") ;
-    // RVB PRE (0..100, vmin 0): primer paso desde 0 = 1% del rango.
+    check(feq(v, 10.5441f), "log2 from 0 starts at vmin") ;
+    // RVB PRE (0..100 LINEAR): desde 0 +1 = p1 -> 1.0.
     v = FxNavigator::EditValue(FX_P_RVB_PRE, 0.0f, 1, false) ;
-    check(feq(v, 1.0f * 1.05946309436f), "curve from 0 uses 1% of range") ;
+    check(feq(v, 1.0f), "linear from 0 uses 1% of range") ;
     // Clamp superior de curva.
     v = FxNavigator::EditValue(FX_P_DLY_TIME, 1990.0f, 1, true) ;
-    check(feq(v, 2000.0f), "curve clamps vmax") ;
+    check(feq(v, 2000.0f), "percent clamps vmax") ;
 
     // 10. ResetValue golden (A+B -> vdef).
     check(feq(FxNavigator::ResetValue(FX_P_DLY_MIX), 1.0f), "reset DLY MIX") ;

@@ -235,6 +235,13 @@ public:
     }
 
     /* Golden drawPitchScreen hint lines (CD_NORMAL). */
+    static const char *PitchHint(int idx) {
+        static const char *hints[2] = {
+            "UP/DN Item | L/R Value | B Preview",
+            "A Apply | L1+R1 Exit | R2+LR Target",
+        };
+        return hints[idx & 1];
+    }
     static void DrawPitchHints(ChopperGrid &g) {
         g.SetText(1, 24, "UP/DN Item | L/R Value | B Preview",
                   CHOP_COLOR_NORMAL, false);
