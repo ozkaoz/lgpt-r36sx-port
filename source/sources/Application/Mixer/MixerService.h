@@ -11,6 +11,7 @@
 #include "Foundation/T_Singleton.h"
 #include "Services/Audio/AudioMixer.h"
 #include "Services/Audio/AudioOut.h"
+#include "Application/Instruments/WavFileWriter.h"
 #include "MixBus.h"
 
 enum MixerServiceRenderMode {
@@ -84,11 +85,23 @@ public:
 
 protected:
 	void toggleRendering(bool enable) ;
+	// bacon-1.5 item 8: true when the project filesystem has room for an
+	// explicit WAV export (or the platform cannot report free space).
+	bool exportSpaceAvailable() ;
+	// bacon-1.5 item 8: open/close the delay-return, reverb-return and master
+	// stem writers (control rate) and hand them to the FxEngine.
+	void enableStemsCapture() ;
+	void disableStemsCapture() ;
 private:
   void initRendering(MixerServiceRenderMode);
   AudioOut *out_;
   MixBus master_;
   MixBus bus_[MAX_BUS_COUNT];
+  // bacon-1.5 item 8: multitrack stems writers, owned by MixerService so the
+  // FxEngine module keeps its zero-allocation RT contract.
+  WavFileWriter *captureDelay_;
+  WavFileWriter *captureReverb_;
+  WavFileWriter *captureMaster_;
   MixerServiceRenderMode mode_;
   SDL_mutex *sync_;
   bool isRendering_;

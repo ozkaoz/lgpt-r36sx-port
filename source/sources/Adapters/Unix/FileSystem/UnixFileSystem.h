@@ -34,5 +34,7 @@ public:
 	virtual Result MakeDir(const char *path) ;	
 	virtual void Delete(const char *path) ;
 	virtual FileType GetFileType(const char *path) ;
+	// MULTITRACK_EXPORT (bacon-1.5, item 8): statvfs-based free-space probe.
+	virtual long long GetFreeSpace(const char *path) ;
 } ;
 #endif

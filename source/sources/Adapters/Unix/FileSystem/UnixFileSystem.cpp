@@ -10,6 +10,9 @@
 #include <sys/dir.h>
 #endif
 #include <sys/stat.h>
+#ifdef __linux__
+#include <sys/statvfs.h>
+#endif
 #include <ctype.h>
 #include <errno.h>
 #include <string>
@@ -171,6 +174,20 @@ FileType UnixFileSystem::GetFileType(const char* path) {
 
 void UnixFileSystem::Delete(const char *path) {
 	remove(path) ;
+} ;
+
+// MULTITRACK_EXPORT (bacon-1.5, item 8): free bytes on the filesystem that
+// hosts `path` (statvfs), or -1 when unavailable.  Only used as a best-effort
+// guard before explicit WAV export.
+long long UnixFileSystem::GetFreeSpace(const char *path) {
+#ifdef __linux__
+	struct statvfs st ;
+	if (statvfs(path ? path : ".", &st) != 0) return -1 ;
+	if (st.f_bfree == 0 || st.f_frsize == 0) return -1 ;
+	return (long long)st.f_bfree * (long long)st.f_frsize ;
+#else
+	return -1 ;
+#endif
 } ;
 
 Result UnixFileSystem::MakeDir(const char *path) {

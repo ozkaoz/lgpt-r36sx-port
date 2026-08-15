@@ -1193,6 +1193,13 @@ void AppWindow::H35PollExternalExport() {
                 snprintf(stale,sizeof(stale),"%s/channel%d.wav",_root.GetPath().c_str(),i);
                 unlink(stale);
             }
+            // bacon-1.5 item 8: also clear the FX return / master stems so a
+            // failed or interrupted export cannot leave stale multitrack files.
+            static const char *kStemStale[] = {"delayret.wav","reveret.wav","master.wav"};
+            for (unsigned int s=0;s<sizeof(kStemStale)/sizeof(kStemStale[0]);s++) {
+                snprintf(stale,sizeof(stale),"%s/%s",_root.GetPath().c_str(),kStemStale[s]);
+                unlink(stale);
+            }
         }
         Variable *render=_viewData->project_->FindVariable(VAR_RENDER);
         if (render) render->SetInt(mode,false);
@@ -1215,7 +1222,18 @@ void AppWindow::H35PollExternalExport() {
         snprintf(error,sizeof(error),"/tmp/r36sx_lgpt_usb/export_error.%d",session);
         bool ok=true;
         if (command==2) { snprintf(test,sizeof(test),"%s/mixdown.wav",_root.GetPath().c_str()); ok=h35FileExists(test); }
-        else { for(int i=0;i<8;i++){ snprintf(test,sizeof(test),"%s/channel%d.wav",_root.GetPath().c_str(),i); if(!h35FileExists(test)){ok=false;break;} } }
+        else {
+            for(int i=0;i<8;i++){ snprintf(test,sizeof(test),"%s/channel%d.wav",_root.GetPath().c_str(),i); if(!h35FileExists(test)){ok=false;break;} }
+            // bacon-1.5 item 8: multitrack export also requires the FX
+            // return / master stems.
+            if (ok) {
+                static const char *kStemReq[] = {"delayret.wav","reveret.wav","master.wav"};
+                for (unsigned int s=0;s<sizeof(kStemReq)/sizeof(kStemReq[0]);s++) {
+                    snprintf(test,sizeof(test),"%s/%s",_root.GetPath().c_str(),kStemReq[s]);
+                    if(!h35FileExists(test)){ok=false;break;}
+                }
+            }
+        }
         if (ok) {
             snprintf(body,sizeof(body),"ROOT=%s\nMODE=%s\nFORMAT=WAV\n",
                      _root.GetPath().c_str(),command==2?"MIXDOWN":"STEMS");

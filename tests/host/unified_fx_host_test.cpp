@@ -11,9 +11,15 @@
 #include "Application/Audio/FxEngine/FxEngine.h"
 #include "Application/Mixer/FxPages.h"
 #include "Application/Player/SyncMaster.h"
+#include "Services/Audio/Audio.h"
+#include "Services/Audio/AudioOut.h"
+#include "System/System/System.h"
+#include "System/FileSystem/FileSystem.h"
+#include "System/Console/Trace.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
 
 using namespace FxEngine;
 
@@ -23,6 +29,77 @@ using namespace FxEngine;
 SyncMaster::SyncMaster() : tempo_(120), currentSlice_(0), tableRatio_(1),
     beatCount_(0), playSampleCount_(0), tickSampleCount_(0) {}
 int SyncMaster::GetTempo() { return tempo_; }
+
+// ---- Stubs for the WavFileWriter dependency pulled by FxEngine.cpp ----
+Audio::Audio(AudioSettings &hints) : T_SimpleList<AudioOut>(true), settings_() {}
+Audio::~Audio() {}
+
+class StubAudio : public Audio {
+  public:
+    StubAudio() : Audio(settings_) {}
+    virtual void Init() {}
+    virtual void Close() {}
+    virtual int GetSampleRate() { return 44100; }
+  private:
+    static AudioSettings settings_;
+};
+AudioSettings StubAudio::settings_;
+
+class StubSystem : public System {
+  public:
+    virtual unsigned long GetClock() { return 0; }
+    virtual int GetBatteryLevel() { return 100; }
+    virtual void *Malloc(unsigned size) { return malloc(size); }
+    virtual void Free(void *p) { free(p); }
+    virtual void Memset(void *addr, char value, int size) {
+        memset(addr, value, size);
+    }
+    virtual void *Memcpy(void *s1, const void *s2, int n) {
+        return memcpy(s1, s2, n);
+    }
+    virtual void PostQuitMessage() {}
+    virtual unsigned int GetMemoryUsage() { return 0; }
+};
+
+// Null filesystem: WavFileWriter opens are only used by the stems capture
+// (never exercised here), so returning null files is enough to link.
+class NullFileSystem : public FileSystem {
+  public:
+    virtual I_File *Open(const char *path, char *mode) { return 0; }
+    virtual I_Dir *Open(const char *path) { return 0; }
+    virtual Result MakeDir(const char *path) { return Result::NoError; }
+    virtual void Delete(const char *path) {}
+    virtual FileType GetFileType(const char *path) { return FT_UNKNOWN; }
+};
+
+void Trace::Debug(const char *, ...) {}
+void Trace::Log(const char *, const char *, ...) {}
+void Trace::Error(const char *, ...) {}
+
+short Swap16(short from) { return from; }
+int Swap32(int from) { return from; }
+
+AudioOut::AudioOut() : AudioMixer("AudioOut"), sampleOffset_(0) {}
+AudioOut::~AudioOut() {}
+AudioMixer::AudioMixer(const char *name) :
+    T_SimpleList<AudioModule>(false), enableRendering_(0), writer_(0),
+    name_(name) {
+    volume_ = i2fp(1);
+    softclip_ = -1;
+    softclipGain_ = 0;
+    masterVolume_ = 100;
+    masterVolumeCached_ = -1;
+    dampCached_ = 1.0f;
+    clipped_ = false;
+    clipBypass_ = false;
+    peakValue_ = 0.0f;
+    lastPeakClock_ = 0;
+}
+AudioMixer::~AudioMixer() {}
+bool AudioMixer::Render(fixed *buffer, int samplecount) { return true; }
+void AudioMixer::SetSoftclip(int clip, int gain) {}
+void AudioMixer::SetMasterVolume(int volume) {}
+bool AudioMixer::Clipped() { return false; }
 
 static int failures = 0;
 static int checks = 0;
@@ -142,6 +219,9 @@ static void testUiDelegation() {
 }
 
 int main() {
+    Audio::Install(new StubAudio());
+    System::Install(new StubSystem());
+    FileSystem::Install(new NullFileSystem());
     testRoundTripAll();
     testClamp();
     testByteMatchesUiPercent();

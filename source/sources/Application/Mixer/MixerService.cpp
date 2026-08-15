@@ -1,5 +1,6 @@
 #include "MixerService.h"
 #include "Application/Audio/DummyAudioOut.h"
+#include "Application/Audio/FxEngine/FxEngine.h"
 #include "Application/Model/Config.h"
 #include "Application/Model/Mixer.h"
 #include "Application/Model/Project.h"
@@ -7,8 +8,17 @@
 #include "Services/Audio/AudioDriver.h"
 #include "Services/Midi/MidiService.h"
 #include "System/Console/Trace.h"
+#include "System/FileSystem/FileSystem.h"
 
-MixerService::MixerService() : out_(0), sync_(0), isRendering_(false) {
+// bacon-1.5 item 8: minimum free bytes required to start an explicit WAV
+// export (mixdown or stems).  128 MB covers the full stem set (8 tracks +
+// delay return + reverb return + master) for a typical render length.
+// GetFreeSpace() returning -1 (unknown, e.g. DummyFileSystem on host tests)
+// always allows the export, so behaviour is unchanged there.
+static const long long kMinExportFreeBytes = 128LL * 1024 * 1024;
+
+MixerService::MixerService() : out_(0), sync_(0), isRendering_(false),
+    captureDelay_(0), captureReverb_(0), captureMaster_(0) {
     mode_ = MSRM_PLAYBACK;
 };
 
@@ -190,15 +200,79 @@ void MixerService::toggleRendering(bool enable) {
         break;
     case MSRM_STEREO:
         initRendering(MSRM_STEREO);
+        if (enable && !exportSpaceAvailable()) {
+            Trace::Log("MixerService", "mixdown render aborted: low free space");
+            break;
+        }
         out_->EnableRendering(enable);
         break;
     case MSRM_STEMS:
         initRendering(MSRM_STEMS);
-        for (int i = 0; i < SONG_CHANNEL_COUNT; i++) {
-            bus_[i].EnableRendering(enable);
-        };
+        if (enable) {
+            // bacon-1.5 item 8: guard the export against filling the SD,
+            // then open the track writers AND the FX return/master stems.
+            if (!exportSpaceAvailable()) {
+                Trace::Log("MixerService", "stems render aborted: low free space");
+                break;
+            }
+            for (int i = 0; i < SONG_CHANNEL_COUNT; i++) {
+                bus_[i].EnableRendering(true);
+            }
+            enableStemsCapture();
+        } else {
+            for (int i = 0; i < SONG_CHANNEL_COUNT; i++) {
+                bus_[i].EnableRendering(false);
+            }
+            disableStemsCapture();
+        }
         break;
     }
+}
+
+// bacon-1.5 item 8: free-space probe on the project filesystem.  -1 (unknown)
+// means "allow"; otherwise require at least kMinExportFreeBytes.
+bool MixerService::exportSpaceAvailable() {
+    Path p("project:");
+    long long free =
+        FileSystem::GetInstance()->GetFreeSpace(p.GetPath().c_str());
+    return free < 0 || free >= kMinExportFreeBytes;
+}
+
+// bacon-1.5 item 8: open the three stems writers and hand them to the
+// FxEngine.  On any open failure the whole capture is aborted (no partial
+// files left behind).  Control-rate, never in the audio thread.
+void MixerService::enableStemsCapture() {
+    if (captureMaster_) return; // already open
+    WavFileWriter *d = new WavFileWriter("project:delayret.wav");
+    WavFileWriter *r = new WavFileWriter("project:reveret.wav");
+    WavFileWriter *m = new WavFileWriter("project:master.wav");
+    if (!d->IsOpen() || !r->IsOpen() || !m->IsOpen()) {
+        m->Close();
+        r->Close();
+        d->Close();
+        delete m;
+        delete r;
+        delete d;
+        Trace::Log("MixerService", "stems capture aborted: cannot open output files");
+        return;
+    }
+    captureDelay_ = d;
+    captureReverb_ = r;
+    captureMaster_ = m;
+    FxEngine::FxEngine::GetInstance().EnableStemsCapture(d, r, m);
+}
+
+void MixerService::disableStemsCapture() {
+    FxEngine::FxEngine::GetInstance().EnableStemsCapture(0, 0, 0);
+    if (captureMaster_) captureMaster_->Close();
+    if (captureReverb_) captureReverb_->Close();
+    if (captureDelay_) captureDelay_->Close();
+    delete captureDelay_;
+    captureDelay_ = 0;
+    delete captureReverb_;
+    captureReverb_ = 0;
+    delete captureMaster_;
+    captureMaster_ = 0;
 }
 
 void MixerService::OnPlayerStart() {

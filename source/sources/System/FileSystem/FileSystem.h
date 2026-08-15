@@ -104,6 +104,10 @@ public:
 	virtual Result MakeDir(const char *path)=0 ;
 	virtual void Delete(const char *)=0 ;
 	virtual FileType GetFileType(const char *path)=0 ;
+	// MULTITRACK_EXPORT (bacon-1.5, item 8): free bytes on the filesystem
+	// hosting `path`, or -1 when the platform cannot report it.  Used to
+	// guard explicit WAV export from filling the SD; -1 skips the guard.
+	virtual long long GetFreeSpace(const char *path) { return -1; }
 } ;
 
 #define FS_FOPEN(a,b) FileSystem::GetInstance()->Open(a,b)

@@ -7,6 +7,8 @@
 #include "ParametricEQ.h"
 #include "Compressor.h"
 
+class WavFileWriter;
+
 /*
  * FxEngine -- post-mix master effects stage (PLAN_FX_REDESIGN_ES.md, Fase 1).
  *
@@ -218,6 +220,18 @@ public:
                + Compressor::StaticMemoryBytes();
     }
 
+    // MULTITRACK_EXPORT (bacon-1.5, item 8): stems capture of the delay
+    // return, the reverb return and the post-DSP master, written from inside
+    // Process() while an explicit multitrack render runs.  Control-rate only
+    // (called by MixerService on render start/stop), and the WavFileWriter
+    // objects are OWNED BY THE CALLER (MixerService) so this module keeps its
+    // zero-allocation RT contract.  Passing a null pointer disables capture
+    // of that stem; capture is fully off when masterWriter is 0.
+    void EnableStemsCapture(WavFileWriter *delayWriter,
+                            WavFileWriter *reverbWriter,
+                            WavFileWriter *masterWriter);
+    bool StemsCaptureActive() const { return captureMaster_ != 0; }
+
 private:
     FxEngine();
     FxEngine(const FxEngine &);
@@ -247,6 +261,12 @@ private:
     // (static, single-use per Process() call).
     fixed scTap_[FX_ENGINE_MAX_FIXED];
     bool scTapValid_;
+    // bacon-1.5 item 8: multitrack stems capture (see EnableStemsCapture).
+    WavFileWriter *captureDelay_;
+    WavFileWriter *captureReverb_;
+    WavFileWriter *captureMaster_;
+    // Scratch to rescale Q15 returns to the int16<<15 writer scale.
+    fixed captureBuf_[FX_ENGINE_MAX_FIXED];
     DelayLine delay_;
     Reverb reverb_;
     ParametricEQ eq_;

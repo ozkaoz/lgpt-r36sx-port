@@ -1,6 +1,7 @@
 #include "FxEngine.h"
 #include "Application/Player/SyncMaster.h"
 #include "Application/Mixer/FxPages.h"
+#include "Application/Instruments/WavFileWriter.h"
 
 namespace FxEngine {
 
@@ -9,7 +10,8 @@ FxEngine::FxEngine()
       callCount_(0), frames_(0), maxFrames_(0),
       rtViolations_(0), sampleRate_(44100),
       delaySend_(0), delayReturn_(fl2fp(0.5f)),
-      reverbSend_(0), reverbReturn_(fl2fp(0.5f)), scTapValid_(false) {
+      reverbSend_(0), reverbReturn_(fl2fp(0.5f)), scTapValid_(false),
+      captureDelay_(0), captureReverb_(0), captureMaster_(0) {
     delay_.SetSampleRate(sampleRate_);
     delay_.SetMix(i2fp(1)); // send/return: full wet return
     reverb_.SetSampleRate(sampleRate_);
@@ -36,6 +38,17 @@ void FxEngine::Reset() {
     reverb_.Reset();
     eq_.Reset();
     comp_.Reset();
+}
+
+// bacon-1.5 item 8: multitrack stems capture.  Control-rate only: the caller
+// (MixerService) owns and closes the writers; this module only wires the
+// pointers so the RT path (Process) stays allocation-free.
+void FxEngine::EnableStemsCapture(WavFileWriter *delayWriter,
+                                  WavFileWriter *reverbWriter,
+                                  WavFileWriter *masterWriter) {
+    captureDelay_ = delayWriter;
+    captureReverb_ = reverbWriter;
+    captureMaster_ = masterWriter;
 }
 
 void FxEngine::SetSampleRate(int rate) {
@@ -134,6 +147,9 @@ void FxEngine::Process(fixed *buffer, int samplecount) {
     // Legacy mode (default) preserves the original master path exactly:
     // no DSP, gain 1.0, buffer untouched.
     if (legacyMode_) {
+        // bacon-1.5 item 8: even in legacy bypass the master stem is the
+        // final mix (the wet returns are silent by design), so capture it.
+        if (captureMaster_) captureMaster_->AddBuffer(buffer, samplecount);
         return;
     }
 
@@ -143,6 +159,7 @@ void FxEngine::Process(fixed *buffer, int samplecount) {
     }
 
     processSendReturns(buffer, samplecount);
+    if (captureMaster_) captureMaster_->AddBuffer(buffer, samplecount);
 }
 
 // Sends/returns: dry passes through; delay/reverb process their send buses
@@ -184,6 +201,21 @@ void FxEngine::processSendReturns(fixed *buffer, int samplecount) {
     // Process returns (wet).
     delay_.Process(buses_.send_[0], buses_.returnDelay_, samplecount);
     reverb_.Process(buses_.send_[1], buses_.returnReverb_, samplecount);
+
+    // bacon-1.5 item 8: multitrack stems.  The returns are Q15, rescale to
+    // the int16<<15 scale WavFileWriter expects (same clamp the mixer uses).
+    if (captureDelay_) {
+        for (int i = 0; i < n; i++) {
+            captureBuf_[i] = buses_.returnDelay_[i] << FIXED_SHIFT;
+        }
+        captureDelay_->AddBuffer(captureBuf_, samplecount);
+    }
+    if (captureReverb_) {
+        for (int i = 0; i < n; i++) {
+            captureBuf_[i] = buses_.returnReverb_[i] << FIXED_SHIFT;
+        }
+        captureReverb_->AddBuffer(captureBuf_, samplecount);
+    }
 
     // Sum returns back into the master output (Q15).
     for (int i = 0; i < n; i++) {
