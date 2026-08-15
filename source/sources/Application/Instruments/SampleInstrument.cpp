@@ -8,6 +8,7 @@ extern bool LGPTChopperGetChopRangeForSampleIndex(int sampleIndex, int chopIndex
 #include "Application/Player/PlayerMixer.h" // For MIX_BUFFER_SIZE.. kick out pls
 #include "Application/Player/SyncMaster.h"
 #include "Application/Instruments/Filters.h"
+#include "Application/Instruments/FilterV2.h"
 #include "Application/Model/Table.h"
 #include "Services/Audio/Audio.h"
 #include "SampleVariable.h"
@@ -26,6 +27,14 @@ extern bool LGPTChopperGetChopRangeForSampleIndex(int sampleIndex, int chopIndex
 // persisted variables.  Fingerprint-cached so the audio thread recomputes the
 // (float) RBJ coefficients only when a variable changed.
 void SampleInstrument::syncInstrumentEq() {
+    // FXP_INSTRUMENT_EQ_RATE (bacon-1.5, item 2): rebuild the EQ at the real
+    // audio driver rate (48 kHz on the R36SX) instead of the InstrumentEq
+    // ctor default 44100, and refresh whenever the driver rate changes.
+    int rate = Audio::GetInstance()->GetSampleRate();
+    if (rate != eqRateCache_) {
+        eqRateCache_ = rate;
+        eqDsp_.SetSampleRate(rate);
+    }
     int vals[34];
     vals[0] = eqEnable_->GetInt();
     vals[1] = eqMask_->GetInt();
@@ -89,13 +98,13 @@ SampleInstrument::SampleInstrument() {
 	 WatchedVariable *wv=new SampleVariable("sample",SIP_SAMPLE) ;
 	 Insert(wv) ;
 	 wv->AddObserver(*this) ;
-	 
+
 	 volume_=new Variable("volume",SIP_VOLUME,0x80) ;
 	 Insert(volume_) ;
 
 	 interpolation_=new Variable("interpol",SIP_INTERPOLATION,interpolationTypes,2,0) ;
 	 Insert(interpolation_) ;
-	 
+
 	 crush_=new Variable("crush",SIP_CRUSH,16) ;
 	 Insert(crush_) ;
 
@@ -125,6 +134,8 @@ SampleInstrument::SampleInstrument() {
 
 	 filterMode_=new Variable("filter mode",SIP_FILTMODE,filterMode,3,0) ;
 	 Insert(filterMode_) ;
+	 filterKind_=new Variable("filter kind",SIP_FILTERKIND,filterKind,4,0) ;
+	 Insert(filterKind_) ;
 
 	 attenuate_=new Variable("attenuate",SIP_ATTENUATE,0xFF) ;
 	 Insert(attenuate_) ;
@@ -272,7 +283,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 {
 	// Look if we're dirty & need to update this instrument's data
 
-  if (dirty_) 
+  if (dirty_)
   {
   updateInstrumentData(false) ;
   }
@@ -297,7 +308,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
   }
 
   rp->midiNote_=playbackNote ;
-  
+
   if (lastMidiNote_[channel] == -1) // To prevent First LEGA to go bonkers
   {
     lastMidiNote_[channel]=playbackNote ;
@@ -332,7 +343,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 			 rp->rendLoopEnd_=source_->GetSize(rp->midiNote_) ; // hack at the moment
 			 loopMode_->SetInt(SILM_ONESHOT) ;
 		 } ;
-	 } 
+	 }
      SampleInstrumentLoopMode loopmode=(SampleInstrumentLoopMode)loopMode_->GetInt() ;
      if (lgptRuntimeChop >= 0) loopmode = SILM_ONESHOT;
 
@@ -400,7 +411,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 			} ;
 			SyncMaster *sm=SyncMaster::GetInstance() ;
 			int sampleCount=int(sm->GetTickSampleCount()) ;
-			sampleCount*=(6*16) ; 
+			sampleCount*=(6*16) ;
 			rp->baseSpeed_=fl2fp(length/float(sampleCount)) ;
       rp->rendFirst_ = rp->rendLoopStart_;
       if (cleanstart) {
@@ -435,9 +446,9 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
     fixed freqFactor=fl2fp(float(pow(2.0,(offset+fineTune)/12.0))) ;
 	rp->baseSpeed_=fp_mul(rp->baseSpeed_,freqFactor) ;
     rp->speed_=rp->baseSpeed_ ;
-    
+
   // Init k rate counter
- 
+
     rp->krateCount_=0 ;
 
 	// We allow processing
@@ -451,16 +462,16 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 	rp->feedbackIn_=0 ;
 	rp->feedbackMode_=FB_NONE ;
 
-	rp->baseFbTun_=rp->fbTun_=fl2fp(fbTune_->GetInt()/255.0f) ; 
-	rp->baseFbMix_=rp->fbMix_=fl2fp(fbMix_->GetInt()/255.0f) ; 
+	rp->baseFbTun_=rp->fbTun_=fl2fp(fbTune_->GetInt()/255.0f) ;
+	rp->baseFbMix_=rp->fbMix_=fl2fp(fbMix_->GetInt()/255.0f) ;
 
   // If we do a clean start (there was a instr number on the line)
 
-	if (cleanstart) 
+	if (cleanstart)
   {
 
 	// Clear retrigger data
-	  
+
 		rp->retrig_=false ;
 		rp->retrigLoop_=0 ;
 		rp->retrigCount_=0 ;
@@ -472,7 +483,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 
 	// Init filter params
 
-		rp->cutoff_=rp->baseFCut_=fl2fp(cutoff_->GetInt()/255.0f); 
+		rp->cutoff_=rp->baseFCut_=fl2fp(cutoff_->GetInt()/255.0f);
 		rp->reso_=rp->baseFRes_=fl2fp(reso_->GetInt()/255.0f) ;
 
 	// Init crush params
@@ -493,7 +504,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 		rp->rvbSend_=GetFxReverbSendOverride() ;
 
 		// Disable all updaters for new voice
-		
+
 		std::vector<I_SRPUpdater *>::iterator it ;
 
 		for (it=rp->updaters_.begin();it!=rp->updaters_.end();it++) {
@@ -502,7 +513,7 @@ bool SampleInstrument::Start(int channel,unsigned char midinote,bool cleanstart)
 		}
 
 		rp->activeUpdaters_.clear() ;
-	}	
+	}
 	return true ;
 }
 
@@ -536,7 +547,7 @@ void SampleInstrument::doKRateUpdate(int channel) {
 		I_SRPUpdater *current=*it;
 		current->Trigger(false) ;
 	}
-	
+
 } ;
 
 void SampleInstrument::updateFeedback(renderParams *rp) {
@@ -545,7 +556,7 @@ void SampleInstrument::updateFeedback(renderParams *rp) {
 
 	 if (rp->fbMix_!=0) {
 		int offset=fp2i(fp_mul(rp->fbTun_,fl2fp(255.0f))) ;
-		
+
 		switch(loopMode) {
 			case SILM_ONESHOT:
 			case SILM_LOOP:
@@ -586,7 +597,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
   bool somethingToMix=false ;
 
   // Get Current render parameters
-	  
+
   renderParams *rp=renderParams_+channel ;
   lastMidiNote_[channel]=rp->midiNote_ ;
 	 bool *rpFinished=&(rp->finished_) ;
@@ -619,16 +630,19 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 		 FilterMode filterMode=(FilterMode)filterMode_->GetInt() ;
 		 bool filterBoost=(filterMode==FM_SCREAM) ;
 		 bool bassyFilter=(filterMode==FM_BASSY) ;
+		 FilterV2Type filterKind=(FilterV2Type)filterKind_->GetInt() ;
+		 if (filterKind<0 || filterKind>=FV2_TYPECOUNT) filterKind=FV2_LOWPASS ;
+		 int driverRate=Audio::GetInstance()->GetSampleRate() ;
 
 		 // Be sure filters are properly initialized
 
-		 set_filter(channel,FLT_LOWPASS,rp->cutoff_,rp->reso_,filterMix,bassyFilter);
+		 set_filter_v2(channel,filterKind,rp->cutoff_,rp->reso_,filterMix,bassyFilter,filterBoost,(int)driverRate);
 
-		 filter_t* flt =get_filter(channel) ;
+		 filter_v2_t* fltv2 =get_filter_v2(channel) ;
 		 bool filtering=(rp->cutoff_<i2fp(1))||(rp->reso_>i2fp(0)) ;
 
 	// Process tick-level updates
-	  
+
 		 if (updateTick) {
 
 			 if (hasUpdaters) {
@@ -652,7 +666,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 			}
 
 		// Process retrig
-		  
+
 			if (rp->retrig_) {
 				if (rp->retrigCount_==0) {
 					int ticks=rp->retrigOffset_-rp->retrigLoop_ ;
@@ -668,7 +682,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 
 
 		}
-		
+
 	  // Get additional parameters from variables
 
 
@@ -709,7 +723,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 		 int interpol=interpolation_->GetInt() ;
 
 		 // Get sound characteristics
- 
+
 
 		char *wavbuf=(char *)rp->sampleBuffer_ ;
 
@@ -731,11 +745,6 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 		fixed fixedpanl=panlaw[pan] ;
 		fixed fixedpanr=panlaw[254-pan] ;
 
-		// filter constants
-
-		fixed f_k=fl2fp( 1.0F / 3.0F ) ;
-		fixed f_s=FP_ONE - f_k ;
-
 		// Get pan multiplicators, and take volume into account
 
     int n=int(rp->position_) ;
@@ -746,8 +755,8 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 		fixed fpSpeed=rp->speed_ ;     // speed in fixed
 		if (rp->reverse_)
     {
-			fpSpeed=-rp->speed_ ; 
-		} 
+			fpSpeed=-rp->speed_ ;
+		}
 
     fixed s1,s2,t2,eta,inveta;
 		s2=0 ; t2=0 ;
@@ -759,7 +768,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
     {
 			lastSample=(short *)(wavbuf+rp->rendLoopEnd_*2*channelCount) ;
 		}
-        
+
     fixed zerofive=fl2fp(0.5f) ;
 
 		// Get feedback pointer position & boundary
@@ -784,26 +793,13 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 		int rpKrateCount=rp->krateCount_ ;
 		FeedbackMode rpFeedbackMode=rp->feedbackMode_ ;
 
-		fixed *fltSpeed=flt->speed ;
-		fixed *fltHeight=flt->height ;
-		fixed fltMix=flt->mix ;
-		fixed fltMixInv=FP_ONE-fltMix ;
-		fixed *fltDelay=flt->hipdelay ;
-		fixed fltParm1=flt->freq ;
-		fixed fltParm2=flt->reso ;
-		fixed fltDirt=flt->dirt ;
+		short *dsBasePtr = ((short *)wavbuf) + rp->rendFirst_* channelCount;
 
-		fixed *fltSpeedPtr=0 ;
-		fixed *fltDelayPtr=0 ;
-		fixed *fltHeightPtr=0 ;
-
-    short *dsBasePtr = ((short *)wavbuf) + rp->rendFirst_* channelCount;
-       
 		while (count>0) {
 
 			// look where we are, if we need to
 
-			if (!rpReverse) { //Looping forward 
+			if (!rpReverse) { //Looping forward
 				if (input>=lastSample/*-((loopMode==SILM_OSCFINE)?1:0)*/) {
 					switch(loopMode) {
                     case SILM_ONESHOT:
@@ -901,7 +897,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 				}
 			};
 
-			
+
       if (*rpFinished) {
 				count=-1 ;
 			} else {
@@ -916,14 +912,14 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 						struct RUParams rup ;
 						rup.cutOffset_=rup.resOffset_=rup.volumeOffset_=rup.panOffset_=rup.fbMixOffset_=rup.fbTunOffset_=0 ;
 						rup.speedOffset_=FP_ONE;
-				
+
 						std::vector<I_SRPUpdater *>::iterator it ;
 
 						for (it=rp->activeUpdaters_.begin();it!=rp->activeUpdaters_.end();it++) {
 							I_SRPUpdater *current=*it ;
 							current->UpdateSRP(rup) ;
 						}
-						
+
 						rp->volume_=fp_mul(rp->baseVolume_+rup.volumeOffset_,rp->rowGain_) ;
 						rp->pan_=rp->basePan_+rup.panOffset_ ;
 						rp->speed_=fp_mul(rp->baseSpeed_,rup.speedOffset_) ;
@@ -932,7 +928,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 						rp->fbMix_=rp->baseFbMix_+rup.fbMixOffset_ ;
 						rp->fbTun_=rp->baseFbTun_+rup.fbTunOffset_ ;
 
-						set_filter(channel,FLT_LOWPASS,rp->cutoff_,rp->reso_,filterMix,bassyFilter);
+						set_filter_v2(channel,filterKind,rp->cutoff_,rp->reso_,filterMix,bassyFilter,filterBoost,(int)driverRate);
 						filtering=(rp->cutoff_<i2fp(1))||(rp->reso_>i2fp(0)) ;
 
 						rp->feedbackIn_ = (feedbackIn-feedback_[channel])/2 ;
@@ -979,26 +975,18 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 
         short *i2=i1+channelCount ;
 
-				if (filtering) 
-        {
-					fltSpeedPtr=fltSpeed ;
-					fltHeightPtr=fltHeight ;
-					fltDelayPtr=fltDelay ;
-				}
-
-				for (int i=0;i<channelCount;i++) 
-        {
-					t2=s2 ; // move L to R if necessary
+for (int i=0;i<channelCount;i++) {
+				t2=s2 ; // move L to R if necessary
 					s1=i2fp(*i1++) ;
           s2=i2fp(*i2++) ;
 
 					switch(interpol) {
 
 						case 0: // Linear interpolation
-						
+
 							eta=fpPos ;
 							inveta=fp_sub(FP_ONE,eta) ;
-		           
+
 							// interpolate
 
 			  				s1=fp_mul(s1,inveta) ;
@@ -1008,9 +996,9 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 
     					s1+=s2 ;
 							break ;
-							
+
 						case 1: // Nearest neighbor
-						
+
 							if (fpPos>zerofive) {
 								s1=s2 ;
 							} ;
@@ -1056,37 +1044,10 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 
           s2=fp_mul(s2,volfactor) ;
 
-				// apply filtering if needed
+// apply filtering if needed
 
 					if (filtering) {
-
-						fixed lpin =fp_mul(s2,fltMixInv) ;
-      			fixed hpin = -fp_mul(s2,fltMix) ;
-							
-    				fixed difr = fp_sub(lpin,*fltHeightPtr);
-
-						// Introduce non-linearity if screamin'
-
-						if (filterBoost) {
-							if (*fltSpeedPtr<-FP_ONE) {
-								*fltSpeedPtr=-f_s ;
-							} else if (fltSpeed[i]>FP_ONE) {
-								*fltSpeedPtr=f_s ;
-							};
-							*fltSpeedPtr=fp_mul(*fltSpeedPtr,fltDirt) ;
-						}
-
-						*fltSpeedPtr = fp_mul(*fltSpeedPtr,fltParm2);		//mul by res, it's some kind of inertia. caution to feedback
-/*HOG:5*/				*fltSpeedPtr = fp_add(*fltSpeedPtr,fp_mul(difr,fltParm1)); //mul by cutoff, less cutoff = no sound, so it's better not be 0.
-
-						*fltHeightPtr += *fltSpeedPtr ;
-						*fltHeightPtr += *fltDelayPtr-hpin ;
-						s2=*fltHeightPtr ;
-
-						*fltDelayPtr=hpin ;
-						fltDelayPtr++ ;
-						fltHeightPtr++ ;
-						fltSpeedPtr++ ;
+						s2 = filterv2_process(fltv2, i, s2) ;
 					}
 					// apply attenuation
 					s2=fp_mul(s2,fpattenuate) ;
@@ -1118,7 +1079,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 
 			// Computes new pos for next input sample
 			// fpPos is always relative to 'input' pointer
-		
+
 			   fpPos=fp_add(fpPos,fpSpeed) ;
          int delta=fp2i(fpPos) ;
          input+=channelCount*delta;
@@ -1152,7 +1113,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
         SpectrumAnalyzer::Get().Feed(buffer, size) ;
     }
 
-    return somethingToMix ; 
+    return somethingToMix ;
 } ;
 
 
@@ -1292,7 +1253,7 @@ void SampleInstrument::Update(Observable &o,I_ObservableData *d)
 	FourCC id=v.GetID() ;
 
 	switch(id) {
-		case SIP_SAMPLE:	
+		case SIP_SAMPLE:
 		{
 			if (running_) {
 				dirty_=true ; // we'll update later, when instrument gets re-triggered
@@ -1326,7 +1287,7 @@ static unsigned char treefrogFxIntensity(unsigned int v, unsigned char maxCap) {
 }
 
 void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
-	
+
  	renderParams *rp=renderParams_+channel ;
 	if (!source_) return ;
 
@@ -1427,7 +1388,7 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				float speed=float(value>>8) ;
                 float startVolume=fp2fl(rp->volume_) ;
 				float baseVolume=fp2fl(rp->baseVolume_) ;
-                
+
 				int sampleCount=int(4*SyncMaster::GetInstance()->GetTickSampleCount()) ;
 				speed=(speed==0)?0:fabs(targetVolume-startVolume)*KRATE_SAMPLE_COUNT/float(speed)/sampleCount ;
 				rp->volumeRamp_.SetData(targetVolume-baseVolume,speed,startVolume-baseVolume) ;
@@ -1483,7 +1444,7 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				float target=float(resRaw)/255.0f ;
 				float speed=float(value>>8) ;
                 float start=fp2fl(rp->reso_) ;
-				float baseRes=fp2fl(rp->baseFRes_) ;                
+				float baseRes=fp2fl(rp->baseFRes_) ;
 				int sampleCount=int(4*SyncMaster::GetInstance()->GetTickSampleCount()) ;
 				speed=(speed==0)?0:fabs(target-start)*KRATE_SAMPLE_COUNT/float(speed)/sampleCount ;
  				rp->resRamp_.SetData(target-baseRes,speed,start-baseRes) ;
@@ -1506,7 +1467,7 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				float target=float(mixRaw)/255.0f ;
 				float speed=float(value>>8) ;
                 float start=fp2fl(rp->fbMix_) ;
-				float baseMix=fp2fl(rp->baseFbMix_) ;                
+				float baseMix=fp2fl(rp->baseFbMix_) ;
 				int sampleCount=int(4*SyncMaster::GetInstance()->GetTickSampleCount()) ;
 				speed=(speed==0)?0:fabs(target-start)*KRATE_SAMPLE_COUNT/float(speed)/sampleCount ;
  				rp->fbMixRamp_.SetData(target-baseMix,speed,start-baseMix) ;
@@ -1529,7 +1490,7 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				float target=float(tunRaw)/255.0f ;
 				float speed=float(value>>8) ;
                 float start=fp2fl(rp->fbTun_) ;
-				float baseTune=fp2fl(rp->baseFbTun_) ;                
+				float baseTune=fp2fl(rp->baseFbTun_) ;
 				int sampleCount=int(4*SyncMaster::GetInstance()->GetTickSampleCount()) ;
 				speed=(speed==0)?0:fabs(target-start)*KRATE_SAMPLE_COUNT/float(speed)/sampleCount ;
  				rp->fbTunRamp_.SetData(target-baseTune,speed,start-baseTune) ;
@@ -1547,16 +1508,16 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				if (pitch>127) pitch=pitch-256 ;
 
 			 // Target speed for the ramp
-			 
+
 				float targetSpeed=float(pow(2.0,(pitch)/12.0)) ;
 				float srcSpeed=fp2fl(rp->speed_)/fp2fl(rp->baseSpeed_) ;
 
 			// speed of ramp
-			
+
 				speed=(speed==0)?0.0f:fp2fl(rp->speed_)*255.0f/speed/KRATE_SAMPLE_COUNT/32.0f ;
 
 			 // Fill ramp data & enable
-			 
+
         rp->speedRamp_.SetData(targetSpeed,speed,srcSpeed) ;
 				if (!rp->speedRamp_.Enabled()) {
 					rp->speedRamp_.Enable() ;
@@ -1571,29 +1532,29 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				float speed=float(value>>8) ;   // get speed parameter
 
 				if (pitch>127) pitch=pitch-256 ;
-				
+
 			 // Target speed for the ramp, taken from channel' last note
 			 // if no pitch is given
-			 
+
         float targetSpeed,initSpeed ;
-        if (pitch==0) 
+        if (pitch==0)
         {
           pitch=lastMidiNote_[channel]-rp->midiNote_ ;
           targetSpeed=1.0 ;
           initSpeed=float(pow(2.0f,pitch/12.0f)) ;
-        } 
+        }
         else
         {
           initSpeed=fp2fl(rp->speed_)/fp2fl(rp->baseSpeed_) ;
-          targetSpeed=float(pow(2.0f,pitch/12.0f)) ;                    
+          targetSpeed=float(pow(2.0f,pitch/12.0f)) ;
         }
-                
+
 			// speed of ramp
-			
+
 				speed=(speed==0)?0.0f:float(1+50.0/KRATE_SAMPLE_COUNT/speed) ;
 
 			 // Fill ramp data & enable
-			 
+
         rp->legato_.SetData(targetSpeed,speed,initSpeed) ;
 				if (!rp->legato_.Enabled()) {
 					rp->legato_.Enable() ;
@@ -1601,7 +1562,7 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				}
 			} ;
 			break ;
-			
+
 		case I_CMD_PFIN:
 			{
 
@@ -1609,16 +1570,16 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				if (semi>1) semi=semi-2 ;
 
 				float speed=float(value>>8) ;   // get speed parameter
-				
+
 				float initSpeed=rp->pfin_.Enabled()?rp->pfin_.GetCurrent():1 ;
-        float targetSpeed=float(pow(2.0f,semi/12.0f)) ;                    
-                
+        float targetSpeed=float(pow(2.0f,semi/12.0f)) ;
+
 			// speed of ramp
-			
+
 				speed=(speed==0)?0.0f:float(1+50.0/KRATE_SAMPLE_COUNT/speed) ;
 
 			 // Fill ramp data & enable
-			 
+
         rp->pfin_.SetData(targetSpeed,speed,initSpeed) ;
 
 				if (!rp->pfin_.Enabled()) {
@@ -1627,7 +1588,7 @@ void SampleInstrument::ProcessCommand(int channel,FourCC cc,ushort value) {
 				}
 			} ;
 			break ;
-			
+
 		case I_CMD_RTRG:
             {
 				unsigned char loop=(value&0xFF) ; // number of ticks before repeat

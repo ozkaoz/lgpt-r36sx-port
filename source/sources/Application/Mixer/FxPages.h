@@ -17,21 +17,25 @@
 
 // TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9):
 // MixerView page system for the master FX engine.  SELECT cycles
-// MIX -> DELAY -> REVERB -> EQ -> COMP -> MIX.  MIX keeps the per-channel
-// bars plus an FX RETURNS readout (master DLY/RVB return levels).  The
-// per-track DLY/RVB send readouts were removed in Fase 9: sends are
-// per-instrument now (edited in InstrumentView), and the per-track sends
-// survive only as the Fase 7 inheritance/compatibility layer.  R2 alone
-// cycles the MIX-page edit target VOL -> DLY RET -> RVB RET.  DELAY/REVERB/
-// EQ/COMP are parameter pages: UP/DOWN moves the row cursor, LEFT/RIGHT
-// edits the value, A+UP/DOWN coarse.  EQ exposes the 3-band parametric EQ,
+// MIX -> DELAY -> REVERB -> EQ -> EQ_EXT -> COMP -> MIX.  MIX keeps the
+// per-channel bars plus an FX RETURNS readout (master DLY/RVB return
+// levels).  The per-track DLY/RVB send readouts were removed in Fase 9:
+// sends are per-instrument now (edited in InstrumentView), and the
+// per-track sends survive only as the Fase 7 inheritance/compatibility
+// layer.  R2 alone cycles the MIX-page edit target VOL -> DLY RET -> RVB
+// RET.  DELAY/REVERB/EQ/EQ_EXT/COMP are parameter pages: UP/DOWN moves the
+// row cursor, LEFT/RIGHT edits the value, A+UP/DOWN coarse.  EQ exposes
+// the 3-band parametric EQ, EQ_EXT the 5-band EXT chain (bacon-1.5 item 2),
 // COMP the compressor (Fase 6 splits the old single MASTER page in two so
 // each page fits the 8-line mixer screen without scrolling).
+// FXP_MASTER_EQ8 (bacon-1.5, item 2): EQ EXT page inserted between EQ and
+// COMP (runtime-only; nothing persists the FxPage number).
 enum FxPage {
     FX_PAGE_MIX = 0,
     FX_PAGE_DELAY,
     FX_PAGE_REVERB,
     FX_PAGE_EQ,
+    FX_PAGE_EQ_EXT,
     FX_PAGE_COMP,
     FX_PAGE_COUNT
 };
@@ -92,6 +96,31 @@ enum FxParamId {
     FX_P_CMP_MKU,
     FX_P_CMP_LINK,
     FX_P_CMP_SC,
+    // EQ EXT (FX_PAGE_EQ_EXT, bacon-1.5 item 2): bypass + 5 EXT bands
+    // (BAND3..BAND7, no EN: enabled derived from GAI!=0 || TYP!=BELL).
+    // Appended AFTER the golden ids so every existing FX_P_* value is
+    // unchanged (bit-identical persistence).
+    FX_P_EQX_BYP,
+    FX_P_EQX_B3_FRQ,
+    FX_P_EQX_B3_GAI,
+    FX_P_EQX_B3_Q,
+    FX_P_EQX_B3_TYP,
+    FX_P_EQX_B4_FRQ,
+    FX_P_EQX_B4_GAI,
+    FX_P_EQX_B4_Q,
+    FX_P_EQX_B4_TYP,
+    FX_P_EQX_B5_FRQ,
+    FX_P_EQX_B5_GAI,
+    FX_P_EQX_B5_Q,
+    FX_P_EQX_B5_TYP,
+    FX_P_EQX_B6_FRQ,
+    FX_P_EQX_B6_GAI,
+    FX_P_EQX_B6_Q,
+    FX_P_EQX_B6_TYP,
+    FX_P_EQX_B7_FRQ,
+    FX_P_EQX_B7_GAI,
+    FX_P_EQX_B7_Q,
+    FX_P_EQX_B7_TYP,
     FX_PARAM_COUNT
 };
 
@@ -161,6 +190,31 @@ static const FxParamSpec kFxParams_[FX_PARAM_COUNT] = {
     { "CMP MKU", FX_PAGE_COMP,     0.0f,  24.0f,    0.0f,   "%5.1f" },  // FX_P_CMP_MKU (dB)
     { "CMP LNK", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_LINK
     { "CMP SCL", FX_PAGE_COMP,     0.0f,   1.0f,    1.0f,   "%5.0f" },  // FX_P_CMP_SC (softclip)
+    // EQ EXT page (bacon-1.5 item 2): BYP + 5 bands x (FRQ/GAI/Q/TYP), the
+    // ParametricEQ BAND3..BAND7.  Frequencies default to the 2/4/8/16 kHz
+    // ladder; TYP defaults BELL so the bands are implicitly disabled until
+    // gain or type changes.
+    { "EQX BYP", FX_PAGE_EQ_EXT,    0.0f,   1.0f,    0.0f,   "%5.0f" },  // FX_P_EQX_BYP
+    { "B3 FRQ",  FX_PAGE_EQ_EXT,   20.0f, 20000.0f,2000.0f, "%5.0f" },  // FX_P_EQX_B3_FRQ
+    { "B3 GAI",  FX_PAGE_EQ_EXT,  -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQX_B3_GAI
+    { "B3 Q",    FX_PAGE_EQ_EXT,    0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQX_B3_Q
+    { "B3 TYP",  FX_PAGE_EQ_EXT,    0.0f,   6.0f,    1.0f,   "%5.0f" },  // FX_P_EQX_B3_TYP (BELL)
+    { "B4 FRQ",  FX_PAGE_EQ_EXT,   20.0f, 20000.0f,4000.0f, "%5.0f" },  // FX_P_EQX_B4_FRQ
+    { "B4 GAI",  FX_PAGE_EQ_EXT,  -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQX_B4_GAI
+    { "B4 Q",    FX_PAGE_EQ_EXT,    0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQX_B4_Q
+    { "B4 TYP",  FX_PAGE_EQ_EXT,    0.0f,   6.0f,    1.0f,   "%5.0f" },  // FX_P_EQX_B4_TYP
+    { "B5 FRQ",  FX_PAGE_EQ_EXT,   20.0f, 20000.0f,8000.0f, "%5.0f" },  // FX_P_EQX_B5_FRQ
+    { "B5 GAI",  FX_PAGE_EQ_EXT,  -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQX_B5_GAI
+    { "B5 Q",    FX_PAGE_EQ_EXT,    0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQX_B5_Q
+    { "B5 TYP",  FX_PAGE_EQ_EXT,    0.0f,   6.0f,    1.0f,   "%5.0f" },  // FX_P_EQX_B5_TYP
+    { "B6 FRQ",  FX_PAGE_EQ_EXT,   20.0f, 20000.0f,16000.0f,"%5.0f" },  // FX_P_EQX_B6_FRQ
+    { "B6 GAI",  FX_PAGE_EQ_EXT,  -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQX_B6_GAI
+    { "B6 Q",    FX_PAGE_EQ_EXT,    0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQX_B6_Q
+    { "B6 TYP",  FX_PAGE_EQ_EXT,    0.0f,   6.0f,    1.0f,   "%5.0f" },  // FX_P_EQX_B6_TYP
+    { "B7 FRQ",  FX_PAGE_EQ_EXT,   20.0f, 20000.0f,16000.0f,"%5.0f" },  // FX_P_EQX_B7_FRQ
+    { "B7 GAI",  FX_PAGE_EQ_EXT,  -24.0f,  24.0f,   0.0f,   "%5.1f" },  // FX_P_EQX_B7_GAI
+    { "B7 Q",    FX_PAGE_EQ_EXT,    0.1f,  10.0f,    1.0f,   "%5.2f" },  // FX_P_EQX_B7_Q
+    { "B7 TYP",  FX_PAGE_EQ_EXT,    0.0f,   6.0f,    1.0f,   "%5.0f" },  // FX_P_EQX_B7_TYP
 } ;
 
 // FXP_DESCRIPTORS_V1 (bacon-1.5, item 1): metadatos de la capa comun de
@@ -216,6 +270,28 @@ static const FxParamMeta kFxParamMeta_[FX_PARAM_COUNT] = {
     { FX_PARAM_CONTINUOUS, FX_CURVE_LINEAR, "dB" },  // CMP MKU
     { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // CMP LNK
     { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // CMP SC
+    // EQ EXT (bacon-1.5 item 2)
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // EQX BYP
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // B3 FRQ
+    { FX_PARAM_SIGNED,     FX_CURVE_LINEAR, "dB" },  // B3 GAI
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Q"  },  // B3 Q
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // B3 TYP (discrete 0..6)
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // B4 FRQ
+    { FX_PARAM_SIGNED,     FX_CURVE_LINEAR, "dB" },  // B4 GAI
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Q"  },  // B4 Q
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // B4 TYP
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // B5 FRQ
+    { FX_PARAM_SIGNED,     FX_CURVE_LINEAR, "dB" },  // B5 GAI
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Q"  },  // B5 Q
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // B5 TYP
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // B6 FRQ
+    { FX_PARAM_SIGNED,     FX_CURVE_LINEAR, "dB" },  // B6 GAI
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Q"  },  // B6 Q
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // B6 TYP
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Hz" },  // B7 FRQ
+    { FX_PARAM_SIGNED,     FX_CURVE_LINEAR, "dB" },  // B7 GAI
+    { FX_PARAM_CONTINUOUS, FX_CURVE_LOG2,   "Q"  },  // B7 Q
+    { FX_PARAM_SWITCH,     FX_CURVE_LINEAR, ""   },  // B7 TYP
 } ;
 
 // Descriptor completo (range natural de kFxParams_ + meta de la capa
@@ -247,6 +323,23 @@ inline int fxDspToPercentId(int id,float v) {
 // True si el parametro es continuo (editable en %); false para switches.
 inline bool fxIsPercentParam(int id) {
 	return kFxParamMeta_[id].kind_!=FX_PARAM_SWITCH ;
+}
+
+// FXP_MASTER_EQ8 (bacon-1.5, item 2): discrete params (switch AND multi-value
+// discrete like the EQ EXT band TYPE 0..6) always step by 1, never by a
+// percent step.
+inline bool fxIsDiscreteParam(int id) {
+	if (kFxParamMeta_[id].kind_==FX_PARAM_SWITCH) return true ;
+	switch (id) {
+	case FX_P_EQX_B3_TYP:
+	case FX_P_EQX_B4_TYP:
+	case FX_P_EQX_B5_TYP:
+	case FX_P_EQX_B6_TYP:
+	case FX_P_EQX_B7_TYP:
+		return true ;
+	default:
+		return false ;
+	}
 }
 
 // TREEFROG_MIXER_VU_DB_SCALE_V5 (Bacon 1.1.1):
@@ -296,6 +389,7 @@ inline int fxBypassId(FxPage page) {
 	case FX_PAGE_DELAY:  return FX_P_DLY_BYP ;
 	case FX_PAGE_REVERB: return FX_P_RVB_BYP ;
 	case FX_PAGE_EQ:     return FX_P_EQ_BYP ;
+	case FX_PAGE_EQ_EXT: return FX_P_EQX_BYP ;
 	case FX_PAGE_COMP:   return FX_P_CMP_BYP ;
 	default:             return -1 ;
 	}
@@ -353,6 +447,11 @@ inline bool fxUsesCurve(int id) {
 	case FX_P_EQ_LOW_FRQ:
 	case FX_P_EQ_MID_FRQ:
 	case FX_P_EQ_HI_FRQ:
+	case FX_P_EQX_B3_FRQ:
+	case FX_P_EQX_B4_FRQ:
+	case FX_P_EQX_B5_FRQ:
+	case FX_P_EQX_B6_FRQ:
+	case FX_P_EQX_B7_FRQ:
 	case FX_P_DLY_TIME:
 	case FX_P_RVB_PRE:
 	case FX_P_RVB_DEC:

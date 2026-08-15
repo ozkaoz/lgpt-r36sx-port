@@ -1,5 +1,6 @@
 #include "ParametricEQ.h"
 #include <math.h>
+#include "Application/Audio/EqBiquad.h"
 
 namespace FxEngine {
 
@@ -22,8 +23,23 @@ namespace FxEngine {
 #define FX_EQ_SHELF_Q_MIN 0.5f
 #define FX_EQ_SHELF_Q_MAX 2.0f
 
+// FXP_MASTER_EQ8 (bacon-1.5, item 2): persisted BandType -> EqBiquad type.
+static int mapBandType(ParametricEQ::BandType t) {
+    switch (t) {
+    case ParametricEQ::BT_LOW_SHELF:  return EQ_BIQUAD_LOW_SHELF;
+    case ParametricEQ::BT_HIGH_SHELF: return EQ_BIQUAD_HIGH_SHELF;
+    case ParametricEQ::BT_LOW_PASS:   return EQ_BIQUAD_LOW_PASS;
+    case ParametricEQ::BT_HIGH_PASS:  return EQ_BIQUAD_HIGH_PASS;
+    case ParametricEQ::BT_BAND_PASS:  return EQ_BIQUAD_BAND_PASS;
+    case ParametricEQ::BT_NOTCH:      return EQ_BIQUAD_NOTCH;
+    case ParametricEQ::BT_BELL:
+    default:                          return EQ_BIQUAD_BELL;
+    }
+}
+
 ParametricEQ::ParametricEQ()
-    : rate_(44100), bypass_(false), bypassMix_(0), rtViolations_(0) {
+    : rate_(44100), bypass_(false), extBypass_(true), bypassMix_(0),
+      extBypassMix_(0), rtViolations_(0) {
     for (int b = 0; b < kNumBands; b++) {
         Biquad &bg = bands_[b];
         bg.b0 = i2fp(1); bg.b1 = bg.b2 = bg.a1 = bg.a2 = 0;
@@ -31,15 +47,26 @@ ParametricEQ::ParametricEQ()
         bg.mixCur = 0;
         bg.enabled = false;
         bg.hz = 0; bg.db = 0; bg.q = fl2fp(1.0f);
+        bg.type = BT_BELL;
     }
-    // Defaults: low shelf 100 Hz, bell 1 kHz, high shelf 10 kHz, all 0 dB.
+    // Golden defaults: low shelf 100 Hz, bell 1 kHz, high shelf 10 kHz, all
+    // 0 dB.  EXT bands (FX_PAGE_EQ_EXT) default to a 2/4/8/16 kHz ladder,
+    // all 0 dB, so the EXT page is silent until edited (and the legacy
+    // AllParamsAtLegacyDefault bypass stays true).
+    bands_[LOW].type = BT_LOW_SHELF;
+    bands_[HIGH].type = BT_HIGH_SHELF;
     SetBandFreq(LOW, fl2fp(100.0f));
     SetBandFreq(MID, fl2fp(1000.0f));
     SetBandFreq(HIGH, fl2fp(10000.0f));
+    SetBandFreq(BAND3, fl2fp(2000.0f));
+    SetBandFreq(BAND4, fl2fp(4000.0f));
+    SetBandFreq(BAND5, fl2fp(8000.0f));
+    SetBandFreq(BAND6, fl2fp(16000.0f));
+    SetBandFreq(BAND7, fl2fp(16000.0f));
     SetBandQ(LOW, fl2fp(1.0f));
     SetBandQ(MID, fl2fp(1.0f));
     SetBandQ(HIGH, fl2fp(1.0f));
-    for (int b = 0; b < kNumBands; b++) recompute((Band)b);
+    for (int b = 0; b < kNumBands; b++) recompute(b);
 }
 
 void ParametricEQ::Reset() {
@@ -49,6 +76,7 @@ void ParametricEQ::Reset() {
         bg.mixCur = bg.enabled ? i2fp(1) : 0;
     }
     bypassMix_ = bypass_ ? i2fp(1) : 0;
+    extBypassMix_ = extBypass_ ? i2fp(1) : 0;
 }
 
 void ParametricEQ::SetSampleRate(int rate) {
@@ -57,11 +85,11 @@ void ParametricEQ::SetSampleRate(int rate) {
         return;
     }
     rate_ = rate;
-    for (int b = 0; b < kNumBands; b++) recompute((Band)b);
+    for (int b = 0; b < kNumBands; b++) recompute(b);
 }
 
-void ParametricEQ::SetBandFreq(Band band, fixed hz) {
-    if (band < LOW || band > HIGH) {
+void ParametricEQ::SetBandFreq(int band, fixed hz) {
+    if (band < LOW || band >= kNumBands) {
         ++rtViolations_;
         return;
     }
@@ -72,8 +100,8 @@ void ParametricEQ::SetBandFreq(Band band, fixed hz) {
     recompute(band);
 }
 
-void ParametricEQ::SetBandGainDb(Band band, fixed db) {
-    if (band < LOW || band > HIGH) {
+void ParametricEQ::SetBandGainDb(int band, fixed db) {
+    if (band < LOW || band >= kNumBands) {
         ++rtViolations_;
         return;
     }
@@ -81,11 +109,12 @@ void ParametricEQ::SetBandGainDb(Band band, fixed db) {
     if (g < FX_EQ_MIN_DB) g = FX_EQ_MIN_DB;
     if (g > FX_EQ_MAX_DB) g = FX_EQ_MAX_DB;
     bands_[band].db = fl2fp(g);
+    refreshBandEnabled(band);
     recompute(band);
 }
 
-void ParametricEQ::SetBandQ(Band band, fixed q) {
-    if (band < LOW || band > HIGH) {
+void ParametricEQ::SetBandQ(int band, fixed q) {
+    if (band < LOW || band >= kNumBands) {
         ++rtViolations_;
         return;
     }
@@ -96,15 +125,32 @@ void ParametricEQ::SetBandQ(Band band, fixed q) {
     recompute(band);
 }
 
-void ParametricEQ::SetBandEnabled(Band band, bool on) {
-    if (band < LOW || band > HIGH) {
+void ParametricEQ::SetBandType(int band, BandType type) {
+    if (band < LOW || band >= kNumBands) {
+        ++rtViolations_;
+        return;
+    }
+    if (type < BT_LOW_SHELF || type >= BT_TYPECOUNT) type = BT_BELL;
+    bands_[band].type = type;
+    refreshBandEnabled(band);
+    recompute(band);
+}
+
+void ParametricEQ::SetBandEnabled(int band, bool on) {
+    // EXT bands are enabled implicitly from their settings; only the golden
+    // base bands carry an explicit enable.
+    if (band < LOW || band >= BAND3) {
         ++rtViolations_;
         return;
     }
     bands_[band].enabled = on;
 }
 
-void ParametricEQ::SetBypass(bool on) { bypass_ = on; }
+void ParametricEQ::refreshBandEnabled(int band) {
+    if (band < BAND3) return; // base bands: explicit enable only
+    Biquad &bg = bands_[band];
+    bg.enabled = (bg.db != 0) || (bg.type != BT_BELL);
+}
 
 fixed ParametricEQ::saturate(fixed x) {
     if (x > i2fp(1)) return i2fp(1);
@@ -112,67 +158,16 @@ fixed ParametricEQ::saturate(fixed x) {
     return x;
 }
 
-// Audio EQ Cookbook (RBJ) biquads.  LOW = low shelf, MID = bell (peak),
-// HIGH = high shelf.  Computed at control-rate (parameter changes only).
-void ParametricEQ::recompute(Band band) {
+// Audio EQ Cookbook (RBJ) biquads via the shared EqBiquad primitive.
+// Computed at control-rate (parameter changes only).
+void ParametricEQ::recompute(int band) {
     Biquad &bg = bands_[band];
     float f0 = fp2fl(bg.hz);
-    float gainDb = fp2fl(bg.db);
-    float q = fp2fl(bg.q);
-
     if (f0 <= 0.0f) f0 = 1.0f;
-    float w0 = 2.0f * 3.14159265f * f0 / (float)rate_;
-    if (w0 > 3.14159265f * 0.9f) w0 = 3.14159265f * 0.9f;
-    float cw = cosf(w0);
-    float sw = sinf(w0);
-    float A = powf(10.0f, gainDb / 40.0f);      // A = 10^(G/40)
-    float sqrtA = sqrtf(A);
-
-    float b0, b1, b2, a0, a1, a2;
-    if (band == MID) {
-        float alpha = sw / (2.0f * q);
-        // b0 = 1 + alpha*A ; b1 = -2*cos ; b2 = 1 - alpha*A
-        b0 = 1.0f + alpha * A;
-        b1 = -2.0f * cw;
-        b2 = 1.0f - alpha * A;
-        a0 = 1.0f + alpha / A;
-        a1 = -2.0f * cw;
-        a2 = 1.0f - alpha / A;
-    } else {
-        // Shelf slope S from Q (clamped).
-        float S = (band == LOW) ? q : q;
-        if (S < FX_EQ_SHELF_Q_MIN) S = FX_EQ_SHELF_Q_MIN;
-        if (S > FX_EQ_SHELF_Q_MAX) S = FX_EQ_SHELF_Q_MAX;
-        float alpha = (sw / 2.0f) * sqrtf((A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f);
-        if (band == LOW) {
-            // low shelf
-            b0 = A * ((A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * alpha);
-            b1 = 2.0f * A * ((A - 1.0f) - (A + 1.0f) * cw);
-            b2 = A * ((A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * alpha);
-            a0 = (A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * alpha;
-            a1 = -2.0f * ((A - 1.0f) + (A + 1.0f) * cw);
-            a2 = (A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * alpha;
-        } else {
-            // high shelf
-            b0 = A * ((A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * alpha);
-            b1 = -2.0f * A * ((A - 1.0f) + (A + 1.0f) * cw);
-            b2 = A * ((A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * alpha);
-            a0 = (A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * alpha;
-            a1 = 2.0f * ((A - 1.0f) - (A + 1.0f) * cw);
-            a2 = (A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * alpha;
-        }
-    }
-
-    // Normalize by a0.
-    if (a0 != 0.0f) {
-        bg.b0 = fl2fp(b0 / a0);
-        bg.b1 = fl2fp(b1 / a0);
-        bg.b2 = fl2fp(b2 / a0);
-        bg.a1 = fl2fp(a1 / a0);
-        bg.a2 = fl2fp(a2 / a0);
-    } else {
-        bg.b0 = i2fp(1); bg.b1 = bg.b2 = bg.a1 = bg.a2 = 0;
-    }
+    fixed b0, b1, b2, a1, a2;
+    eqBiquadCoeffs(mapBandType(bg.type), rate_, f0, fp2fl(bg.db),
+                   fp2fl(bg.q), b0, b1, b2, a1, a2);
+    bg.b0 = b0; bg.b1 = b1; bg.b2 = b2; bg.a1 = a1; bg.a2 = a2;
 }
 
 void ParametricEQ::Process(const fixed *in, fixed *out, int frames) {
@@ -184,6 +179,9 @@ void ParametricEQ::Process(const fixed *in, fixed *out, int frames) {
     // Global bypass crossfade (smoothed).
     fixed targetBypass = bypass_ ? 0 : i2fp(1);
     FX_EQ_SNAP(FX_EQ_MIX_SMOOTH, bypassMix_, targetBypass);
+    // EXT chain crossfade (smoothed).
+    fixed targetExt = extBypass_ ? 0 : i2fp(1);
+    FX_EQ_SNAP(FX_EQ_MIX_SMOOTH, extBypassMix_, targetExt);
     // Smooth each band's engage mix.
     for (int b = 0; b < kNumBands; b++) {
         Biquad &bg = bands_[b];
@@ -198,23 +196,47 @@ void ParametricEQ::Process(const fixed *in, fixed *out, int frames) {
         fixed yL = xL;
         fixed yR = xR;
 
-        for (int b = 0; b < kNumBands; b++) {
+        // Base chain: golden bands LOW/MID/HIGH.
+        for (int b = LOW; b < BAND3; b++) {
             Biquad &bg = bands_[b];
             if (bg.mixCur == 0) continue; // fully off: leave dry
-
             // Transposed direct form II (L).
             fixed tL = fp_mul(bg.b0, xL) + bg.s1[0];
             bg.s1[0] = fp_mul(bg.b1, xL) - fp_mul(bg.a1, tL) + bg.s2[0];
             bg.s2[0] = fp_mul(bg.b2, xL) - fp_mul(bg.a2, tL);
-            // (R)
             fixed tR = fp_mul(bg.b0, xR) + bg.s1[1];
             bg.s1[1] = fp_mul(bg.b1, xR) - fp_mul(bg.a1, tR) + bg.s2[1];
             bg.s2[1] = fp_mul(bg.b2, xR) - fp_mul(bg.a2, tR);
-
             yL = xL + fp_mul(tL - xL, bg.mixCur);
             yR = xR + fp_mul(tR - xR, bg.mixCur);
             xL = yL; // cascade: next band sees this band's output
             xR = yR;
+        }
+        // Snapshot the base chain for the EXT bypass crossfade.
+        fixed yBaseL = yL;
+        fixed yBaseR = yR;
+
+        // EXT chain: bands BAND3..BAND7 (FX_PAGE_EQ_EXT).
+        for (int b = BAND3; b < kNumBands; b++) {
+            Biquad &bg = bands_[b];
+            if (bg.mixCur == 0) continue;
+            // Transposed direct form II (L).
+            fixed tL = fp_mul(bg.b0, xL) + bg.s1[0];
+            bg.s1[0] = fp_mul(bg.b1, xL) - fp_mul(bg.a1, tL) + bg.s2[0];
+            bg.s2[0] = fp_mul(bg.b2, xL) - fp_mul(bg.a2, tL);
+            fixed tR = fp_mul(bg.b0, xR) + bg.s1[1];
+            bg.s1[1] = fp_mul(bg.b1, xR) - fp_mul(bg.a1, tR) + bg.s2[1];
+            bg.s2[1] = fp_mul(bg.b2, xR) - fp_mul(bg.a2, tR);
+            yL = xL + fp_mul(tL - xL, bg.mixCur);
+            yR = xR + fp_mul(tR - xR, bg.mixCur);
+            xL = yL;
+            xR = yR;
+        }
+
+        // EXT bypass: crossfade between base chain and full 8-band chain.
+        if (extBypassMix_ != i2fp(1)) {
+            yL = yBaseL + fp_mul(yL - yBaseL, extBypassMix_);
+            yR = yBaseR + fp_mul(yR - yBaseR, extBypassMix_);
         }
 
         // Global bypass: dry (or whatever) crossfade.

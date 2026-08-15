@@ -1,6 +1,7 @@
 #include "InstrumentEq.h"
 
 #include <math.h>
+#include "EqBiquad.h"
 
 static const float kMinGainDb = -24.0f;
 static const float kMaxGainDb = 24.0f;
@@ -111,83 +112,29 @@ void InstrumentEq::refreshFlat() {
     flat_ = !any;
 }
 
+// FXP_INSTRUMENT_EQ_BP (bacon-1.5, item 2): the coefficient math lives in the
+// shared EqBiquad primitive (same DSP as FxEngine::ParametricEQ).  Maps the
+// persisted BandType (0..6) to the EqBiquad type; BELL default on unknown.
+static int mapBandType(int t) {
+    switch (t) {
+    case InstrumentEq::TYPE_LOW_SHELF:  return EQ_BIQUAD_LOW_SHELF;
+    case InstrumentEq::TYPE_HIGH_SHELF: return EQ_BIQUAD_HIGH_SHELF;
+    case InstrumentEq::TYPE_LOW_PASS:   return EQ_BIQUAD_LOW_PASS;
+    case InstrumentEq::TYPE_HIGH_PASS:  return EQ_BIQUAD_HIGH_PASS;
+    case InstrumentEq::TYPE_BAND_PASS:  return EQ_BIQUAD_BAND_PASS;
+    case InstrumentEq::TYPE_NOTCH:      return EQ_BIQUAD_NOTCH;
+    case InstrumentEq::TYPE_BELL:
+    default:                            return EQ_BIQUAD_BELL;
+    }
+}
+
 void InstrumentEq::recomputeBand(int band) {
     if (rate_ <= 0) return;
     BandCfg &bg = bandCfg_[band];
-    float f0 = fp2fl(bg.hz);
-    float lvl = fp2fl(bg.db);
-    float qv = fp2fl(bg.q);
-    if (qv < 0.1f) qv = 0.1f;
-
-    float w0 = 2.0f * 3.14159265f * f0 / (float)rate_;
-    if (w0 > 3.14159265f * 0.95f) w0 = 3.14159265f * 0.95f;
-    if (w0 < 1e-6f) w0 = 1e-6f;
-    float cw = cosf(w0);
-    float sw = sinf(w0);
-    float A = powf(10.0f, lvl / 40.0f);
-    float alpha = sw / (2.0f * qv);
-
-    float b0, b1, b2, a0, a1, a2;
-    switch (bg.type) {
-    case TYPE_LOW_SHELF: {
-        float S = qv; if (S < 0.5f) S = 0.5f; if (S > 2.0f) S = 2.0f;
-        float sqA = sqrtf(A);
-        float ac = (sw / 2.0f) * sqrtf((A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f);
-        b0 = A * ((A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqA * ac);
-        b1 = 2.0f * A * ((A - 1.0f) - (A + 1.0f) * cw);
-        b2 = A * ((A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqA * ac);
-        a0 = (A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqA * ac;
-        a1 = -2.0f * ((A - 1.0f) + (A + 1.0f) * cw);
-        a2 = (A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqA * ac;
-        break;
-    }
-    case TYPE_HIGH_SHELF: {
-        float S = qv; if (S < 0.5f) S = 0.5f; if (S > 2.0f) S = 2.0f;
-        float sqA = sqrtf(A);
-        float as = (sw / 2.0f) * sqrtf((A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f);
-        b0 = A * ((A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqA * as);
-        b1 = -2.0f * A * ((A - 1.0f) + (A + 1.0f) * cw);
-        b2 = A * ((A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqA * as);
-        a0 = (A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqA * as;
-        a1 = 2.0f * ((A - 1.0f) - (A + 1.0f) * cw);
-        a2 = (A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqA * as;
-        break;
-    }
-    case TYPE_HIGH_PASS:
-        b0 = (1.0f + cw) / 2.0f;
-        b1 = -(1.0f + cw);
-        b2 = b0;
-        a0 = 1.0f + alpha;
-        a1 = -2.0f * cw;
-        a2 = 1.0f - alpha;
-        break;
-    case TYPE_NOTCH:
-        b0 = 1.0f;
-        b1 = -2.0f * cw;
-        b2 = 1.0f;
-        a0 = 1.0f + alpha;
-        a1 = -2.0f * cw;
-        a2 = 1.0f - alpha;
-        break;
-    case TYPE_BELL:
-    default:
-        b0 = 1.0f + alpha * A;
-        b1 = -2.0f * cw;
-        b2 = 1.0f - alpha * A;
-        a0 = 1.0f + alpha / A;
-        a1 = -2.0f * cw;
-        a2 = 1.0f - alpha / A;
-        break;
-    }
-    if (a0 != 0.0f) {
-        bg.b0 = fl2fp(b0 / a0);
-        bg.b1 = fl2fp(b1 / a0);
-        bg.b2 = fl2fp(b2 / a0);
-        bg.a1 = fl2fp(a1 / a0);
-        bg.a2 = fl2fp(a2 / a0);
-    } else {
-        bg.b0 = i2fp(1); bg.b1 = 0; bg.b2 = 0; bg.a1 = 0; bg.a2 = 0;
-    }
+    fixed b0, b1, b2, a1, a2;
+    eqBiquadCoeffs(mapBandType((int)bg.type), rate_, fp2fl(bg.hz),
+                   fp2fl(bg.db), fp2fl(bg.q), b0, b1, b2, a1, a2);
+    bg.b0 = b0; bg.b1 = b1; bg.b2 = b2; bg.a1 = a1; bg.a2 = a2;
 }
 
 fixed InstrumentEq::saturate(fixed x) {

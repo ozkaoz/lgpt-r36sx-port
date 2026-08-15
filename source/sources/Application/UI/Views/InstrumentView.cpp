@@ -213,9 +213,17 @@ void InstrumentView::fillSampleParameters() {
 	T_SimpleList<UIField>::Insert(f2) ;
 
 	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
 	v=instrument->FindVariable(SIP_ATTENUATE) ;
 	f1=new UIPercentVarField(position,*v,kFxInstParams_[FX_INST_ATTENUATE],"attenuate",1,10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
+	// FXP_FILTER_V2 (bacon-1.5, item 2): additive filter topology on the free
+	// right cell of the attenuate row.  CHAR_LIST (filterKind[]) shows the
+	// type name; the variable default (LP) keeps old projects unchanged.
+	v=instrument->FindVariable(SIP_FILTERKIND) ;
+	f2=new UIIntVarField(col2,*v,"filt: %s",0,3,1,1) ;
+	T_SimpleList<UIField>::Insert(f2) ;
 
 	// ----------------------------------------------------------
 	// Block 3: BITCRUSHER (bit depth / drive / downsample).

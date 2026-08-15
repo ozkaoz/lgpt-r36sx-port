@@ -167,13 +167,20 @@ def check_eq_comp_pages():
     # Bypass row and headers/params share the centered columns.
     assert "drawEqRow(FX_P_EQ_BYP,ml.labelX,ml.valueX,ml.startY)" in eq
     assert "DrawString(ml.labelX,yHeader" in eq
+    # FXP_MASTER_EQ8: the EQ EXT page is a self-labeled 21-row centered block
+    # between drawEqPage and drawCompPage.
+    assert "MakeCenteredMenuLayout(21,6,13,2)" in eq
+    assert "drawEqExtRow(bandId+p,ml.labelX,ml.valueX,ml.startY+1+4*b+p)" in eq
+    mlx = centered_menu(21, 6, 13, 2)
+    assert mlx["startY"] >= KBAND_TOP
+    assert mlx["startY"] + mlx["blockHeight"] - 1 <= KBAND_BOT
     # COMP GR meter sits one row below the last parameter, still in band.
     assert "ml.startY+9" in cm
     ml = centered_menu(9, 11, 13, 3)
     assert ml["startY"] + 9 <= KBAND_BOT
     # No fixed columns remain on these pages.
     assert "const int x=13" not in eq and "const int labelX=8" not in cm
-    print("5. EQ (16 rows) and COMP (9 rows) centered blocks OK")
+    print("5. EQ (16 rows), EQ_EXT (21 rows) and COMP (9 rows) centered blocks OK")
 
 
 # ---------------------------------------------------------------------------
@@ -356,6 +363,12 @@ def check_dsp_table_unchanged():
     # Mixer FxPage order untouched.
     assert FXP.index("FX_PAGE_MIX") < FXP.index("FX_PAGE_DELAY")
     assert FXP.index("FX_PAGE_COMP") < FXP.index("FX_PAGE_COUNT")
+    # FXP_MASTER_EQ8: EQ_EXT sits between EQ and COMP, ids appended at the
+    # end (before FX_PARAM_COUNT) so every golden FX_P_* value is unchanged.
+    assert FXP.index("FX_PAGE_EQ_EXT") > FXP.index("FX_PAGE_EQ")
+    assert FXP.index("FX_PAGE_EQ_EXT") < FXP.index("FX_PAGE_COMP")
+    assert FXP.index("FX_P_EQX_BYP") > FXP.index("FX_P_CMP_SC")
+    assert FXP.index("FX_P_EQX_BYP") < FXP.index("FX_PARAM_COUNT")
     print("11. DSP ranges/defaults and FxParamId/FxPage enums unchanged OK")
 
 
@@ -370,6 +383,7 @@ def check_footer_band():
         "DELAY": 17,
         "REVERB": 17,
         "EQ": 21,
+        "EQ_EXT": 24,    # 21-row block centered at startY=4
         "COMP": 19,      # GR row
     }
     for name, max_row in block_max_row.items():

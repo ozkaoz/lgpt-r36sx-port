@@ -138,6 +138,9 @@ public:
     void SetEqBandGainDb(int band, fixed db) { eq_.SetBandGainDb((ParametricEQ::Band)band, db); RefreshLegacy(); }
     void SetEqBandQ(int band, fixed q) { eq_.SetBandQ((ParametricEQ::Band)band, q); RefreshLegacy(); }
     void SetEqBandEnabled(int band, bool on) { eq_.SetBandEnabled((ParametricEQ::Band)band, on); RefreshLegacy(); }
+    // FXP_MASTER_EQ8 (bacon-1.5, item 2): per-band type + EXT chain bypass.
+    void SetEqBandType(int band, int type) { eq_.SetBandType((ParametricEQ::Band)band, (ParametricEQ::BandType)type); RefreshLegacy(); }
+    void SetEqExtBypass(bool on) { eq_.SetExtBypass(on); RefreshLegacy(); }
 
     // --- Compresor/limitador master (Fase 3) ---
     void SetCompBypass(bool on) { comp_.SetBypass(on); RefreshLegacy(); }
@@ -156,6 +159,8 @@ public:
     fixed GetEqBandGainDb(int band) const { return eq_.GetBandGainDb((ParametricEQ::Band)band); }
     fixed GetEqBandQ(int band) const { return eq_.GetBandQ((ParametricEQ::Band)band); }
     bool GetEqBandEnabled(int band) const { return eq_.GetBandEnabled((ParametricEQ::Band)band); }
+    int GetEqBandType(int band) const { return (int)eq_.GetBandType((ParametricEQ::Band)band); }
+    bool GetEqExtBypass() const { return eq_.GetExtBypass(); }
     bool GetEqBypass() const { return eq_.GetBypass(); }
     fixed GetCompThresholdDb() const { return comp_.GetThresholdDb(); }
     fixed GetCompRatio() const { return comp_.GetRatio(); }

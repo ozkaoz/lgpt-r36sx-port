@@ -29,6 +29,9 @@ public:
         TYPE_LOW_PASS,
         TYPE_HIGH_PASS,
         TYPE_NOTCH,
+        // FXP_INSTRUMENT_EQ_BP (bacon-1.5, item 2): band-pass added at the
+        // end so persisted eqType_ values 0..5 are unchanged.
+        TYPE_BAND_PASS,
         kTypeCount
     };
     static const int kNumBands = 8;

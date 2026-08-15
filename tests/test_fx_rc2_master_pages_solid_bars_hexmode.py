@@ -49,9 +49,12 @@ def check_master_pages_dispatched():
     idx = MV_CPP.index("void MixerView::drawFxParamPage")
     assert "drawDelayPage(pageTitle)" in MV_CPP[idx:idx + 1200]
     assert "drawReverbPage(pageTitle)" in MV_CPP[idx:idx + 1600]
-    # Titles carry the SELECT page position [n/5].
-    assert '"DELAY MASTER [%d/5]"' in MV_CPP
-    assert '"REVERB MASTER [%d/5]"' in MV_CPP
+    # Titles carry the SELECT page position [n/6] (6 pages since EQ_EXT).
+    assert '"DELAY MASTER [%d/6]"' in MV_CPP
+    assert '"REVERB MASTER [%d/6]"' in MV_CPP
+    # FXP_MASTER_EQ8: the EQ EXT page is dispatched to its dedicated renderer.
+    assert '"MASTER EQ EXT [%d/6]"' in MV_CPP
+    assert "drawEqExtPage(pageTitle)" in MV_CPP[idx:idx + 2400]
     print("DELAY/REVERB MASTER pages dispatched by drawFxParamPage OK")
 
 

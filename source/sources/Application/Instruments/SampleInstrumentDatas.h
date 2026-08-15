@@ -23,6 +23,25 @@ enum FilterMode
   FM_LAST
 };
 
+// FXP_FILTER_V2 (bacon-1.5, item 2): filter topology of the TPT SVF.
+// Additive SIP_FILTERKIND variable, default LP so old projects sound
+// unchanged.  Names are the CHAR_LIST shown on the "filt: %s" row.
+char *filterKind[] = {
+	"LP",
+	"HP",
+	"BP",
+	"NOTCH"
+} ;
+
+enum FilterV2Kind
+{
+  FK_LP=0,
+  FK_HP,
+  FK_BP,
+  FK_NOTCH,
+  FK_LAST
+};
+
 fixed panlaw[]= {0x0,
 0x808,
 0xb5b,

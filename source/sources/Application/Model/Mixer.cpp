@@ -186,6 +186,21 @@ void Mixer::SaveContent(TiXmlNode *node) {
 		sprintf(attr,"EQ%dEN",b) ;
 		fxMaster.SetAttribute(attr,fx.GetEqBandEnabled(b)?1:0) ;
 	}
+	// FXP_MASTER_EQ8 (bacon-1.5, item 2): EXT EQ chain (ParametricEQ
+	// BAND3..BAND7) + its bypass.  No EQ%dEN: enabled is derived on load from
+	// GAI/TYP.
+	fxMaster.SetAttribute("EQXBYP",fx.GetEqExtBypass()?1:0) ;
+	for (int b=3;b<8;b++) {
+		char attr[16] ;
+		sprintf(attr,"EQ%dFRQ",b) ;
+		fxMaster.SetAttribute(attr,(int)fx.GetEqBandFreq(b)) ;
+		sprintf(attr,"EQ%dGAI",b) ;
+		fxMaster.SetAttribute(attr,(int)fx.GetEqBandGainDb(b)) ;
+		sprintf(attr,"EQ%dQ",b) ;
+		fxMaster.SetAttribute(attr,(int)fx.GetEqBandQ(b)) ;
+		sprintf(attr,"EQ%dTYP",b) ;
+		fxMaster.SetAttribute(attr,fx.GetEqBandType(b)) ;
+	}
 	fxMaster.SetAttribute("CMPTHR",(int)fx.GetCompThresholdDb()) ;
 	fxMaster.SetAttribute("CMPRAT",(int)fx.GetCompRatio()) ;
 	fxMaster.SetAttribute("CMPKNE",(int)fx.GetCompKneeDb()) ;
@@ -268,6 +283,18 @@ void Mixer::RestoreContent(TiXmlElement *element) {
 			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandQ(b,(fixed)value) ;
 			sprintf(attr,"EQ%dEN",b) ;
 			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandEnabled(b,value!=0) ;
+		}
+		if (fxMaster->Attribute("EQXBYP",&value)) fx.SetEqExtBypass(value!=0) ;
+		for (int b=3;b<8;b++) {
+			char attr[16] ;
+			sprintf(attr,"EQ%dFRQ",b) ;
+			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandFreq(b,(fixed)value) ;
+			sprintf(attr,"EQ%dGAI",b) ;
+			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandGainDb(b,(fixed)value) ;
+			sprintf(attr,"EQ%dQ",b) ;
+			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandQ(b,(fixed)value) ;
+			sprintf(attr,"EQ%dTYP",b) ;
+			if (fxMaster->Attribute(attr,&value)) fx.SetEqBandType(b,value) ;
 		}
 		if (fxMaster->Attribute("CMPTHR",&value)) fx.SetCompThresholdDb((fixed)value) ;
 		if (fxMaster->Attribute("CMPRAT",&value)) fx.SetCompRatio((fixed)value) ;

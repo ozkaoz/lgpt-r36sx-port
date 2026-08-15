@@ -107,6 +107,10 @@ protected:
 	// drawFxParamPage.
 	void drawEqPage(const char *title) ;
 	void drawEqRow(int id,int labelX,int valueX,int y) ;
+	// FXP_MASTER_EQ8 (bacon-1.5, item 2): EQ EXT page (ParametricEQ
+	// BAND3..BAND7), dedicated self-labeled 21-row menu.
+	void drawEqExtPage(const char *title) ;
+	void drawEqExtRow(int id,int labelX,int valueX,int y) ;
 	// TREEFROG_COMP_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 13): dedicated COMP
 	// menu (exclusive page) with BYP first, centered labeled rows with units,
 	// ratio as x:1, booleans as ON/OFF, and the GR meter always visible below.

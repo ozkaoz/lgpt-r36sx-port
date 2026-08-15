@@ -545,9 +545,19 @@ def check_comp_gr_meter():
 
 def check_source_guards():
     src = (ROOT / "source/sources/Application/Audio/FxEngine/ParametricEQ.cpp").read_text()
-    for token in ("Audio EQ Cookbook", "sqrtf", "cosf", "sinf", "Transposed",
-                  "SetBandEnabled", "SetBypass"):
+    for token in ("Audio EQ Cookbook", "Transposed",
+                  "SetBandEnabled"):
         assert token in src, token
+    # bacon-1.5 item 2: SetBypass/SetExtBypass are trivial inline setters in
+    # the header (the .cpp no longer redefines them).
+    hdr = (ROOT / "source/sources/Application/Audio/FxEngine/ParametricEQ.h").read_text()
+    for token in ("SetBypass", "SetExtBypass"):
+        assert token in hdr, token
+    # bacon-1.5 item 2: the RBJ coefficient math moved to the shared
+    # EqBiquad primitive (also used by InstrumentEq).
+    bq = (ROOT / "source/sources/Application/Audio/EqBiquad.h").read_text()
+    for token in ("sqrtf", "cosf", "sinf"):
+        assert token in bq, token
     csrc = (ROOT / "source/sources/Application/Audio/FxEngine/Compressor.cpp").read_text()
     for token in ("recomputeTable", "cubicClip", "stereoLink_", "attK_",
                   "relK_", "grTable_", "out[i] = in[i]"):

@@ -15,8 +15,10 @@
 // ---------------------------------------------------------------------------
 // Shared constants
 // ---------------------------------------------------------------------------
-static const char *kEqTypeNames[6] = {
-    "BELL", "LOWSH", "HISHE", "LOWPA", "HIPAS", "NOTCH",
+// FXP_INSTRUMENT_EQ_BP (bacon-1.5, item 2): BANDP added as type 6 (persisted
+// types 0..5 unchanged).
+static const char *kEqTypeNames[7] = {
+    "BELL", "LOWSH", "HISHE", "LOWPA", "HIPAS", "NOTCH", "BANDP",
 };
 
 static const FourCC kFreqIDs[8] = {SIP_EQF0, SIP_EQF1, SIP_EQF2, SIP_EQF3,
@@ -91,6 +93,8 @@ static void eqCoeffs(double f0, double gDb, double q, int type, int rate,
             a0 = 1.0 + alpha; a1 = -2.0 * cw; a2 = 1.0 - alpha; break;
     case 5: b0 = 1.0; b1 = -2.0 * cw; b2 = 1.0;
             a0 = 1.0 + alpha; a1 = -2.0 * cw; a2 = 1.0 - alpha; break;
+    case 6: b0 = alpha; b1 = 0.0; b2 = -alpha;
+            a0 = 1.0 + alpha; a1 = -2.0 * cw; a2 = 1.0 - alpha; break;  // BANDP
     case 1: case 2: {
         double S = q; if (S < 0.5) S = 0.5; if (S > 2.0) S = 2.0;
         double sqA = sqrt(A);
@@ -351,7 +355,7 @@ void InstrumentEqModal::refreshDraw() {
 }
 
 void InstrumentEqModal::cycleBandType() {
-    type_[selected_] = (type_[selected_] + 1) % 6;
+    type_[selected_] = (type_[selected_] + 1) % 7;
     char buf[88];
     sprintf(buf, "BAND%1d %s %5.0fHz %+3ddB Q%.2f %s",
             selected_ + 1, kEqTypeNames[type_[selected_]], freqHz_[selected_],

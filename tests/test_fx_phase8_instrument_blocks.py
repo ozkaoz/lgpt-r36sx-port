@@ -60,7 +60,7 @@ FIELDS = [
     ("root note", 7), ("detune", 7),
     ("type", 9), ("mode", 9),
     ("cutoff", 10), ("reso", 10),
-    ("attenuate", 11),
+    ("attenuate", 11), ("filt", 11),
     ("bit depth", 13), ("drive", 13),
     ("downsample", 14),
     ("interpolation", 16), ("loop mode", 16),
@@ -166,6 +166,17 @@ def check_bar_render():
     print("send bars (SetBar DRY/DELAY/REVERB, solid inverted cells, INH) OK")
 
 
+def check_filter_kind_field():
+    # FXP_FILTER_V2 (bacon-1.5, item 2): the filter-kind row (right cell of
+    # the attenuate row, y=11) is a CHAR_LIST field fed by SIP_FILTERKIND.
+    fill = IV_CPP.split("fillSampleParameters() {", 1)[1].split("fillMidiParameters", 1)[0]
+    assert '"filt: %s"' in fill
+    assert "SIP_FILTERKIND" in fill
+    assert "SIP_FILTERKIND" in SI_H
+    assert "filter kind" in SI_CPP
+    print("filter-kind field (filt) wired to SIP_FILTERKIND OK")
+
+
 def check_fb_retired():
     # retired from editing: SIP_FBTUNE/SIP_FBMIX not referenced in the view
     assert "SIP_FBTUNE" not in IV_CPP
@@ -188,6 +199,7 @@ check_headers_in_drawview()
 check_first_last_fields()
 check_bitcrusher_label()
 check_bar_render()
+check_filter_kind_field()
 check_fb_retired()
 check_offline_fx_guarded()
 print("FX_INSTRUMENT_BLOCKS_PHASE8_OK")

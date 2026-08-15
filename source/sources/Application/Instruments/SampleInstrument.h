@@ -44,6 +44,8 @@ enum SampleInstrumentLoopMode {
 #define SIP_FILTMIX			MAKE_FOURCC('F','M','I','X')
 #define SIP_FILTCUTOFF		MAKE_FOURCC('F','C','U','T')
 #define SIP_FILTRESO		MAKE_FOURCC('F','R','E','S')
+// FXP_FILTER_V2 (bacon-1.5, item 2): additive filter topology (FK_LP default).
+#define SIP_FILTERKIND		MAKE_FOURCC('F','K','I','N')
 #define SIP_TABLE			MAKE_FOURCC('T','A','B','L')
 #define SIP_TABLEAUTO		MAKE_FOURCC('T','B','L','A')
 #define SIP_FBTUNE			MAKE_FOURCC('F','B','T','U')
@@ -179,6 +181,10 @@ private:
        Variable *eqType_[8] ;
        Variable *eqQ_[8] ;
        int eqCache_[34] ;
+       // FXP_INSTRUMENT_EQ_RATE (bacon-1.5, item 2): the audio driver sample
+       // rate cached at the last syncInstrumentEq so InstrumentEq is rebuilt
+       // at the real rate (48 kHz) instead of the ctor default 44100.
+       int eqRateCache_ ;
        FxEngine::InstrumentEq eqDsp_ ;
 
 private:
@@ -209,6 +215,7 @@ private:
 	   WatchedVariable *loopEnd_ ;
 	   Variable *filterMix_ ;
 	   Variable *filterMode_ ;
+	   Variable *filterKind_ ;
 	   Variable *attenuate_ ;
 	   Variable *pan_ ;
 	   Variable *loopMode_ ;

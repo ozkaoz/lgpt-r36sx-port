@@ -31,7 +31,9 @@ class FxNavigator {
         row_ = 0 ;
     }
 
-    // cycleFxPage golden: SELECT cicla MIX->DELAY->REVERB->EQ->COMP->MIX.
+    // cycleFxPage golden: SELECT cicla
+    // MIX->DELAY->REVERB->EQ->EQ_EXT->COMP->MIX (FXP_MASTER_EQ8 adds the
+    // EXT page).
     void CyclePage() {
         page_ = (FxPage)((page_ + 1) % FX_PAGE_COUNT) ;
         row_ = 0 ;
@@ -63,12 +65,14 @@ class FxNavigator {
     // editan SIEMPRE en la vista comun 0..100 % (paso fino 1, grueso 10),
     // convirtiendo al rango natural via la capa FxParamDescriptor (curva
     // LOG2 para frecuencia/tiempo, LINEAL para ganancias/mezclas).  Los
-    // switches (kind==SWITCH) conservan el paso 0/1 golden.
+    // switches (kind==SWITCH) conservan el paso 0/1 golden.  FXP_MASTER_EQ8
+    // (bacon-1.5, item 2): los discretos multi-valor (TYP 0..6) tambien
+    // usan paso 1 (nunca %), via fxIsDiscreteParam.
     static float EditValue(int id, float current, int delta, bool coarse) {
         const FxParamSpec &spec = kFxParams_[id] ;
-        if (!fxIsPercentParam(id)) {
+        if (!fxIsPercentParam(id) || fxIsDiscreteParam(id)) {
             float step = (coarse ? 10.0f : 1.0f) ;
-            if (spec.vmax - spec.vmin <= 1.5f) step = 1.0f ;
+            if (spec.vmax - spec.vmin <= 1.5f || fxIsDiscreteParam(id)) step = 1.0f ;
             float v = current + step * (float)delta ;
             if (v < spec.vmin) v = spec.vmin ;
             if (v > spec.vmax) v = spec.vmax ;

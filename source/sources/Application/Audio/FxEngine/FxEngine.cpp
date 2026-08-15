@@ -77,13 +77,22 @@ bool FxEngine::AllParamsAtLegacyDefault() const {
     if (reverb_.GetBypass()) return false;
     // Master EQ: global bypass on (dry) by default, all bands disabled.
     if (!eq_.GetBypass()) return false;
+    // FXP_MASTER_EQ8 (bacon-1.5, item 2): EXT bands (BAND3..BAND7) default to
+    // a 2/4/8/16 kHz ladder, 0 dB, type BELL => implicit-disabled, so the
+    // legacy-all-defaults check stays true.
     static const fixed kBandFreqDefault[ParametricEQ::kNumBands] = {
-        fl2fp(100.0f), fl2fp(1000.0f), fl2fp(10000.0f) };
+        fl2fp(100.0f), fl2fp(1000.0f), fl2fp(10000.0f),
+        fl2fp(2000.0f), fl2fp(4000.0f), fl2fp(8000.0f),
+        fl2fp(16000.0f), fl2fp(16000.0f) };
     for (int b = 0; b < ParametricEQ::kNumBands; b++) {
         if (eq_.GetBandEnabled((ParametricEQ::Band)b)) return false;
         if (eq_.GetBandFreq((ParametricEQ::Band)b) != kBandFreqDefault[b]) return false;
         if (eq_.GetBandGainDb((ParametricEQ::Band)b) != 0) return false;
         if (eq_.GetBandQ((ParametricEQ::Band)b) != fl2fp(1.0f)) return false;
+        // EXT bands must be neutral BELL at defaults; base LOW/HIGH are
+        // shelves by design (golden topology).
+        if (b >= ParametricEQ::BAND3 &&
+            eq_.GetBandType((ParametricEQ::Band)b) != ParametricEQ::BT_BELL) return false;
     }
     // Master compressor: bypass on (dry) by default, others at ctor defaults.
     if (!comp_.GetBypass()) return false;

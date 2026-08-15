@@ -8,6 +8,7 @@
 #include "Application/Model/Config.h"
 #include "Application/Persistency/PersistencyService.h"
 #include "Filters.h"
+#include "FilterV2.h"
 
 char *InstrumentTypeData[IT_LAST]= {
 	"Sample",
@@ -244,4 +245,5 @@ void InstrumentBank::OnStart() {
 		instrument_[i]->OnStart() ;
 	}
 	init_filters() ;
+	init_filters_v2() ;
 } ;

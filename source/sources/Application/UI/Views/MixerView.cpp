@@ -1190,6 +1190,27 @@ float MixerView::fxGet(int id) const {
 	case FX_P_EQ_HI_GAI:  return fp2fl(fx.GetEqBandGainDb(2)) ;
 	case FX_P_EQ_HI_Q:    return fp2fl(fx.GetEqBandQ(2)) ;
 	case FX_P_EQ_HI_EN:   return fx.GetEqBandEnabled(2)?1.0f:0.0f ;
+	case FX_P_EQX_BYP:    return fx.GetEqExtBypass()?1.0f:0.0f ;
+	case FX_P_EQX_B3_FRQ: return fp2fl(fx.GetEqBandFreq(3)) ;
+	case FX_P_EQX_B3_GAI: return fp2fl(fx.GetEqBandGainDb(3)) ;
+	case FX_P_EQX_B3_Q:   return fp2fl(fx.GetEqBandQ(3)) ;
+	case FX_P_EQX_B3_TYP: return (float)fx.GetEqBandType(3) ;
+	case FX_P_EQX_B4_FRQ: return fp2fl(fx.GetEqBandFreq(4)) ;
+	case FX_P_EQX_B4_GAI: return fp2fl(fx.GetEqBandGainDb(4)) ;
+	case FX_P_EQX_B4_Q:   return fp2fl(fx.GetEqBandQ(4)) ;
+	case FX_P_EQX_B4_TYP: return (float)fx.GetEqBandType(4) ;
+	case FX_P_EQX_B5_FRQ: return fp2fl(fx.GetEqBandFreq(5)) ;
+	case FX_P_EQX_B5_GAI: return fp2fl(fx.GetEqBandGainDb(5)) ;
+	case FX_P_EQX_B5_Q:   return fp2fl(fx.GetEqBandQ(5)) ;
+	case FX_P_EQX_B5_TYP: return (float)fx.GetEqBandType(5) ;
+	case FX_P_EQX_B6_FRQ: return fp2fl(fx.GetEqBandFreq(6)) ;
+	case FX_P_EQX_B6_GAI: return fp2fl(fx.GetEqBandGainDb(6)) ;
+	case FX_P_EQX_B6_Q:   return fp2fl(fx.GetEqBandQ(6)) ;
+	case FX_P_EQX_B6_TYP: return (float)fx.GetEqBandType(6) ;
+	case FX_P_EQX_B7_FRQ: return fp2fl(fx.GetEqBandFreq(7)) ;
+	case FX_P_EQX_B7_GAI: return fp2fl(fx.GetEqBandGainDb(7)) ;
+	case FX_P_EQX_B7_Q:   return fp2fl(fx.GetEqBandQ(7)) ;
+	case FX_P_EQX_B7_TYP: return (float)fx.GetEqBandType(7) ;
 	case FX_P_CMP_THR:    return fp2fl(fx.GetCompThresholdDb()) ;
 	case FX_P_CMP_RAT:    return fp2fl(fx.GetCompRatio()) ;
 	case FX_P_CMP_KNE:    return fp2fl(fx.GetCompKneeDb()) ;
@@ -1237,6 +1258,32 @@ void MixerView::fxSet(int id,float v) {
 	case FX_P_EQ_HI_FRQ:  fx.SetEqBandFreq(2,fl2fp(v)) ; break ;
 	case FX_P_EQ_HI_GAI:  fx.SetEqBandGainDb(2,fl2fp(v)) ;
 	                     fx.SetEqBandEnabled(2,true) ; fx.SetEqBypass(false) ; break ;
+	case FX_P_EQX_BYP:    fx.SetEqExtBypass(v>=0.5f) ; break ;
+	case FX_P_EQX_B3_FRQ: fx.SetEqBandFreq(3,fl2fp(v)) ; break ;
+	case FX_P_EQX_B3_GAI: fx.SetEqBandGainDb(3,fl2fp(v)) ;
+	                     fx.SetEqBypass(false) ; break ;
+	case FX_P_EQX_B3_Q:   fx.SetEqBandQ(3,fl2fp(v)) ; break ;
+	case FX_P_EQX_B3_TYP: fx.SetEqBandType(3,(int)v) ; break ;
+	case FX_P_EQX_B4_FRQ: fx.SetEqBandFreq(4,fl2fp(v)) ; break ;
+	case FX_P_EQX_B4_GAI: fx.SetEqBandGainDb(4,fl2fp(v)) ;
+	                     fx.SetEqBypass(false) ; break ;
+	case FX_P_EQX_B4_Q:   fx.SetEqBandQ(4,fl2fp(v)) ; break ;
+	case FX_P_EQX_B4_TYP: fx.SetEqBandType(4,(int)v) ; break ;
+	case FX_P_EQX_B5_FRQ: fx.SetEqBandFreq(5,fl2fp(v)) ; break ;
+	case FX_P_EQX_B5_GAI: fx.SetEqBandGainDb(5,fl2fp(v)) ;
+	                     fx.SetEqBypass(false) ; break ;
+	case FX_P_EQX_B5_Q:   fx.SetEqBandQ(5,fl2fp(v)) ; break ;
+	case FX_P_EQX_B5_TYP: fx.SetEqBandType(5,(int)v) ; break ;
+	case FX_P_EQX_B6_FRQ: fx.SetEqBandFreq(6,fl2fp(v)) ; break ;
+	case FX_P_EQX_B6_GAI: fx.SetEqBandGainDb(6,fl2fp(v)) ;
+	                     fx.SetEqBypass(false) ; break ;
+	case FX_P_EQX_B6_Q:   fx.SetEqBandQ(6,fl2fp(v)) ; break ;
+	case FX_P_EQX_B6_TYP: fx.SetEqBandType(6,(int)v) ; break ;
+	case FX_P_EQX_B7_FRQ: fx.SetEqBandFreq(7,fl2fp(v)) ; break ;
+	case FX_P_EQX_B7_GAI: fx.SetEqBandGainDb(7,fl2fp(v)) ;
+	                     fx.SetEqBypass(false) ; break ;
+	case FX_P_EQX_B7_Q:   fx.SetEqBandQ(7,fl2fp(v)) ; break ;
+	case FX_P_EQX_B7_TYP: fx.SetEqBandType(7,(int)v) ; break ;
 	case FX_P_CMP_THR:    fx.SetCompThresholdDb(fl2fp(v)) ; break ;
 	case FX_P_CMP_RAT:    fx.SetCompRatio(fl2fp(v)) ; break ;
 	case FX_P_CMP_KNE:    fx.SetCompKneeDb(fl2fp(v)) ; break ;
@@ -1279,16 +1326,17 @@ void MixerView::drawFxParamPage(FxPage page) {
 	int y=2 ;
 	GUITextProperties props ;
 	// TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 11): the title shows
-	// the page position [n/5] so the SELECT cycle is always visible.  RC3
+	// the page position [n/6] so the SELECT cycle is always visible.  RC3
 	// (PLAN_RC3 point 2/26): the title is centered with UiDraw and the
 	// permanent hint lines moved to HelpRegistry (SELECT+R1).
 	char pageTitle[24] ;
 	int pageNum=(int)page+1 ;
 	switch(page) {
-	case FX_PAGE_DELAY:  sprintf(pageTitle,"DELAY MASTER [%d/5]",pageNum) ; break ;
-	case FX_PAGE_REVERB: sprintf(pageTitle,"REVERB MASTER [%d/5]",pageNum) ; break ;
-	case FX_PAGE_EQ:     sprintf(pageTitle,"MASTER EQ [%d/5]",pageNum) ; break ;
-	default:             sprintf(pageTitle,"MASTER COMP [%d/5]",pageNum) ; break ;
+	case FX_PAGE_DELAY:  sprintf(pageTitle,"DELAY MASTER [%d/6]",pageNum) ; break ;
+	case FX_PAGE_REVERB: sprintf(pageTitle,"REVERB MASTER [%d/6]",pageNum) ; break ;
+	case FX_PAGE_EQ:     sprintf(pageTitle,"MASTER EQ [%d/6]",pageNum) ; break ;
+	case FX_PAGE_EQ_EXT: sprintf(pageTitle,"MASTER EQ EXT [%d/6]",pageNum) ; break ;
+	default:             sprintf(pageTitle,"MASTER COMP [%d/6]",pageNum) ; break ;
 	}
 	// RC6: each dedicated page draws its own title at the top of its centered
 	// block (ml.startY-1) so the title and its menu form one centered unit.
@@ -1305,6 +1353,12 @@ void MixerView::drawFxParamPage(FxPage page) {
 	// per band), so it does not use the generic parameter list.
 	if (page==FX_PAGE_EQ) {
 		drawEqPage(pageTitle) ;
+		return ;
+	}
+	// FXP_MASTER_EQ8 (bacon-1.5, item 2): EQ EXT page, dedicated self-labeled
+	// 21-row menu (BYP + 5 bands x FRQ/GAI/Q/TYP).
+	if (page==FX_PAGE_EQ_EXT) {
+		drawEqExtPage(pageTitle) ;
 		return ;
 	}
 	// TREEFROG_COMP_MENU_V1 (PLAN_FX_REDESIGN_ES.md, Fase 13): the COMP page
@@ -1489,6 +1543,77 @@ void MixerView::drawEqPage(const char *title) {
 			drawEqRow(bandBase[b]+p,ml.labelX,ml.valueX,yHeader+1+p) ;
 		}
 		yHeader+=5 ;
+	}
+}
+
+// FXP_MASTER_EQ8 (bacon-1.5, item 2): EQ EXT page.  Dedicated self-labeled
+// 21-row menu (BYP + 5 bands x FRQ/GAI/Q/TYP) backed by ParametricEQ
+// BAND3..BAND7.  There are no EN rows: a band is audible when gain != 0 dB
+// or type != BELL (derived in ParametricEQ).  RC5 centers the block in the
+// safe menu band 3..25 (label column 6, value column 13, two-cell spacing)
+// so all 21 rows stay on screen; drawNotes()/drawMap() always render below.
+static const char *eqExtTypeName(int t) {
+	if (t<0) t=0 ;
+	if (t>6) t=6 ;
+	static const char *names[7]={"LSHELF","BELL","HSHELF","LPASS","HPASS",
+	                             "BANDP","NOTCH"} ;
+	return names[t] ;
+}
+
+void MixerView::drawEqExtRow(int id,int labelX,int valueX,int y) {
+	GUITextProperties props ;
+	char buffer[16] ;
+	bool selected=(fxRowForId(id)==navigator_.Row()) ;
+	bool on=(fxGet(id)>=0.5f) ;
+	if (id==FX_P_EQX_BYP) {
+		UiDraw::DrawBypassRow(*this,labelX,valueX,y,on,selected) ;
+		return ;
+	}
+	SetColor(selected?CD_HILITE2:CD_NORMAL) ;
+	props.invert_=selected ;
+	char pct[8] ;
+	fxPctBuffer(pct,id,fxGet(id)) ;
+	if (fxUsesCurve(id)) {
+		sprintf(buffer,"%s %6.0f Hz",pct,fxGet(id)) ;
+	} else {
+		switch (id) {
+		case FX_P_EQX_B3_TYP:
+		case FX_P_EQX_B4_TYP:
+		case FX_P_EQX_B5_TYP:
+		case FX_P_EQX_B6_TYP:
+		case FX_P_EQX_B7_TYP:
+			sprintf(buffer,"%s %-6s",pct,eqExtTypeName((int)fxGet(id))) ;
+			break ;
+		case FX_P_EQX_B3_GAI:
+		case FX_P_EQX_B4_GAI:
+		case FX_P_EQX_B5_GAI:
+		case FX_P_EQX_B6_GAI:
+		case FX_P_EQX_B7_GAI:
+			sprintf(buffer,"%s %+5.1f dB",pct,fxGet(id)) ;
+			break ;
+		default:
+			sprintf(buffer,"%s %5.2f",pct,fxGet(id)) ;
+			break ;
+		}
+	}
+	DrawString(labelX,y,kFxParams_[id].label,props) ;
+	DrawString(valueX,y,buffer,props) ;
+	props.invert_=false ;
+	SetColor(CD_NORMAL) ;
+}
+
+void MixerView::drawEqExtPage(const char *title) {
+	MenuLayout ml=UiDraw::MakeCenteredMenuLayout(21,6,13,2) ;
+	UiDraw::DrawCenteredTitleAt(*this,ml.startY-1,title) ;
+	// Row order matches fxRowForId: BYP first, then FRQ/GAI/Q/TYP per band
+	// (B3..B7) so UP/DOWN walks the page in visual order.  The ids are
+	// contiguous after the page bypass (enum order == row order).
+	drawEqExtRow(FX_P_EQX_BYP,ml.labelX,ml.valueX,ml.startY) ;
+	for (int b=0;b<5;b++) {
+		int bandId=FX_P_EQX_B3_FRQ+4*b ;
+		for (int p=0;p<4;p++) {
+			drawEqExtRow(bandId+p,ml.labelX,ml.valueX,ml.startY+1+4*b+p) ;
+		}
 	}
 }
 

@@ -3,6 +3,7 @@
 // return conversions against hand-computed oracles, plus purity guards
 // (no GUI/audio/Player/SamplePool dependencies).
 #include "Application/Mixer/FxPages.h"
+#include "Application/Mixer/FxNavigator.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -27,26 +28,33 @@ static int countPage(FxPage page) {
 }
 
 int main() {
-    // ---- Table shape: 36 params, pages match the enum ----
-    check(FX_PARAM_COUNT == 36, "FX_PARAM_COUNT == 36") ;
+    // ---- Table shape: 57 params (36 golden + 21 EQ EXT), pages match ----
+    check(FX_PARAM_COUNT == 57, "FX_PARAM_COUNT == 57") ;
     check(countPage(FX_PAGE_DELAY) == 7, "DELAY page has 7 rows") ;
     check(countPage(FX_PAGE_REVERB) == 7, "REVERB page has 7 rows") ;
     check(countPage(FX_PAGE_EQ) == 13, "EQ page has 13 rows") ;
+    check(countPage(FX_PAGE_EQ_EXT) == 21, "EQ_EXT page has 21 rows") ;
     check(countPage(FX_PAGE_COMP) == 9, "COMP page has 9 rows") ;
     check(countPage(FX_PAGE_MIX) == 0, "MIX page has no param rows") ;
     check(kFxParams_[FX_P_DLY_TIME].page == FX_PAGE_DELAY, "DLY TIME on DELAY") ;
     check(kFxParams_[FX_P_CMP_SC].page == FX_PAGE_COMP, "CMP SC on COMP") ;
+    check(kFxParams_[FX_P_EQX_BYP].page == FX_PAGE_EQ_EXT, "EQX BYP on EQ_EXT") ;
+    check(kFxParams_[FX_P_EQX_B7_TYP].page == FX_PAGE_EQ_EXT, "B7 TYP on EQ_EXT") ;
     check(strcmp(kFxParams_[FX_P_DLY_TIME].label, "DLY TIM") == 0, "DLY TIM label") ;
     check(strcmp(kFxParams_[FX_P_CMP_BYP].label, "CMP BYP") == 0, "CMP BYP label") ;
+    check(strcmp(kFxParams_[FX_P_EQX_B4_TYP].label, "B4 TYP") == 0, "B4 TYP label") ;
     check(kFxParams_[FX_P_DLY_TIME].vmin == 10.0f && kFxParams_[FX_P_DLY_TIME].vmax == 2000.0f,
           "DLY TIM range 10..2000") ;
     check(kFxParams_[FX_P_CMP_THR].vmin == -60.0f && kFxParams_[FX_P_CMP_THR].vmax == 0.0f,
           "CMP THR range -60..0") ;
+    check(kFxParams_[FX_P_EQX_B3_TYP].vmax == 6.0f, "B3 TYP max 6") ;
+    check(kFxParams_[FX_P_EQX_B6_FRQ].vdef == 16000.0f, "B6 FRQ default 16000") ;
 
     // ---- Bypass rows first ----
     check(fxBypassId(FX_PAGE_DELAY) == FX_P_DLY_BYP, "DELAY bypass id") ;
     check(fxBypassId(FX_PAGE_REVERB) == FX_P_RVB_BYP, "REVERB bypass id") ;
     check(fxBypassId(FX_PAGE_EQ) == FX_P_EQ_BYP, "EQ bypass id") ;
+    check(fxBypassId(FX_PAGE_EQ_EXT) == FX_P_EQX_BYP, "EQ_EXT bypass id") ;
     check(fxBypassId(FX_PAGE_COMP) == FX_P_CMP_BYP, "COMP bypass id") ;
     check(fxBypassId(FX_PAGE_MIX) == -1, "MIX has no bypass") ;
 
@@ -76,9 +84,21 @@ int main() {
     check(fxUsesCurve(FX_P_RVB_DEC), "RVB DEC curve") ;
     check(fxUsesCurve(FX_P_CMP_ATK), "CMP ATK curve") ;
     check(fxUsesCurve(FX_P_CMP_RAT), "CMP RAT curve") ;
+    check(fxUsesCurve(FX_P_EQX_B3_FRQ), "EQX B3 FRQ curve") ;
+    check(fxUsesCurve(FX_P_EQX_B7_FRQ), "EQX B7 FRQ curve") ;
     check(!fxUsesCurve(FX_P_DLY_FBK), "DLY FBK not curve") ;
     check(!fxUsesCurve(FX_P_EQ_LOW_GAI), "EQ gain not curve") ;
     check(!fxUsesCurve(FX_P_CMP_BYP), "CMP BYP not curve") ;
+    check(!fxUsesCurve(FX_P_EQX_B3_TYP), "EQX TYP not curve") ;
+
+    // ---- Discrete params (bacon-1.5 item 2) ----
+    check(fxIsDiscreteParam(FX_P_EQX_B3_TYP), "B3 TYP discrete") ;
+    check(fxIsDiscreteParam(FX_P_EQX_B7_TYP), "B7 TYP discrete") ;
+    check(fxIsDiscreteParam(FX_P_CMP_BYP), "CMP BYP discrete (switch)") ;
+    check(!fxIsDiscreteParam(FX_P_EQX_B3_FRQ), "B3 FRQ not discrete") ;
+    check(FxNavigator::EditValue(FX_P_EQX_B3_TYP, 1.0f, 1, true) == 2.0f, "TYP coarse steps by 1") ;
+    check(FxNavigator::EditValue(FX_P_EQX_B3_TYP, 6.0f, 1, false) == 6.0f, "TYP clamps at 6") ;
+    check(FxNavigator::EditValue(FX_P_EQX_B3_TYP, 0.0f, -1, false) == 0.0f, "TYP clamps at 0") ;
 
     // ---- Curve edit math (golden from Bacon 1.2.1) ----
     const FxParamSpec &dly = kFxParams_[FX_P_DLY_TIME] ;

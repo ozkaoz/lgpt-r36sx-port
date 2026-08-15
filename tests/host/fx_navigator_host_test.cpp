@@ -41,7 +41,8 @@ int main() {
     nav.SetPage((FxPage)(FX_PAGE_MIX - 1)) ;
     check(nav.Page() == FX_PAGE_REVERB, "SetPage ignores out-of-range lo") ;
 
-    // 3. CyclePage golden: MIX->DELAY->REVERB->EQ->COMP->MIX, fila 0.
+    // 3. CyclePage golden: MIX->DELAY->REVERB->EQ->EQ_EXT->COMP->MIX, fila 0
+    // (FXP_MASTER_EQ8 inserts the EXT page after EQ).
     nav.SetPage(FX_PAGE_MIX) ;
     nav.MoveRow(2) ;
     nav.CyclePage() ;
@@ -52,7 +53,9 @@ int main() {
     nav.CyclePage() ;
     check(nav.Page() == FX_PAGE_EQ, "CyclePage REVERB->EQ") ;
     nav.CyclePage() ;
-    check(nav.Page() == FX_PAGE_COMP, "CyclePage EQ->COMP") ;
+    check(nav.Page() == FX_PAGE_EQ_EXT, "CyclePage EQ->EQ_EXT") ;
+    nav.CyclePage() ;
+    check(nav.Page() == FX_PAGE_COMP, "CyclePage EQ_EXT->COMP") ;
     nav.CyclePage() ;
     check(nav.Page() == FX_PAGE_MIX, "CyclePage COMP->MIX") ;
 
@@ -70,6 +73,9 @@ int main() {
     nav.SetPage(FX_PAGE_COMP) ;
     nav.MoveRow(-1) ;
     check(nav.Row() == 8, "MoveRow wrap up COMP 9 rows") ;
+    nav.SetPage(FX_PAGE_EQ_EXT) ;
+    nav.MoveRow(-1) ;
+    check(nav.Row() == 20, "MoveRow wrap up EQ_EXT 21 rows") ;
     nav.SetPage(FX_PAGE_MIX) ;
     nav.MoveRow(5) ;
     check(nav.Row() == 0, "MoveRow no-op on MIX page") ;
@@ -85,6 +91,12 @@ int main() {
     check(nav.IdForRow() == FX_P_EQ_BYP, "EQ row0 = bypass") ;
     nav.MoveRow(1) ;
     check(nav.IdForRow() == FX_P_EQ_LOW_EN, "EQ row1 = LOW EN") ;
+    nav.SetPage(FX_PAGE_EQ_EXT) ;
+    check(nav.IdForRow() == FX_P_EQX_BYP, "EQ_EXT row0 = bypass") ;
+    nav.MoveRow(1) ;
+    check(nav.IdForRow() == FX_P_EQX_B3_FRQ, "EQ_EXT row1 = B3 FRQ") ;
+    nav.MoveRow(19) ;
+    check(nav.IdForRow() == FX_P_EQX_B7_TYP, "EQ_EXT last = B7 TYP") ;
     nav.SetPage(FX_PAGE_COMP) ;
     check(nav.IdForRow() == FX_P_CMP_BYP, "COMP row0 = bypass") ;
     nav.SetPage(FX_PAGE_MIX) ;
