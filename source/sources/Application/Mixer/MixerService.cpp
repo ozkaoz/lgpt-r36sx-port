@@ -17,8 +17,8 @@
 // always allows the export, so behaviour is unchanged there.
 static const long long kMinExportFreeBytes = 128LL * 1024 * 1024;
 
-MixerService::MixerService() : out_(0), sync_(0), isRendering_(false),
-    captureDelay_(0), captureReverb_(0), captureMaster_(0) {
+MixerService::MixerService() : out_(0), captureDelay_(0), captureReverb_(0),
+    captureMaster_(0), sync_(0), isRendering_(false) {
     mode_ = MSRM_PLAYBACK;
 };
 
