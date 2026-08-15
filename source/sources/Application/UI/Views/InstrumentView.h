@@ -23,6 +23,7 @@ protected:
 	void fillSampleParameters() ;
 	void fillMidiParameters() ;
 	void fillSynthParameters() ;
+	void fillPianoParameters() ;
 	InstrumentType getInstrumentType() ;
 	void Update(Observable &o,I_ObservableData *d) ;
 

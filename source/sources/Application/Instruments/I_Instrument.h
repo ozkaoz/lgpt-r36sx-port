@@ -11,6 +11,7 @@ enum InstrumentType {
 	IT_SAMPLE=0,
 	IT_MIDI,
 	IT_SYNTH,	// BASS_SYNTH (bacon-1.5, item 6): slots 0x90..0x9F
+	IT_PIANO,	// PIANO_SYNTH (bacon-1.5, item 7): slots 0xA0..0xAF
 	IT_LAST
 } ;
 

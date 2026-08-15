@@ -12,6 +12,7 @@ extern "C" void TreeFrogInputTrace_LogView(
 #include "Application/Instruments/MidiInstrument.h"
 #include "Application/Instruments/SampleInstrument.h"
 #include "Application/Instruments/BassSynth.h"
+#include "Application/Instruments/PianoSynth.h"
 #include "Application/Instruments/SamplePool.h"
 #include "Application/Model/Config.h"
 #include "Application/Player/Player.h"
@@ -85,6 +86,9 @@ void InstrumentView::onInstrumentChange() {
 			break ;
 		case IT_SYNTH:
 			fillSynthParameters() ;
+			break ;
+		case IT_PIANO:
+			fillPianoParameters() ;
 			break ;
 	} ;
 
@@ -596,6 +600,189 @@ void InstrumentView::fillSynthParameters() {
 } ;
 
 
+// PIANO_SYNTH (bacon-1.5, item 7): form for the polyphonic additive piano.
+// Same contract as fillSynthParameters(): headers drawn by DrawView(),
+// GetFirst() = mode field, GetLast() = table field.
+//
+// Row 4  : INSTRUMENT (header)
+// Row 5  : mode | partials
+// Row 6  : volume | pan
+// Row 7  : width | timbre
+// Row 8  : pdecay | accent
+// Row 9  : FILTER (header)
+// Row 10 : type | cutoff
+// Row 11 : reso | fenv
+// Row 12 : f atk | f dec
+// Row 13 : f sus | f rel
+// Row 14 : ENV (header)
+// Row 15 : attack | decay
+// Row 16 : sustain | release
+// Row 17 : EFFECT SENDS (header)
+// Row 18 : DRY [bar]
+// Row 19 : DELAY [bar]
+// Row 20 : REVERB [bar]
+// Row 21 : EQ (header)
+// Row 22 : EQ 8-B | mask
+// Row 23 : AUTOMATION (header)
+// Row 24 : table auto | table
+
+void InstrumentView::fillPianoParameters() {
+
+	int i=viewData_->currentInstrument_ ;
+	InstrumentBank *bank=viewData_->project_->GetInstrumentBank() ;
+	I_Instrument *instr=bank->GetInstrument(i) ;
+	PianoSynth *instrument=(PianoSynth *)instr  ;
+	GUIPoint position=GetAnchor() ;
+	position._x -= 4 ;
+
+	Variable *v ;
+	UIIntVarField *f1 ;
+	UIIntVarField *f2 ;
+	GUIPoint col2 ;
+
+	position._y+=1 ;  // skip header row 4
+	v=instrument->FindVariable(PNP_MODE) ;
+	f1=new UIIntVarField(position,*v,"mode: %s",0,1,1,1) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	f1->SetFocus() ;
+
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_PARTIALS) ;
+	f2=new UIIntVarField(col2,*v,"part: %s",0,2,1,1) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_VOLUME) ;
+	f1=new UIIntVarField(position,*v,"vol:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(PNP_PAN) ;
+	f2=new UIIntVarField(col2,*v,"pan:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_WIDTH) ;
+	f1=new UIIntVarField(position,*v,"width:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(PNP_TIMBRE) ;
+	f2=new UIIntVarField(col2,*v,"timbre:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_PDECAY) ;
+	f1=new UIIntVarField(position,*v,"pdecay:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(PNP_ACCENT) ;
+	f2=new UIIntVarField(col2,*v,"acc:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=2 ;  // skip header row 9
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_FTYPE) ;
+	f1=new UIIntVarField(position,*v,"type: %s",0,2,1,1) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(PNP_FCUT) ;
+	f2=new UIIntVarField(col2,*v,"cut:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_FRES) ;
+	f1=new UIIntVarField(position,*v,"reso:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(PNP_FENV) ;
+	f2=new UIIntVarField(col2,*v,"fenv:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_FATK) ;
+	f1=new UIIntVarField(position,*v,"f atk:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(PNP_FDEC) ;
+	f2=new UIIntVarField(col2,*v,"f dec:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_FSUS) ;
+	f1=new UIIntVarField(position,*v,"f sus:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(PNP_FREL) ;
+	f2=new UIIntVarField(col2,*v,"f rel:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=2 ;  // skip header row 14
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_ATTACK) ;
+	f1=new UIIntVarField(position,*v,"atk:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(PNP_DECAY) ;
+	f2=new UIIntVarField(col2,*v,"dec:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(PNP_SUSTAIN) ;
+	f1=new UIIntVarField(position,*v,"sus:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(PNP_RELEASE) ;
+	f2=new UIIntVarField(col2,*v,"rel:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=2 ;  // skip header row 17
+	v=instrument->FindVariable(PNP_DRY) ;
+	f1=new UIIntVarField(position,*v,"dry:%3d",0,100,1,10) ;
+	f1->SetBar("DRY",14) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+	position._y+=1 ;
+	v=instrument->FindVariable(PNP_DLYSEND) ;
+	f1=new UIIntVarField(position,*v,"dly:%3d",-1,100,1,10) ;
+	f1->SetBar("DELAY",14) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+	position._y+=1 ;
+	v=instrument->FindVariable(PNP_RVBSEND) ;
+	f1=new UIIntVarField(position,*v,"rvb:%3d",-1,100,1,10) ;
+	f1->SetBar("REVERB",14) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+	position._y+=2 ;  // skip header row 21
+	col2=position ;
+	col2._x+=12 ;
+	v=instrument->FindVariable(SIP_EQEN) ;
+	f1=new UIIntVarField(position,*v,"EQ 8-B:%d",0,1,1,1) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SIP_EQMASK) ;
+	f2=new UIIntVarOffField(col2,*v,"mask:%2.2X",0,0xFF,1,0x10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=2 ;  // skip header row 23
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SIP_TABLEAUTO) ;
+	f2=new UIIntVarField(position,*v,"table auto: %s",0,1,1,1) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+	v=instrument->FindVariable(SIP_TABLE) ;
+	f1=new UIIntVarOffField(col2,*v,"table: %2.2X",0x00,0x7F,1,0x10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+} ;
+
+
 void InstrumentView::warpToNext(int offset) {
 	int instrument=viewData_->currentInstrument_+offset ;
 	if (instrument>=MAX_INSTRUMENT_COUNT) {
@@ -747,7 +934,8 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
                 }
                 case SIP_EQEN: {
                     if (getInstrumentType() == IT_SAMPLE ||
-                        getInstrumentType() == IT_SYNTH) {
+                        getInstrumentType() == IT_SYNTH ||
+                        getInstrumentType() == IT_PIANO) {
                         DoModal(new InstrumentEqModal(*this,
                                  viewData_->currentInstrument_));
                         isDirty_ = true;
@@ -943,6 +1131,18 @@ void InstrumentView::DrawView() {
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 15, "EFFECT SENDS");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 19, "EQ");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 21, "AUTOMATION");
+    } else if (getInstrumentType()==IT_PIANO) {
+        // PIANO_SYNTH (bacon-1.5, item 7): block headers for
+        // fillPianoParameters() (rows 4, 9, 14, 17, 21, 23).
+        GUIPoint hp = GetAnchor();
+        hp._x -= 4 ;
+        props.invert_ = false;
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y, "INSTRUMENT");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 5, "FILTER");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 10, "ENV");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 13, "EFFECT SENDS");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 17, "EQ");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 19, "AUTOMATION");
     }
 
     // Draw fields

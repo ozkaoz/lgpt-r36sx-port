@@ -4,6 +4,7 @@
 #include "Application/Instruments/SamplePool.h"
 #include "Application/Instruments/MidiInstrument.h"
 #include "Application/Instruments/BassSynth.h"
+#include "Application/Instruments/PianoSynth.h"
 #include "System/io/Status.h"
 #include "Application/Utils/char.h"
 #include "Application/Model/Config.h"
@@ -14,7 +15,8 @@
 char *InstrumentTypeData[IT_LAST]= {
 	"Sample",
 	"Midi",
-	"Synth"		// BASS_SYNTH (bacon-1.5, item 6)
+	"Synth",	// BASS_SYNTH (bacon-1.5, item 6)
+	"Piano"		// PIANO_SYNTH (bacon-1.5, item 7)
 } ;
 
 
@@ -39,6 +41,12 @@ InstrumentBank::InstrumentBank():Persistent("INSTRUMENTBANK") {
 	for (int i=0;i<MAX_SYNTHINSTRUMENT_COUNT;i++) {
         BassSynth *s=new BassSynth() ;
         instrument_[MAX_SAMPLEINSTRUMENT_COUNT+MAX_MIDIINSTRUMENT_COUNT+i]=s ;
+    }
+	// PIANO_SYNTH (bacon-1.5, item 7): piano slots live after the synth
+	// range (IDs 0xA0..0xAF), same construction rules as the synths.
+	for (int i=0;i<MAX_PIANOINSTRUMENT_COUNT;i++) {
+        PianoSynth *s=new PianoSynth() ;
+        instrument_[MAX_SAMPLEINSTRUMENT_COUNT+MAX_MIDIINSTRUMENT_COUNT+MAX_SYNTHINSTRUMENT_COUNT+i]=s ;
     }
     Status::Set("All instrument loaded") ;
 } ;
@@ -151,6 +159,10 @@ void InstrumentBank::RestoreContent(TiXmlElement *element) {
 						case IT_SYNTH:
 							instr=new BassSynth() ;
 							break ;
+						// PIANO_SYNTH (bacon-1.5, item 7)
+						case IT_PIANO:
+							instr=new PianoSynth() ;
+							break ;
 					}
 					instrument_[id]=instr ;
 				} ;
@@ -244,6 +256,8 @@ unsigned short InstrumentBank::Clone(unsigned short i) {
 		dst=new SampleInstrument() ;
 	} else if (src->GetType()==IT_SYNTH) {
 		dst=new BassSynth() ;
+	} else if (src->GetType()==IT_PIANO) {
+		dst=new PianoSynth() ;
 	} else {
 		dst=new MidiInstrument() ;
 	}

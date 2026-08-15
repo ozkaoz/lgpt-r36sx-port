@@ -413,10 +413,10 @@ def check_grid_views_centered():
     # vertical shift applies, so the row-number column stays anchor-derived.
     assert "pos._x = anchor._x - 1;" in TABLE_CPP
     # Instrument form columns shift left 4 (labels x=6, second column x+16)
-    # both fillers and in the block headers of DrawView.  The synth form
-    # (BASS_SYNTH, bacon-1.5 item 6) adds a second header branch.
-    assert INSTRUMENT_CPP.count("position._x -= 4 ;") == 3
-    assert INSTRUMENT_CPP.count("hp._x -= 4 ;") == 2
+    # in the four fillers (sample/midi/synth/piano) and in the block headers
+    # of DrawView (BASS_SYNTH and PIANO_SYNTH added two header branches).
+    assert INSTRUMENT_CPP.count("position._x -= 4 ;") == 4
+    assert INSTRUMENT_CPP.count("hp._x -= 4 ;") == 3
     # View::GetAnchor() itself is untouched by this iteration (the per-view
     # offsets live in Phrase/Table/Instrument, never in View.cpp).
     v = (VIEWS / "BaseClasses/View.cpp").read_text()
