@@ -1,12 +1,70 @@
-# LGPT R36SX Bacon 1.4 — Bug Fixes
+# LGPT R36SX Bacon 1.5 — Synths nativos + multitrack (items 6-8)
 
-Release de corrección de bugs sobre la arquitectura de Bacon 1.3.
-Mismo comportamiento, sonido, controles, timings, sampler, USB,
-proyectos y compatibilidad — sin cambios de arquitectura.
+Release de desarrollo sobre la arquitectura de Bacon 1.4 (ABI7, audio
+48 kHz stereo, cuatro modos de audio USB Local / Windows / Android /
+Sampler SP404MKII, frontend-safe y sin escrituras a la SD en runtime).
 
-ABI7, audio 48 kHz stereo. Cuatro modos de audio USB seleccionables
-(Local / Windows / Android / Sampler SP404MKII), frontend-safe y sin
-escrituras a la SD en runtime.
+## Estado actual (items 6-8, 15/08/2026)
+
+`PENDIENTE BUILD DEL CORE`: el core `cubegm/cores/lgpt_r36sx_port_libretro.so`
+que hay en este paquete sigue siendo el de Bacon 1.4 (U2.54, `e4fbbdc8`) y **NO
+incluye los items 6-8**. Para probarlos hay que compilar el core nuevo y
+reemplazar el `.so` (ver `## Build del core (items 6-8)`).
+
+## Qué incluye esta release (items 6-8)
+
+- **Item 6 — BassSynth nativo** (slots `0x90`-`0x9F`, tipo `IT_SYNTH`): mono por
+  canal, osc PolyBLEP saw/square/tri/sine sin aliasing, subosc square, noise
+  LFSR xorshift32, amp ADSR + filter ADSR por etapas, Filter V2 TPT SVF
+  LP/HP/BP/NOTCH por canal a control rate, drive soft-clip, accent, LFO
+  0-20 Hz (CUT/VOL/PIT), pan equal-power, EQ8, sends dry/delay/reverb, tabla +
+  automatización. Comandos: VOLM/PAN/FCUT/FRES (0-255→0-100), PTCH (bend
+  ±12 st), LEGA, DLYS/RVBS en vivo.
+- **Item 7 — PianoSynth nativo** (slots `0xA0`-`0xAF`, tipo `IT_PIANO`): aditivo
+  con tabla seno 256 (band-limited, sin aliasing), 4 voces por canal, modos EP
+  y TINE (parciales armónicos), velocity, pitch bend, width Haas (~21 ms),
+  Filter V2 por canal, sustains, re-strike y voice-stealing.
+- **Item 8 — Multitrack / stems de export**: además de `channel0-7.wav` el
+  render multipista escribe `project:delayret.wav`, `project:reveret.wav` y
+  `project:master.wav`. Guard de espacio libre: el render aborta si quedan
+  < 128 MB libres en la SD (`FileSystem::GetFreeSpace`, statvfs).
+
+## Build del core (items 6-8)
+
+En la máquina de compilación con la toolchain sf3000 (mipsel):
+
+```bash
+cd /mnt/d/R36S/PORT\ LPTRACKER/GITHUB/lgpt-r36sx-port
+bash scripts/build.sh
+```
+
+El core queda en `BUILD/U2523/lgpt_r36sx_u2523.so`. Copiarlo a la SD:
+
+```bash
+cp BUILD/U2523/lgpt_r36sx_u2523.so sd_root/cubegm/cores/lgpt_r36sx_port_libretro.so
+```
+
+## Pruebas a hacer en consola (items 6-8)
+
+1. **BassSynth**: crear instrumento en un canal, tipo SYNTH (slots 0x90-0x9F).
+   Probar las 4 formas de onda (saw/square/tri/sine) sin aliasing en agudos;
+   subosc, noise, glide/portamento (PTCH/LEGA), accent, LFO sobre CUT/VOL/PIT,
+   drive, filtro LP/HP/BP/NOTCH, ADSR de amp y de filtro, pan, EQ8, sends.
+2. **PianoSynth**: tipo PIANO (slots 0xA0-0xAF). Modos EP y TINE (parciales 1P
+   a 4P), timbre, pdecay, width Haas, velocity, sustains (colas naturales),
+   acordes de 4 notas (voice-stealing), filtro y sends.
+3. **EQ8**: 8 bandas con la página EXT (5 bandas adicionales: frecuencia,
+   ganancia, Q, tipo, bypass con crossfade) en Master y en instrumento.
+4. **Sends**: dry 0-100 y delay/reverb -1..100 (0xFF hereda del track) en
+   BassSynth y PianoSynth; hear return delay y reverb en el send master.
+5. **Export multitrack**: render en modo MULTITRACK → `channel0-7.wav`,
+   `delayret.wav`, `reveret.wav` y `master.wav`; comprobar longitudes iguales,
+   que master = mezcla de canales + returns, y que el render aborta con aviso
+   si la SD tiene < 128 MB libres.
+6. **Regresión**: modos de audio (Local/Windows/Android/Sampler), Mixer,
+   Chopper, persistencia de proyectos y arranque en frío.
+
+## Bugs conocidos
 
 ## Estado actual (U2.54, 14/08/2026)
 

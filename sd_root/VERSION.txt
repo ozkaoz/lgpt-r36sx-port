@@ -1,1 +1,1 @@
-BACON_1.4_BUG_FIXES_U2.54
+BACON_1.5_ITEMS_6_8_DEV (core pendiente de build, ver README_PRIMERO_ES.md)
