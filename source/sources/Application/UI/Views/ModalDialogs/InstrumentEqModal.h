@@ -4,7 +4,7 @@
 #include "Application/UI/Views/BaseClasses/ModalView.h"
 #include "UIFramework/Framework/GUITextProperties.h"
 
-class SampleInstrument ;
+class I_Instrument ;
 
 /*
  * InstrumentEqModal -- graphical 8-band equalizer for the current sample
@@ -53,7 +53,7 @@ class InstrumentEqModal : public ModalView {
     int indexFromFreq(float hz) const;
 
     int instrumentIndex_ ;
-    class SampleInstrument *instr_ ;
+    class I_Instrument *instr_ ;
     int selected_ ;
     bool bypass_ ;
     float freqHz_[8] ;

@@ -11,6 +11,7 @@ extern "C" void TreeFrogInputTrace_LogView(
 #include "Application/UI/Views/ModalDialogs/UsbRecordModal.h"
 #include "Application/Instruments/MidiInstrument.h"
 #include "Application/Instruments/SampleInstrument.h"
+#include "Application/Instruments/BassSynth.h"
 #include "Application/Instruments/SamplePool.h"
 #include "Application/Model/Config.h"
 #include "Application/Player/Player.h"
@@ -81,6 +82,9 @@ void InstrumentView::onInstrumentChange() {
 			break ;
 		case IT_SAMPLE:
 			fillSampleParameters() ;
+			break ;
+		case IT_SYNTH:
+			fillSynthParameters() ;
 			break ;
 	} ;
 
@@ -397,6 +401,200 @@ void InstrumentView::fillMidiParameters() {
 
 } ;
 
+// BASS_SYNTH (bacon-1.5, item 6): synth parameter page.  Same block layout
+// contract as fillSampleParameters(): headers drawn by DrawView(), GetFirst()
+// = wave field, GetLast() = table field (L2+A cut/clear relies on both).
+//
+// Row 4  : INSTRUMENT (header)
+// Row 5  : wave | sub
+// Row 6  : volume | pan
+// Row 7  : glide | accent
+// Row 8  : FILTER (header)
+// Row 9  : type | cutoff
+// Row 10 : reso | fenv
+// Row 11 : f atk | f dec
+// Row 12 : f sus | f rel
+// Row 13 : ENV (header)
+// Row 14 : attack | decay
+// Row 15 : sustain | release
+// Row 16 : LFO/DRIVE (header)
+// Row 17 : rate | depth
+// Row 18 : target | drive
+// Row 19 : EFFECT SENDS (header)
+// Row 20 : DRY [bar]
+// Row 21 : DELAY [bar]
+// Row 22 : REVERB [bar]
+// Row 23 : EQ (header)
+// Row 24 : EQ 8-B | mask
+// Row 25 : AUTOMATION (header)
+// Row 26 : table auto | table
+
+void InstrumentView::fillSynthParameters() {
+
+	int i=viewData_->currentInstrument_ ;
+	InstrumentBank *bank=viewData_->project_->GetInstrumentBank() ;
+	I_Instrument *instr=bank->GetInstrument(i) ;
+	BassSynth *instrument=(BassSynth *)instr  ;
+	GUIPoint position=GetAnchor() ;
+	position._x -= 4 ;
+
+	Variable *v ;
+	UIIntVarField *f1 ;
+	UIIntVarField *f2 ;
+	GUIPoint col2 ;
+
+	position._y+=1 ;  // skip header row 4
+	v=instrument->FindVariable(SBP_WAVE) ;
+	f1=new UIIntVarField(position,*v,"wave: %s",0,3,1,1) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	f1->SetFocus() ;
+
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_SUB) ;
+	f2=new UIIntVarField(col2,*v,"sub:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_VOLUME) ;
+	f1=new UIIntVarField(position,*v,"vol:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_PAN) ;
+	f2=new UIIntVarField(col2,*v,"pan:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_GLIDE) ;
+	f1=new UIIntVarField(position,*v,"glide:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_ACCENT) ;
+	f2=new UIIntVarField(col2,*v,"acc:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=2 ;  // skip header row 8
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_FTYPE) ;
+	f1=new UIIntVarField(position,*v,"type: %s",0,2,1,1) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_FCUT) ;
+	f2=new UIIntVarField(col2,*v,"cut:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_FRES) ;
+	f1=new UIIntVarField(position,*v,"reso:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_FENV) ;
+	f2=new UIIntVarField(col2,*v,"fenv:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_FATK) ;
+	f1=new UIIntVarField(position,*v,"f atk:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_FDEC) ;
+	f2=new UIIntVarField(col2,*v,"f dec:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_FSUS) ;
+	f1=new UIIntVarField(position,*v,"f sus:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_FREL) ;
+	f2=new UIIntVarField(col2,*v,"f rel:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=2 ;  // skip header row 13
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_ATTACK) ;
+	f1=new UIIntVarField(position,*v,"atk:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_DECAY) ;
+	f2=new UIIntVarField(col2,*v,"dec:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_SUSTAIN) ;
+	f1=new UIIntVarField(position,*v,"sus:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_RELEASE) ;
+	f2=new UIIntVarField(col2,*v,"rel:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=2 ;  // skip header row 16
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_LRATE) ;
+	f1=new UIIntVarField(position,*v,"rate:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_LDEPTH) ;
+	f2=new UIIntVarField(col2,*v,"depth:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=1 ;
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SBP_LTARGET) ;
+	f1=new UIIntVarField(position,*v,"target: %s",0,2,1,1) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SBP_DRIVE) ;
+	f2=new UIIntVarField(col2,*v,"drive:%3d",0,100,1,10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=2 ;  // skip header row 19
+	v=instrument->FindVariable(SBP_DRY) ;
+	f1=new UIIntVarField(position,*v,"dry:%3d",0,100,1,10) ;
+	f1->SetBar("DRY",14) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+	position._y+=1 ;
+	v=instrument->FindVariable(SBP_DLYSEND) ;
+	f1=new UIIntVarField(position,*v,"dly:%3d",-1,100,1,10) ;
+	f1->SetBar("DELAY",14) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+	position._y+=1 ;
+	v=instrument->FindVariable(SBP_RVBSEND) ;
+	f1=new UIIntVarField(position,*v,"rvb:%3d",-1,100,1,10) ;
+	f1->SetBar("REVERB",14) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+	position._y+=2 ;  // skip header row 23
+	col2=position ;
+	col2._x+=12 ;
+	v=instrument->FindVariable(SIP_EQEN) ;
+	f1=new UIIntVarField(position,*v,"EQ 8-B:%d",0,1,1,1) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+	v=instrument->FindVariable(SIP_EQMASK) ;
+	f2=new UIIntVarOffField(col2,*v,"mask:%2.2X",0,0xFF,1,0x10) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+
+	position._y+=2 ;  // skip header row 25
+	col2=position ;
+	col2._x+=16 ;
+	v=instrument->FindVariable(SIP_TABLEAUTO) ;
+	f2=new UIIntVarField(position,*v,"table auto: %s",0,1,1,1) ;
+	T_SimpleList<UIField>::Insert(f2) ;
+	v=instrument->FindVariable(SIP_TABLE) ;
+	f1=new UIIntVarOffField(col2,*v,"table: %2.2X",0x00,0x7F,1,0x10) ;
+	T_SimpleList<UIField>::Insert(f1) ;
+
+} ;
+
 
 void InstrumentView::warpToNext(int offset) {
 	int instrument=viewData_->currentInstrument_+offset ;
@@ -548,7 +746,8 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
                     break;
                 }
                 case SIP_EQEN: {
-                    if (getInstrumentType() == IT_SAMPLE) {
+                    if (getInstrumentType() == IT_SAMPLE ||
+                        getInstrumentType() == IT_SYNTH) {
                         DoModal(new InstrumentEqModal(*this,
                                  viewData_->currentInstrument_));
                         isDirty_ = true;
@@ -730,6 +929,19 @@ void InstrumentView::DrawView() {
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 8, "BITCRUSHER");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 11, "PLAYBACK");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 17, "EFFECT SENDS");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 21, "AUTOMATION");
+    } else if (getInstrumentType()==IT_SYNTH) {
+        // BASS_SYNTH (bacon-1.5, item 6): block headers for
+        // fillSynthParameters() (rows 4, 8, 13, 16, 19, 23, 25).
+        GUIPoint hp = GetAnchor();
+        hp._x -= 4 ;
+        props.invert_ = false;
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y, "INSTRUMENT");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 4, "FILTER");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 9, "ENV");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 12, "LFO/DRIVE");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 15, "EFFECT SENDS");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 19, "EQ");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 21, "AUTOMATION");
     }
 

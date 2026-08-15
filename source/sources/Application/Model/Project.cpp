@@ -402,7 +402,15 @@ void Project::LoadFirstGen(const char *root) {
 		if (byteRead>0) {
 			int *current=buffer ;
 			InstrumentBank *bank=this->instrumentBank_ ;
-			for (int i=0;i<MAX_INSTRUMENT_COUNT;i++) {
+			// BASS_SYNTH (bacon-1.5, item 6): the legacy binary format only
+			// carries MAX_INSTRUMENT_COUNT*3 ints written by the build that
+			// saved the file.  Clamp the restore loop to the instruments the
+			// file actually contains so the new synth slots (which never
+			// existed in legacy files) are left at their defaults instead of
+			// reading uninitialized stack memory beyond byteRead.
+			int instCount=byteRead/3 ;
+			if (instCount>MAX_INSTRUMENT_COUNT) instCount=MAX_INSTRUMENT_COUNT ;
+			for (int i=0;i<instCount;i++) {
 				I_Instrument *instr=bank->GetInstrument(i) ;
 				int count=0 ;
 				IteratorPtr<Variable> it(instr->GetIterator()) ;

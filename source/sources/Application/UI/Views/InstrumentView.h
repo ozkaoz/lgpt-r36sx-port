@@ -22,6 +22,7 @@ protected:
 	void onInstrumentChange() ;
 	void fillSampleParameters() ;
 	void fillMidiParameters() ;
+	void fillSynthParameters() ;
 	InstrumentType getInstrumentType() ;
 	void Update(Observable &o,I_ObservableData *d) ;
 

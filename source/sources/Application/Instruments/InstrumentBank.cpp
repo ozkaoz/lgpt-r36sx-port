@@ -3,6 +3,7 @@
 #include "Application/Instruments/SampleInstrument.h"
 #include "Application/Instruments/SamplePool.h"
 #include "Application/Instruments/MidiInstrument.h"
+#include "Application/Instruments/BassSynth.h"
 #include "System/io/Status.h"
 #include "Application/Utils/char.h"
 #include "Application/Model/Config.h"
@@ -12,7 +13,8 @@
 
 char *InstrumentTypeData[IT_LAST]= {
 	"Sample",
-	"Midi"
+	"Midi",
+	"Synth"		// BASS_SYNTH (bacon-1.5, item 6)
 } ;
 
 
@@ -28,6 +30,15 @@ InstrumentBank::InstrumentBank():Persistent("INSTRUMENTBANK") {
         MidiInstrument *s=new MidiInstrument() ;
         s->SetChannel(i) ;
         instrument_[MAX_SAMPLEINSTRUMENT_COUNT+i]=s ;
+    }
+	// BASS_SYNTH (bacon-1.5, item 6): synth slots live after the MIDI range
+	// (IDs 0x90..0x9F).  Created at bank construction so they are always
+	// available from the instrument selector; RestoreContent converts a slot
+	// back to Sample/Midi only when a project explicitly saved a different
+	// type in it.
+	for (int i=0;i<MAX_SYNTHINSTRUMENT_COUNT;i++) {
+        BassSynth *s=new BassSynth() ;
+        instrument_[MAX_SAMPLEINSTRUMENT_COUNT+MAX_MIDIINSTRUMENT_COUNT+i]=s ;
     }
     Status::Set("All instrument loaded") ;
 } ;
@@ -133,6 +144,13 @@ void InstrumentBank::RestoreContent(TiXmlElement *element) {
 						case IT_MIDI:
 							instr=new MidiInstrument() ;
 							break ;
+						// BASS_SYNTH (bacon-1.5, item 6): a saved Synth type is
+						// restored to its own class; old projects (no TYPE or
+						// TYPE=Sample/Midi) never hit this branch, so their
+						// slots stay exactly as they were saved.
+						case IT_SYNTH:
+							instr=new BassSynth() ;
+							break ;
 					}
 					instrument_[id]=instr ;
 				} ;
@@ -224,6 +242,8 @@ unsigned short InstrumentBank::Clone(unsigned short i) {
   
 	if (src->GetType()==IT_SAMPLE) {
 		dst=new SampleInstrument() ;
+	} else if (src->GetType()==IT_SYNTH) {
+		dst=new BassSynth() ;
 	} else {
 		dst=new MidiInstrument() ;
 	}

@@ -263,7 +263,7 @@ InstrumentEqModal::InstrumentEqModal(View &view, int instrumentIndex)
     ViewData *vd = viewData_;
     InstrumentBank *bank = vd->project_->GetInstrumentBank();
     I_Instrument *inst = bank->GetInstrument(instrumentIndex);
-    if (inst && inst->GetType() == IT_SAMPLE) instr_ = (SampleInstrument *)inst;
+    if (inst && (inst->GetType() == IT_SAMPLE || inst->GetType() == IT_SYNTH)) instr_ = inst;
 
     status_[0] = 0;
     for (int i = 0; i < 8; i++) {
