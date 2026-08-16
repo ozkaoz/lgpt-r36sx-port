@@ -3,6 +3,7 @@
 #include "Foundation/Variables/Variable.h"
 #include "Application/Instruments/FilterV2.h"
 #include "Application/Instruments/CommandList.h"
+#include "Application/Instruments/SynthMath.h"
 #include "Services/Audio/Audio.h"
 #include "System/System/System.h"
 
@@ -275,6 +276,10 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
 
     SYS_MEMSET(buffer, 0, size * 2 * sizeof(fixed));
 
+    // TREEFROG_FAST_MATH_V1: build the shared tables on first render (cheap
+    // flag check afterwards); removes sinf/powf from the audio thread.
+    ensureSynthMath();
+
     int wave = wave_->GetInt();
     if (wave < 0) wave = 0;
     if (wave > 3) wave = 3;
@@ -300,8 +305,11 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     if (ltarget > 2) ltarget = 2;
 
     float pan = ((float)pan_->GetInt() / 100.0f);
-    float panL = cosf(pan * 1.57079633f);
-    float panR = sinf(pan * 1.57079633f);
+    // TREEFROG_FAST_MATH_V1: equal-power pan from the sine table (no libm
+    // calls on the audio thread; pan is in [0,1] so the phase stays in
+    // [pi/2, pi] + [0, pi/2], no wrap ever needed).
+    float panL = synthSinRad(pan * 1.57079633f + 1.57079633f);
+    float panR = synthSinRad(pan * 1.57079633f);
 
     float baseCut = (float)fcut_->GetInt() / 100.0f;
     float envAmount = (float)fenv_->GetInt() / 100.0f;
@@ -316,17 +324,25 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     // envelope and LFO sampled at the buffer boundary.
     float cutoffTarget = baseCut + envAmount * (*fEnv);
     if (ltarget == 0) {
-        cutoffTarget += sinf(v.lfoPhase_) * lfoDepth * 0.5f;
+        cutoffTarget += synthSinRad(v.lfoPhase_) * lfoDepth * 0.5f;
     }
     if (cutoffTarget > 1.0f) cutoffTarget = 1.0f;
     if (cutoffTarget < 0.0f) cutoffTarget = 0.0f;
+
+    // TREEFROG_FAST_MATH_V1: the glide decay factor is constant while the
+    // glide runs (glideTime_ only goes to 0 at convergence), so it is
+    // computed once per buffer instead of per sample (removes the per-sample
+    // expf from the audio thread; result is bit-identical).
+    float glideK = 0.0f;
+    if (v.glideTime_ > 0.0f) {
+        glideK = 1.0f - expf(-1.0f / (v.glideTime_ * rate));
+    }
 
     for (int i = 0; i < size; i++) {
 
         // ---- glide ----
         if (v.glideTime_ > 0.0f) {
-            float k = 1.0f - expf(-1.0f / (v.glideTime_ * rate));
-            v.freq_ += (v.targetFreq_ - v.freq_) * k;
+            v.freq_ += (v.targetFreq_ - v.freq_) * glideK;
             if (fabsf(v.targetFreq_ - v.freq_) < 0.01f) {
                 v.freq_ = v.targetFreq_;
                 v.glideTime_ = 0.0f;
@@ -335,12 +351,17 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
 
         // ---- LFO ----
         v.lfoPhase_ += v.lfoStep_;
-        float lfo = sinf(v.lfoPhase_) * lfoDepth;
+        // TREEFROG_FAST_MATH_V1: phase kept wrapped in [0,2*pi) so the sine
+        // table lookup stays exact and the accumulator never loses precision.
+        if (v.lfoPhase_ >= 6.28318531f) v.lfoPhase_ -= 6.28318531f;
+        float lfo = synthSinRad(v.lfoPhase_) * lfoDepth;
 
         // ---- pitch modulation ----
         float freq = v.freq_;
         if (ltarget == 2) {
-            freq *= powf(2.0f, lfo * 2.0f / 12.0f);
+            // TREEFROG_FAST_MATH_V1: lfo is bounded by ldepth (0..1), so the
+            // exponent stays in [-1/6, 1/6]: 2^x table instead of powf.
+            freq *= synthPow2Bounded(lfo * 2.0f / 12.0f);
         }
 
         // ---- oscillators ----
@@ -367,7 +388,9 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
                 break;
             }
             case 3: { // sine
-                osc = sinf(2.0f * 3.14159265f * p);
+                // TREEFROG_FAST_MATH_V1: 1024-entry interpolated table
+                // instead of per-sample sinf (same pattern as PianoSynth).
+                osc = synthSinP1(p);
                 break;
             }
             default: { // saw (with PolyBLEP)

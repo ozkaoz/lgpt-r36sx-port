@@ -4,13 +4,38 @@ Release de desarrollo sobre la arquitectura de Bacon 1.4 (ABI7, audio
 48 kHz stereo, cuatro modos de audio USB Local / Windows / Android /
 Sampler SP404MKII, frontend-safe y sin escrituras a la SD en runtime).
 
-## Estado actual (items 6-9 + src selector + EQ8 + warnings 0, 16/08/2026)
+## Estado actual (items 6-9 + FAST_MATH + crash dump hex, 16/08/2026)
 
 Core **compilado e instalado** en esta SD (`cubegm/cores/lgpt_r36sx_port_libretro.so`,
-SHA256 `2f14c0ac93c6d6192ac57d246de341ef410a98127ef8befdd1b75e0061e02c8d`).
+SHA256 `afcf5ba756b0ee3d7d89a47d2f25d86ac0e9edf004755e42239f2c7c396d7021`).
 Build device: `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`, `BUILD_U2523_OK`; regresión
-host `AUDIT_CLEAN_MAIN_U2523_OK`. Daemons y módulo UAC2 sin cambios (baseline
-Bacon 1.4, hashes `f7140072`/`968dfa61`/`3f0ea7a2`/`e9062ac5`).
+host `AUDIT_CLEAN_MAIN_U2523_OK` + `F10_BASELINE_OK`. Daemons y módulo UAC2 sin
+cambios (baseline Bacon 1.4, hashes `f7140072`/`968dfa61`/`3f0ea7a2`/`e9062ac5`).
+
+## Fix FAST_MATH — audio estable (16/08/2026)
+
+Reporte en consola: "lag, sonido no estable" en modo Local Console, silencio en
+la preescucha B de Bass/Piano, al asignar instrumentos a Phrase y tras editar
+el EQ8. Los logs del dispositivo (`LGPT_OTG_LOGS/crash.txt`) mostraban 4
+SIGSEGV del core instalado, con `pc` dentro de `libm.so.6` llamado desde el
+hilo de audio. Causa: los sintetizadores llamaban `sinf`/`powf`/`expf`
+**por muestra** en el render (el R36S tiene una MIPS débil: son caros, y la
+`libm` del dispositivo fallaba dentro de esos bucles → el CrashTrap hacía
+`_exit(128+sig)` → el core moría y picoarch lo reiniciaba → lag/audio
+inestable/silencio).
+
+- **BassSynth**: oscilador seno, LFO (CUT/VOL/PIT) y pan equal-power pasan a
+  tablas interpoladas compartidas (`SynthMath.h`: 1024 entradas de seno + 256
+  para 2^x, el mismo patrón que PianoSynth ya usaba para sus parciales); el
+  factor de decay del glide se hoistea fuera del bucle por muestra (era
+  `expf` por muestra; ahora uno por buffer, bit-identical).
+- **PianoSynth**: el pan (últimos `sinf`/`cosf` por buffer) usa también la
+  tabla compartida.
+- **CrashTrap**: el formatter hex escribía `"0x"` después de los dígitos
+  (valores ilegibles tipo `724d69ac0x` en crash.txt); el dump ahora se puede
+  parsear para futuros diagnósticos.
+- Sin cambios de sonido perceptibles (error de interpolación < 1e-6) ni de
+  persistencia; cero llamadas libm en el bucle por muestra de los synths.
 
 ## Qué añade esta release (último corte, item 9 + feedback)
 

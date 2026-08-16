@@ -3,6 +3,7 @@
 #include "Foundation/Variables/Variable.h"
 #include "Application/Instruments/FilterV2.h"
 #include "Application/Instruments/CommandList.h"
+#include "Application/Instruments/SynthMath.h"
 #include "Services/Audio/Audio.h"
 #include "System/System/System.h"
 
@@ -156,6 +157,9 @@ bool PianoSynth::Init() {
         }
         gSineTableReady = true;
     }
+    // TREEFROG_FAST_MATH_V1: build the shared sine/pow2 tables used by the
+    // equal-power pan (Init runs once, before any Render).
+    ensureSynthMath();
     return true;
 }
 
@@ -318,8 +322,10 @@ bool PianoSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     if (ftype > 2) ftype = 2;
 
     float pan = ((float)pan_->GetInt() / 100.0f);
-    float panL = cosf(pan * 1.57079633f);
-    float panR = sinf(pan * 1.57079633f);
+    // TREEFROG_FAST_MATH_V1: equal-power pan from the shared sine table
+    // (removes the last per-buffer sinf/cosf on the audio thread).
+    float panL = synthSinRad(pan * 1.57079633f + 1.57079633f);
+    float panR = synthSinRad(pan * 1.57079633f);
 
     float baseCut = (float)fcut_->GetInt() / 100.0f;
     float envAmount = (float)fenv_->GetInt() / 100.0f;

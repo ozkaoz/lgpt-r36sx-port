@@ -54,13 +54,16 @@ static void crashHex(unsigned long long v) {
     char b[20];
     int i = 19;
     b[i] = 0;
-    b[--i] = 'x';
-    b[--i] = '0';
     do {
         int d = (int)(v & 0xF);
         b[--i] = (char)(d < 10 ? '0' + d : 'a' + d - 10);
         v >>= 4;
     } while (v != 0);
+    // TREEFROG_CRASHDUMP_HEX_V1: "0x" must precede the digits; writing it
+    // before the digit loop put it *after* them, producing unparseable
+    // values like "724d69ac0x" in crash.txt.
+    b[--i] = 'x';
+    b[--i] = '0';
     crashWrite(b + i);
 }
 
