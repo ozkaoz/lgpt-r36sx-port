@@ -307,7 +307,13 @@ public:
                         trimMode ? " ADJ" : "");
     }
 
-    /* Golden status del progress (showOperationProgress): OK o porcentaje. */
+    /* Golden status del progress (showOperationProgress): OK o porcentaje.
+       snprintf truncates on purpose and returns the would-be length; GCC 7+
+       flags that as -Wformat-truncation, so it is suppressed locally. */
+#if defined(__GNUC__) && (__GNUC__ >= 7)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
     static int ComposeOperationStatus(char *buf, int bufLen,
                                       const char *comboLabel,
                                       const char *message, int percent) {
@@ -319,6 +325,9 @@ public:
                         comboLabel ? comboLabel : "",
                         message ? message : "", percent);
     }
+#if defined(__GNUC__) && (__GNUC__ >= 7)
+#pragma GCC diagnostic pop
+#endif
 
     /* Golden fila de porcentaje del overlay (drawOperationOverlay):
        "%3d%%". */

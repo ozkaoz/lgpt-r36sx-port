@@ -10,7 +10,7 @@
 NDSDir::NDSDir(const char *path):I_Dir(path) {
 } ;
 
-void NDSDir::GetContent(char *mask) {
+void NDSDir::GetContent(const char *mask) {
 
 	Empty() ;
         
@@ -98,7 +98,7 @@ Trace::Debug("init fat") ;
 Trace::Debug("~init fat") ;
 }
 
-I_File *NDSFileSystem::Open(const char *path,char *mode) {
+I_File *NDSFileSystem::Open(const char *path,const char *mode) {
 	char buffer[256] ;
 	strcpy(buffer,root_) ;
 	strcat(buffer,path) ;

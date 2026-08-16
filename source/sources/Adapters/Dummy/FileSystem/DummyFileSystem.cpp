@@ -6,7 +6,7 @@
 
 
 
-I_File *DummyFileSystem::Open(const char *path,char *mode) {
+I_File *DummyFileSystem::Open(const char *path,const char *mode) {
 	return 0 ;
 } ;
 

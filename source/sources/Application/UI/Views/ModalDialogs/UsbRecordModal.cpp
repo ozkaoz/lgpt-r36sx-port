@@ -128,8 +128,8 @@ UsbRecordModal::UsbRecordModal(View &view, int instrumentIndex)
                 &frames,
                 reason,
                 sizeof(reason))) {
-            snprintf(currentTakePath_, sizeof(currentTakePath_), "%s", capture_.path);
-            snprintf(validatedPath_, sizeof(validatedPath_), "%s", capture_.path);
+            snprintf(currentTakePath_, sizeof(currentTakePath_), "%.255s", capture_.path);
+            snprintf(validatedPath_, sizeof(validatedPath_), "%.255s", capture_.path);
             validatedDataBytes_ = bytes;
             validatedFrames_ = frames;
 

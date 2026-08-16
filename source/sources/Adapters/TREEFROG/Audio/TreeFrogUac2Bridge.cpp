@@ -21,6 +21,23 @@
 
 #if TREEFROG_UAC2_BRIDGE
 
+/* Best-effort marker/mode file writes: the bytes are informational and the
+ * failure is intentionally ignored, but the return value must be consumed to
+ * satisfy -Wunused-result on warn_unused_result write(). */
+static void best_effort_write(int fd, const void *buf, size_t count) {
+    if (write(fd, buf, count) < 0) { /* best-effort, ignore */ }
+}
+
+/* Bounded string copy into a fixed buffer: never warns under
+ * -Wformat-truncation because the size is enforced with strnlen/memcpy. */
+static void copy_bounded(char *dst, size_t dst_size, const char *src) {
+    if (!dst || dst_size == 0) return;
+    if (!src) src = "";
+    size_t n = strnlen(src, dst_size - 1);
+    memcpy(dst, src, n);
+    dst[n] = 0;
+}
+
 extern "C" const char *TreeFrogU241OtgBuildMarker(void) {
     return "R36SX U2.51.7 MONITOR FIFO HANDSHAKE FILENAME EDITOR";
 }
@@ -466,8 +483,8 @@ static void write_active_branch_file(int mode) {
     int fd = open(kActiveBranch, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) {
         const char *bn = branch_name_for_mode(mode);
-        write(fd, bn, strlen(bn));
-        write(fd, "\n", 1);
+        best_effort_write(fd, bn, strlen(bn));
+        best_effort_write(fd, "\n", 1);
         close(fd);
     }
     char branch_mode[320];
@@ -475,8 +492,8 @@ static void write_active_branch_file(int mode) {
     fd = open(branch_mode, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) {
         const char *mn = mode_token(mode);
-        write(fd, mn, strlen(mn));
-        write(fd, "\n", 1);
+        best_effort_write(fd, mn, strlen(mn));
+        best_effort_write(fd, "\n", 1);
         close(fd);
     }
 }
@@ -545,7 +562,7 @@ static void log_msg(const char *msg) {
 
 static void au10z_write_text_file(const char *path, const char *text) {
     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd >= 0) { if (text) write(fd, text, strlen(text)); close(fd); }
+    if (fd >= 0) { if (text) best_effort_write(fd, text, strlen(text)); close(fd); }
 }
 
 static void au10z_mirror_runtime_file(const char *leaf, const char *text) {
@@ -824,14 +841,14 @@ static void write_mode_file(int mode) {
      * a best-effort persistence for the next boot. */
     int rt = open(kRuntimeMode, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (rt >= 0) {
-        write(rt, m, strlen(m));
-        write(rt, "\n", 1);
+        best_effort_write(rt, m, strlen(m));
+        best_effort_write(rt, "\n", 1);
         close(rt);
     }
     int fd = open(kMode, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0) {
-        write(fd, m, strlen(m));
-        write(fd, "\n", 1);
+        best_effort_write(fd, m, strlen(m));
+        best_effort_write(fd, "\n", 1);
         /*
          * U2.41.5.2 FAST_MODE_FILE:
          * close() is sufficient here.  A synchronous fsync on the SD card
@@ -1398,7 +1415,7 @@ static void refresh_capture_status_internal(int force) {
             buf[n] = 0;
             char *nl = strchr(buf, '\n');
             if (nl) *nl = 0;
-            snprintf(g_capture_status, sizeof(g_capture_status), "%s", buf);
+            copy_bounded(g_capture_status, sizeof(g_capture_status), buf);
         }
     }
 
@@ -1417,29 +1434,17 @@ static void refresh_capture_status_internal(int force) {
 
             if (capture_meta_value(meta, "TOKEN=", value, sizeof(value)) &&
                 value[0]) {
-                snprintf(
-                    g_capture_token,
-                    sizeof(g_capture_token),
-                    "%s",
-                    value);
+                copy_bounded(g_capture_token, sizeof(g_capture_token), value);
             }
 
             if (capture_meta_value(meta, "PATH=", value, sizeof(value)) &&
                 value[0]) {
-                snprintf(
-                    g_last_capture_path,
-                    sizeof(g_last_capture_path),
-                    "%s",
-                    value);
+                copy_bounded(g_last_capture_path, sizeof(g_last_capture_path), value);
             }
 
             if (capture_meta_value(meta, "NAME=", value, sizeof(value)) &&
                 value[0]) {
-                snprintf(
-                    g_last_capture_name,
-                    sizeof(g_last_capture_name),
-                    "%s",
-                    value);
+                copy_bounded(g_last_capture_name, sizeof(g_last_capture_name), value);
             }
 
             if (capture_meta_value(meta, "FRAMES=", value, sizeof(value)))
@@ -1452,11 +1457,7 @@ static void refresh_capture_status_internal(int force) {
                 g_capture_elapsed_seconds = atoi(value);
 
             if (capture_meta_value(meta, "ERROR=", value, sizeof(value))) {
-                snprintf(
-                    g_capture_error,
-                    sizeof(g_capture_error),
-                    "%s",
-                    value);
+                copy_bounded(g_capture_error, sizeof(g_capture_error), value);
             }
         }
     }
@@ -2348,7 +2349,7 @@ int TreeFrogUac2Bridge_GetLastCaptureName(char *dst, int dst_len) {
             buf[n] = 0;
             char *nl = strchr(buf, '\n');
             if (nl) *nl = 0;
-            snprintf(g_last_capture_name, sizeof(g_last_capture_name), "%s", buf);
+            copy_bounded(g_last_capture_name, sizeof(g_last_capture_name), buf);
         }
     }
     if (!g_last_capture_name[0]) return 0;
@@ -2375,7 +2376,7 @@ int TreeFrogUac2Bridge_GetLastCapturePath(char *dst, int dst_len) {
             buf[n] = 0;
             char *nl = strchr(buf, '\n');
             if (nl) *nl = 0;
-            snprintf(g_last_capture_path, sizeof(g_last_capture_path), "%s", buf);
+            copy_bounded(g_last_capture_path, sizeof(g_last_capture_path), buf);
         }
     }
     if (!g_last_capture_path[0]) return 0;

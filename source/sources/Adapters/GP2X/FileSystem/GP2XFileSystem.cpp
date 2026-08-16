@@ -14,7 +14,7 @@
 GP2XDir::GP2XDir(const char *path):I_Dir(path) {
 } ;
 
-void GP2XDir::GetContent(char *mask) {
+void GP2XDir::GetContent(const char *mask) {
 
 	Empty() ;
 
@@ -88,7 +88,7 @@ void GP2XFile::Close() {
 	fclose(file_) ;
 } ;
 
-I_File *GP2XFileSystem::Open(const char *path,char *mode) {
+I_File *GP2XFileSystem::Open(const char *path,const char *mode) {
 	char *rmode ;
 	switch(*mode) {
         case 'r':

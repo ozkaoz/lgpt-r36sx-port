@@ -12,7 +12,7 @@
 CAANOODir::CAANOODir(const char *path):I_Dir(path) {
 } ;
 
-void CAANOODir::GetContent(char *mask) {
+void CAANOODir::GetContent(const char *mask) {
 
 	Empty() ;
 
@@ -85,7 +85,7 @@ void CAANOOFile::Close() {
 	fclose(file_) ;
 } ;
 
-I_File *CAANOOFileSystem::Open(const char *path,char *mode) {
+I_File *CAANOOFileSystem::Open(const char *path,const char *mode) {
 	const char *rmode ;
 	switch(*mode) {
         case 'r':

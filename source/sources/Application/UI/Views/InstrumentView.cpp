@@ -33,20 +33,37 @@ extern "C" void TreeFrogInputTrace_LogView(
 #include <string.h>
 #include <string>
 
+// BASS_SYNTH_SOURCE (bacon-1.5, feedback): the "src" selector maps a slot to
+// its sound engine.  Indexes must match the kSrcNames list below.
+static const FourCC srcID_ = MAKE_FOURCC('S', 'R', 'C', 'S');
+static const char *kSrcNames[3] = {"Sample", "Bass", "Piano"};
+
+static int typeToSrcIndex(InstrumentType t) {
+    switch (t) {
+        case IT_SYNTH: return 1;
+        case IT_PIANO: return 2;
+        case IT_SAMPLE:
+        default:       return 0;
+    }
+}
+
 // U2.52.0: destructive sample deletion was moved out of Instrument fields.
 // It is now available only in the Import/Listen/Manage/Exit sample browser,
 // where the selected source path and project identity can be validated safely.
 
-InstrumentView::InstrumentView(GUIWindow &w,ViewData *data):FieldView(w,data) {
+InstrumentView::InstrumentView(GUIWindow &w,ViewData *data):FieldView(w,data),
+	srcVar_("src", srcID_, kSrcNames, 3, 0) {
 
 	project_=data->project_ ;
 	lastFocusID_=0 ;
 	current_=0 ;
+	srcVar_.AddObserver(*this) ;
 	onInstrumentChange() ;
 }
 
 
 InstrumentView::~InstrumentView() {
+	srcVar_.RemoveObserver(*this) ;
 	if (current_) {
 		current_->RemoveObserver(*this) ;
 		current_=0 ;
@@ -134,7 +151,10 @@ void InstrumentView::fillSampleParameters() {
 	// (GetAnchor()._y==4).  Block headers are drawn by DrawView(), NOT
 	// inserted as UIStaticField, so T_SimpleList<UIField>::GetFirst() stays
 	// the sample field and GetLast() stays the table field (L2+A cut/clear
-	// relies on both).
+	// rely on both).  The "src" engine selector lives only on the synth and
+	// piano pages: the sample page is already at the 22-row budget (rows
+	// 5..26) with the map/notes band starting at row 27, so it cannot host
+	// the extra selector row (or a graphic-EQ block) without overflowing.
 	//
 	// Row 4  : INSTRUMENT (header)
 	// Row 5  : sample
@@ -143,7 +163,7 @@ void InstrumentView::fillSampleParameters() {
 	// Row 8  : FILTER (header)
 	// Row 9  : type | mode
 	// Row 10 : cutoff | reso
-	// Row 11 : attenuate
+	// Row 11 : attenuate | filt
 	// Row 12 : BITCRUSHER (header)
 	// Row 13 : bit depth | drive
 	// Row 14 : downsample
@@ -314,21 +334,6 @@ position._y+=1 ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
 	// ----------------------------------------------------------
-	// Block 6: GRAPHIC EQ (TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1).
-	// A focused ENTER/ACTION opens the graphical 8-band editor Modal; the
-	// EQ bypass can also be toggled from this field directly.
-	// ----------------------------------------------------------
-	position._y+=2 ;  // skip header row
-	col2=position ;
-	col2._x+=12 ;
-	v=instrument->FindVariable(SIP_EQEN) ;
-	f1=new UIIntVarField(position,*v,"EQ 8-B:%d",0,1,1,1) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-	v=instrument->FindVariable(SIP_EQMASK) ;
-	f2=new UIIntVarOffField(col2,*v,"mask:%2.2X",0,0xFF,1,0x10) ;
-	T_SimpleList<UIField>::Insert(f2) ;
-
-	// ----------------------------------------------------------
 	// Offline render FX (print fx / wet / pad).  Only compiled on
 	// desktop builds: the R36SX build has no FFMPEG_ENABLED so these
 	// fields do not exist there (PLAN_FX_REDESIGN_ES.md, Fase 8).
@@ -406,30 +411,32 @@ void InstrumentView::fillMidiParameters() {
 } ;
 
 // BASS_SYNTH (bacon-1.5, item 6): synth parameter page.  Same block layout
-// contract as fillSampleParameters(): headers drawn by DrawView(), GetFirst()
-// = wave field, GetLast() = table field (L2+A cut/clear relies on both).
+// contract as fillSampleParameters(): headers drawn by DrawView(), GetLast()
+// = table field (L2+A clear relies on it).  The "src" selector (bacon-1.5
+// feedback) is the first field of the INSTRUMENT block.
 //
 // Row 4  : INSTRUMENT (header)
-// Row 5  : wave | sub
-// Row 6  : volume | pan
-// Row 7  : glide | accent
-// Row 8  : FILTER (header)
-// Row 9  : type | cutoff
-// Row 10 : reso | fenv
-// Row 11 : f atk | f dec
-// Row 12 : f sus | f rel
-// Row 13 : ENV (header)
-// Row 14 : attack | decay
-// Row 15 : sustain | release
-// Row 16 : LFO/DRIVE (header)
-// Row 17 : rate | depth
-// Row 18 : target | drive
-// Row 19 : EFFECT SENDS (header)
-// Row 20 : DRY [bar]
-// Row 21 : DELAY [bar]
-// Row 22 : REVERB [bar]
-// Row 23 : EQ (header)
-// Row 24 : EQ 8-B | mask
+// Row 5  : src (Sample/Bass/Piano)
+// Row 6  : wave | sub
+// Row 7  : volume | pan
+// Row 8  : glide | accent
+// Row 9  : FILTER (header)
+// Row 10 : type | cutoff
+// Row 11 : reso | fenv
+// Row 12 : f atk | f dec
+// Row 13 : f sus | f rel
+// Row 14 : ENV (header)
+// Row 15 : attack | decay
+// Row 16 : sustain | release
+// Row 17 : LFO/DRIVE (header)
+// Row 18 : rate | depth
+// Row 19 : target | drive
+// Row 20 : EFFECT SENDS (header)
+// Row 21 : DRY [bar]
+// Row 22 : DELAY [bar]
+// Row 23 : REVERB [bar]
+// Row 24 : EQ8 | mask (no header: with the "src" row on 5 the form is exactly
+//          at the 22-row budget rows 5..26, so the EQ header row was dropped)
 // Row 25 : AUTOMATION (header)
 // Row 26 : table auto | table
 
@@ -448,6 +455,18 @@ void InstrumentView::fillSynthParameters() {
 	GUIPoint col2 ;
 
 	position._y+=1 ;  // skip header row 4
+
+	// BASS_SYNTH_SOURCE (bacon-1.5, feedback): "src" engine selector at the
+	// top of the INSTRUMENT block.  Arrows cycle Sample/Bass/Piano; on change
+	// the slot is converted in place (InstrumentBank::SetInstrumentType) and
+	// the view rebuilds to the engine's full parameter page.  When a sample
+	// is assigned (not Null) switching to a synth is refused so the sample is
+	// never silently discarded.
+	srcVar_.SetInt(typeToSrcIndex(getInstrumentType()), false) ;
+	UIIntVarField *fSrc=new UIIntVarField(position,srcVar_,"src: %s",0,2,1,1) ;
+	T_SimpleList<UIField>::Insert(fSrc) ;
+
+	position._y+=1 ;
 	v=instrument->FindVariable(SBP_WAVE) ;
 	f1=new UIIntVarField(position,*v,"wave: %s",0,3,1,1) ;
 	T_SimpleList<UIField>::Insert(f1) ;
@@ -577,17 +596,17 @@ void InstrumentView::fillSynthParameters() {
 	f1->SetBar("REVERB",14) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
-	position._y+=2 ;  // skip header row 23
+	position._y+=1 ;  // EQ8 field right after REVERB (no header row)
 	col2=position ;
 	col2._x+=12 ;
 	v=instrument->FindVariable(SIP_EQEN) ;
-	f1=new UIIntVarField(position,*v,"EQ 8-B:%d",0,1,1,1) ;
+	f1=new UIIntVarField(position,*v,"EQ8:%d",0,1,1,1) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 	v=instrument->FindVariable(SIP_EQMASK) ;
 	f2=new UIIntVarOffField(col2,*v,"mask:%2.2X",0,0xFF,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f2) ;
 
-	position._y+=2 ;  // skip header row 25
+	position._y+=2 ;  // skip AUTOMATION header row 25
 	col2=position ;
 	col2._x+=16 ;
 	v=instrument->FindVariable(SIP_TABLEAUTO) ;
@@ -602,27 +621,28 @@ void InstrumentView::fillSynthParameters() {
 
 // PIANO_SYNTH (bacon-1.5, item 7): form for the polyphonic additive piano.
 // Same contract as fillSynthParameters(): headers drawn by DrawView(),
-// GetFirst() = mode field, GetLast() = table field.
+// GetLast() = table field.  The "src" selector (bacon-1.5 feedback) is the
+// first field of the INSTRUMENT block.
 //
 // Row 4  : INSTRUMENT (header)
-// Row 5  : mode | partials
-// Row 6  : volume | pan
-// Row 7  : width | timbre
-// Row 8  : pdecay | accent
-// Row 9  : FILTER (header)
-// Row 10 : type | cutoff
-// Row 11 : reso | fenv
-// Row 12 : f atk | f dec
-// Row 13 : f sus | f rel
-// Row 14 : ENV (header)
-// Row 15 : attack | decay
-// Row 16 : sustain | release
-// Row 17 : EFFECT SENDS (header)
-// Row 18 : DRY [bar]
-// Row 19 : DELAY [bar]
-// Row 20 : REVERB [bar]
-// Row 21 : EQ (header)
-// Row 22 : EQ 8-B | mask
+// Row 5  : src (Sample/Bass/Piano)
+// Row 6  : mode | partials
+// Row 7  : volume | pan
+// Row 8  : width | timbre
+// Row 9  : pdecay | accent
+// Row 10 : FILTER (header)
+// Row 11 : type | cutoff
+// Row 12 : reso | fenv
+// Row 13 : f atk | f dec
+// Row 14 : f sus | f rel
+// Row 15 : ENV (header)
+// Row 16 : attack | decay
+// Row 17 : sustain | release
+// Row 18 : EFFECT SENDS (header)
+// Row 19 : DRY [bar]
+// Row 20 : DELAY [bar]
+// Row 21 : REVERB [bar]
+// Row 22 : EQ8 | mask (no header, matches the bass form)
 // Row 23 : AUTOMATION (header)
 // Row 24 : table auto | table
 
@@ -641,6 +661,18 @@ void InstrumentView::fillPianoParameters() {
 	GUIPoint col2 ;
 
 	position._y+=1 ;  // skip header row 4
+
+	// BASS_SYNTH_SOURCE (bacon-1.5, feedback): "src" engine selector at the
+	// top of the INSTRUMENT block.  Arrows cycle Sample/Bass/Piano; on change
+	// the slot is converted in place (InstrumentBank::SetInstrumentType) and
+	// the view rebuilds to the engine's full parameter page.  When a sample
+	// is assigned (not Null) switching to a synth is refused so the sample is
+	// never silently discarded.
+	srcVar_.SetInt(typeToSrcIndex(getInstrumentType()), false) ;
+	UIIntVarField *fSrc=new UIIntVarField(position,srcVar_,"src: %s",0,2,1,1) ;
+	T_SimpleList<UIField>::Insert(fSrc) ;
+
+	position._y+=1 ;
 	v=instrument->FindVariable(PNP_MODE) ;
 	f1=new UIIntVarField(position,*v,"mode: %s",0,1,1,1) ;
 	T_SimpleList<UIField>::Insert(f1) ;
@@ -760,17 +792,17 @@ void InstrumentView::fillPianoParameters() {
 	f1->SetBar("REVERB",14) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 
-	position._y+=2 ;  // skip header row 21
+	position._y+=1 ;  // EQ8 field right after REVERB (no header, bass style)
 	col2=position ;
 	col2._x+=12 ;
 	v=instrument->FindVariable(SIP_EQEN) ;
-	f1=new UIIntVarField(position,*v,"EQ 8-B:%d",0,1,1,1) ;
+	f1=new UIIntVarField(position,*v,"EQ8:%d",0,1,1,1) ;
 	T_SimpleList<UIField>::Insert(f1) ;
 	v=instrument->FindVariable(SIP_EQMASK) ;
 	f2=new UIIntVarOffField(col2,*v,"mask:%2.2X",0,0xFF,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f2) ;
 
-	position._y+=2 ;  // skip header row 23
+	position._y+=2 ;  // skip AUTOMATION header row 23
 	col2=position ;
 	col2._x+=16 ;
 	v=instrument->FindVariable(SIP_TABLEAUTO) ;
@@ -875,8 +907,13 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
                   EPBM_B | EPBM_X | EPBM_Y | EPBM_L | EPBM_R |
                   EPBM_R2 | EPBM_SELECT | EPBM_START));
     if (cutInstrument) {
+        // BASS_SYNTH_SOURCE (bacon-1.5, feedback): cut is keyed on the sample
+        // field's variable ID (robust even though GetFirst() is the "src"
+        // selector on the synth/piano pages and the sample field elsewhere).
+        UIField *cutFocus = GetFocus();
         if (getInstrumentType() == IT_SAMPLE &&
-            GetFocus() == T_SimpleList<UIField>::GetFirst()) {
+            cutFocus && !cutFocus->IsStatic() &&
+            ((UIIntVarField *)cutFocus)->GetVariableID() == SIP_SAMPLE) {
             int i = viewData_->currentInstrument_;
             InstrumentBank *bank = viewData_->project_->GetInstrumentBank();
             I_Instrument *instr = bank->GetInstrument(i);
@@ -1008,7 +1045,8 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
             if (mask & EPBM_R) {
                 // Graphical Chopper U2.4.3 route: Instrument sample field + R+A.
                 if ((mask & EPBM_A) && (getInstrumentType() == IT_SAMPLE) &&
-                    (GetFocus() == T_SimpleList<UIField>::GetFirst())) {
+                    (GetFocus() != 0) && (!GetFocus()->IsStatic()) &&
+                    (((UIIntVarField *)GetFocus())->GetVariableID() == SIP_SAMPLE)) {
                     int instrIndex = viewData_->currentInstrument_;
                     InstrumentBank *bank = viewData_->project_->GetInstrumentBank();
                     I_Instrument *instr = bank->GetInstrument(instrIndex);
@@ -1104,8 +1142,10 @@ void InstrumentView::DrawView() {
     DrawString(pos._x, pos._y, title, props);
 
     // TREEFROG_FX_BLOCKS_V1 (PLAN_FX_REDESIGN_ES.md, Fase 8): block
-    // headers for fillSampleParameters().  Drawn here (not as fields) so
-    // the field list's first/last stay sample/table for L2+A cut/clear.
+    // headers for the parameter pages.  Drawn here (not as fields) so
+    // T_SimpleList<UIField>::GetFirst() stays the sample field and
+    // GetLast() stays the table field (L2+A cut/clear rely on both); the
+    // "src" selector lives only on the synth/piano pages (see below).
     // RC3 (point 19): rendered through UiDraw::DrawSectionHeader.
     if (getInstrumentType()==IT_SAMPLE) {
         // RC6: block headers align with the centered field columns (x=6).
@@ -1120,28 +1160,28 @@ void InstrumentView::DrawView() {
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 21, "AUTOMATION");
     } else if (getInstrumentType()==IT_SYNTH) {
         // BASS_SYNTH (bacon-1.5, item 6): block headers for
-        // fillSynthParameters() (rows 4, 8, 13, 16, 19, 23, 25).
-        GUIPoint hp = GetAnchor();
-        hp._x -= 4 ;
-        props.invert_ = false;
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y, "INSTRUMENT");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 4, "FILTER");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 9, "ENV");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 12, "LFO/DRIVE");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 15, "EFFECT SENDS");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 19, "EQ");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 21, "AUTOMATION");
-    } else if (getInstrumentType()==IT_PIANO) {
-        // PIANO_SYNTH (bacon-1.5, item 7): block headers for
-        // fillPianoParameters() (rows 4, 9, 14, 17, 21, 23).
+        // fillSynthParameters() (rows 4, 9, 14, 17, 20, 25); the EQ8 row
+        // has no header (22-row budget is full).
         GUIPoint hp = GetAnchor();
         hp._x -= 4 ;
         props.invert_ = false;
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y, "INSTRUMENT");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 5, "FILTER");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 10, "ENV");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 13, "EFFECT SENDS");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 17, "EQ");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 13, "LFO/DRIVE");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 16, "EFFECT SENDS");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 21, "AUTOMATION");
+    } else if (getInstrumentType()==IT_PIANO) {
+        // PIANO_SYNTH (bacon-1.5, item 7): block headers for
+        // fillPianoParameters() (rows 4, 10, 15, 18, 23); the EQ8 row has
+        // no header (matches the bass form).
+        GUIPoint hp = GetAnchor();
+        hp._x -= 4 ;
+        props.invert_ = false;
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y, "INSTRUMENT");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 6, "FILTER");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 11, "ENV");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 14, "EFFECT SENDS");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 19, "AUTOMATION");
     }
 
@@ -1154,5 +1194,50 @@ void InstrumentView::DrawView() {
 void InstrumentView::OnFocus() { onInstrumentChange(); }
 
 void InstrumentView::Update(Observable &o,I_ObservableData *d) {
+	// BASS_SYNTH_SOURCE (bacon-1.5, feedback): the "src" selector changed.
+	// Convert the slot engine in place; onInstrumentChange() then rebuilds the
+	// page so the new engine's full parameter set is shown right away.
+	if (&o == &srcVar_) {
+		int wanted=srcVar_.GetInt() ;
+		InstrumentType cur=getInstrumentType() ;
+		int curSrc=typeToSrcIndex(cur) ;
+		if (wanted==curSrc) return ;
+		InstrumentType target=IT_SAMPLE ;
+		switch (wanted) {
+			case 1: target=IT_SYNTH ; break ;
+			case 2: target=IT_PIANO ; break ;
+			default: target=IT_SAMPLE ; break ;
+		}
+		// Never leave a loaded sample slot as a synth: that would silently
+		// discard the assigned sample.
+		if (cur==IT_SAMPLE && target!=IT_SAMPLE) {
+			I_Instrument *instr=viewData_->project_->GetInstrumentBank()->GetInstrument(viewData_->currentInstrument_) ;
+			Variable *sv=instr ? instr->FindVariable(SIP_SAMPLE) : 0 ;
+			if (sv && sv->GetInt()!=NO_SAMPLE) {
+				srcVar_.SetInt(curSrc,false) ;
+				View::SetNotification("Clear the sample to switch to a synth") ;
+				return ;
+			}
+		}
+		if (target!=cur) {
+			// Drop the observer BEFORE SetInstrumentType deletes the current
+			// engine object: onInstrumentChange() would otherwise call
+			// RemoveObserver on the freed instance.
+			if (current_) {
+				current_->RemoveObserver(*this) ;
+				current_=0 ;
+			}
+			// Stop playback so no sounding note dereferences the engine object
+			// being replaced (same safety step as the USB sampler route).
+			Player *p=Player::GetInstance() ;
+			if (p) {
+				p->Stop() ;
+				p->StopStreaming() ;
+			}
+			viewData_->project_->GetInstrumentBank()->SetInstrumentType(viewData_->currentInstrument_,target) ;
+			onInstrumentChange() ;
+		}
+		return ;
+	}
 	onInstrumentChange() ;
 }

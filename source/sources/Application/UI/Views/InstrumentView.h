@@ -4,6 +4,7 @@
 #include "Application/FX/FxPrinter.h"
 #include "BaseClasses/FieldView.h"
 #include "Foundation/Observable.h"
+#include "Foundation/Variables/WatchedVariable.h"
 #include "ViewData.h"
 #include "System/FileSystem/FileSystem.h"
 
@@ -31,5 +32,9 @@ private:
 	Project *project_ ;
 	FourCC lastFocusID_ ;
 	I_Instrument *current_ ;
+	// BASS_SYNTH_SOURCE (bacon-1.5, feedback): view-local selector that maps
+	// the current slot to its engine (Sample/Bass/Piano).  Not persisted: the
+	// converted type is what SaveContent writes.
+	WatchedVariable srcVar_ ;
 } ;
 #endif

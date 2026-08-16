@@ -45,7 +45,7 @@ void W32File::Close() {
 W32Dir::W32Dir(const char *path):I_Dir(path) {
 } ;
 
-void W32Dir::GetContent(char *mask) {
+void W32Dir::GetContent(const char *mask) {
 
 	Empty() ;
 	WIN32_FIND_DATA findData ;
@@ -71,7 +71,7 @@ I_Dir *W32FileSystem::Open(const char *path) {
     return new W32Dir(path) ;
 } ;
 
-I_File *W32FileSystem::Open(const char *path,char *mode) {
+I_File *W32FileSystem::Open(const char *path,const char *mode) {
 	char *rmode ;
 	switch(*mode) {
         case 'r':

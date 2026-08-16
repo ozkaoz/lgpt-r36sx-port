@@ -12,7 +12,7 @@
 DINGOODir::DINGOODir(const char *path):I_Dir(path) {
 } ;
 
-void DINGOODir::GetContent(char *mask) {
+void DINGOODir::GetContent(const char *mask) {
 
 	Empty() ;
 
@@ -87,7 +87,7 @@ void DINGOOFile::Close() {
 	fclose(file_) ;
 } ;
 
-I_File *DINGOOFileSystem::Open(const char *path,char *mode) {
+I_File *DINGOOFileSystem::Open(const char *path,const char *mode) {
 	char *rmode ;
 	switch(*mode) {
         case 'r':

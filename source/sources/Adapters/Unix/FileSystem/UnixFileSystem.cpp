@@ -43,7 +43,7 @@ static std::string unixJoinPath(const char *base,const std::string &leaf) {
 UnixDir::UnixDir(const char *path):I_Dir(path) {
 } ;
 
-void UnixDir::GetContent(char *mask) {
+void UnixDir::GetContent(const char *mask) {
 
 	Empty() ;
 
@@ -135,7 +135,7 @@ void UnixFile::Close() {
 UnixFileSystem::UnixFileSystem() {
 }
 
-I_File *UnixFileSystem::Open(const char *path,char *mode) {
+I_File *UnixFileSystem::Open(const char *path,const char *mode) {
 	char *rmode ;
 	switch(*mode) {
         case 'r':

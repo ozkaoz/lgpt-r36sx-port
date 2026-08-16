@@ -1,17 +1,36 @@
-# LGPT R36SX Bacon 1.5 — Synths nativos + multitrack (items 6-8)
+# LGPT R36SX Bacon 1.5 — Synths nativos + multitrack + src selector + EQ8 (items 6-8)
 
 Release de desarrollo sobre la arquitectura de Bacon 1.4 (ABI7, audio
 48 kHz stereo, cuatro modos de audio USB Local / Windows / Android /
 Sampler SP404MKII, frontend-safe y sin escrituras a la SD en runtime).
 
-## Estado actual (items 6-8, 15/08/2026)
+## Estado actual (items 6-8 + src selector + EQ8 + warnings 0, 15/08/2026)
 
 Core **compilado e instalado** en esta SD (`cubegm/cores/lgpt_r36sx_port_libretro.so`,
-SHA256 `2288cb5c3a6eb8644402a49618edfe710f8f2ab823aa0f762f8b7c29e3981eb4`).
+SHA256 `537624b8312365e4de2a99a5f62e9153b98d34806bc75b548a62e6a8083139be`).
 Build device: `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`, `BUILD_U2523_OK`; regresión
 host `AUDIT_CLEAN_MAIN_U2523_OK`. Daemons y módulo UAC2 sin cambios (baseline
-Bacon 1.4, hashes `f7140072`/`968dfa61`/`3f0ea7a2`/`e9062ac5`). Commits:
-`a0da94f` (item 7), `ee62202` (item 8), `c59ebc6` (fix DIAGNOSTIC_GATE).
+Bacon 1.4, hashes `f7140072`/`968dfa61`/`3f0ea7a2`/`e9062ac5`).
+
+## Qué añade esta release (último corte)
+
+- **Selector `src` en InstrumentView (Bass/Piano)**: la fila `src` cicla
+  Sample/Bass/Piano con las flechas. Al cambiar a Bass/Piano se despliega
+  la página completa de parámetros del sintetizador; con un sample asignado
+  la conversión a sintetizador se bloquea con el aviso "Clear the sample to
+  switch to a synth". El formulario Sample queda en su layout original (tabla
+  en la fila 26, sin EQ8) y las formas Bass/Piano colocan el campo EQ8 sin
+  header (filas 24 y 22 respectivamente) para que nada solape la banda
+  map/notas (y=27).
+- **EQ8 gráfico por instrumento**: en las formas Bass/Piano la fila `EQ8`
+  (con máscara) abre con A el editor gráfico `InstrumentEqModal` para el
+  instrumento activo.
+- **42 warnings del host syntax check resueltos** (GCC 13 host, GCC 6.3
+  MIPS): firmas `const` de `FileSystem::Open`/`GetContent` y adaptadores,
+  `WatchedVariable` (sobrecarga de listas), `Status::Set`,
+  `Tiny2NosStub`/`TreeFrogUac2Bridge`/`UsbRecordModal`/`SampleChopperModal`/
+  `ImportSampleDialog` (truncado explícito de snprintf) y `ChopperView.h`
+  (guard `-Wformat-truncation` para GCC >= 7).
 
 ## Qué incluye esta release (items 6-8)
 
@@ -65,6 +84,14 @@ cp BUILD/U2523/lgpt_r36sx_u2523.so sd_root/cubegm/cores/lgpt_r36sx_port_libretro
    si la SD tiene < 128 MB libres.
 6. **Regresión**: modos de audio (Local/Windows/Android/Sampler), Mixer,
    Chopper, persistencia de proyectos y arranque en frío.
+7. **Selector `src`**: en una forma Bass/Piano, con las flechas en `src`
+   ciclar Sample→Bass→Piano; comprobar que al pasar a Bass/Piano se
+   despliega la página de parámetros del sintetizador y que con un sample
+   asignado aparece "Clear the sample to switch to a synth" (no convierte).
+8. **EQ8 de instrumento**: en Bass/Piano, sobre la fila `EQ8` pulsar A para
+   abrir el editor gráfico (`INSTR EQ8  INS-xx`), editar bandas y comprobar
+   que el layout no solapa la banda map/notas (ni en el formulario Sample,
+   que queda en su layout original).
 
 ## Bugs conocidos
 
@@ -138,7 +165,7 @@ modos de audio). Core `e4fbbdc8`, daemon `f7140072`.
 ## Checksums
 
 ```text
-CORE   (lgpt_r36sx_port_libretro.so)  e4fbbdc82a487484cf6d9e3844427893b113e7dcbbdc3bb2edfccf4effd7e61d
+CORE   (lgpt_r36sx_port_libretro.so)  537624b8312365e4de2a99a5f62e9153b98d34806bc75b548a62e6a8083139be
 DAEMON (r36s_u241_usb_audio_io)       f7140072f9b83573e03caf904d17de6227374823c3719757c7d11a438bb1417d
 SP404  (r36s_sp404_host_audio_io)     968dfa61e561d348fd4ec8006e39b23b4dd56a49f1912f885c2731f118983b83
 MIDI   (r36s_midi_host_io)            3f0ea7a23db7390f1fb3b73cbda97f66316c6568d0c7574b838579a014baee80

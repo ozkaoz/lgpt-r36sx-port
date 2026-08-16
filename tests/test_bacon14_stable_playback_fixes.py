@@ -104,7 +104,7 @@ assert "ChopperView::PitchLabel(i)" in pub
 assert "ChopperView::ComposePitchValue(g_chopperPitchValues[i], sizeof(g_chopperPitchValues[i]), i," in pub
 assert 'snprintf(g_chopperPitchHints[0], sizeof(g_chopperPitchHints[0]), "%s", ChopperView::PitchHint(0));' in pub, "hint 1 publicado"
 assert 'snprintf(g_chopperPitchHints[1], sizeof(g_chopperPitchHints[1]), "%s", ChopperView::PitchHint(1));' in pub, "hint 2 publicado"
-assert 'snprintf(g_chopperPitchStatus, sizeof(g_chopperPitchStatus), "%s", statusMessage_[0] ? statusMessage_ : "");' in pub, "status publicado"
+assert 'snprintf(g_chopperPitchStatus, sizeof(g_chopperPitchStatus), "%.39s", statusMessage_[0] ? statusMessage_ : "");' in pub, "status publicado"
 clr = chopper[chopper.index("void SampleChopperModal::clearOverlayState()"):]
 clr = clr[:clr.index("void SampleChopperModal::setPreviewPlaybackRange")]
 assert "g_chopperPitchActive = 0;" in clr, "clearOverlayState apaga el panel"

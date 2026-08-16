@@ -78,6 +78,34 @@ I_Instrument *InstrumentBank::GetInstrument(int i) {
 	return instrument_[i] ;
 } ;
 
+// BASS_SYNTH_SOURCE (bacon-1.5, feedback): in-place engine swap for the
+// Instrument view "src" selector.  Mirrors the RestoreContent conversion so
+// the resulting type persists through a normal save/load round-trip.
+bool InstrumentBank::SetInstrumentType(int id, InstrumentType type) {
+	if (id<0 || id>=MAX_INSTRUMENT_COUNT) return false ;
+	I_Instrument *instr=instrument_[id] ;
+	if (!instr || instr->GetType()==type) return false ;
+	delete instr ;
+	switch (type) {
+		case IT_SAMPLE:
+			instr=new SampleInstrument() ;
+			break ;
+		case IT_MIDI:
+			instr=new MidiInstrument() ;
+			break ;
+		case IT_SYNTH:
+			instr=new BassSynth() ;
+			break ;
+		case IT_PIANO:
+			instr=new PianoSynth() ;
+			break ;
+		default:
+			return false ;
+	}
+	instrument_[id]=instr ;
+	return true ;
+} ;
+
 void InstrumentBank::SaveContent(TiXmlNode *node) {
 	char hex[3] ;
 	for (int i=0;i<MAX_INSTRUMENT_COUNT;i++) {

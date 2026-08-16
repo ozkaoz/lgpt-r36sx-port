@@ -18,6 +18,11 @@ WatchedVariable::WatchedVariable(const char *name,FourCC id,char **list,int size
 		updating_=false ;
 } ;
 
+WatchedVariable::WatchedVariable(const char *name,FourCC id,const char *const *list,int size,int index)
+	            :Variable(name,id,list,size,index) {
+		updating_=false ;
+} ;
+
 
 void WatchedVariable::onChange() {
 	if (!updating_&&enabled_) {

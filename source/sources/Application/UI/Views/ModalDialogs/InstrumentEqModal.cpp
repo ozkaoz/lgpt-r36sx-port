@@ -73,6 +73,50 @@ static void tfFill(int x, int y, int w, int h, unsigned short c) {
     }
 }
 
+// TREEFROG_INSTRUMENT_GRAPHIC_EQ_V2 (bacon-1.5 feedback): tiny 3x5 pixel font
+// used to label the EQ canvas (band numbers, dB scale, frequency axis) so the
+// editor reads like a graphic parametric EQ (Fruity Parametric EQ 2).
+// Glyphs: 0-9 (indices 0..9), '+' (10), '-' (11), 'k' (12).
+static const unsigned char kTinyGlyphs[13][5] = {
+    {0x7, 0x5, 0x5, 0x5, 0x7},   // 0
+    {0x2, 0x6, 0x2, 0x2, 0x7},   // 1
+    {0x7, 0x1, 0x7, 0x4, 0x7},   // 2
+    {0x7, 0x1, 0x7, 0x1, 0x7},   // 3
+    {0x5, 0x5, 0x7, 0x1, 0x1},   // 4
+    {0x7, 0x4, 0x7, 0x1, 0x7},   // 5
+    {0x7, 0x4, 0x7, 0x5, 0x7},   // 6
+    {0x7, 0x1, 0x2, 0x2, 0x2},   // 7
+    {0x7, 0x5, 0x7, 0x5, 0x7},   // 8
+    {0x7, 0x5, 0x7, 0x1, 0x7},   // 9
+    {0x0, 0x2, 0x7, 0x2, 0x0},   // +
+    {0x0, 0x0, 0x7, 0x0, 0x0},   // -
+    {0x5, 0x5, 0x6, 0x6, 0x5},   // k
+};
+
+static int tfTinyIndex(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c == '+') return 10;
+    if (c == '-') return 11;
+    if (c == 'k') return 12;
+    return -1;
+}
+
+static void tfTinyText(int x, int y, const char *s, unsigned short c) {
+    while (s && *s) {
+        int g = tfTinyIndex(*s);
+        if (g >= 0) {
+            for (int r = 0; r < 5; r++) {
+                unsigned char row = kTinyGlyphs[g][r];
+                for (int b = 0; b < 3; b++) {
+                    if (row & (1 << (2 - b))) tfFill(x + b, y + r, 1, 1, c);
+                }
+            }
+        }
+        x += 4;
+        s++;
+    }
+}
+
 // RBJ biquad coefficients, a0 normalized.  (UI/flush path only.)
 static void eqCoeffs(double f0, double gDb, double q, int type, int rate,
                      double &b0, double &b1, double &b2,
@@ -155,10 +199,16 @@ extern "C" void TreeFrogInstrumentEqOverlayDraw(void) {
     const unsigned short bandC  = tf565(150, 185, 235);
     const unsigned short selC   = tf565(255, 244, 120);
     const unsigned short specC  = tf565(90, 190, 130);
+    const unsigned short lblC   = tf565(170, 178, 205);
+    const unsigned short guideC = tf565(46, 52, 80);
 
+    // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V2 (bacon-1.5 feedback): the canvas now
+    // dominates the modal (y=60..192) with a +/-12 dB scale, labeled band
+    // numbers, dB axis and frequency axis, like a graphic parametric EQ.
     const int cX0 = 6,   cX1 = 314;
-    const int cY0 = 64,  cY1 = 160;      // curve canvas
+    const int cY0 = 60,  cY1 = 192;      // curve canvas
     const int cMid = (cY0 + cY1) / 2;    // 0 dB
+    const double pxPerDb = (double)(cY1 - cY0) / 24.0;  // +/-12 dB visible
 
     const unsigned short bandColor = bandC;
     const unsigned short selColor = selC;
@@ -170,10 +220,39 @@ extern "C" void TreeFrogInstrumentEqOverlayDraw(void) {
     tfFill(cX0 - 2, cY0 - 2, 1, cY1 - cY0 + 5, border);
     tfFill(cX1 + 2, cY0 - 2, 1, cY1 - cY0 + 5, border);
 
+    // dB grid: 0 dB axis + +/-6/+/-12 lines
     tfFill(cX0, cMid, cX1 - cX0, 1, axisC);
-    for (int g = -24; g <= 24; g += 12) {
-        int yy = cMid - (cY1 - cY0) * g / 48;
+    for (int g = -12; g <= 12; g += 6) {
+        int yy = cMid - (int)(g * pxPerDb);
         tfFill(cX0, yy, cX1 - cX0 + 1, 1, gridC);
+    }
+
+    // dB labels (left margin, outside the canvas)
+    tfTinyText(0, cY0 - 1, "+12", lblC);
+    tfTinyText(0, cMid - 4, "0", lblC);
+    tfTinyText(0, cY1 - 6, "-12", lblC);
+
+    // Band vertical guide lines + handles (drawn before the curve so the
+    // response stays on top)
+    for (int b2 = 0; b2 < 8; b2++) {
+        if (!EQBandOn[b2]) continue;
+        int gx = freqToX(EQFreq[b2]);
+        int gyy = cMid - (int)(EQGain[b2] * pxPerDb);
+        if (gyy < cY0) gyy = cY0;
+        if (gyy > cY1) gyy = cY1;
+        unsigned short col = (b2 == EQSelected) ? selC : bandC;
+        // faint vertical guide from the top of the canvas to the handle
+        tfFill(gx, cY0, 1, gyy - cY0 + 1, guideC);
+        // crosshair handle
+        tfFill(gx - 2, gyy - 4, 5, 2, col);
+        tfFill(gx - 2, gyy + 3, 5, 2, col);
+        tfFill(gx - 2, gyy - 4, 2, 9, col);
+        tfFill(gx + 1, gyy - 4, 2, 9, col);
+        // band number just above the handle
+        char num[2] = {(char)('1' + b2), 0};
+        int ny = gyy - 16;
+        if (ny < cY0 - 8) ny = cY0 - 8;
+        tfTinyText(gx - 1, ny, num, col);
     }
 
     // Composite response curve
@@ -196,7 +275,7 @@ extern "C" void TreeFrogInstrumentEqOverlayDraw(void) {
         }
         if (db > 24.0) db = 24.0;
         if (db < -24.0) db = -24.0;
-        int yy = cMid + (int)(db / 24.0 * (cY1 - cY0) / 2.0);
+        int yy = cMid - (int)(db * pxPerDb);
         if (yy < cY0) yy = cY0;
         if (yy > cY1) yy = cY1;
         if (db >= 0.0) {
@@ -207,22 +286,13 @@ extern "C" void TreeFrogInstrumentEqOverlayDraw(void) {
         tfFill(x + 1, yy, 1, 1, selColor);
     }
 
-    // Band handles
-    for (int b2 = 0; b2 < 8; b2++) {
-        if (!EQBandOn[b2]) continue;
-        int x = freqToX(EQFreq[b2]);
-        int yy = cMid - (int)((EQGain[b2] / 24.0) * (cY1 - cY0) / 2.0);
-        if (yy < cY0) yy = cY0;
-        if (yy > cY1) yy = cY1;
-        unsigned short col = (b2 == EQSelected) ? selC : bandC;
-        tfFill(x - 2, yy - 4, 5, 2, col);
-        tfFill(x - 2, yy + 3, 5, 2, col);
-        tfFill(x - 2, yy - 4, 2, 9, col);
-        tfFill(x + 1, yy - 4, 2, 9, col);
-    }
+    // Frequency axis labels under the canvas
+    tfTinyText(freqToX(100) - 3, cY1 + 3, "100", lblC);
+    tfTinyText(freqToX(1000) - 2, cY1 + 3, "1k", lblC);
+    tfTinyText(freqToX(10000) - 5, cY1 + 3, "10k", lblC);
 
-    // Live spectrum (20 bars)
-    const int sY0 = 188, sY1 = 224;
+    // Live spectrum
+    const int sY0 = 200, sY1 = 230;
     tfFill(cX0 - 2, sY0 - 2, cX1 - cX0 + 5, sY1 - sY0 + 5, bgC);
     tfFill(cX0 - 2, sY0 - 2, cX1 - cX0 + 5, 1, border);
 
@@ -375,25 +445,25 @@ void InstrumentEqModal::DrawView() {
     sprintf(title, "INSTR EQ8  INS-%02X", instrumentIndex_ & 0x3F);
     DrawString(1, 0, title, props);
 
+    // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V2 (bacon-1.5 feedback): keep the char
+    // text to a compact header (title + selected-band readout + one hint
+    // block + transient status); the pixel-level curve canvas now dominates
+    // the modal (y=60..192) exactly like a graphic parametric EQ.
     SetColor(CD_NORMAL);
     char line[96];
-    sprintf(line, "BYPASS:%s   %d: %s   %s",
-            bypass_ ? "Y" : "N",
+    sprintf(line, "B%1d %s %4.0fHz %+3.1fdB Q%.2f %s",
             selected_ + 1, kEqTypeNames[type_[selected_]],
-            bandOn_[selected_] ? "on" : "off");
+            freqHz_[selected_], gainDb_[selected_], q_[selected_],
+            bandOn_[selected_] ? "ON" : "OFF");
     DrawString(1, 1, line, props);
 
-    sprintf(line, "%5.0f Hz  %+3.1f dB  Q %.2f",
-            freqHz_[selected_], gainDb_[selected_], q_[selected_]);
-    DrawString(1, 3, line, props);
-
     props.invert_ = true;
-    DrawString(1, 4, "< > band   X freq/gain", props);
-    DrawString(1, 5, "A on/off   B TYPE     Y outer", props);
-    DrawString(1, 6, "SELECT bypass   R+B EXIT", props);
+    DrawString(1, 2, "< > band   X freq/gain   Y Q", props);
+    DrawString(1, 3, "A on/off  B type  SELECT bypass", props);
+    DrawString(1, 4, "R+B exit", props);
     props.invert_ = false;
 
-    if (status_[0]) DrawString(1, 8, status_, props);
+    if (status_[0]) DrawString(1, 5, status_, props);
 }
 
 void InstrumentEqModal::OnPlayerUpdate(PlayerEventType, unsigned int) {

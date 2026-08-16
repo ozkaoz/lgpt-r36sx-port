@@ -91,7 +91,7 @@ public:
 		strcpy(path_,path) ;
 	} ;
 	virtual ~I_Dir() { if (path_) free (path_) ; } ;
-	virtual void GetContent(char *mask)=0 ;
+	virtual void GetContent(const char *mask)=0 ;
 	void Compare(Path &p1,Path &p2) ;
 protected:
    char *path_ ;
@@ -99,7 +99,7 @@ protected:
 
 class FileSystem: public T_Factory<FileSystem> {
 public:
-	virtual I_File *Open(const char *path,char *mode)=0 ;
+	virtual I_File *Open(const char *path,const char *mode)=0 ;
 	virtual I_Dir *Open(const char *path)=0 ;
 	virtual Result MakeDir(const char *path)=0 ;
 	virtual void Delete(const char *)=0 ;

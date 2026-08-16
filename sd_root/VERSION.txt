@@ -1,1 +1,1 @@
-BACON_1.5_ITEMS_6_8 (core 2288cb5c instalado, ver README_PRIMERO_ES.md)
+BACON_1.5_ITEMS_6_8_SRC_EQ8_WARNINGS0 (core 537624b8 instalado, ver README_PRIMERO_ES.md)

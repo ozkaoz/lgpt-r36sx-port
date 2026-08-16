@@ -212,7 +212,7 @@ void ImportSampleDialog::DrawView() {
 
 	if (statusMessage_[0]) {
 		char status[LIST_WIDTH+1] ;
-		snprintf(status,sizeof(status),"%s",statusMessage_) ;
+		snprintf(status,sizeof(status),"%.*s",(int)sizeof(status)-1,statusMessage_) ;
 		status[LIST_WIDTH]=0 ;
 		SetColor(CD_HILITE1) ;
 		props.invert_=false ;

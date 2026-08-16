@@ -69,7 +69,7 @@ void PSPFile::Close() {
 PSPDir::PSPDir(const char *path):I_Dir(path) {
 }
 
-void PSPDir::GetContent(char *mask) {
+void PSPDir::GetContent(const char *mask) {
 
 	Empty() ;
 
@@ -119,7 +119,7 @@ I_Dir *PSPFileSystem::Open(const char *path) {
     return new PSPDir(path) ;
 }
 
-I_File *PSPFileSystem::Open(const char *path,char *mode) {
+I_File *PSPFileSystem::Open(const char *path,const char *mode) {
 	
 	int flags=0 ;
 	

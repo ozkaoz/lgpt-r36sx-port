@@ -14,6 +14,6 @@
 #define ftell(a) a->Tell()
 #define fputs(a,b) b->Write(a,1,strlen(a))
 #define fread(a,b,c,d)  d->Read(a,b,c)
-extern void fprintf(FILE *f,char *fmt,...) ;
+extern void fprintf(FILE *f,const char *fmt,...) ;
 
 #endif

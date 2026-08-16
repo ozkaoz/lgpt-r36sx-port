@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-void fprintf(I_File *f,char *fmt,...) {
+void fprintf(I_File *f,const char *fmt,...) {
      char buffer[256] ;
      va_list args;
      va_start(args,fmt);

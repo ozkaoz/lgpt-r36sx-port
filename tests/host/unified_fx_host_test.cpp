@@ -65,7 +65,7 @@ class StubSystem : public System {
 // (never exercised here), so returning null files is enough to link.
 class NullFileSystem : public FileSystem {
   public:
-    virtual I_File *Open(const char *path, char *mode) { return 0; }
+    virtual I_File *Open(const char *path, const char *mode) { return 0; }
     virtual I_Dir *Open(const char *path) { return 0; }
     virtual Result MakeDir(const char *path) { return Result::NoError; }
     virtual void Delete(const char *path) {}
