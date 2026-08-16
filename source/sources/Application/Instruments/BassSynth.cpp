@@ -352,7 +352,13 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
         float osc;
         switch (wave) {
             case 1: { // square
-                float b = polyblep(p, dt) - polyblep(fmodf(p + 0.5f, 1.0f), dt);
+                // H38.8 OPT_PERF: fmodf(p+0.5,1) removed -- p is always in
+                // [0,1), so p+0.5 in [0,1.5) and the modulus is a branch,
+                // bit-identical to the fmodf result (no transcendental call
+                // on the audio thread).
+                float bp = p + 0.5f;
+                if (bp >= 1.0f) bp -= 1.0f;
+                float b = polyblep(p, dt) - polyblep(bp, dt);
                 osc = ((p < 0.5f) ? 1.0f : -1.0f) + b;
                 break;
             }

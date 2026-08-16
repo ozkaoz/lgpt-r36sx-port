@@ -5,7 +5,11 @@
 Mirrors the reorganized fillSampleParameters() layout:
 
 - The sample instrument view is split into vertical blocks with headers
-  (INSTRUMENT, FILTER, BITCRUSHER, PLAYBACK, EFFECT SENDS, AUTOMATION).
+  (INSTRUMENT, FILTER, BITCRUSHER, EQ8, EFFECT SENDS, AUTOMATION).
+- BASS_SYNTH_EQ8_MENU (bacon-1.5, feedback): the inherited LGPT PLAYBACK
+  section (interpolation/loop mode/slices/start/loop start/loop end) was
+  removed from the instrument page; the EQ8 block (EQ8 enable + band mask,
+  A on the row opens the graphic InstrumentEqModal) now occupies rows 15-16.
 - Block headers are drawn by DrawView(), NOT inserted as UIStaticField, so
   T_SimpleList<UIField>::GetFirst() stays the sample field and GetLast() stays
   the table field (L2+A cut/clear depend on both).
@@ -17,7 +21,7 @@ Mirrors the reorganized fillSampleParameters() layout:
   their variables keep existing (load/playback/IDs preserved).
 - Offline render FX (print fx/wet/pad) stay behind #ifdef FFMPEG_ENABLED and
   therefore do not exist in the R36SX build.
-- The whole field stack stays on-screen (rows 5..26 within the 22 visible
+- The whole field stack stays on-screen (rows 5..22 within the 22 visible
   rows anchored at y=4; the bottom bar/map starts at y=27).
 
 Acceptance:
@@ -48,9 +52,9 @@ HEADERS = [
     ("INSTRUMENT", 4),
     ("FILTER", 8),
     ("BITCRUSHER", 12),
-    ("PLAYBACK", 15),
-    ("EFFECT SENDS", 21),
-    ("AUTOMATION", 25),
+    ("EQ8", 15),
+    ("EFFECT SENDS", 17),
+    ("AUTOMATION", 21),
 ]
 
 # (field label, screen row).  Mirrors fillSampleParameters block layout.
@@ -63,11 +67,9 @@ FIELDS = [
     ("attenuate", 11), ("filt", 11),
     ("bit depth", 13), ("drive", 13),
     ("downsample", 14),
-    ("interpolation", 16), ("loop mode", 16),
-    ("slices", 17),
-    ("start", 18), ("loop start", 19), ("loop end", 20),
-    ("DRY", 22), ("DELAY", 23), ("REVERB", 24),
-    ("table auto", 26), ("table", 26),
+    ("EQ8", 16), ("mask", 16),
+    ("DRY", 18), ("DELAY", 19), ("REVERB", 20),
+    ("table auto", 22), ("table", 22),
 ]
 
 # Map label -> tokens expected in the source for that field.

@@ -8,6 +8,9 @@
 #include "Application/Instruments/WavFile.h"
 #include "Services/Time/TimeService.h"
 #include "Application/UI/Views/ModalDialogs/SampleManagerDialog.h"
+// BASS_SYNTH_SOURCE_MENU (bacon-1.5, feedback): the host Instrument view
+// performs the slot conversion (observer detach, Stop, page rebuild).
+#include "Application/UI/Views/InstrumentView.h"
 // TREEFROG_U2_34_SAMPLE_MANAGER_PURGE
 // TREEFROG_U2_35_SAMPLE_MANAGER_IMPORT_FORCE_DELETE
 // TREEFROG_U2_36_IMPORT_DEDUP_LISTEN_LAYOUT_USAGE
@@ -107,12 +110,79 @@ extern "C" const char *TreeFrogU2523BrowserManageBuildMarker(void) {
     return "U2523_RENAME_CARET_ALIGNMENT_GITHUB_FINAL";
 }
 
-static const char *buttonText[4]= {
+static const char *buttonText[5]= {
 	"Listen",
 	"Import",
     "Manage",
+	"Sinth",
 	"Exit"	
 } ;
+
+// BASS_SYNTH_SOURCE_MENU (bacon-1.5, feedback): picker shown when the
+// "Sinth" menu entry is pressed.  Choose the engine to convert the current
+// slot to (1 = Bass, 2 = Piano); B cancels.  The conversion itself runs in
+// ImportSampleDialog::ConfirmSynthSelection through the host Instrument
+// view, so the page rebuilds with the new engine.
+class InstrumentSynthPickerModal : public ModalView {
+public:
+    InstrumentSynthPickerModal(View &view)
+        : ModalView(view) {
+        selected_ = 1;
+    }
+
+    virtual ~InstrumentSynthPickerModal() {}
+
+    virtual void DrawView() {
+        SetWindow(34, 8);
+        GUITextProperties props;
+        props.invert_ = false;
+
+        SetColor(CD_NORMAL);
+        props.invert_ = true;
+        DrawString(0, 0, "       SELECT SYNTH ENGINE       ", props);
+        props.invert_ = false;
+
+        SetColor((selected_ == 1) ? CD_HILITE2 : CD_NORMAL);
+        props.invert_ = (selected_ == 1);
+        DrawString(1, 2, "BASS SYNTH  (0x90-0x9F)", props);
+
+        SetColor((selected_ == 2) ? CD_HILITE2 : CD_NORMAL);
+        props.invert_ = (selected_ == 2);
+        DrawString(1, 3, "PIANO SYNTH (0xA0-0xAF)", props);
+
+        props.invert_ = false;
+        SetColor(CD_HILITE2);
+        DrawString(1, 5, "A SELECT", props);
+        DrawString(22, 5, "B CANCEL", props);
+        SetColor(CD_NORMAL);
+        DrawString(1, 6, "UP/DOWN move | A select", props);
+    }
+
+    virtual void OnPlayerUpdate(PlayerEventType, unsigned int) {}
+    virtual void OnFocus() {}
+
+    virtual void ProcessButtonMask(unsigned short mask, bool pressed) {
+        if (!pressed) return;
+        if (mask == EPBM_A) { EndModal(selected_); return; }
+        if (mask == EPBM_B) { EndModal(0); return; }
+        if (mask == EPBM_UP || mask == EPBM_DOWN ||
+            mask == EPBM_LEFT || mask == EPBM_RIGHT) {
+            selected_ = (selected_ == 1) ? 2 : 1;
+            isDirty_ = true;
+            return;
+        }
+    }
+
+private:
+    int selected_;
+};
+
+static void InstrumentSynthPickerCallback(View &view, ModalView &dialog) {
+    int choice = dialog.GetReturnCode();
+    if (choice < 1 || choice > 2) return;
+    ImportSampleDialog &browser = (ImportSampleDialog &)view;
+    browser.ConfirmSynthSelection((choice == 2) ? IT_PIANO : IT_SYNTH);
+}
 
 static void copySampleDialogDisplayName(char *dst,int dstSize,Path &path) {
 	if (!dst || dstSize<=0) return ;
@@ -126,6 +196,7 @@ static void copySampleDialogDisplayName(char *dst,int dstSize,Path &path) {
 }
 
 ImportSampleDialog::ImportSampleDialog(View &view):ModalView(view),sampleList_(true) {
+	hostView_=&view ;
 	currentSample_=0 ;
 	topIndex_=0 ;
 	toInstr_=0 ;
@@ -222,9 +293,10 @@ void ImportSampleDialog::DrawView() {
 	// TREEFROG_U2_35_SAMPLE_MANAGER_IMPORT_FORCE_DELETE
 	// TREEFROG_U2_36_IMPORT_DEDUP_LISTEN_LAYOUT_USAGE
 	// Single-line action layout with explicit spacing for R36S readability.
+	// BASS_SYNTH_SOURCE_MENU: 5 entries (Sinth added between Manage and Exit).
 	y=LIST_SIZE+2 ;
-	static const int actionX[4] = { 1, 10, 20, 29 };
-	for (int i=0;i<4;i++) {
+	static const int actionX[5] = { 1, 8, 15, 22, 28 };
+	for (int i=0;i<5;i++) {
 		const char *text=buttonText[i] ;
 		x=actionX[i] ;
 		SetColor((i==selected_)?CD_HILITE2:CD_NORMAL) ;
@@ -717,6 +789,9 @@ void ImportSampleDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
                 SampleManagerDialog *smd = new SampleManagerDialog(*this);
                 DoModal(smd);
 			} else if (selected_==3) {
+                // BASS_SYNTH_SOURCE_MENU: Sinth works without any WAV selected.
+                OpenSynthPicker();
+			} else if (selected_==4) {
 				endPreview();
 				EndModal(0) ;
 			}
@@ -742,7 +817,11 @@ void ImportSampleDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
                 DoModal(smd);
                 break ;
             }
-			case 3:
+            case 3:
+                // BASS_SYNTH_SOURCE_MENU: Sinth -> Bass/Piano picker.
+                OpenSynthPicker();
+                break ;
+			case 4:
 				endPreview();
 				EndModal(0) ;
 				break ;
@@ -783,14 +862,40 @@ void ImportSampleDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
 	if (mask==EPBM_DOWN) warpToNextSample(1);
 	if (mask==EPBM_LEFT) {
 		selected_-=1;
-		if (selected_<0) selected_+=4;
+		if (selected_<0) selected_+=5;
 		isDirty_=true;
 	}
 	if (mask==EPBM_RIGHT) {
-		selected_=(selected_+1)%4;
+		selected_=(selected_+1)%5;
 		isDirty_=true;
 	}
 } ;
+
+// BASS_SYNTH_SOURCE_MENU (bacon-1.5, feedback): "Sinth" entry opens the
+// Bass/Piano picker.  No sample or WAV is required.
+void ImportSampleDialog::OpenSynthPicker() {
+    endPreview();
+    DoModal(new InstrumentSynthPickerModal(*this),
+            InstrumentSynthPickerCallback);
+    isDirty_ = true;
+}
+
+// BASS_SYNTH_SOURCE_MENU: converts the current slot through the host
+// Instrument view (observer detach, Stop, SetInstrumentType, page rebuild).
+// On success the browser closes so the synth page is visible; on refusal
+// (slot still has an assigned sample) the browser stays open.
+void ImportSampleDialog::ConfirmSynthSelection(InstrumentType target) {
+    endPreview();
+    if (hostView_) {
+        InstrumentView &instrumentView = (InstrumentView &)*hostView_;
+        if (instrumentView.ConvertCurrentToSynth(target)) {
+            EndModal(0);
+            return;
+        }
+    }
+    setStatusMessage("Synth conversion failed");
+    isDirty_ = true;
+}
 
 bool ImportSampleDialog::isSampleLibRoot()
 {
@@ -814,6 +919,7 @@ bool ImportSampleDialog::enterFolderIfRequested(Path *element, unsigned short ma
 	if (!element) return false ;
 	if (mask&(EPBM_UP|EPBM_DOWN|EPBM_LEFT|EPBM_RIGHT)) return false ;
 	if (selected_==2) return false ;
+	if (selected_==4) return false ;
 	if (!element->IsDirectory()) return false ;
 
 	Path target(*element) ;

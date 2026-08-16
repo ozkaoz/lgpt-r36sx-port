@@ -18,6 +18,10 @@ public:
 	virtual void ProcessButtonMask(unsigned short mask,bool pressed) ;
     void ConfirmPendingBrowserDelete() ;
     void ConfirmPendingBrowserRename(const char *newName) ;
+    // BASS_SYNTH_SOURCE_MENU (bacon-1.5, feedback): "Sinth" menu entry.
+    // Called from the synth picker callback with the chosen engine type.
+    void ConfirmSynthSelection(InstrumentType target) ;
+    void OpenSynthPicker() ;
 
 protected:
 	void setCurrentFolder(Path *path) ;
@@ -47,6 +51,9 @@ private:
     std::string pendingDeleteName_ ;
     std::string pendingRenamePath_ ;
     std::string pendingRenameName_ ;
+    // BASS_SYNTH_SOURCE_MENU: the Instrument view that hosts this browser,
+    // used to convert the current slot to Bass/Piano (page rebuild included).
+    View *hostView_ ;
 	static bool initStatic_ ;
 	static Path sampleLib_ ;
 	static Path currentPath_ ;

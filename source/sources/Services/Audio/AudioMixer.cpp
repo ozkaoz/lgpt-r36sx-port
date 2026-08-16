@@ -5,6 +5,16 @@
 #define MAX_POSITIVE_FIXED i2fp(32767)
 #define MAX_NEGATIVE_FIXED i2fp(-32768)
 
+// H38.8 OPT_PERF (bacon-1.5 FX/Synth optimization): the module-sum scratch
+// used to be heap-allocated on every Render() call (malloc in the audio
+// thread).  The primary mix buffer can never hold more than 10000 stereo
+// frames (AudioOutDriver::primarySoundBuffer_ is MIX_BUFFER_SIZE/2 fixed
+// samples), so a static scratch of that size covers any samplecount the
+// pipeline can request.  No dynamic allocation, no freeing, no cache
+// misses from a fresh heap block each buffer.
+#define AUDIO_MIXER_MAX_RENDER_FRAMES 10000
+static fixed s_moduleMixScratch[AUDIO_MIXER_MAX_RENDER_FRAMES * 2];
+
 AudioMixer::AudioMixer(const char *name):
 	T_SimpleList<AudioModule>(false),
 	enableRendering_(0),
@@ -81,7 +91,10 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
             gotData=current.Render(buffer,samplecount) ;           
          } else {
             if (!mixBuffer) {
-               mixBuffer=(fixed *)malloc(samplecount*2*sizeof(fixed)) ;
+                // H38.8 OPT_PERF: static scratch (see s_moduleMixScratch).
+                // samplecount is bounded by the primary mix buffer (10000
+                // stereo frames), so the scratch never overflows.
+                mixBuffer = s_moduleMixScratch;
             } 
             if (current.Render(mixBuffer,samplecount)) {
                fixed *dst=buffer ;
@@ -216,7 +229,7 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
 		writer_->AddBuffer(buffer,samplecount) ;
 	}
 
-     SAFE_FREE(mixBuffer) ;
+     // H38.8 OPT_PERF: no free -- s_moduleMixScratch is a static buffer.
      return gotData ;
 } ;
 
@@ -306,7 +319,9 @@ fixed AudioMixer::softClip(fixed sample) {
 
     x = data->alphaInv * (sampleFloat / maxFloat);
     if (x > -1.0f && x < 1.0f) {
-        sampleFloat = maxFloat * (data->alpha * (x - (pow(x, 3.0f) / 3.0f)));
+        // H38.8 OPT_PERF: x*x*x replaces pow(x,3.0f) -- same cubic, no
+        // transcendental call on the audio thread (per sample).
+        sampleFloat = maxFloat * (data->alpha * (x - (x * x * x / 3.0f)));
     } else {
         sampleFloat = maxFloat * data->alpha23;
     }

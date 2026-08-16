@@ -7,7 +7,10 @@ Verifica que:
    etiquetas en orden exacto, clamps de softclip (0..4) y clip gain
    (0..1), codificado de accion (fila master >= 2 -> pagina FX 1..4 =
    DELAY..COMP; fila track -> seccion 101..105) y los hints FourCC de
-   seccion (SIP_FILTMIX/SIP_CRUSH/SIP_INTERPOLATION/SIP_DRY/SIP_TABLEAUTO).
+   seccion (SIP_FILTMIX/SIP_CRUSH/SIP_EQEN/SIP_DRY/SIP_TABLEAUTO).
+   BASS_SYNTH_EQ8_MENU (bacon-1.5, feedback): the PLAYBACK row became EQ8
+   (SIP_EQEN), since the PLAYBACK section was removed from the instrument
+   page.
 2. MixerMenu.h NO depende de GUI/audio/Player/framebuffer (capa pura:
    solo Foundation/Types/Types.h).
 3. MixerView.cpp ya no lleva las etiquetas/clamps/sections/hintIds
@@ -31,7 +34,7 @@ TOKENS = [
     "mixerMenuClampSoftclip", "mixerMenuClampSoftclipGain",
     "mixerMenuActionForRow", "mixerMenuSectionHint",
     "LIMITER", "CLIP GAIN", "FX DELAY", "FX REVERB", "FX EQ", "FX COMP",
-    "FILTER", "BITCRUSHER", "PLAYBACK", "FX SENDS", "AUTOMATION",
+    "FILTER", "BITCRUSHER", "EQ8", "FX SENDS", "AUTOMATION",
 ]
 
 FORBIDDEN = [

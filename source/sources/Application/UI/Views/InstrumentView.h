@@ -17,6 +17,14 @@ public:
 	virtual void DrawView() ;
 	virtual void OnPlayerUpdate(PlayerEventType type,unsigned int tick) { UpdateActiveModal(type,tick); } ;
 	virtual void OnFocus() ;
+	virtual void OnFrameUpdate(unsigned long frameClock) ;
+
+	// BASS_SYNTH_SOURCE_MENU (bacon-1.5, feedback): the Import/Synth browser
+	// menu converts the current slot through this entry point.  Same safety
+	// steps as the "src" selector: observer detach, Stop, SetInstrumentType,
+	// page rebuild.  Refuses (returns false) when the slot still holds an
+	// assigned sample so nothing is silently discarded.
+	bool ConvertCurrentToSynth(InstrumentType target) ;
 
 protected:
 	void warpToNext(int offset) ;

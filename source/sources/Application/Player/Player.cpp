@@ -105,6 +105,10 @@ void Player::Start(PlayMode mode,bool forceSongMode) {
     TreeFrogStartTrace("V133_Player_Start_ENTER");
     TreeFrogStartTrace("Player::Start ENTER");
     
+    // BASS_SYNTH_PREVIEW: a real playback run always cancels any active
+    // instrument preview note (it would hold a stale channel reference).
+    previewActive_ = false;
+
 	TreeFrogStartTrace("V133_Player_Start_LOCK_BYPASS");
 #if !defined(PLATFORM_TREEFROG)
     mixer_->Lock() ;
@@ -256,6 +260,7 @@ void Player::Stop() {
 
 	SyncMaster::GetInstance()->Stop() ;
 	isRunning_=false ;
+	previewActive_=false ;
 	SetChanged() ;
 	PlayerEvent pe(PET_STOP) ;
 	NotifyObservers(&pe) ;
@@ -1408,4 +1413,53 @@ int Player::GetAudioPreBufferCount() {
 	AudioOut *out=mixer_->GetAudioOut() ;
 	return (out)?out->GetAudioPreBufferCount():0 ;
 } ;
+
+// BASS_SYNTH_PREVIEW (bacon-1.5, feedback): one-shot note preview of an
+// instrument with its current settings.  The Instrument view calls this on
+// plain B while a Bass/Piano page is open and the sequencer is stopped.
+// The audio pipeline renders only while armed, so the same arm/disarm
+// pattern as the streaming previews (StartStreamingRangeAt/StopStreaming)
+// is used here; StopPreview() is a no-op while the sequencer runs.
+static const unsigned long kPreviewNoteDurationMs = 900 ;
+
+void Player::PreviewNote(int channel,I_Instrument *instrument,unsigned char note) {
+	if (isRunning_) return ;
+	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return ;
+	if (!instrument) return ;
+#if defined(PLATFORM_TREEFROG)
+	TreeFrogAudioSetPlaybackArmed(1) ;
+#endif
+	// The preview must never fight a live queue: clear any queued live
+	// states on the target channel before starting the note.
+	liveQueueingMode_[channel]=QM_NONE ;
+	timeToLive_[channel]=0 ;
+	timeToStart_[channel]=0 ;
+	TablePlayback::GetTablePlayback(channel).Stop() ;
+	mixer_->StartChannel(channel) ;
+	mixer_->StartInstrument(channel,instrument,note,true) ;
+	previewActive_=true ;
+	previewStopClock_=System::GetInstance()->GetClock()+kPreviewNoteDurationMs ;
+}
+
+void Player::StopPreview() {
+	if (!previewActive_) return ;
+	previewActive_=false ;
+	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
+		mixer_->StopChannel(i) ;
+	}
+#if defined(PLATFORM_TREEFROG)
+	if (!isRunning_) {
+		TreeFrogAudioSetPlaybackArmed(0) ;
+	}
+#endif
+}
+
+// Called from the Instrument view frame loop: retires the preview note on
+// its own (the view also stops it earlier on any other button press).
+void Player::UpdatePreview() {
+	if (!previewActive_) return ;
+	if (System::GetInstance()->GetClock()>=previewStopClock_) {
+		StopPreview() ;
+	}
+}
 

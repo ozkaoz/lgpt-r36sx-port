@@ -5,10 +5,13 @@
 // (TREEFROG_MIXER_ACTION_MENU_V1, Bacon 1.1.1 V13).  Declara como datos los
 // dos menus del L1+A: MASTER (6 filas: LIMITER / CLIP GAIN / FX DELAY /
 // FX REVERB / FX EQ / FX COMP) y TRACK (5 secciones: FILTER / BITCRUSHER /
-// PLAYBACK / FX SENDS / AUTOMATION), los clamps golden de los valores
+// EQ8 / FX SENDS / AUTOMATION), los clamps golden de los valores
 // editables (softclip 0..4, clip gain 0..1) y el codificado de accion
 // (fila master >= 2 -> pagina FX 1..4 = DELAY..COMP; fila track ->
 // seccion 101..105 del editor de instrumento).
+// BASS_SYNTH_EQ8_MENU (bacon-1.5, feedback): the inherited LGPT PLAYBACK
+// section was removed from the instrument page; the TRACK menu row that
+// jumped there now jumps to the EQ8 row instead.
 // No depende de GUI, audio, Player, SamplePool ni del framebuffer: solo
 // Foundation (MAKE_FOURCC para los hints FourCC de seccion).
 // Todo el comportamiento es byte-identico al que vivia en MixerView.cpp
@@ -26,7 +29,7 @@ static const char *kMixerMasterMenuLabels[kMixerMasterMenuRowCount] = {
 
 // Etiquetas de fila del menu TRACK (secciones del editor de instrumento).
 static const char *kMixerTrackMenuLabels[kMixerTrackMenuRowCount] = {
-    "FILTER", "BITCRUSHER", "PLAYBACK", "FX SENDS", "AUTOMATION" } ;
+    "FILTER", "BITCRUSHER", "EQ8", "FX SENDS", "AUTOMATION" } ;
 
 // Clamps golden de los valores editables del menu MASTER.
 static const int kMixerSoftclipMin = 0 ;
@@ -37,7 +40,7 @@ static const int kMixerSoftclipGainMax = 1 ;
 // Hint FourCC de cada seccion TRACK (SIP_* puros de SampleInstrument.h).
 static const unsigned int kMixerTrackSectionHints[kMixerTrackMenuRowCount] = {
     MAKE_FOURCC('F','M','I','X'), MAKE_FOURCC('C','R','S','H'),
-    MAKE_FOURCC('I','N','T','P'), MAKE_FOURCC('D','R','Y','_'),
+    MAKE_FOURCC('E','Q','E','N'), MAKE_FOURCC('D','R','Y','_'),
     MAKE_FOURCC('T','B','L','A') } ;
 
 // Numero de filas del menu activo.

@@ -1,36 +1,43 @@
-# LGPT R36SX Bacon 1.5 — Synths nativos + multitrack + src selector + EQ8 (items 6-8)
+# LGPT R36SX Bacon 1.5 — Synths nativos + multitrack + menú Sinth + EQ8 en Instrument (items 6-9)
 
 Release de desarrollo sobre la arquitectura de Bacon 1.4 (ABI7, audio
 48 kHz stereo, cuatro modos de audio USB Local / Windows / Android /
 Sampler SP404MKII, frontend-safe y sin escrituras a la SD en runtime).
 
-## Estado actual (items 6-8 + src selector + EQ8 + warnings 0, 15/08/2026)
+## Estado actual (items 6-9 + src selector + EQ8 + warnings 0, 16/08/2026)
 
 Core **compilado e instalado** en esta SD (`cubegm/cores/lgpt_r36sx_port_libretro.so`,
-SHA256 `537624b8312365e4de2a99a5f62e9153b98d34806bc75b548a62e6a8083139be`).
+SHA256 `2f14c0ac93c6d6192ac57d246de341ef410a98127ef8befdd1b75e0061e02c8d`).
 Build device: `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`, `BUILD_U2523_OK`; regresión
 host `AUDIT_CLEAN_MAIN_U2523_OK`. Daemons y módulo UAC2 sin cambios (baseline
 Bacon 1.4, hashes `f7140072`/`968dfa61`/`3f0ea7a2`/`e9062ac5`).
 
-## Qué añade esta release (último corte)
+## Qué añade esta release (último corte, item 9 + feedback)
 
-- **Selector `src` en InstrumentView (Bass/Piano)**: la fila `src` cicla
-  Sample/Bass/Piano con las flechas. Al cambiar a Bass/Piano se despliega
-  la página completa de parámetros del sintetizador; con un sample asignado
-  la conversión a sintetizador se bloquea con el aviso "Clear the sample to
-  switch to a synth". El formulario Sample queda en su layout original (tabla
-  en la fila 26, sin EQ8) y las formas Bass/Piano colocan el campo EQ8 sin
-  header (filas 24 y 22 respectivamente) para que nada solape la banda
-  map/notas (y=27).
-- **EQ8 gráfico por instrumento**: en las formas Bass/Piano la fila `EQ8`
-  (con máscara) abre con A el editor gráfico `InstrumentEqModal` para el
-  instrumento activo.
-- **42 warnings del host syntax check resueltos** (GCC 13 host, GCC 6.3
-  MIPS): firmas `const` de `FileSystem::Open`/`GetContent` y adaptadores,
-  `WatchedVariable` (sobrecarga de listas), `Status::Set`,
-  `Tiny2NosStub`/`TreeFrogUac2Bridge`/`UsbRecordModal`/`SampleChopperModal`/
-  `ImportSampleDialog` (truncado explícito de snprintf) y `ChopperView.h`
-  (guard `-Wformat-truncation` para GCC >= 7).
+- **Menú "Sinth" en el navegador del instrumento (Listen/Import/Manage/
+  Sinth/Exit)**: Sinth abre un selector Bass/Piano (flechas + A; B cancela).
+  Al confirmar, el slot actual se convierte a `IT_SYNTH` o `IT_PIANO` con el
+  mismo protocolo seguro del selector `src` (detach del observer, Stop,
+  `SetInstrumentType`, rebuild de la página). Con un sample asignado se
+  bloquea con el aviso "Clear the sample to switch to a synth" y el
+  navegador permanece abierto.
+- **Preescucha con B en las páginas Bass/Piano**: B reproduce una nota del
+  instrumento activo con su configuración actual (bass en C3, piano en C4);
+  otro B la corta al instante, se auto-corta a los ~0.9 s y cualquier Start
+  de reproducción la cancela. En la página Sample B mantiene su
+  comportamiento original (sin acción).
+- **EQ8 en el formulario Sample**: la sección heredada PLAYBACK
+  (interpolation/loop mode/slices/start/loop start/loop end) se eliminó del
+  editor y en su lugar va el bloque EQ8 (fila `EQ8` + `mask`, header "EQ8");
+  A abre el editor gráfico `InstrumentEqModal` como en Bass/Piano. El menú
+  L1+A del Mixer (TRACK) ahora salta a la sección EQ8 en vez de PLAYBACK.
+  Los parámetros de PLAYBACK siguen existiendo en el modelo (persistencia y
+  reproducción sin cambios), solo se quitan de la edición en pantalla.
+- **Optimización del hilo de audio** (H38.8): el scratch de suma de módulos
+  de `AudioMixer::Render` era `malloc` por buffer → ahora es un buffer
+  estático (sin allocations en el audio thread); `pow(x,3)` del softclip →
+  `x*x*x`; el `fmodf` del square wave del BassSynth → rama equivalente
+  (bit-identical). Sin cambios de sonido ni de persistencia.
 
 ## Qué incluye esta release (items 6-8)
 
@@ -49,6 +56,17 @@ Bacon 1.4, hashes `f7140072`/`968dfa61`/`3f0ea7a2`/`e9062ac5`).
   render multipista escribe `project:delayret.wav`, `project:reveret.wav` y
   `project:master.wav`. Guard de espacio libre: el render aborta si quedan
   < 128 MB libres en la SD (`FileSystem::GetFreeSpace`, statvfs).
+- **Selector `src` en InstrumentView (Bass/Piano)**: la fila `src` cicla
+  Sample/Bass/Piano con las flechas. Con un sample asignado la conversión a
+  sintetizador se bloquea con "Clear the sample to switch to a synth".
+- **EQ8 gráfico por instrumento**: en las formas Bass/Piano y Sample la fila
+  `EQ8` abre con A el editor gráfico `InstrumentEqModal`.
+- **42 warnings del host syntax check resueltos** (GCC 13 host, GCC 6.3
+  MIPS): firmas `const` de `FileSystem::Open`/`GetContent` y adaptadores,
+  `WatchedVariable` (sobrecarga de listas), `Status::Set`,
+  `Tiny2NosStub`/`TreeFrogUac2Bridge`/`UsbRecordModal`/`SampleChopperModal`/
+  `ImportSampleDialog` (truncado explícito de snprintf) y `ChopperView.h`
+  (guard `-Wformat-truncation` para GCC >= 7).
 
 ## Build del core (items 6-8)
 
@@ -88,10 +106,22 @@ cp BUILD/U2523/lgpt_r36sx_u2523.so sd_root/cubegm/cores/lgpt_r36sx_port_libretro
    ciclar Sample→Bass→Piano; comprobar que al pasar a Bass/Piano se
    despliega la página de parámetros del sintetizador y que con un sample
    asignado aparece "Clear the sample to switch to a synth" (no convierte).
-8. **EQ8 de instrumento**: en Bass/Piano, sobre la fila `EQ8` pulsar A para
-   abrir el editor gráfico (`INSTR EQ8  INS-xx`), editar bandas y comprobar
-   que el layout no solapa la banda map/notas (ni en el formulario Sample,
-   que queda en su layout original).
+8. **EQ8 de instrumento**: sobre la fila `EQ8` (Sample, Bass y Piano) pulsar
+   A para abrir el editor gráfico (`INSTR EQ8  INS-xx`), editar bandas y
+   comprobar que el layout no solapa la banda map/notas (y=27).
+9. **Menú Sinth**: en Instrument, A sobre el instrumento → navegador → a la
+   derecha de Manage la opción `Sinth` → A → selector Bass/Piano (flechas
+   arriba/abajo, A confirma, B cancela). Confirmar Bass: el slot pasa a ser
+   `SYNTH`, se ve la página de parámetros y se puede programar desde Phrase.
+   Con un sample asignado: aviso "Clear the sample to switch to a synth" y
+   el navegador se queda abierto.
+10. **Preescucha con B**: en una página Bass/Piano (proyecto detenido), B
+    suena una nota (bass C3 / piano C4) con el sonido actual; otro B la
+    corta; esperar ~0.9 s para el auto-corte; Start corta la preescucha. En
+    Sample, B sigue sin hacer nada.
+11. **Menú TRACK del Mixer (L1+A)**: la fila EQ8 salta al campo EQ8 del
+    instrumento del canal (antes PLAYBACK); comprobar que cae en la fila
+    `EQ8` y que A abre el editor gráfico.
 
 ## Bugs conocidos
 
@@ -165,7 +195,7 @@ modos de audio). Core `e4fbbdc8`, daemon `f7140072`.
 ## Checksums
 
 ```text
-CORE   (lgpt_r36sx_port_libretro.so)  537624b8312365e4de2a99a5f62e9153b98d34806bc75b548a62e6a8083139be
+CORE   (lgpt_r36sx_port_libretro.so)  2f14c0ac93c6d6192ac57d246de341ef410a98127ef8befdd1b75e0061e02c8d
 DAEMON (r36s_u241_usb_audio_io)       f7140072f9b83573e03caf904d17de6227374823c3719757c7d11a438bb1417d
 SP404  (r36s_sp404_host_audio_io)     968dfa61e561d348fd4ec8006e39b23b4dd56a49f1912f885c2731f118983b83
 MIDI   (r36s_midi_host_io)            3f0ea7a23db7390f1fb3b73cbda97f66316c6568d0c7574b838579a014baee80

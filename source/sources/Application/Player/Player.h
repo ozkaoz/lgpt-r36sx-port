@@ -83,6 +83,15 @@ void StopStreaming() ;
 	int GetStreamingStartFrame() ;
 	int GetStreamingEndFrame() ;
 
+	// BASS_SYNTH_PREVIEW (bacon-1.5, feedback): one-shot note preview of an
+	// instrument object with its current parameter settings, used by the
+	// Instrument view (plain B on a Bass/Piano page).  Only active while the
+	// sequencer is stopped; auto-stops after kPreviewNoteDurationMs.
+	void PreviewNote(int channel,I_Instrument *instrument,unsigned char note) ;
+	void StopPreview() ;
+	bool IsPreviewActive() { return previewActive_ ; }
+	void UpdatePreview() ;
+
 	// Channel data
 	
 	bool IsChannelPlaying(int channel) ;
@@ -168,6 +177,11 @@ private:
 	bool retrigAllImmediate_ ;
 	unsigned char retrigPos_ ;
 	
+	// BASS_SYNTH_PREVIEW (bacon-1.5, feedback): preview note state (UI-thread
+	// driven; the audio render only touches the PlayerChannel, never these).
+	bool previewActive_ ;
+	unsigned long previewStopClock_ ;
+
 } ;
 
 #endif

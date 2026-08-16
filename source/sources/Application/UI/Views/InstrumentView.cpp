@@ -167,18 +167,14 @@ void InstrumentView::fillSampleParameters() {
 	// Row 12 : BITCRUSHER (header)
 	// Row 13 : bit depth | drive
 	// Row 14 : downsample
-	// Row 15 : PLAYBACK (header)
-	// Row 16 : interpolation | loop mode
-	// Row 17 : slices
-	// Row 18 : start
-	// Row 19 : loop start
-	// Row 20 : loop end
-	// Row 21 : EFFECT SENDS (header)
-	// Row 22 : DRY [bar]
-	// Row 23 : DELAY [bar]
-	// Row 24 : REVERB [bar]
-	// Row 25 : AUTOMATION (header)
-	// Row 26 : table auto | table
+	// Row 15 : EQ8 (header, BASS_SYNTH_EQ8_MENU bacon-1.5 feedback)
+	// Row 16 : EQ8 | mask
+	// Row 17 : EFFECT SENDS (header)
+	// Row 18 : DRY [bar]
+	// Row 19 : DELAY [bar]
+	// Row 20 : REVERB [bar]
+	// Row 21 : AUTOMATION (header)
+	// Row 22 : table auto | table
 
 	Variable *v ;
 	UIIntVarField *f1 ;
@@ -273,40 +269,21 @@ void InstrumentView::fillSampleParameters() {
 	T_SimpleList<UIField>::Insert(f1) ;
 
 	// ----------------------------------------------------------
-	// Block 4: PLAYBACK
+	// Block 4: EQ8 (graphic EQ, BASS_SYNTH_EQ8_MENU bacon-1.5 feedback).
+	// The inherited LGPT "PLAYBACK" section (interpolation, loop mode,
+	// slices, start, loop start, loop end) was removed from the instrument
+	// page and replaced by the EQ8 row: A on it opens the graphic
+	// InstrumentEqModal for the current instrument (sample, bass or piano).
 	// ----------------------------------------------------------
 	position._y+=2 ;  // skip header row 15
 	col2=position ;
-	col2._x+=16 ;
-	v=instrument->FindVariable(SIP_INTERPOLATION) ;
-	f1=new UIIntVarField(position,*v,"interpolation: %s",0,1,1,1) ;
+	col2._x+=12 ;
+	v=instrument->FindVariable(SIP_EQEN) ;
+	f1=new UIIntVarField(position,*v,"EQ8:%d",0,1,1,1) ;
 	T_SimpleList<UIField>::Insert(f1) ;
-	v=instrument->FindVariable(SIP_LOOPMODE) ;
-	f2=new UIIntVarField(col2,*v,"loop mode: %s",0,SILM_LAST-1,1,1) ;
+	v=instrument->FindVariable(SIP_EQMASK) ;
+	f2=new UIIntVarOffField(col2,*v,"mask:%2.2X",0,0xFF,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f2) ;
-
-	position._y+=1 ;
-	v=instrument->FindVariable(SIP_SLICES) ;
-	f1=new UIIntVarField(position,*v,"slices: %2.2X",1,0xFF,1,0x10) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-
-	int sampleSize = instrument->GetSampleSize() ;
-	if (sampleSize <= 0) sampleSize = 1 ;
-
-	position._y+=1 ;
-	v=instrument->FindVariable(SIP_START) ;
-	f1=new UIBigHexVarField(position,*v,7,"start: %7.7X",0,sampleSize-1,16) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-
-	position._y+=1 ;
-	v=instrument->FindVariable(SIP_LOOPSTART) ;
-	f1=new UIBigHexVarField(position,*v,7,"loop start: %7.7X",0,sampleSize-1,16) ;
-	T_SimpleList<UIField>::Insert(f1) ;
-
-	position._y+=1 ;
-	v=instrument->FindVariable(SIP_END) ;
-	f1=new UIBigHexVarField(position,*v,7,"loop end: %7.7X",0,sampleSize-1,16) ;
-	T_SimpleList<UIField>::Insert(f1) ;
 
 	// ----------------------------------------------------------
 	// Block 5: EFFECT SENDS (percent bars, TREEFROG_FX_SEND_BAR_V1).
@@ -315,7 +292,7 @@ void InstrumentView::fillSampleParameters() {
 	// Since Fase 15 only these edits write the persisted base; phrase/table
 	// DLYS/RVBS automation modulates the live per-channel override instead.
 	// ----------------------------------------------------------
-	position._y+=2 ;  // skip header row 21
+	position._y+=1 ;  // skip header row 17
 	v=instrument->FindVariable(SIP_DRY) ;
 	f1=new UIIntVarField(position,*v,"dry:%3d",0,100,1,10) ;
 	f1->SetBar("DRY",14) ;
@@ -361,7 +338,7 @@ position._y+=1 ;
 	// Block 6: AUTOMATION (must remain the last fields so that
 	// T_SimpleList<UIField>::GetLast() is the table field).
 	// ----------------------------------------------------------
-	position._y+=2 ;  // skip header row 25
+	position._y+=1 ;  // skip header row 21
 	col2=position ;
 	col2._x+=16 ;
 	v=instrument->FindVariable(SIP_TABLEAUTO) ;
@@ -900,6 +877,26 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
         return;
     }
 
+    // BASS_SYNTH_PREVIEW (bacon-1.5, feedback): plain B on a Bass/Piano page
+    // previews the current instrument with its current settings (one note,
+    // auto-stop ~0.9 s); a second B stops it immediately.  Plain B on the
+    // sample page keeps the inherited no-op behavior (see the U2.33 note).
+    if (mask == EPBM_B) {
+        InstrumentType it = getInstrumentType();
+        if (it == IT_SYNTH || it == IT_PIANO) {
+            Player *p = Player::GetInstance();
+            if (p->IsPreviewActive()) {
+                p->StopPreview();
+            } else if (current_) {
+                unsigned char note = (it == IT_SYNTH) ? 48 : 60;
+                p->PreviewNote(viewData_->currentInstrument_ % SONG_CHANNEL_COUNT,
+                               current_, note);
+            }
+            isDirty_ = true;
+            return;
+        }
+    }
+
     // TREEFROG_FX_NAV_A_B_DEFAULT_V1: cut instrument / clear table moved from
     // B+A to L2+A (A+B is now "reset field to default").
     bool cutInstrument = (mask & EPBM_L2) && (mask & EPBM_A) &&
@@ -1155,9 +1152,13 @@ void InstrumentView::DrawView() {
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y, "INSTRUMENT");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 4, "FILTER");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 8, "BITCRUSHER");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 11, "PLAYBACK");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 17, "EFFECT SENDS");
-        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 21, "AUTOMATION");
+        // BASS_SYNTH_EQ8_MENU (bacon-1.5, feedback): the inherited PLAYBACK
+        // section was removed from the instrument page; the EQ8 block header
+        // now sits where PLAYBACK used to be (A on the EQ8 row opens the
+        // graphic InstrumentEqModal, see InstrumentEqModal.cpp).
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 11, "EQ8");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 13, "EFFECT SENDS");
+        UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 17, "AUTOMATION");
     } else if (getInstrumentType()==IT_SYNTH) {
         // BASS_SYNTH (bacon-1.5, item 6): block headers for
         // fillSynthParameters() (rows 4, 9, 14, 17, 20, 25); the EQ8 row
@@ -1192,6 +1193,43 @@ void InstrumentView::DrawView() {
 } ;
 
 void InstrumentView::OnFocus() { onInstrumentChange(); }
+
+// BASS_SYNTH_PREVIEW (bacon-1.5, feedback): per-frame retirement of an
+// active instrument preview note (see Player::UpdatePreview).
+void InstrumentView::OnFrameUpdate(unsigned long frameClock) {
+    Player *p = Player::GetInstance();
+    if (p) p->UpdatePreview();
+}
+
+// BASS_SYNTH_SOURCE_MENU (bacon-1.5, feedback): converts the current slot
+// from the Import/Synth browser menu (Sinth -> Bass/Piano).  Shares the
+// safety steps of the "src" selector: never converts a slot that still
+// holds an assigned sample, drops the observer before the engine object is
+// replaced, stops playback first, then rebuilds the page.
+bool InstrumentView::ConvertCurrentToSynth(InstrumentType target) {
+    if (target != IT_SYNTH && target != IT_PIANO) return false;
+    if (getInstrumentType() == target) return true;
+    if (getInstrumentType() == IT_SAMPLE) {
+        I_Instrument *instr = viewData_->project_->GetInstrumentBank()->GetInstrument(viewData_->currentInstrument_);
+        Variable *sv = instr ? instr->FindVariable(SIP_SAMPLE) : 0;
+        if (sv && sv->GetInt() != NO_SAMPLE) {
+            View::SetNotification("Clear the sample to switch to a synth");
+            return false;
+        }
+    }
+    if (current_) {
+        current_->RemoveObserver(*this);
+        current_ = 0;
+    }
+    Player *p = Player::GetInstance();
+    if (p) {
+        p->Stop();
+        p->StopStreaming();
+    }
+    viewData_->project_->GetInstrumentBank()->SetInstrumentType(viewData_->currentInstrument_, target);
+    onInstrumentChange();
+    return true;
+}
 
 void InstrumentView::Update(Observable &o,I_ObservableData *d) {
 	// BASS_SYNTH_SOURCE (bacon-1.5, feedback): the "src" selector changed.

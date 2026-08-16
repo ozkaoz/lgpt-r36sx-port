@@ -31,7 +31,9 @@ int main() {
     }
 
     // 3. Etiquetas del menu TRACK, en orden exacto.
-    const char *trackLabels[5] = { "FILTER", "BITCRUSHER", "PLAYBACK",
+    // BASS_SYNTH_EQ8_MENU (bacon-1.5, feedback): the PLAYBACK section was
+    // removed from the instrument page; the menu row now jumps to EQ8.
+    const char *trackLabels[5] = { "FILTER", "BITCRUSHER", "EQ8",
                                    "FX SENDS", "AUTOMATION" } ;
     for (int i = 0; i < 5; i++) {
         check(!strcmp(mixerMenuLabel(false, i), trackLabels[i]),
@@ -65,8 +67,8 @@ int main() {
           "hint FILTER = SIP_FILTMIX") ;
     check(mixerMenuSectionHint(1) == MAKE_FOURCC('C','R','S','H'),
           "hint BITCRUSHER = SIP_CRUSH") ;
-    check(mixerMenuSectionHint(2) == MAKE_FOURCC('I','N','T','P'),
-          "hint PLAYBACK = SIP_INTERPOLATION") ;
+    check(mixerMenuSectionHint(2) == MAKE_FOURCC('E','Q','E','N'),
+          "hint EQ8 = SIP_EQEN") ;
     check(mixerMenuSectionHint(3) == MAKE_FOURCC('D','R','Y','_'),
           "hint FX SENDS = SIP_DRY") ;
     check(mixerMenuSectionHint(4) == MAKE_FOURCC('T','B','L','A'),
