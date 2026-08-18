@@ -160,10 +160,15 @@ void InstrumentEq::refreshFlat() {
         ResetChannelState();
         return;
     }
+    // BACON_1.5_EQ8_0DB_TRANSPARENT (U2.52.6, feedback): a band at 0 dB is
+    // transparent for EVERY type.  The RBJ LP/HP/NOTCH/BP filters have no
+    // gain, so at 0 dB they were still active (e.g. LOWPA on the default
+    // 80 Hz band cut everything above 80 Hz -> "the EQ kills the sound").
+    // The band only enters the DSP once the user moves the gain off 0.
     bool any = false;
     for (int b = 0; b < kNumBands; b++) {
         if (!bandCfg_[b].enabled) continue;
-        if (bandCfg_[b].db != 0 || (int)bandCfg_[b].type != TYPE_BELL) { any = true; break; }
+        if (bandCfg_[b].db != 0) { any = true; break; }
     }
     flat_ = !any;
     if (flat_) {
@@ -191,8 +196,20 @@ static int mapBandType(int t) {
 }
 
 void InstrumentEq::recomputeBand(int band) {
-    if (rate_ <= 0) return;
     BandCfg &bg = bandCfg_[band];
+    // BACON_1.5_EQ8_0DB_TRANSPARENT: a 0 dB band is the identity filter for
+    // EVERY type.  Snap the coefficients immediately (no smoothing, no
+    // stale LP/HP/NOTCH state left behind while the band is transparent).
+    if (bg.db == 0) {
+        bg.tB0 = bg.b0 = i2fp(1);
+        bg.tB1 = bg.b1 = 0;
+        bg.tB2 = bg.b2 = 0;
+        bg.tA1 = bg.a1 = 0;
+        bg.tA2 = bg.a2 = 0;
+        bg.smoothing = false;
+        return;
+    }
+    if (rate_ <= 0) return;
     fixed b0, b1, b2, a1, a2;
     eqBiquadCoeffs(mapBandType((int)bg.type), rate_, fp2fl(bg.hz),
                    fp2fl(bg.db), fp2fl(bg.q), b0, b1, b2, a1, a2);
@@ -251,7 +268,9 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
         fixed xR = buffer[idx + 1];
         for (int b = 0; b < kNumBands; b++) {
             const BandCfg &bg = bandCfg_[b];
-            if (!bg.enabled) continue;
+            // BACON_1.5_EQ8_0DB_TRANSPARENT: same rule as refreshFlat() --
+            // a 0 dB band (any type) never touches the audio.
+            if (!bg.enabled || bg.db == 0) continue;
             ChanState &st = state_[channel][b];
             // BACON_1.5_EQ8_DF2_64BIT: compute the transposed Df2 state update
             // in 64 bits.  With full-scale input and EQ boosts the per-term

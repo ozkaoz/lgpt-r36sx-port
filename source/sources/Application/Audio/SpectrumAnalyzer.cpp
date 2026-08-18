@@ -17,7 +17,13 @@ SpectrumAnalyzer::SpectrumAnalyzer()
     memset(wim_, 0, sizeof(wim_));
     memset(bins_, 0, sizeof(bins_));
 
-    static const float fLo = 30.0f;
+    // BACON_1.5_ANALYZER_20HZ (U2.52.6, feedback): log bars from 20 Hz to
+    // 20 kHz.  The FFT is 1024 points so the low bars resolve real bass
+    // (46.9 Hz/bin at 48 kHz instead of 187.5 Hz/bin): with 256 points the
+    // bottom nine bars all collapsed onto a single FFT bin and any sample
+    // lit them all through spectral leakage ("las barras no miden
+    // 20 Hz-20 kHz").
+    static const float fLo = 20.0f;
     static const float fHi = 20000.0f;
     const float step = logf(fHi / fLo) / (kLogBins - 1);
     const float hzPerBin = (float)kRate / (float)kFftSize;

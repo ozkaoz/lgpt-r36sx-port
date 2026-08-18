@@ -386,7 +386,10 @@ void InstrumentEqView::PostFlushDraw() {
             double f = xToFreq(x);
             double db = 0.0;
             for (int b = 0; b < 8; b++) {
-                if (!bandOn_[b]) continue;
+                // BACON_1.5_EQ8_0DB_TRANSPARENT: a 0 dB band is transparent
+                // in the DSP, so the drawn response skips it too (what you
+                // see == what you hear).
+                if (!bandOn_[b] || gainDb_[b] == 0.0f) continue;
                 fixed f0, f1, f2, fA1, fA2;
                 FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
                                          gainDb_[b], q_[b], f0, f1, f2,
@@ -432,8 +435,12 @@ void InstrumentEqView::PostFlushDraw() {
     const int n = sp.BinCount();
     int bw = (cX1 - cX0) / n;
     for (int i = 0; i < n; i++) {
-        int h = (int)(fp2fl(bb[i]) * 34.0f);
+        // BACON_1.5_ANALYZER_20HZ: a 0 dBFS sine peaks around 0.25 in the
+        // normalized FFT bins (Hann window), so scale x4 to make the full
+        // bar mean 0 dBFS; clamp to the strip height.
+        int h = (int)(fp2fl(bb[i]) * 4.0f * (float)(sY1 - sY0));
         if (h < 2) h = 2;
+        if (h > sY1 - sY0) h = sY1 - sY0;
         tfFill(cX0 + i * bw, sY1 - h, bw - 1, h, specC);
     }
 #endif

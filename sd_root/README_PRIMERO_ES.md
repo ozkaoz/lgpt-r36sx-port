@@ -188,6 +188,17 @@ cp BUILD/U2523/lgpt_r36sx_u2523.so sd_root/cubegm/cores/lgpt_r36sx_port_libretro
     NINGUNA edición corta el sonido del preview ni de la frase. El volumen
     del sinth sostenido iguala al de una sample a volumen máximo (sustain
     por defecto 100).
+13. **EQ8 transparente a 0 dB (U2.52.6)**: cualquier modo (BELL/LOWSH/HISHE/
+    LOWPA/HIPAS/NOTCH/BANDP) con ganancia 0 dB NO altera el sonido — el
+    filtro solo entra al mover la ganancia fuera de 0. En samples: cambiar
+    el modo con 0 dB ya no mata el sonido (antes LOWPA a 80 Hz cortaba todo).
+14. **Espectro 20 Hz-20 kHz (U2.52.6)**: las barras bajo el canvas del EQ8
+    miden graves reales: un kick ilumina solo las barras bajas; un tono de
+    1 kHz deja apagadas las de <300 Hz (antes cualquier sample encendía casi
+    todas). Barra llena = 0 dBFS.
+15. **Sinths +6 dB (U2.52.6)**: el sinth sostenido (saw por defecto) suena
+    ~4 dB más fuerte que antes — a la par de las samples; pico 1.0 full
+    scale, drive 0..100 de "boosteado" a "clip duro".
 
 ## Bugs conocidos
 

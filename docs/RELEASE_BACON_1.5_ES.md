@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 739d35296c8e0b10e5cec8d851f47093580a795ccf0056f70d47c7edecf04689
+- lgpt_r36sx_u2523.so - SHA256 814e4b3a716bf263d1e35e3daa84e04c5abbd846ff898b503b605f674a43c4af
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...
@@ -116,7 +116,61 @@ Fixes:
   golden (solo se toca si el dispositivo lo evidencia).
 
 Regresión: AUDIT_CLEAN_MAIN_U2523_OK (tests/run_all.sh), F10_BASELINE_OK
-(golden core 9faaa713), host bass 72 + piano 46 + eq8_struct 63 +
+(golden core 739d3529), host bass 72 + piano 46 + eq8_struct 63 +
 analyzer_mix 55 checks OK (bass 7b con UBSAN limpio), TEST_FX_PHASE19
 _AUDITION_ISOLATED_OK, DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK,
 verify ERRORS=0.
+
+Novedades U2.52.6 (feedback de la prueba en R36SX #3):
+
+22. El EQ8 ya no mata el sonido al cambiar el modo (causa raíz definitiva,
+    samples y sinths): los filtros RBJ LOW_PASS/HIGH_PASS/NOTCH/BAND_PASS no
+    tienen ganancia, así que con 0 dB seguían ACTIVOS — p. ej. LOWPA en la
+    banda 1 (80 Hz por defecto) cortaba todo lo que está por encima de 80 Hz
+    y el sample quedaba casi mudo (por eso "solo suenan en BELL": BELL@0dB sí
+    era transparente). Ahora UNA banda a 0 dB es transparente para TODOS los
+    tipos: se salta en el DSP, sus coeficientes saltan a la identidad al
+    instante (recomputeBand, sin smoothing ni estado residual) y la curva
+    dibujada la omite (lo que ves == lo que oyes). El filtro entra solo al
+    mover la ganancia fuera de 0. BACON_1.5_EQ8_0DB_TRANSPARENT.
+23. Barras del espectro 20 Hz-20 kHz reales: FFT de 256→1024 puntos (47 Hz/bin
+    en vez de 187.5) + piso logarítmico 30→20 Hz. Con 256 puntos las nueve
+    barras bajas se colapsaban sobre un solo bin de FFT y CUALQUIER sample las
+    encendía todas por fuga espectral; ahora un kick ilumina solo las barras
+    de graves y un tono de 1 kHz deja apagadas las de <300 Hz (regresión
+    clavada en el test 4 del analyzer). Escala visual ×4 (barra llena =
+    0 dBFS) con clamp al alto del strip. BACON_1.5_ANALYZER_20HZ.
+24. Sinths +6 dB: el softclip viejo (hard clip ±1 + cúbica) limitaba TODO
+    wave a pico 0.667 → el sinth quedaba ~3-4 dB bajo las samples. El
+    clipper es ahora monótono por tramos (cúbica hasta ±1, taper lineal hasta
+    el rail ±2) con boost ×2 previo: la sierra por defecto llega a pico 1.0
+    (RMS ~0.48 post-pan, verificado por test; antes 0.31) y drive 0..100
+    sigue abarcando de "boosteado" a "clip duro". BACON_1.5_SYNTH_LEVEL.
+25. Guard del diálogo de proyectos ampliado: dump #5 (FileSystemService::Copy
+    con ruta NULL durante un rename) — las entradas de directorio con ruta
+    vacía se saltan en RecursiveCopyDirectory (TREEFROG_DIALOG_NULL_GUARD_V2)
+    en lugar de pasarse al copy de SD.
+
+Fixes:
+
+- Fix EQ8 0 dB (U2.52.6): refreshFlat() y el lazo de Process() aplican la
+  misma regla (banda activa ⇔ enabled && ganancia != 0) — la curva y el DSP
+  nunca pueden divergir por el tipo seleccionado a 0 dB.
+- Fix spectro (U2.52.6): anillo del analyzer 512→2048 frames para ventana
+  FFT de 1024; el test de silencio alimenta 2048 ceros (antes 512 dejaba
+  mitad de la ventana con audio viejo).
+
+Pendiente de verificar en dispositivo (prueba #4):
+
+- "Sinths en Phrase no se muestran en el mixer": el VU del mixer muestrea los
+  picos de los 8 PlayerChannel (post-render, audible && !muted && volume>0),
+  sin distinción sample/sinth — si la frase suena pero la barra no se mueve,
+  el detalle está en el caso de uso exacto (frase lanzada desde la pantalla
+  Phrase vs canción corriendo, canal mudo, o audición por bus propio).
+  Protocolo de prueba: cargar proyecto, asignar sinth a un canal, lanzar la
+  CANCIÓN (START en Song, no solo la frase) y observar las barras del canal.
+
+Regresión: AUDIT_CLEAN_MAIN_U2523_OK (tests/run_all.sh), F10_BASELINE_OK
+(golden core 814e4b3a), host bass 72 + piano 46 + eq8_struct 68 +
+analyzer_mix 64 checks OK (UBSAN limpio), DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS,
+BUILD_U2523_OK, verify ERRORS=0.

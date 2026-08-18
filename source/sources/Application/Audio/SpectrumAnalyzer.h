@@ -23,15 +23,15 @@ class I_Instrument;
  *     master buffer into a small ring.  When nobody is listening
  *     (armed == false) it returns on a single branch -- zero cost.
  *   - Compute() runs on the UI thread only while the EQ view is open,
- *     throttled to ~12 fps.  It runs a 256-point radix-2 FFT (float math is
+ *     throttled to ~12 fps.  It runs a 1024-point radix-2 FFT (float math is
  *     fine here: never the audio thread) and derives log-scaled bins.
  *   - No allocation in either path; all storage is a singleton.
  */
 
 class SpectrumAnalyzer {
 public:
-    static const int kRingFrames = 512;
-    static const int kFftSize = 256;
+    static const int kRingFrames = 2048;
+    static const int kFftSize = 1024;
     static const int kLogBins = 24;
     static const int kRate = 48000;
 

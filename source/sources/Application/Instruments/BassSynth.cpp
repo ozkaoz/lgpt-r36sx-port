@@ -314,7 +314,10 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
         subLvl /= s;
         noiseLvl /= s;
     }
-    float driveGain = 1.0f + ((float)drive_->GetInt() / 100.0f) * 4.0f;
+    // BACON_1.5_SYNTH_LEVEL (U2.52.6, feedback): the drive range is
+    // rebased around the +6 dB boost (boosted input 2.0..6.0), so drive
+    // 0..100 still spans from "punchy boosted" to "fully clipped".
+    float driveGain = 1.0f + ((float)drive_->GetInt() / 100.0f) * 2.0f;
 
     int ftype = ftype_->GetInt();
     if (ftype < 0) ftype = 0;
@@ -439,10 +442,25 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
                   + noise * noiseLvl;
 
         // ---- drive (soft clip) ----
-        mix *= driveGain;
-        if (mix > 1.0f) mix = 1.0f;
-        if (mix < -1.0f) mix = -1.0f;
-        mix = mix - (mix * mix * mix) / 3.0f;
+        // BACON_1.5_SYNTH_LEVEL (U2.52.6, feedback): +6 dB on the base
+        // tone.  The old cascade (hard clip at +/-1, then cubic) capped
+        // every waveform at 0.667 peak, so the synths sat ~3-4 dB below
+        // the samples.  The clipper is now a monotonic piecewise: cubic
+        // up to +/-1 (0.667 max), then a linear taper to the +/-2 hard
+        // rail.  A default saw reaches ~1.0 peak (was 0.667) with the
+        // harmonics still smooth, and drive 100 still fully saturates.
+        mix *= driveGain * 2.0f;
+        if (mix > 2.0f) mix = 2.0f;
+        if (mix < -2.0f) mix = -2.0f;
+        {
+            float ax = fabsf(mix);
+            if (ax <= 1.0f) {
+                mix = mix - (mix * mix * mix) / 3.0f;
+            } else {
+                float y = 0.66666669f + (ax - 1.0f) * 0.33333334f;
+                mix = (mix > 0.0f) ? y : -y;
+            }
+        }
 
         // ---- envelopes (per sample) ----
         if (*ampStage == SES_ATTACK) {

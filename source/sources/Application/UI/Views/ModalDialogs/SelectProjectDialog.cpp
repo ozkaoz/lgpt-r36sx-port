@@ -227,6 +227,15 @@ static bool RecursiveCopyDirectory(const Path &srcPath, Path &dstPath) {
 	IteratorPtr<Path> copyIt(items.GetIterator());
 	for (copyIt->Begin(); !copyIt->IsDone(); copyIt->Next()) {
 		Path &item = copyIt->CurrentItem();
+		// TREEFROG_DIALOG_NULL_GUARD_V2 (U2.52.6): a stale dir entry can
+		// carry an empty path (crash dump #5: FileSystemService::Copy with
+		// a NULL source while renaming).  Skip it instead of passing it to
+		// the SD copy path.
+		if (item.GetPath().empty()) {
+			Trace::Log("SelectProjectDialog:Rename", "skip empty path entry");
+			ok = false;
+			continue;
+		}
 		Path dstItem = dstPath.Descend(item.GetName());
 		if (item.IsDirectory()) {
 			if (!RecursiveCopyDirectory(item, dstItem)) ok = false;

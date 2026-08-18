@@ -324,9 +324,11 @@ int main() {
     // sustain 100 must be clearly louder than sustain 60 (>= 1.3x).
     check(rmsS100 > rmsS60 * 1.3f, "sustain 100 >= 1.3x louder than 60");
     // ... and reach the ~0 dBFS level: full-scale saw (RMS 0.577) through
-    // the softclip (x - x^3/3, RMS ~0.44) and the equal-power center pan
-    // (0.707) -> ~0.31.
-    check(rmsS100 > 0.30, "sustained note at 0 dBFS level");
+    // the BACON_1.5_SYNTH_LEVEL +6 dB boost and monotonic piecewise
+    // clipper (RMS ~0.68 pre-pan, peak 1.0) and the equal-power center
+    // pan (0.707) -> ~0.48 (the old hard-clip+cubic cascade capped at
+    // 0.667 and measured ~0.31, i.e. 3-4 dB below the samples).
+    check(rmsS100 > 0.42, "sustained note at 0 dBFS level");
     // The device edit flow: X+UP (gain +1) on every band, rendered each
     // time -- the sound must never collapse after ANY single edit.
     for (int b = 0; b < 8; b++) {

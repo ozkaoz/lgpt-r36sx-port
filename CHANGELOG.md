@@ -1,5 +1,48 @@
 # Changelog
 
+## Update: Bacon 1.5 U2.52.6 - EQ8 0 dB transparente, espectro 20 Hz-20 kHz real, sinths +6 dB
+
+- **Estado**: cuarta iteración de la pre-release Bacon 1.5 tras el tercer
+  feedback del dispositivo. En samples el EQ seguía "matando el sonido" al
+  editar (solo BELL sonaba; cambiar el modo lo mataba), las barras del
+  espectro no medían 20 Hz-20 kHz (cualquier sample encendía casi todas), y
+  los sinths seguían ~3-4 dB bajo las samples. Corregido + regresiones
+  clavadas en test.
+- **Fix "el EQ mata el sonido" definitivo** (`InstrumentEq.cpp`): los filtros
+  RBJ LOW_PASS/HIGH_PASS/NOTCH/BAND_PASS no tienen ganancia, así que a 0 dB
+  seguían ACTIVOS (p. ej. LOWPA en la banda 1 @80 Hz cortaba todo lo de
+  arriba de 80 Hz → sample casi mudo; por eso "solo suenan en BELL", cuyo
+  0 dB sí era identidad). Nueva regla `BACON_1.5_EQ8_0DB_TRANSPARENT`: una
+  banda a 0 dB es transparente para TODOS los tipos — se salta en el DSP, sus
+  coeficientes saltan a la identidad al instante (`recomputeBand`, sin
+  smoothing ni estado residual) y la curva dibujada la omite (lo que ves ==
+  lo que oyes). El filtro entra solo al mover la ganancia fuera de 0 dB.
+- **Espectro 20 Hz-20 kHz real** (`SpectrumAnalyzer` + view): FFT 256→1024
+  (47 Hz/bin vs 187.5) y piso logarítmico 30→20 Hz; con 256 puntos las nueve
+  barras bajas se colapsaban sobre un solo bin y CUALQUIER sample las
+  encendía todas por fuga espectral. Ahora un kick ilumina solo las barras de
+  graves y un tono de 1 kHz deja apagadas las de <300 Hz (regresión en el
+  test 4 del analyzer). Anillo 512→2048 frames; escala visual ×4 (barra
+  llena = 0 dBFS) con clamp al strip. `BACON_1.5_ANALYZER_20HZ`.
+- **Sinths +6 dB** (`BassSynth.cpp`): el softclip viejo (hard clip ±1 +
+  cúbica) limitaba todo wave a pico 0.667 → ~3-4 dB bajo las samples.
+  Clipper monótono por tramos (cúbica hasta ±1, taper lineal al rail ±2)
+  con boost ×2 previo: la sierra por defecto llega a pico 1.0 (RMS ~0.48
+  post-pan; antes 0.31); drive 0..100 re-mapeado 1..3 ×2 (2..6) para que
+  siga abarcando de "boosteado" a "clip duro". `BACON_1.5_SYNTH_LEVEL`.
+- **Guard rename ampliado** (`SelectProjectDialog.cpp`): dump #5
+  (FileSystemService::Copy con ruta NULL durante un rename): las entradas de
+  directorio con ruta vacía se saltan en `RecursiveCopyDirectory`
+  (`TREEFROG_DIALOG_NULL_GUARD_V2`).
+- **Tests**: `eq8_struct_host_test` 68 checks (nuevo 8b: LOW_PASS@0 dB =
+  identidad + flat; +6 dB = filtro real), `analyzer_target_host_test` 64
+  checks (ventanas de 2048 frames + regresión LF: 1 kHz no enciende las
+  barras <300 Hz), `bass_synth_host_test` 72 checks (umbral 7b 0.30→0.42
+  para el nuevo nivel +6 dB). Todo bajo ASAN/UBSAN.
+- **Regresión**: `AUDIT_CLEAN_MAIN_U2523_OK` (run_all.sh completo),
+  `F10_BASELINE_OK` (golden core 814e4b3a), `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`,
+  `BUILD_U2523_OK`, install/verify en SD `ERRORS=0` (`VERIFY_U2523_OK`).
+
 ## Update: Bacon 1.5 U2.52.5 - EQ8 8 bandas (sinths), curva en vivo, ±24 dB, sin kill de sonido
 
 - **Estado**: tercera iteración de la pre-release Bacon 1.5 tras el segundo

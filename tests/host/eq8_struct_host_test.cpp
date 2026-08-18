@@ -256,11 +256,11 @@ int main() {
         InstrumentEq eq;
         eq.SetSampleRate(44100);
         eq.ConfigureBand(4, InstrumentEq::TYPE_BAND_PASS, fl2fp(3000.0f),
-                         fl2fp(0.0f), fl2fp(1.0f), true);
+                         fl2fp(6.0f), fl2fp(1.0f), true);
         eq.SetSampleRate(kRate);
 
         fixed rb0, rb1, rb2, ra1, ra2;
-        eqBiquadCoeffs(EQ_BIQUAD_BAND_PASS, kRate, 3000.0f, 0.0f, 1.0f,
+        eqBiquadCoeffs(EQ_BIQUAD_BAND_PASS, kRate, 3000.0f, 6.0f, 1.0f,
                        rb0, rb1, rb2, ra1, ra2);
         fixed buf[2 * kFrames];
         makeSignal(buf, kFrames);
@@ -268,6 +268,36 @@ int main() {
         fixed c0, c1, c2, ca1, ca2;
         eq.GetBandCoeffs(4, &c0, &c1, &c2, &ca1, &ca2);
         CHECK(c0 == rb0 && c1 == rb1 && c2 == rb2 && ca1 == ra1 && ca2 == ra2);
+    }
+
+    /* --- 8b. BACON_1.5_EQ8_0DB_TRANSPARENT: a 0 dB band is the identity
+     * filter for EVERY type (a LOW_PASS at 0 dB must not cut anything:
+     * this is the "the EQ kills the sound" regression) --- */
+    {
+        InstrumentEq eq;
+        eq.SetSampleRate(kRate);
+        eq.ConfigureBand(0, InstrumentEq::TYPE_LOW_PASS, fl2fp(80.0f),
+                         fl2fp(0.0f), fl2fp(1.0f), true);
+        CHECK(eq.IsFlat());
+        fixed c0, c1, c2, ca1, ca2;
+        eq.GetBandCoeffs(0, &c0, &c1, &c2, &ca1, &ca2);
+        CHECK(c0 == i2fp(1) && c1 == 0 && c2 == 0 && ca1 == 0 && ca2 == 0);
+
+        fixed in[2 * kFrames], out[2 * kFrames];
+        makeSignal(in, kFrames);
+        memcpy(out, in, sizeof(in));
+        eq.Process(0, out, kFrames);
+        CHECK(memcmp(in, out, sizeof(in)) == 0);
+
+        // ... and the same band with +6 dB IS a real low-pass: the highs
+        // are cut, so the output differs from the identity.
+        eq.ConfigureBand(0, InstrumentEq::TYPE_LOW_PASS, fl2fp(80.0f),
+                         fl2fp(6.0f), fl2fp(1.0f), true);
+        CHECK(!eq.IsFlat());
+        memset(out, 0, sizeof(out));
+        memcpy(out, in, sizeof(in));
+        eq.Process(0, out, kFrames);
+        CHECK(memcmp(in, out, sizeof(in)) != 0);
     }
 
     /* --- 9. RBJ bell stability guard: settings that made the canonical
