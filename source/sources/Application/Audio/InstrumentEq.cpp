@@ -253,12 +253,22 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
             const BandCfg &bg = bandCfg_[b];
             if (!bg.enabled) continue;
             ChanState &st = state_[channel][b];
-            fixed tL = fp_mul(bg.b0, xL) + st.s1L;
-            st.s1L = fp_mul(bg.b1, xL) - fp_mul(bg.a1, tL) + st.s2L;
-            st.s2L = fp_mul(bg.b2, xL) - fp_mul(bg.a2, tL);
-            fixed tR = fp_mul(bg.b0, xR) + st.s1R;
-            st.s1R = fp_mul(bg.b1, xR) - fp_mul(bg.a1, tR) + st.s2R;
-            st.s2R = fp_mul(bg.b2, xR) - fp_mul(bg.a2, tR);
+            // BACON_1.5_EQ8_DF2_64BIT: compute the transposed Df2 state update
+            // in 64 bits.  With full-scale input and EQ boosts the per-term
+            // Q15 values (b1*x, a1*t, s2...) can each approach +/-2^31, so a
+            // 32-bit sum overflows (verified under UBSAN; on the device any
+            // edit "killed" the sample sound: U2.52.5).  The final value fits
+            // in 32 bits, so the truncation is exact.
+            fixed tL = (fixed)((long long)fp_mul(bg.b0, xL) + st.s1L);
+            st.s1L = (fixed)((long long)fp_mul(bg.b1, xL) -
+                             (long long)fp_mul(bg.a1, tL) + st.s2L);
+            st.s2L = (fixed)((long long)fp_mul(bg.b2, xL) -
+                             (long long)fp_mul(bg.a2, tL));
+            fixed tR = (fixed)((long long)fp_mul(bg.b0, xR) + st.s1R);
+            st.s1R = (fixed)((long long)fp_mul(bg.b1, xR) -
+                             (long long)fp_mul(bg.a1, tR) + st.s2R);
+            st.s2R = (fixed)((long long)fp_mul(bg.b2, xR) -
+                             (long long)fp_mul(bg.a2, tR));
             xL = tL;
             xR = tR;
         }

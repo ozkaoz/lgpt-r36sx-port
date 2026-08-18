@@ -1,6 +1,7 @@
 #include "InstrumentEqView.h"
 
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
+#include "Application/Audio/EqBiquad.h"
 #include "Application/Audio/InstrumentEq.h"
 #include "Application/Audio/SpectrumAnalyzer.h"
 #include "Application/Instruments/InstrumentBank.h"
@@ -317,11 +318,13 @@ void InstrumentEqView::PostFlushDraw() {
     const int cX0 = 6,   cX1 = 314;
     const int cY0 = 24,  cY1 = 156;      // curve canvas
     const int cMid = (cY0 + cY1) / 2;    // 0 dB
-    const double pxPerDb = (double)(cY1 - cY0) / 24.0;  // +/-12 dB visible
+    // BACON_1.5_EQ8_24DB (U2.52.5, feedback): the gain range is +/-24 dB,
+    // so the canvas maps the FULL range (pxPerDb over 48 dB).  Previously
+    // +/-12 dB made handles/curve leave the screen for gains beyond +12.
+    const double pxPerDb = (double)(cY1 - cY0) / 48.0;
 
-    // BACON_1.5_EQ8_VIEW: single source of truth = the DSP module of the
-    // instrument being edited.  Its (smoothed) coefficients ARE what the
-    // audio path applies right now.
+    // The DSP module is only used for the sample rate; the curve/handles
+    // come from the view state below (BACON_1.5_EQ8_LIVE_CURVE).
     FxEngine::InstrumentEq *eq = instr_->GetInstrumentEq();
     int rate = eq ? eq->GetSampleRate() : 48000;
 
@@ -332,62 +335,62 @@ void InstrumentEqView::PostFlushDraw() {
     tfFill(cX0 - 2, cY0 - 2, 1, cY1 - cY0 + 5, border);
     tfFill(cX1 + 2, cY0 - 2, 1, cY1 - cY0 + 5, border);
 
-    // dB grid: 0 dB axis + +/-6/+/-12 lines
+    // dB grid: 0 dB axis + +/-12/+/-24 lines
     tfFill(cX0, cMid, cX1 - cX0, 1, axisC);
-    for (int g = -12; g <= 12; g += 6) {
+    for (int g = -24; g <= 24; g += 12) {
         int yy = cMid - (int)(g * pxPerDb);
         tfFill(cX0, yy, cX1 - cX0 + 1, 1, gridC);
     }
 
     // dB labels (left margin, inside the canvas top)
-    tfTinyText(0, cY0 + 1, "+12", lblC);
+    tfTinyText(0, cY0 + 1, "+24", lblC);
     tfTinyText(0, cMid - 4, "0", lblC);
-    tfTinyText(0, cY1 - 6, "-12", lblC);
+    tfTinyText(0, cY1 - 6, "-24", lblC);
 
-    if (!eq) {
-        // No instrument EQ (should not happen: OnFocus filters the types).
-        tfTinyText(cX0, cMid - 4, "no EQ", lblC);
-        return;
-    }
+    // BACON_1.5_EQ8_LIVE_CURVE (U2.52.5, feedback): the band handles and
+    // the composite response are computed from the VIEW state
+    // (freqHz_/gainDb_/type_/q_/bandOn_) through the same eqBiquadCoeffs()
+    // the DSP uses, NOT from the DSP readbacks: the DSP only updates while
+    // audio renders (preview/song), so reading it froze the canvas during
+    // editing and could show a type/shape that was never assigned (stale
+    // coefficients).  The view state is the DSP smoothing target, so the
+    // drawn curve equals the converged DSP response exactly.
+    if (!bypass_) {
+        // Band vertical guide lines + handles
+        for (int b = 0; b < 8; b++) {
+            if (!bandOn_[b]) continue;
+            int gx = freqToX(freqHz_[b]);
+            int gyy = cMid - (int)(gainDb_[b] * pxPerDb);
+            if (gyy < cY0) gyy = cY0;
+            if (gyy > cY1) gyy = cY1;
+            unsigned short col = (b == selected_) ? selC : bandC;
+            // faint vertical guide from the top of the canvas to the handle
+            tfFill(gx, cY0, 1, gyy - cY0 + 1, guideC);
+            // crosshair handle
+            tfFill(gx - 2, gyy - 4, 5, 2, col);
+            tfFill(gx - 2, gyy + 3, 5, 2, col);
+            tfFill(gx - 2, gyy - 4, 2, 9, col);
+            tfFill(gx + 1, gyy - 4, 2, 9, col);
+            // band number just above the handle, always INSIDE the canvas
+            // (a +24 dB handle would otherwise push it onto the char header)
+            char num[2] = {(char)('1' + b), 0};
+            int ny = gyy - 16;
+            if (ny < cY0 + 1) ny = cY0 + 1;
+            tfTinyText(gx - 1, ny, num, col);
+        }
 
-    // Band vertical guide lines + handles (before the curve so the response
-    // stays on top).  Live values come from the DSP readbacks.
-    for (int b = 0; b < 8; b++) {
-        if (!eq->GetBandEnabled(b)) continue;
-        if (bypass_) continue;
-        int gx = freqToX(fp2fl(eq->GetBandFreq(b)));
-        int gyy = cMid - (int)(fp2fl(eq->GetBandGainDb(b)) * pxPerDb);
-        if (gyy < cY0) gyy = cY0;
-        if (gyy > cY1) gyy = cY1;
-        unsigned short col = (b == selected_) ? selC : bandC;
-        // faint vertical guide from the top of the canvas to the handle
-        tfFill(gx, cY0, 1, gyy - cY0 + 1, guideC);
-        // crosshair handle
-        tfFill(gx - 2, gyy - 4, 5, 2, col);
-        tfFill(gx - 2, gyy + 3, 5, 2, col);
-        tfFill(gx - 2, gyy - 4, 2, 9, col);
-        tfFill(gx + 1, gyy - 4, 2, 9, col);
-        // band number just above the handle
-        char num[2] = {(char)('1' + b), 0};
-        int ny = gyy - 16;
-        if (ny < cY0 - 8) ny = cY0 - 8;
-        tfTinyText(gx - 1, ny, num, col);
-    }
-
-    // Composite response curve, evaluated from the DSP's ACTUAL coefficients
-    // (the same ones Process() applies to the signal).  Bypassed EQ draws a
-    // flat 0 dB line.
-    const double rateD = (double)rate;
-    for (int x = cX0; x <= cX1; x += 3) {
-        double f = xToFreq(x);
-        double db = 0.0;
-        if (bypass_) {
-            db = 0.0;
-        } else {
+        // Composite response curve, evaluated from the view coefficients.
+        // Bypassed EQ draws a flat 0 dB line.
+        const double rateD = (double)rate;
+        for (int x = cX0; x <= cX1; x += 3) {
+            double f = xToFreq(x);
+            double db = 0.0;
             for (int b = 0; b < 8; b++) {
-                if (!eq->GetBandEnabled(b)) continue;
+                if (!bandOn_[b]) continue;
                 fixed f0, f1, f2, fA1, fA2;
-                eq->GetBandCoeffs(b, &f0, &f1, &f2, &fA1, &fA2);
+                FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
+                                         gainDb_[b], q_[b], f0, f1, f2,
+                                         fA1, fA2);
                 double b0 = fp2fl(f0), b1 = fp2fl(f1), b2 = fp2fl(f2);
                 double a1 = fp2fl(fA1), a2 = fp2fl(fA2);
                 double w = 2.0 * 3.14159265358979323846 * f / rateD;
@@ -399,18 +402,18 @@ void InstrumentEqView::PostFlushDraw() {
                 db += 10.0 * log10((reN * reN + imN * imN + 1e-12) /
                                    (reD * reD + imD * imD + 1e-12));
             }
+            if (db > 24.0) db = 24.0;
+            if (db < -24.0) db = -24.0;
+            int yy = cMid - (int)(db * pxPerDb);
+            if (yy < cY0) yy = cY0;
+            if (yy > cY1) yy = cY1;
+            if (db >= 0.0) {
+                tfFill(x, yy, 3, cMid - yy + 1, bandC);
+            } else {
+                tfFill(x, cMid, 3, yy - cMid + 1, bandC);
+            }
+            tfFill(x + 1, yy, 1, 1, selC);
         }
-        if (db > 24.0) db = 24.0;
-        if (db < -24.0) db = -24.0;
-        int yy = cMid - (int)(db * pxPerDb);
-        if (yy < cY0) yy = cY0;
-        if (yy > cY1) yy = cY1;
-        if (db >= 0.0) {
-            tfFill(x, yy, 3, cMid - yy + 1, bandC);
-        } else {
-            tfFill(x, cMid, 3, yy - cMid + 1, bandC);
-        }
-        tfFill(x + 1, yy, 1, 1, selC);
     }
 
     // Frequency axis labels under the canvas

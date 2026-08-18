@@ -141,9 +141,15 @@ def check_analyzer_mix():
 
 
 def check_eq_curve_dsp():
-    # The EQ8 view draws the curve from the SAME coefficients Process() uses.
-    assert "GetBandCoeffs" in IEQ_H
-    assert "GetBandCoeffs" in IEQ_VIEW
+    # U2.52.5 (BACON_1.5_EQ8_LIVE_CURVE): the EQ8 view draws the curve from
+    # its own state (freqHz_/gainDb_/type_/q_/bandOn_) via the SAME RBJ math
+    # the DSP uses (FxEngine::eqBiquadCoeffs), so the canvas updates live
+    # while editing (the old DSP readbacks only synced while audio rendered).
+    assert "eqBiquadCoeffs" in IEQ_VIEW
+    assert "BACON_1.5_EQ8_LIVE_CURVE" in IEQ_VIEW
+    # U2.52.5 (BACON_1.5_EQ8_24DB): the canvas maps the full +/-24 dB range.
+    assert "pxPerDb" in IEQ_VIEW
+    assert "/ 48.0" in IEQ_VIEW
     # Per-frame exponential smoothing + exact snap at the last 2^-6 step.
     assert "kSmoothShift" in IEQ_CPP
     assert "bg.b0 += d0 >> kSmoothShift;" in IEQ_CPP
@@ -152,7 +158,12 @@ def check_eq_curve_dsp():
     # Per-band-per-channel states (no shared cascade state).
     assert "state_[channel][b]" in IEQ_CPP
     assert "ChanState &st = state_[channel][b];" in IEQ_CPP
-    print("6. InstrumentEq: curve == DSP coeffs, exact smoothing snap OK")
+    # U2.52.5 (BACON_1.5_EQ8_DF2_64BIT): the transposed Df2 state update
+    # runs in 64 bits (a 32-bit sum overflows with full-scale input + boosts;
+    # on the device any EQ edit "killed" the sound).
+    assert "BACON_1.5_EQ8_DF2_64BIT" in IEQ_CPP
+    assert "(long long)fp_mul(bg.b1, xL)" in IEQ_CPP
+    print("6. InstrumentEq: view-state curve (RBJ), +/-24 dB, exact snap, Df2 64-bit OK")
 
 
 def check_bell_guard():

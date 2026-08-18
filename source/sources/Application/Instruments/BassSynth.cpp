@@ -51,7 +51,11 @@ BassSynth::BassSynth() {
     Insert(attack_);
     decay_ = new Variable("decay", SBP_DECAY, 20);
     Insert(decay_);
-    sustain_ = new Variable("sustain", SBP_SUSTAIN, 60);
+    // BACON_1.5_SYNTH_0DB (U2.52.5, feedback): sustain defaults to 100 so a
+    // synth at volume 100 sustains at 0 dBFS (same level as a sample at
+    // volume 255) instead of dropping to 60% (the preview/phones/mixer
+    // meters sounded ~-4.4 dB quieter than samples).
+    sustain_ = new Variable("sustain", SBP_SUSTAIN, 100);
     Insert(sustain_);
     release_ = new Variable("release", SBP_RELEASE, 30);
     Insert(release_);
@@ -96,25 +100,45 @@ BassSynth::BassSynth() {
     // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: same variable contract as
     // SampleInstrument (names + SIP_EQ* FourCCs) so the EQ8 view
     // works unchanged through FindVariable().
-    eqEnable_ = new Variable("eq bypass", SIP_EQEN, 1);
-    Insert(eqEnable_);
-    eqMask_ = new Variable("eq bands", SIP_EQMASK, 255);
-    Insert(eqMask_);
-    for (int i = 0; i < 8; i++) {
-        char n[8];
-        sprintf(n, "eqf%d", i);
-        eqFreq_[i] = new Variable(n, (FourCC)(SIP_EQF0 + i),
-            FxEngine::InstrumentEq::DefaultBandHz(i) * 100);
-        Insert(eqFreq_[i]);
-        sprintf(n, "eqt%d", i);
-        eqType_[i] = new Variable(n, (FourCC)(SIP_EQT0 + i), 0);
-        Insert(eqType_[i]);
-        sprintf(n, "eqg%d", i);
-        eqGain_[i] = new Variable(n, (FourCC)(SIP_EQG0 + i), 0);
-        Insert(eqGain_[i]);
-        sprintf(n, "eqq%d", i);
-        eqQ_[i] = new Variable(n, (FourCC)(SIP_EQ_Q0 + i), 100);
-        Insert(eqQ_[i]);
+    // BACON_1.5_EQ_FOURCC_ARRAYS (U2.52.5, feedback): the variables used
+    // "(FourCC)(SIP_EQF0 + i)" before.  MAKE_FOURCC packs the trailing
+    // digit in the HIGH byte (little-endian variant active on host/device),
+    // so +i bumped the 'E' byte and bands 2..8 got ids the EQ8 view could
+    // never find: only band 1 could be edited ("only band 1 works" on the
+    // device).  Use the explicit arrays like SampleInstrument.
+    {
+        static const FourCC freqIDs[8] = {
+            SIP_EQF0, SIP_EQF1, SIP_EQF2, SIP_EQF3,
+            SIP_EQF4, SIP_EQF5, SIP_EQF6, SIP_EQF7 };
+        static const FourCC gainIDs[8] = {
+            SIP_EQG0, SIP_EQG1, SIP_EQG2, SIP_EQG3,
+            SIP_EQG4, SIP_EQG5, SIP_EQG6, SIP_EQG7 };
+        static const FourCC typeIDs[8] = {
+            SIP_EQT0, SIP_EQT1, SIP_EQT2, SIP_EQT3,
+            SIP_EQT4, SIP_EQT5, SIP_EQT6, SIP_EQT7 };
+        static const FourCC qIDs[8] = {
+            SIP_EQ_Q0, SIP_EQ_Q1, SIP_EQ_Q2, SIP_EQ_Q3,
+            SIP_EQ_Q4, SIP_EQ_Q5, SIP_EQ_Q6, SIP_EQ_Q7 };
+        eqEnable_ = new Variable("eq bypass", SIP_EQEN, 1);
+        Insert(eqEnable_);
+        eqMask_ = new Variable("eq bands", SIP_EQMASK, 255);
+        Insert(eqMask_);
+        for (int i = 0; i < 8; i++) {
+            char n[8];
+            sprintf(n, "eqf%d", i);
+            eqFreq_[i] = new Variable(n, freqIDs[i],
+                FxEngine::InstrumentEq::DefaultBandHz(i) * 100);
+            Insert(eqFreq_[i]);
+            sprintf(n, "eqt%d", i);
+            eqType_[i] = new Variable(n, typeIDs[i], 0);
+            Insert(eqType_[i]);
+            sprintf(n, "eqg%d", i);
+            eqGain_[i] = new Variable(n, gainIDs[i], 0);
+            Insert(eqGain_[i]);
+            sprintf(n, "eqq%d", i);
+            eqQ_[i] = new Variable(n, qIDs[i], 100);
+            Insert(eqQ_[i]);
+        }
     }
     memset(eqCache_, 0xFF, sizeof(eqCache_));
     eqRateCache_ = -1;

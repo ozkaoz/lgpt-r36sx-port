@@ -1,6 +1,7 @@
 #ifndef _EQ_BIQUAD_H_
 #define _EQ_BIQUAD_H_
 
+#include <math.h>
 #include "Application/Utils/fixed.h"
 
 /*

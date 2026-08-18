@@ -182,6 +182,12 @@ cp BUILD/U2523/lgpt_r36sx_u2523.so sd_root/cubegm/cores/lgpt_r36sx_port_libretro
 11. **Menú TRACK del Mixer (L1+A)**: la fila EQ8 salta al campo EQ8 del
     instrumento del canal (antes PLAYBACK); comprobar que cae en la fila
     `EQ8` y que A abre el editor gráfico.
+12. **EQ8 completo en sinths (U2.52.5)**: en Bass/Piano las 8 bandas editan
+    (X+UP/DOWN ganancia, B tipo, L1+R1 frecuencia, Q), la curva se actualiza
+    en vivo al editar, el canvas muestra el rango ±24 dB (grilla ±12/±24) y
+    NINGUNA edición corta el sonido del preview ni de la frase. El volumen
+    del sinth sostenido iguala al de una sample a volumen máximo (sustain
+    por defecto 100).
 
 ## Bugs conocidos
 

@@ -123,6 +123,16 @@ static bool bufferAllZero(const fixed *b, int n) {
     return true;
 }
 
+static double bufferRms(const fixed *b, int n) {
+    double acc = 0.0;
+    for (int i = 0; i < n; i++) {
+        // Q15 (FIXED_SHIFT = 15): full scale 1.0 == 32768.
+        double v = (double)b[i] / 32768.0;
+        acc += v * v;
+    }
+    return sqrt(acc / n);
+}
+
 int main() {
     Audio::Install(new StubAudio());
     System::Install(new StubSystem());
@@ -146,6 +156,11 @@ int main() {
     check(v && v->GetInt() == 80, "fcut default 80");
     v = synth.FindVariable(SBP_GLIDE);
     check(v && v->GetInt() == 0, "glide default 0");
+    // BACON_1.5_SYNTH_0DB (U2.52.5, feedback): sustain defaults to 100 so
+    // the synth sustains at 0 dBFS like a sample at full volume (the old
+    // 60 default dropped sustained notes ~4.4 dB below the samples).
+    v = synth.FindVariable(SBP_SUSTAIN);
+    check(v && v->GetInt() == 100, "sustain default 100");
     v = synth.FindVariable(SIP_EQEN);
     check(v && v->GetInt() == 1, "eq bypass default on");
     v = synth.FindVariable(SBP_DLYSEND);
@@ -243,6 +258,116 @@ int main() {
     v->SetInt(0);
     synth.Render(0, buffer, 512, false);
     check(bufferFinite(buffer, 512 * 2), "EQ bypassed finite");
+
+    // ---- 7b. EQ edit-sequence audibility on the REAL render path ----
+    // Device feedback (U2.52.4): "any EQ edit kills the sound".  Reproduce
+    // the exact view flow -- variable writes + Render() calls -- and assert
+    // the signal never collapses, for every band, every type, sequential
+    // edits, and the sustain-100 level parity.
+    Variable *eqEn = synth.FindVariable(SIP_EQEN);
+    Variable *eqMask = synth.FindVariable(SIP_EQMASK);
+    static const FourCC kTFreq[8] = {SIP_EQF0, SIP_EQF1, SIP_EQF2, SIP_EQF3,
+                                     SIP_EQF4, SIP_EQF5, SIP_EQF6, SIP_EQF7};
+    static const FourCC kTGain[8] = {SIP_EQG0, SIP_EQG1, SIP_EQG2, SIP_EQG3,
+                                     SIP_EQG4, SIP_EQG5, SIP_EQG6, SIP_EQG7};
+    static const FourCC kTType[8] = {SIP_EQT0, SIP_EQT1, SIP_EQT2, SIP_EQT3,
+                                     SIP_EQT4, SIP_EQT5, SIP_EQT6, SIP_EQT7};
+    static const FourCC kTQ[8]    = {SIP_EQ_Q0, SIP_EQ_Q1, SIP_EQ_Q2, SIP_EQ_Q3,
+                                     SIP_EQ_Q4, SIP_EQ_Q5, SIP_EQ_Q6, SIP_EQ_Q7};
+    Variable *eqF[8], *eqG[8], *eqT[8], *eqQ[8];
+    for (int b = 0; b < 8; b++) {
+        eqF[b] = synth.FindVariable(kTFreq[b]);
+        eqG[b] = synth.FindVariable(kTGain[b]);
+        eqT[b] = synth.FindVariable(kTType[b]);
+        eqQ[b] = synth.FindVariable(kTQ[b]);
+        check(eqF[b] && eqG[b] && eqT[b] && eqQ[b], "EQ vars band present");
+    }
+    // Reset to the factory state (8 bands on, 0 dB, BELL, defaults).
+    eqEn->SetInt(1);
+    eqMask->SetInt(0xFF);
+    for (int b = 0; b < 8; b++) {
+        eqF[b]->SetInt((int)(80.0 * pow(2.0, b) + 0.5));
+        eqG[b]->SetInt(0);
+        eqT[b]->SetInt(0);
+        eqQ[b]->SetInt(100);
+    }
+    // Restore the level-relevant synth state the earlier sections disturbed
+    // (VOLM 128 -> volume 50, PAN 0 -> right channel silent, FCUT 255,
+    // GLIDE 50, FRES 20), so the level checks measure the real 0 dBFS path.
+    synth.FindVariable(SBP_VOLUME)->SetInt(100);
+    synth.FindVariable(SBP_PAN)->SetInt(50);
+    synth.FindVariable(SBP_GLIDE)->SetInt(0);
+    synth.FindVariable(SBP_FCUT)->SetInt(80);  // default; 100 degenerates the TPT SVF
+    synth.FindVariable(SBP_FRES)->SetInt(0);
+    synth.FindVariable(SBP_DRIVE)->SetInt(0);
+    synth.FindVariable(SBP_ACCENT)->SetInt(0);
+    // Sustained note measured at the exact sustain level: attack=0 / decay=0
+    // land the envelope instantly on sustain (the defaults attack 10 /
+    // decay 20 are ~200 ms / ~400 ms ramps).  The sustain value is captured
+    // at Start(), so each level needs its own note.
+    synth.FindVariable(SBP_ATTACK)->SetInt(0);
+    synth.FindVariable(SBP_DECAY)->SetInt(0);
+    Variable *sus = synth.FindVariable(SBP_SUSTAIN);
+    double rmsS60, rmsS100;
+    sus->SetInt(60);
+    synth.Start(0, 45, true);
+    for (int i = 0; i < 8; i++) {
+        synth.Render(0, buffer, 512, false);
+    }
+    rmsS60 = bufferRms(buffer, 512 * 2);
+    sus->SetInt(100);
+    synth.Start(0, 45, true);
+    for (int i = 0; i < 8; i++) {
+        synth.Render(0, buffer, 512, false);
+    }
+    rmsS100 = bufferRms(buffer, 512 * 2);
+    // sustain 100 must be clearly louder than sustain 60 (>= 1.3x).
+    check(rmsS100 > rmsS60 * 1.3f, "sustain 100 >= 1.3x louder than 60");
+    // ... and reach the ~0 dBFS level: full-scale saw (RMS 0.577) through
+    // the softclip (x - x^3/3, RMS ~0.44) and the equal-power center pan
+    // (0.707) -> ~0.31.
+    check(rmsS100 > 0.30, "sustained note at 0 dBFS level");
+    // The device edit flow: X+UP (gain +1) on every band, rendered each
+    // time -- the sound must never collapse after ANY single edit.
+    for (int b = 0; b < 8; b++) {
+        eqG[b]->SetInt(1);
+        synth.Render(0, buffer, 512, false);
+        check(bufferRms(buffer, 512 * 2) > 0.05,
+              "single +1dB edit stays audible");
+    }
+    // B (type cycle): every EQ type must remain audible, not just BELL.
+    {
+        Variable *sus = synth.FindVariable(SBP_SUSTAIN);
+        sus->SetInt(100);
+        for (int t = 0; t < 7; t++) {
+            for (int b = 0; b < 8; b++) eqT[b]->SetInt(t);
+            // give the smoothing time to converge, then measure
+            for (int i = 0; i < 6; i++) {
+                synth.Render(0, buffer, 512, false);
+            }
+            check(bufferRms(buffer, 512 * 2) > 0.05,
+                  "EQ type remains audible");
+        }
+    }
+    // Sequential edits without silence in between (the "editing kills the
+    // sound" repro): 32 edits in a row, render between each.
+    {
+        bool audible = true;
+        for (int e = 0; e < 32; e++) {
+            int b = e & 7;
+            int g = ((e >> 3) & 1) ? 1 : -1;
+            eqG[b]->SetInt(g);
+            synth.Render(0, buffer, 512, false);
+            if (bufferRms(buffer, 512 * 2) <= 0.05) audible = false;
+        }
+        check(audible, "32 sequential EQ edits never kill the sound");
+    }
+    // Restore the factory EQ state for the later sections.
+    for (int b = 0; b < 8; b++) {
+        eqG[b]->SetInt(0);
+        eqT[b]->SetInt(0);
+        eqQ[b]->SetInt(100);
+    }
 
     // ---- 8. wave shapes all render ----
     v = synth.FindVariable(SBP_WAVE);

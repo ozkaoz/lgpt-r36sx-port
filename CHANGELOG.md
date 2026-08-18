@@ -1,5 +1,48 @@
 # Changelog
 
+## Update: Bacon 1.5 U2.52.5 - EQ8 8 bandas (sinths), curva en vivo, ±24 dB, sin kill de sonido
+
+- **Estado**: tercera iteración de la pre-release Bacon 1.5 tras el segundo
+  feedback del dispositivo. En sinths/piano solo funcionaba la banda 1, el
+  canvas no se actualizaba al editar (y mostraba tipo/frecuencia viejos), el
+  rango gráfico era ±12 dB (el modelo es ±24), "wave/mode" quedaba marcado
+  como seleccionado sin estarlo, y CUALQUIER edición del EQ mataba el sonido
+  (samples y sinths). Todo corregido + tests 7b de la secuencia real de edición.
+- **Fix 8 bandas en sinths** (`BassSynth.cpp`/`PianoSynth.cpp`): `MAKE_FOURCC`
+  empaqueta el dígito final en el byte alto (variante little-endian activa),
+  así que `(FourCC)(SIP_EQF0 + i)` corrompía los ids de las bandas 2-8 y
+  `FindVariable` devolvía NULL (el view EQ8 no encontraba las variables).
+  Arrays explícitos de FourCC, mismo patrón que `SampleInstrument`.
+- **Curva del EQ8 en vivo** (`InstrumentEqView.cpp`): el canvas se dibuja desde
+  el estado del view (frecuencia/ganancia/tipo/Q/on) vía
+  `FxEngine::eqBiquadCoeffs` — la misma matemática RBJ del DSP — en vez de los
+  readbacks del DSP (solo se sincronizaban mientras el audio renderizaba).
+- **Canvas ±24 dB** (`InstrumentEqView.cpp`): `pxPerDb = (cY1-cY0)/48.0`,
+  grilla ±12/±24, etiquetas +24/0/-24, números de banda clampados dentro del
+  canvas.
+- **Fix foco fantasma** (`InstrumentView.cpp`): eliminados los `f1->SetFocus()`
+  intermedios de los fill() (dejaban `focus_=true` permanente en
+  wave/mode/type).
+- **Fix "el EQ mata el sonido"** (`InstrumentEq.cpp`): el update de estados del
+  Df2 transpuesto sumaba en 32 bits; con entrada full-scale + boosts cada
+  término se acerca a ±2^31 y la suma desbordaba (UB signed, detectado por
+  UBSAN) corrompiendo el estado recursivo. El sumatorio usa intermedios de 64
+  bits (`BACON_1.5_EQ8_DF2_64BIT`); el resultado final cabe en 32 bits, el
+  truncado es exacto.
+- **Volumen del sinth a 0 dBFS** (`BassSynth.cpp`): sustain por defecto 60→100
+  — la nota sostenida quedaba ~4.4 dB bajo una sample a volumen máximo; el
+  preview B y las notas de frase ahora nivelan con las samples.
+- **Tests** (`tests/host/bass_synth_host_test.cpp`): sección 7b con la secuencia
+  real de edición del EQ8 (cada banda a +1 dB audible, 7 tipos audibles, 32
+  ediciones seguidas sin silencio, sostenido 0 dBFS con sustain 100 vs 60
+  ≥1.3×). El check mide con envolvente instantánea (attack/decay 0) y estado
+  nivel-afectante reseteado: los checks previos dejaban volume 50 / pan 0
+  (canal derecho mudo) y `bufferRms` dividía por 65536 cuando el full scale
+  Q15 es 32768 (todos los niveles se leían a la mitad).
+- **Regresión**: `run_all.sh` completo OK (bass 72 checks, eq8_struct 63,
+  analyzer_mix 55, F10_BASELINE_OK, AUDIT_CLEAN_MAIN_U2523_OK), bass 7b sin
+  UBSAN.
+
 ## Update: Bacon 1.5 U2.52.4 - EQ8 fullscreen limpio + espectro sobre el mix + guard afinado
 
 - **Estado**: segunda iteración de la pre-release Bacon 1.5 tras la prueba en

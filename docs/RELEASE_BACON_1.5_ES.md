@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 9faaa7134204832e0fe9aa3de47525257b3bdceb848c03cedb752a6741418f72
+- lgpt_r36sx_u2523.so - SHA256 739d35296c8e0b10e5cec8d851f47093580a795ccf0056f70d47c7edecf04689
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...
@@ -53,6 +53,43 @@ Novedades U2.52.4 (feedback de la prueba en R36SX):
     Q1 quedaba a 0 dB); con el 99.5% los boosts habituales suenan y el filtro
     sigue acotado (bordes marginales verificados por Jury: 1+a1+a2 > 1e-5).
 
+Novedades U2.52.5 (feedback de la prueba en R36SX #2):
+
+15. Solo banda 1 en sinths/piano (causa raíz): MAKE_FOURCC empaqueta el dígito
+    en el byte alto, así que (FourCC)(SIP_EQF0 + i) corrompía los ids de las
+    bandas 2-8 y FindVariable devolvía NULL (el view EQ8 no encontraba las
+    variables). Arrays explícitos de FourCC en BassSynth y PianoSynth (mismo
+    patrón que SampleInstrument) — las 8 bandas editan y suenan.
+16. Curva del EQ8 en vivo: el canvas se dibuja desde el estado del view
+    (frecuencia/ganancia/tipo/Q/on) con la MISMA matemática RBJ del DSP
+    (FxEngine::eqBiquadCoeffs), no desde los readbacks del DSP (que solo se
+    sincronizaban mientras el audio renderizaba: el canvas se congelaba al
+    editar y mostraba el tipo/frecuencia viejos).
+17. Canvas del EQ8 a ±24 dB: la grilla dibuja ±12 y ±24, el rango completo se
+    mapea (pxPerDb sobre 48 dB) y las etiquetas muestran +24/0/-24.
+18. Highlight fantasma "wave/mode/type": los SetFocus intermedios de los fill()
+    de InstrumentView dejaban el foco clavado en la línea (focus_=true sin
+    estar seleccionada) — eliminados (solo el campo bajo el cursor se marca).
+19. El EQ8 ya no mata el sonido al editar (samples Y sinths): el update de
+    estados del Df2 transpuesto sumaba en 32 bits y con entrada full-scale +
+    boosts cada término se acerca a ±2^31 → overflow signed (UB) que corrompía
+    el estado recursivo (detectado por UBSAN en el test 7b). El sumatorio se
+    hace en 64 bits (BACON_1.5_EQ8_DF2_64BIT): el resultado final cabe en 32
+    bits, el truncado es exacto, y el costo es despreciable (fp_mul ya era
+    long long).
+20. Volumen del sinth a 0 dB: sustain por defecto 60→100 — la nota sostenida
+    del BassSynth quedaba ~4.4 dB por debajo de una sample a volumen máximo;
+    ahora el preview B y las notas de frase suenan al mismo nivel (softclip +
+    pan equal-power: RMS ~0.31 a full scale, verificado por test).
+21. Tests 7b (bass_synth_host_test): secuencia de edición real del EQ8 —
+    cada banda a +1 dB audible, los 7 tipos audibles, 32 ediciones seguidas
+    sin silencio, sostenido a 0 dBFS (sustain 100 vs 60 ≥ 1.3×), estado
+    restaurado al final. El check mide con envolvente instantánea
+    (attack/decay 0) y estado nivel-afectante reseteado (volume/pan/glide/
+    fcut/fres/drive/accent), porque los checks previos dejaban volume 50 y
+    pan 0 (canal derecho mudo) y el RMS usaba la escala equivocada (÷65536
+    en Q15 cuyo full scale es 32768).
+
 Fixes:
 
 - Fix FAST_MATH (audio estable): sinf/powf/expf fuera del bucle por muestra de
@@ -73,8 +110,13 @@ Fixes:
 - InstrumentEq: estados biquad por banda y por canal (la cascada ya no comparte
   estado: antes el orden de las bandas cambiaba el sonido ~23k LSB); smoothing
   con snap exacto (antes se quedaba a 63 LSBs del objetivo sin limpiar el flag).
+- InstrumentEq (U2.52.5): overflow signed del Df2 transpuesto (ver punto 19) —
+  el mismo patrón vive en ParametricEQ (master EQ) pero sus entradas son buses
+  pre-mezcla a nivel bajo y nunca se reportó; se deja intacto por política de
+  golden (solo se toca si el dispositivo lo evidencia).
 
 Regresión: AUDIT_CLEAN_MAIN_U2523_OK (tests/run_all.sh), F10_BASELINE_OK
-(golden core 9faaa713), host bass 45 + piano 46 + eq8_struct 63 +
-analyzer_mix 55 checks OK, TEST_FX_PHASE19_AUDITION_ISOLATED_OK,
-DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK, verify ERRORS=0.
+(golden core 9faaa713), host bass 72 + piano 46 + eq8_struct 63 +
+analyzer_mix 55 checks OK (bass 7b con UBSAN limpio), TEST_FX_PHASE19
+_AUDITION_ISOLATED_OK, DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK,
+verify ERRORS=0.

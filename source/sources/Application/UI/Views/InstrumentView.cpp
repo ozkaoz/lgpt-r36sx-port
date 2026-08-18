@@ -190,7 +190,6 @@ void InstrumentView::fillSampleParameters() {
 	if (sampleMax<0) sampleMax=0 ;
 	f1=new UIIntVarField(position,*v,"sample: %s",0,sampleMax,1,0x10) ;
 	T_SimpleList<UIField>::Insert(f1) ;
-	f1->SetFocus() ;
 
 	position._y+=1 ;
 	col2=position ;
@@ -362,7 +361,6 @@ void InstrumentView::fillMidiParameters() {
 	Variable *v=instrument->FindVariable(MIP_CHANNEL) ;
 	UIIntVarField* f1=new UIIntVarField(position,*v,"channel: %2.2d",0,0x0F,1,0x04,1) ;
 	T_SimpleList<UIField>::Insert(f1) ;
-	f1->SetFocus() ;
 
 	position._y+=1;
 	v=instrument->FindVariable(MIP_VOLUME) ;
@@ -446,7 +444,6 @@ void InstrumentView::fillSynthParameters() {
 	v=instrument->FindVariable(SBP_WAVE) ;
 	f1=new UIIntVarField(position,*v,"wave: %s",0,3,1,1) ;
 	T_SimpleList<UIField>::Insert(f1) ;
-	f1->SetFocus() ;
 
 	col2=position ;
 	col2._x+=16 ;
@@ -652,7 +649,6 @@ void InstrumentView::fillPianoParameters() {
 	v=instrument->FindVariable(PNP_MODE) ;
 	f1=new UIIntVarField(position,*v,"mode: %s",0,1,1,1) ;
 	T_SimpleList<UIField>::Insert(f1) ;
-	f1->SetFocus() ;
 
 	col2=position ;
 	col2._x+=16 ;
