@@ -4,25 +4,51 @@ Release de desarrollo sobre la arquitectura de Bacon 1.4 (ABI7, audio
 48 kHz stereo, cuatro modos de audio USB Local / Windows / Android /
 Sampler SP404MKII, frontend-safe y sin escrituras a la SD en runtime).
 
-## Estado actual (items 6-9 + FAST_MATH + crash dump hex, 16/08/2026)
+## Estado actual (items 6-9 + FAST_MATH + crash dump hex + fix diálogo, 18/08/2026)
 
 Core **compilado e instalado** en esta SD (`cubegm/cores/lgpt_r36sx_port_libretro.so`,
-SHA256 `afcf5ba756b0ee3d7d89a47d2f25d86ac0e9edf004755e42239f2c7c396d7021`).
+SHA256 `0935cb026824920e233335ab5feed670e0c7e913994a178d5ee73f6b32341438`).
 Build device: `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`, `BUILD_U2523_OK`; regresión
 host `AUDIT_CLEAN_MAIN_U2523_OK` + `F10_BASELINE_OK`. Daemons y módulo UAC2 sin
 cambios (baseline Bacon 1.4, hashes `f7140072`/`968dfa61`/`3f0ea7a2`/`e9062ac5`).
+
+## Fix DIÁLOGO PROYECTOS — crash SIGSEGV en el menú de inicio (18/08/2026)
+
+Diagnóstico forense de los 5 dumps de `LGPT_OTG_LOGS/crash.txt` (disasm del core
+viejo `2f14c0ac` y del nuevo `afcf5ba7`): **los 5 SIGSEGV eran en
+`SelectProjectDialog`**, no en libm:
+
+- dumps 1-3 (core viejo): `OnRenameProject` — `pc` agrupado en 0x6F574/0x6F6B4/
+  0x6F6C4 (misma función), escritura con puntero NULL (`sb v0,32(s6)` con s6=0)
+  y scan anidado que rebasaba el iterador de la lista tras el rename.
+- dump 5 (core nuevo): `ProcessButtonMask` branch A→Load — `Path::GetName`
+  (`lw s0,4(a1)` con a1=0) cuando la lista está vacía o el cursor quedó stale
+  (pulsación de A rápida justo al abrir el diálogo de proyectos).
+
+Causa: el diálogo se abre al arrancar (y en Open Project); con la lista de
+proyectos vacía o `currentProject_` fuera de rango, los branches de
+Load/Rename/Delete desreferenciaban un `Path *` nulo → SIGSEGV → CrashTrap
+`_exit` → picoarch reiniciaba el core → audio muerto ("el instrumento dejó de
+sonar") y estado perdido.
+
+Fixes aplicados (`TREEFROG_DIALOG_NULL_GUARD_V1`):
+- Branch A→Load: guard `if (current == 0) return;` (mismo patrón que el branch
+  de borrado, que ya lo tenía).
+- `OnRenameProject`: guard de ruta vacía (lista vacía/cursor stale) + el scan
+  O(n²) anidado se reemplaza por un pase único con `foundIndex` (sin rebasar el
+  iterador).
+- `warpToNextProject`: con lista vacía el wrap dejaba `currentProject_` negativo
+  (luego usado como índice de iterador en Draw/Load); ahora clamp a 0.
 
 ## Fix FAST_MATH — audio estable (16/08/2026)
 
 Reporte en consola: "lag, sonido no estable" en modo Local Console, silencio en
 la preescucha B de Bass/Piano, al asignar instrumentos a Phrase y tras editar
-el EQ8. Los logs del dispositivo (`LGPT_OTG_LOGS/crash.txt`) mostraban 4
-SIGSEGV del core instalado, con `pc` dentro de `libm.so.6` llamado desde el
-hilo de audio. Causa: los sintetizadores llamaban `sinf`/`powf`/`expf`
-**por muestra** en el render (el R36S tiene una MIPS débil: son caros, y la
-`libm` del dispositivo fallaba dentro de esos bucles → el CrashTrap hacía
-`_exit(128+sig)` → el core moría y picoarch lo reiniciaba → lag/audio
-inestable/silencio).
+el EQ8. El lag venía de los sintetizadores llamando `sinf`/`powf`/`expf`
+**por muestra** en el render (el R36S tiene una MIPS débil: son caros). La
+causa de los SIGSEGV se re-diagnosticó después como el fix del diálogo de
+arriba (los `pc` de libm del reporte original eran en realidad del core, en
+`SelectProjectDialog`; los crashes de libm no se reprodujeron).
 
 - **BassSynth**: oscilador seno, LFO (CUT/VOL/PIT) y pan equal-power pasan a
   tablas interpoladas compartidas (`SynthMath.h`: 1024 entradas de seno + 256

@@ -423,6 +423,17 @@ void SelectProjectDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
                     count++;
                 }
 
+                // TREEFROG_DIALOG_NULL_GUARD_V1 (H38.8): the list can be
+                // empty or the cursor stale (fast A right after focus);
+                // GetName() on NULL used to SIGSEGV here (crash dump #5,
+                // Path::GetName via ProcessButtonMask).
+                if (current == 0) {
+                    Trace::Log("SelectProjectDialog:Load", "null selection "
+                               "cur=%d size=%d", currentProject_,
+                               content_.Size());
+                    return;
+                }
+
 					//check if folder is a project, indicated by 'lgpt' being the first 4 characters of the folder name
 					std::string name = current->GetName() ;
 					std::string firstFourChars = name.substr(0,4);
@@ -484,6 +495,14 @@ void SelectProjectDialog::warpToNextProject(int amount) {
 
     int offset = currentProject_ - topIndex_;
     int size = content_.Size();
+    // TREEFROG_DIALOG_NULL_GUARD_V1 (H38.8): with an empty list a wrap
+    // would leave currentProject_ negative (later used as an iterator
+    // index in Draw / as the load cursor); clamp to 0 instead.
+    if (size == 0) {
+        currentProject_ = 0;
+        isDirty_ = true;
+        return;
+    }
     currentProject_+=amount ;
 	if (currentProject_<0) currentProject_+=size ;
 	if (currentProject_>=size) currentProject_-=size ;
@@ -671,6 +690,15 @@ Result SelectProjectDialog::OnRenameProject(const char *newBaseName) {
     }
 
     Path oldPath = GetCurrentProjectPath();
+    // TREEFROG_DIALOG_NULL_GUARD_V1 (H38.8): with an empty/stale list the
+    // scan above yields nothing; GetName() on the empty Path used to
+    // SIGSEGV here (crash dumps #1-#3, OnRenameProject in the old core).
+    if (oldPath.GetPath().empty()) {
+        Trace::Log("SelectProjectDialog:Rename", "no current project "
+                   "cur=%d size=%d", currentProject_, content_.Size());
+        View::SetNotification("No project selected", 0);
+        return Result("No project selected");
+    }
     std::string oldName = oldPath.GetName();
     std::string newFullName = "lgpt_";
     newFullName += newBaseName;
@@ -703,18 +731,23 @@ Result SelectProjectDialog::OnRenameProject(const char *newBaseName) {
     View::SetNotification(successMsg.c_str(), 0);
     setCurrentFolder(currentPath_);
     int listSize = content_.Size();
-    for (int i = 0; i < listSize; ++i) {
+    // TREEFROG_DIALOG_NULL_GUARD_V1 (H38.8): the old nested scan overran
+    // the iterator past the end (CurrentItem() on a finished iterator)
+    // and SIGSEGV'd (crash dumps #2/#3). Single pass, no overrun.
+    if (listSize > 0) {
+        int foundIndex = -1;
+        int idx = 0;
         IteratorPtr<Path> it(content_.GetIterator());
-        it->Begin();
-        for (int j = 0; j <= i; ++j) {
-            Path &p = it->CurrentItem();
-            if (p.GetName() == newFullName) {
-                currentProject_ = i;
+        for (it->Begin(); !it->IsDone(); it->Next()) {
+            if (it->CurrentItem().GetName() == newFullName) {
+                foundIndex = idx;
                 break;
             }
-            it->Next();
+            idx++;
         }
-        if (currentProject_ == i) break;
+        if (foundIndex >= 0) currentProject_ = foundIndex;
+    } else {
+        currentProject_ = 0;
     }
     isDirty_ = true;
     return Result::NoError;

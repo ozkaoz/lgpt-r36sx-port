@@ -1,1 +1,1 @@
-BACON_1.5_FAST_MATH_AUDIO_STABLE (core afcf5ba7 instalado, ver README_PRIMERO_ES.md)
+BACON_1.5_DIALOG_GUARD_STABLE (core 0935cb02 instalado, ver README_PRIMERO_ES.md)
