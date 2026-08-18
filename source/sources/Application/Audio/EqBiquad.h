@@ -50,13 +50,15 @@ inline void eqBiquadCoeffs(int type, int rate, float f0, float lvl, float qv,
     // for boosts at low normalized frequencies (a real pole exits the unit
     // circle: P(1) = 1 + a1 + a2 < 0).  Verified divergent settings include
     // +6 dB at 1 kHz Q=1 and +2 dB at 250 Hz Q=1 (44.1/48 kHz).  The
-    // marginal boost is A = sw/(sw - 4*Q*(1-cw)); cap the gain at 90% of it
-    // so the filter always stays bounded.  Cuts (A < 1) and shelves are
-    // unaffected.
+    // marginal boost is A = sw/(sw - 4*Q*(1-cw)); cap the gain at 99.5% of
+    // it so the filter always stays bounded.  Cuts (A < 1) and all other
+    // types are unaffected (their poles are gain-independent; the earlier
+    // 90% cap over-limited the shelves/filters and made low-band boosts
+    // inaudible on the device: U2.52.4 relaxes to 99.5%, BELL only).
     if (type == EQ_BIQUAD_BELL && lvl > 0.0f) {
         float denom = sw - 4.0f * qv * (1.0f - cw);
         if (denom > 0.0f) {
-            float cap = (sw / denom) * 0.9f;
+            float cap = (sw / denom) * 0.995f;
             if (cap < 1.0f) cap = 1.0f;
             float lvlCap = 40.0f * log10f(cap);
             if (lvl > lvlCap) lvl = lvlCap;

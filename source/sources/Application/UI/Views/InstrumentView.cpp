@@ -887,7 +887,11 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
             if (p->IsPreviewActive()) {
                 p->StopPreview();
             } else if (current_) {
-                unsigned char note = (it == IT_SYNTH) ? 48 : 60;
+                // BACON_1.5_PREVIEW_NOTE (bacon-1.5, feedback): the synth
+                // preview now starts on the neutral C-3 (60), matching the
+                // sample instruments ("playbackNote = 60" convention);
+                // previously the bass synth previewed on C-2 (48).
+                unsigned char note = 60;
                 p->PreviewNote(viewData_->currentInstrument_ % SONG_CHANNEL_COUNT,
                                current_, note);
             }

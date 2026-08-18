@@ -1,11 +1,11 @@
 /*
- * ANALYZER_TARGET (bacon-1.5, item 7): host test of the SpectrumAnalyzer
- * targeted-tap contract under ASAN/UBSAN.
+ * ANALYZER_MIX (bacon-1.5, item 7, feedback): host test of the
+ * SpectrumAnalyzer master-mix-tap contract under ASAN/UBSAN.
  *
- * The RT thread feeds the analyzer only when:
- *   - armed (a view is open and listening), AND
- *   - the instrument pointer matches the current target.
- * Instruments that are not being edited must never leak into the ring.
+ * The RT thread feeds the analyzer the FINAL master buffer (the exact
+ * signal that reaches the speakers) via FeedMix().  The tap records only
+ * when armed (a view is open and listening); there is no per-instrument
+ * targeting anymore: the spectrum shows the whole mix.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +13,6 @@
 #include <math.h>
 
 #include "Application/Audio/SpectrumAnalyzer.h"
-#include "Application/Instruments/I_Instrument.h"
 
 static int checks = 0;
 
@@ -26,28 +25,7 @@ static int checks = 0;
         checks++;                                                       \
     } while (0)
 
-/* Minimal I_Instrument so FeedChannel has real pointers to compare. */
-class StubInstrument : public I_Instrument {
-public:
-    virtual bool Init() { return true; }
-    virtual bool Start(int, unsigned char, bool) { return true; }
-    virtual void Stop(int) {}
-    virtual void OnStart() {}
-    virtual bool Render(int, fixed *, int, bool) { return false; }
-    virtual bool IsInitialized() { return true; }
-    virtual bool IsEmpty() { return true; }
-    virtual InstrumentType GetType() { return IT_SAMPLE; }
-    virtual const char *GetName() { return "stub"; }
-    virtual void ProcessCommand(int, FourCC, ushort) {}
-    virtual void Purge() {}
-    virtual int GetTable() { return 0; }
-    virtual bool GetTableAutomation() { return false; }
-    virtual void GetTableState(TableSaveState &) {}
-    virtual void SetTableState(TableSaveState &) {}
-};
-
-static void feedSine(SpectrumAnalyzer &sp, I_Instrument *target, double hz,
-                     int frames) {
+static void feedSine(SpectrumAnalyzer &sp, double hz, int frames) {
     fixed buf[2 * 512];
     for (int i = 0; i < frames && i < 512; i++) {
         fixed s = fl2fp((float)(0.5 * sin(2.0 * 3.14159265 * hz *
@@ -55,25 +33,23 @@ static void feedSine(SpectrumAnalyzer &sp, I_Instrument *target, double hz,
         buf[i * 2] = s;
         buf[i * 2 + 1] = s;
     }
-    sp.FeedChannel(3, target, buf, frames);
+    sp.FeedMix(buf, frames);
 }
 
 int main() {
-    StubInstrument instA, instB;
     SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
 
     /* --- 1. not armed: feeding is a no-op (Compute says "no new data") --- */
     {
-        feedSine(sp, &instA, 1000.0, 512);
+        feedSine(sp, 1000.0, 512);
         CHECK(sp.Compute() == false);
         for (int i = 0; i < sp.BinCount(); i++) CHECK(sp.Bins()[i] == 0);
     }
 
-    /* --- 2. armed + target matches: the 1 kHz sine reaches the bins --- */
+    /* --- 2. armed: the 1 kHz sine reaches the bins --- */
     {
-        sp.SetTargetInstrument(&instA);
         sp.SetArmed(true);
-        feedSine(sp, &instA, 1000.0, 512);
+        feedSine(sp, 1000.0, 512);
         CHECK(sp.Compute() == true);
 
         // expected log-bin index for 1 kHz over 30..20000 Hz, 24 bins
@@ -85,35 +61,44 @@ int main() {
         }
         CHECK(fp2fl(sp.Bins()[peak]) > 0.05f);
         CHECK(peak >= expect - 2 && peak <= expect + 2);
-        sp.SetArmed(false);
-        sp.SetTargetInstrument(0);
     }
 
-    /* --- 3. wrong target: the OTHER instrument's audio is dropped --- */
+    /* --- 3. a MIX of several frequencies peaks in the right places --- */
     {
-        sp.SetTargetInstrument(&instA);
-        sp.SetArmed(true);
-        feedSine(sp, &instB, 1000.0, 512);   // instB is not the target
-        CHECK(sp.Compute() == false);         // no new generation
-        sp.SetTargetInstrument(0);
-        sp.SetArmed(false);
+        fixed buf[2 * 512];
+        for (int i = 0; i < 512; i++) {
+            fixed s = fl2fp((float)(0.3 * sin(2.0 * 3.14159265 * 300.0 *
+                                              (double)i / 48000.0) +
+                                    0.3 * sin(2.0 * 3.14159265 * 3000.0 *
+                                              (double)i / 48000.0)));
+            buf[i * 2] = s;
+            buf[i * 2 + 1] = s;
+        }
+        sp.FeedMix(buf, 512);
+        CHECK(sp.Compute() == true);
+        int peak = 0;
+        for (int i = 0; i < sp.BinCount(); i++) {
+            if (fp2fl(sp.Bins()[i]) > fp2fl(sp.Bins()[peak])) peak = i;
+        }
+        double idx300 = log(300.0 / 30.0) / log(20000.0 / 30.0) * 23.0;
+        double idx3000 = log(3000.0 / 30.0) / log(20000.0 / 30.0) * 23.0;
+        int lo = (int)(idx300 + 0.5);
+        int hi = (int)(idx3000 + 0.5);
+        CHECK(peak >= lo - 2 && peak <= hi + 2);
     }
 
-    /* --- 4. silence from the target still produces fresh bins (all ~0) --- */
+    /* --- 4. silence still produces fresh bins (all ~0) --- */
     {
-        sp.SetTargetInstrument(&instA);
-        sp.SetArmed(true);
         fixed buf[2 * 512];
         memset(buf, 0, sizeof(buf));
-        sp.FeedChannel(0, &instA, buf, 512);
+        sp.FeedMix(buf, 512);
         CHECK(sp.Compute() == true);
         for (int i = 0; i < sp.BinCount(); i++) {
             CHECK(fp2fl(sp.Bins()[i]) < 0.001f);
         }
         sp.SetArmed(false);
-        sp.SetTargetInstrument(0);
     }
 
-    printf("analyzer_target_host_test: ALL OK (%d checks)\n", checks);
+    printf("analyzer_mix_host_test: ALL OK (%d checks)\n", checks);
     return 0;
 }

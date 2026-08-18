@@ -1,6 +1,5 @@
 #include "AuditionService.h"
 
-#include "Application/Audio/SpectrumAnalyzer.h"
 #include "Application/Instruments/I_Instrument.h"
 #include "Application/Mixer/MixerService.h"
 #include "System/System/System.h"
@@ -28,6 +27,13 @@ void AuditionChannel::StopNote() {
     noteActive_ = false;
 }
 
+// BACON_1.5_AUDITION_GAIN (bacon-1.5, feedback): fixed +6 dB lift on the
+// audition note.  The user reported the preview was barely audible next to
+// recorded samples; the song channels can sit at full scale while a synth
+// voice sits lower, so the preview gets a flat +6 dB with the master clip
+// guarding the top (the audition bus is unclipped, like the song buses).
+static const fixed kAuditionGain = 0x20000;  // fl2fp(2.0f), 16.16
+
 bool AuditionChannel::Render(fixed *buffer, int samplecount) {
     bool audible = false;
     if (instr_ && noteActive_) {
@@ -39,10 +45,14 @@ bool AuditionChannel::Render(fixed *buffer, int samplecount) {
             instr_->Render(AUDITION_CHANNEL_INDEX, buffer, samplecount, false);
         audible = status;
         if (audible) {
-            // BACON_1.5_ANALYZER_TAP: post-EQ / pre-gain targeted tap, same
-            // point as PlayerChannel.
-            SpectrumAnalyzer::Get().FeedChannel(AUDITION_CHANNEL_INDEX,
-                                                instr_, buffer, samplecount);
+            // BACON_1.5_ANALYZER_MIX: the analyzer tap moved to the master
+            // output, so the audition does not feed it anymore.  Apply the
+            // fixed gain here, on the audible path only.
+            fixed *c = buffer;
+            for (int i = 0; i < samplecount * 2; i++) {
+                *c = fp_mul(*c, kAuditionGain);
+                c++;
+            }
         }
     }
     return audible;

@@ -3,6 +3,7 @@
 #include "Services/Time/TimeService.h"
 #include "Services/Audio/AudioDriver.h"
 #include "Application/Audio/FxEngine/FxEngine.h"
+#include "Application/Audio/SpectrumAnalyzer.h"
 
 static bool threadon=false ;
 
@@ -35,6 +36,9 @@ void DummyAudioOut::Trigger() {
     // FxEngine (Fase 1): post-mix master stage.  Pure bypass by default
     // (legacyMode_ == true, gain 1.0) so file renders stay unchanged.
     FxEngine::FxEngine::GetInstance().Process(primarySoundBuffer_,sampleCount) ;
+    // BACON_1.5_ANALYZER_MIX: same master tap as AudioOutDriver; the
+    // analyzer records only when armed (zero cost otherwise).
+    SpectrumAnalyzer::Get().FeedMix(primarySoundBuffer_,sampleCount) ;
 } ;
 
 bool DummyAudioOut::Init() {

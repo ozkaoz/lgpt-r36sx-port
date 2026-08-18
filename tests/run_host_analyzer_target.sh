@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ANALYZER_TARGET (bacon-1.5, item 7): host test of the SpectrumAnalyzer
-# targeted-tap contract (feed only when armed AND instrument == target).
+# ANALYZER_MIX (bacon-1.5, item 7, feedback): host test of the SpectrumAnalyzer
+# master-mix-tap contract (feed only when armed; no per-instrument target).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/source/sources"

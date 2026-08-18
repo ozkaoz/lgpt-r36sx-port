@@ -13,9 +13,13 @@ Verifies (token/source-level, mirroring the other F3/Fase golden tests):
   audition path.
 - The audition bus joins the master tree (MixerService master_.Insert
   auditionBus_) so previews reach the same master meters; it is clip-safe.
-- The SpectrumAnalyzer targeted tap sits at the exact post-EQ/pre-gain
-  point in PlayerChannel::Render and in AuditionChannel::Render, fed only
-  when armed and when the instrument is the current target.
+- The audition channel applies a fixed +6 dB lift (kAuditionGain) so the
+  preview is clearly perceivable next to recorded samples.
+- The SpectrumAnalyzer is fed from the FINAL MASTER MIX (bacon-1.5,
+  feedback): the tap lives in AudioOutDriver/DummyAudioOut after the
+  master bus + FxEngine stage, so the EQ8 spectrum shows the whole mix.
+  There are no per-instrument taps in PlayerChannel / AuditionChannel and
+  no targetInstrument_ filtering anymore.
 - InstrumentEq curve == DSP: InstrumentEqView draws from GetBandCoeffs
   (the same coefficients the per-band biquads process) and the smoothing
   snap makes convergence exact.
@@ -82,10 +86,10 @@ def check_player_channel_untouched():
     # The 8 song PlayerChannel never references the audition service.
     assert "Audition" not in PC_CPP
     assert "Preview" not in PC_CPP
-    # But it owns the post-EQ/pre-gain analyzer tap.
-    assert "BACON_1.5_ANALYZER_TAP" in PC_CPP
-    assert "SpectrumAnalyzer::Get().FeedChannel(index_, instr_, buffer," in PC_CPP
-    print("2. PlayerChannel: zero audition references; analyzer tap in place OK")
+    # BACON_1.5_ANALYZER_MIX: the per-channel analyzer tap is GONE from the
+    # song path (the analyzer now reads the master mix from the audio out).
+    assert "SpectrumAnalyzer" not in PC_CPP
+    print("2. PlayerChannel: zero audition references, no analyzer tap OK")
 
 
 def check_audition_channel():
@@ -96,15 +100,18 @@ def check_audition_channel():
     assert "muted_" not in AS_CPP
     assert "volume_" not in AS_CPP
     assert "pan_" not in AS_CPP
-    # Analyzer tap in the audition renderer too (same post-EQ/pre-gain point).
-    assert "BACON_1.5_ANALYZER_TAP: post-EQ / pre-gain targeted tap" in AS_CPP
+    # BACON_1.5_AUDITION_GAIN: fixed +6 dB lift on the audible path.
+    assert "kAuditionGain" in AS_CPP
+    assert "fp_mul(*c, kAuditionGain)" in AS_CPP
+    # The per-channel analyzer tap is gone from the audition path too.
+    assert "SpectrumAnalyzer" not in AS_CPP
     # Service contract.
     assert "void Preview(I_Instrument *instrument, unsigned char note);" in AS_H
     assert "void StopPreview();" in AS_H
     assert "bool IsPreviewing() const" in AS_H
     assert "channel_.GetInstrument() != 0" in AS_H
     assert "NO track mute/volume/pan" in AS_H
-    print("3. AuditionChannel: own index, fixed gain, mute/volume/pan immune OK")
+    print("3. AuditionChannel: own index, fixed gain +6 dB, no analyzer tap OK")
 
 
 def check_mixer_bus():
@@ -116,14 +123,21 @@ def check_mixer_bus():
     print("4. MixerService: auditionBus_ in master_ tree, clip bypass OK")
 
 
-def check_analyzer_target():
-    # Targeted tap: record only when armed and instrument == target.
+def check_analyzer_mix():
+    # Master-mix tap: fed only when armed; no per-instrument targeting.
     assert "void SetArmed(bool armed)" in SA_H
-    assert "void SetTargetInstrument" in SA_H
-    assert "void FeedChannel(int channel, I_Instrument *instr," in SA_H
+    assert "void FeedMix(const fixed *stereo, int frames);" in SA_H
+    assert "SetTargetInstrument" not in SA_H
+    assert "targetInstrument_" not in SA_CPP
     assert "armed_" in SA_CPP
-    assert "if (instr != targetInstrument_) return;" in SA_CPP
-    print("5. SpectrumAnalyzer: armed + target-gated tap OK")
+    assert "if (!armed_) return;" in SA_CPP
+    # The tap lives in both audio out drivers, post master + FxEngine.
+    AOD_CPP = (ROOT / "source/sources/Services/Audio/AudioOutDriver.cpp").read_text()
+    DAO_CPP = (ROOT / "source/sources/Application/Audio/DummyAudioOut.cpp").read_text()
+    assert "SpectrumAnalyzer::Get().FeedMix(primarySoundBuffer_" in AOD_CPP
+    assert "SpectrumAnalyzer::Get().FeedMix(primarySoundBuffer_" in DAO_CPP
+    assert "BACON_1.5_ANALYZER_MIX" in AOD_CPP
+    print("5. SpectrumAnalyzer: master-mix tap (armed-gated, no target) OK")
 
 
 def check_eq_curve_dsp():
@@ -146,9 +160,11 @@ def check_bell_guard():
     assert "RBJ_BELL_STABILITY" in BQ
     assert "if (type == EQ_BIQUAD_BELL && lvl > 0.0f)" in BQ
     assert "denom > 0.0f" in BQ
-    assert "(sw / denom) * 0.9f" in BQ
+    # U2.52.4: 99.5% of the marginal boost (the 90% cap made low-band
+    # boosts inaudible on the device); BELL only.
+    assert "(sw / denom) * 0.995f" in BQ
     assert "EQ_BIQUAD_BELL" in IEQ_CPP  # InstrumentEq maps to the shared primitive
-    print("7. EqBiquad RBJ bell stability guard OK")
+    print("7. EqBiquad RBJ bell stability guard (99.5%, BELL only) OK")
 
 
 def check_build_and_audit():
@@ -166,7 +182,7 @@ check_player_stop_preview()
 check_player_channel_untouched()
 check_audition_channel()
 check_mixer_bus()
-check_analyzer_target()
+check_analyzer_mix()
 check_eq_curve_dsp()
 check_bell_guard()
 check_build_and_audit()

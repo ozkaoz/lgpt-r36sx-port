@@ -1,5 +1,29 @@
 # Changelog
 
+## Update: Bacon 1.5 U2.52.4 - EQ8 fullscreen limpio + espectro sobre el mix + guard afinado
+
+- **Estado**: segunda iteración de la pre-release Bacon 1.5 tras la prueba en
+  R36SX. Corrige el feedback del dispositivo: canvas fullscreen sin texto
+  residual, boosts de banda audibles (guard RBJ 99.5% y BELL-only), preview a
+  C-3 con +6 dB, A+B = valor por defecto por banda, espectro sobre el MIX final.
+- **EQ8 fullscreen limpio** (`InstrumentEqView`): el canvas es propietario de
+  toda la pantalla bajo la cabecera (filas 3+, y >= 24) y repinta el fondo
+  completo cada frame — imposible que queden letras del menú debajo/detrás del
+  preview. La fila de estado muestra los atajos y el bypass.
+- **A+B = banda por defecto** (`InstrumentEqView::ProcessButtonMask`):
+  frecuencia por defecto, ganancia 0, Q 1.00, BELL, ON — misma semántica de
+  reset que los campos de los formularios.
+- **Preview C-3 +6 dB** (`InstrumentView.cpp:890`, `AuditionService.cpp`): el
+  sinth preescucha en nota 60 (C-3, antes C-2) y la audición aplica
+  `kAuditionGain` (+6 dB fijos, clip del master por encima).
+- **Espectro sobre el MIX** (`SpectrumAnalyzer`): `FeedChannel`/target se
+  reemplazan por `FeedMix` alimentado desde `AudioOutDriver` y `DummyAudioOut`
+  tras el master + FxEngine; sin taps por canal ni targetInstrument_. El
+  espectro del EQ8 muestra toda la mezcla.
+- **Guard RBJ afinado** (`EqBiquad.h`): el cap pasa de 0.9 a 0.995 del margen
+  (los boosts de bandas bajas quedaban a ~0 dB y el EQ parecía muerto); solo
+  aplica a BELL (los demás tipos no dependen de la ganancia).
+
 ## Update: Bacon 1.5 U2.52.3 - EQ8 fullscreen + audición aislada + guard RBJ
 
 - **Estado**: actualización de la pre-release Bacon 1.5 (Synths + EQ8).

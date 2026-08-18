@@ -140,7 +140,6 @@ InstrumentEqView::InstrumentEqView(GUIWindow &w, ViewData *data)
 
 InstrumentEqView::~InstrumentEqView() {
     SpectrumAnalyzer::Get().SetArmed(false);
-    SpectrumAnalyzer::Get().SetTargetInstrument(0);
 }
 
 float InstrumentEqView::freqFromIndex(int idx) const {
@@ -229,7 +228,8 @@ void InstrumentEqView::refreshDraw() {
 
 void InstrumentEqView::OnFocus() {
     loadFromInstrument();
-    SpectrumAnalyzer::Get().SetTargetInstrument(instr_);
+    // BACON_1.5_ANALYZER_MIX: the spectrum shows the master mix; arming the
+    // analyzer here starts the (zero-cost when disarmed) master tap.
     SpectrumAnalyzer::Get().SetArmed(true);
     setStatus(0);
     isDirty_ = true;
@@ -237,7 +237,6 @@ void InstrumentEqView::OnFocus() {
 
 void InstrumentEqView::LooseFocus() {
     SpectrumAnalyzer::Get().SetArmed(false);
-    SpectrumAnalyzer::Get().SetTargetInstrument(0);
     View::LooseFocus();
 }
 
@@ -269,15 +268,21 @@ void InstrumentEqView::DrawView() {
             freqHz_[selected_], gainDb_[selected_], q_[selected_],
             bandOn_[selected_] ? "ON" : "OFF");
     DrawString(0, 1, line, props);
-    if (bypass_) DrawString(0, 2, "EQ BYPASSED", props);
 
-    props.invert_ = true;
-    DrawString(0, 3, "< > band   X freq/gain   Y Q", props);
-    DrawString(0, 4, "A on/off  B type  SEL bypass", props);
-    DrawString(0, 5, "START play/stop  R+START stop  R+B exit", props);
-    props.invert_ = false;
-
-    if (status_[0]) DrawString(0, 6, status_, props);
+    // BACON_1.5_EQ8_FULLSCREEN (bacon-1.5, feedback): row 2 carries the
+    // bypass/status line; the ENTIRE screen below the header (rows 3+,
+    // y >= 24) belongs to the pixel canvas, so no menu text can ever show
+    // under or behind the EQ preview.
+    char status[96];
+    if (status_[0]) {
+        strncpy(status, status_, sizeof(status) - 1);
+        status[sizeof(status) - 1] = 0;
+    } else if (bypass_) {
+        strcpy(status, "EQ BYPASSED");
+    } else {
+        strcpy(status, "L/R band  X f/g  Y Q  A on/off  B type  SEL bypass");
+    }
+    DrawString(0, 2, status, props);
 }
 
 void InstrumentEqView::OnPlayerUpdate(PlayerEventType, unsigned int) {
@@ -298,9 +303,19 @@ void InstrumentEqView::PostFlushDraw() {
     const unsigned short lblC   = tf565(170, 178, 205);
     const unsigned short guideC = tf565(46, 52, 80);
 
-    // Fullscreen canvas below the char header (rows 0..6 => 56 px).
+    // BACON_1.5_EQ8_FULLSCREEN (bacon-1.5, feedback): the canvas owns the
+    // full screen below the char header.  The header is 3 rows = 24 px;
+    // everything below is repainted every frame with the background color
+    // first, so stale pixels or leftover glyphs from other views can never
+    // survive under/behind the EQ preview.
+    const int headerH = 24;
+
+    // Full-screen background below the header (rows 3+ => y >= 24).
+    tfFill(0, headerH, 320, 240 - headerH, bgC);
+
+    // Curve canvas below the char header (rows 3..19 => 24..160).
     const int cX0 = 6,   cX1 = 314;
-    const int cY0 = 40,  cY1 = 172;      // curve canvas
+    const int cY0 = 24,  cY1 = 156;      // curve canvas
     const int cMid = (cY0 + cY1) / 2;    // 0 dB
     const double pxPerDb = (double)(cY1 - cY0) / 24.0;  // +/-12 dB visible
 
@@ -324,8 +339,8 @@ void InstrumentEqView::PostFlushDraw() {
         tfFill(cX0, yy, cX1 - cX0 + 1, 1, gridC);
     }
 
-    // dB labels (left margin, outside the canvas)
-    tfTinyText(0, cY0 - 1, "+12", lblC);
+    // dB labels (left margin, inside the canvas top)
+    tfTinyText(0, cY0 + 1, "+12", lblC);
     tfTinyText(0, cMid - 4, "0", lblC);
     tfTinyText(0, cY1 - 6, "-12", lblC);
 
@@ -403,8 +418,8 @@ void InstrumentEqView::PostFlushDraw() {
     tfTinyText(freqToX(1000) - 2, cY1 + 3, "1k", lblC);
     tfTinyText(freqToX(10000) - 5, cY1 + 3, "10k", lblC);
 
-    // Live spectrum (targeted analyzer tap)
-    const int sY0 = 184, sY1 = 214;
+    // Live spectrum (analyzer on the FINAL master mix; BACON_1.5_ANALYZER_MIX)
+    const int sY0 = 168, sY1 = 208;
     tfFill(cX0 - 2, sY0 - 2, cX1 - cX0 + 5, sY1 - sY0 + 5, bgC);
     tfFill(cX0 - 2, sY0 - 2, cX1 - cX0 + 5, 1, border);
 
@@ -458,6 +473,24 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
     }
 
     if (!instr_) return;
+
+    // BACON_1.5_EQ8_A_B_DEFAULT (bacon-1.5, feedback): A+B resets the
+    // SELECTED band to its default (default frequency, gain 0, Q 1.00,
+    // BELL, enabled), the same reset semantics as the form fields.
+    if (a && b &&
+        !(left || right || up || down || x || y || r1 || select || start)) {
+        freqHz_[selected_] = kDefaultFreq8[selected_];
+        gainDb_[selected_] = 0.0f;
+        q_[selected_] = 1.0f;
+        type_[selected_] = 0;
+        bandOn_[selected_] = true;
+        char buf[88];
+        sprintf(buf, "BAND%1d default %5.0fHz 0dB Q1.00 BELL ON",
+                selected_ + 1, freqHz_[selected_]);
+        setStatus(buf);
+        refreshDraw();
+        return;
+    }
 
     if (select) {
         bypass_ = !bypass_;

@@ -7,7 +7,7 @@ Sampler SP404MKII, frontend-safe y sin escrituras a la SD en runtime).
 ## Estado actual (items 6-9 + FAST_MATH + crash dump hex + fix diálogo, 18/08/2026)
 
 Core **compilado e instalado** en esta SD (`cubegm/cores/lgpt_r36sx_port_libretro.so`,
-SHA256 `097bd4d36fb24461f83428ec007378a68e3baa6bcd291e49fc05dec209736432`).
+SHA256 `9faaa7134204832e0fe9aa3de47525257b3bdceb848c03cedb752a6741418f72`).
 Build device: `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`, `BUILD_U2523_OK`; regresión
 host `AUDIT_CLEAN_MAIN_U2523_OK` + `F10_BASELINE_OK`. Daemons y módulo UAC2 sin
 cambios (baseline Bacon 1.4, hashes `f7140072`/`968dfa61`/`3f0ea7a2`/`e9062ac5`).
@@ -113,11 +113,14 @@ arriba (los `pc` de libm del reporte original eran en realidad del core, en
 - **EQ8 gráfico fullscreen por instrumento**: en las formas Bass/Piano y Sample
   la fila `EQ8` abre con A el editor `InstrumentEqView` (reemplaza el modal).
   La curva se dibuja con los mismos coeficientes (`GetBandCoeffs`) que procesa
-  el DSP. La preescucha suena por un canal de audición aislado (sigue sonando
-  con la pista muteada/volumen 0) y el análisis de espectro es un tap dirigido
-  post-EQ/pre-gain solo del instrumento en edición. Guard de estabilidad RBJ
-  en `EqBiquad.h`: los boosts del peaking en baja frecuencia quedan limitados
-  para que el filtro nunca diverja (aplica a InstrumentEq y ParametricEQ).
+  el DSP y el canvas cubre toda la pantalla bajo la cabecera (sin letras
+  residuales). A+B resetea la banda seleccionada a su valor por defecto. La
+  preescucha suena por un canal de audición aislado a C-3 (+6 dB fijos, sigue
+  sonando con la pista muteada/volumen 0) y el análisis de espectro se toma
+  del MIX final del master (post-FxEngine), no del instrumento. Guard de
+  estabilidad RBJ en `EqBiquad.h`: los boosts del peaking en baja frecuencia
+  quedan limitados al 99.5% del margen (solo BELL) para que el filtro nunca
+  diverja (aplica a InstrumentEq y ParametricEQ).
 - **42 warnings del host syntax check resueltos** (GCC 13 host, GCC 6.3
   MIPS): firmas `const` de `FileSystem::Open`/`GetContent` y adaptadores,
   `WatchedVariable` (sobrecarga de listas), `Status::Set`,

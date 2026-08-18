@@ -2,6 +2,7 @@
 #include "AudioOutDriver.h"
 #include "Application/Model/Project.h"
 #include "Application/Player/SyncMaster.h" // Should be installable
+#include "Application/Audio/SpectrumAnalyzer.h"
 #include "AudioDriver.h"
 #include "Services/Time/TimeService.h"
 #include "System/Console/Trace.h"
@@ -52,6 +53,13 @@ void AudioOutDriver::Trigger() {
     // FxEngine (Fase 1): post-mix master stage.  Pure bypass by default
     // (legacyMode_ == true, gain 1.0) so the master path is unchanged.
     FxEngine::FxEngine::GetInstance().Process(primarySoundBuffer_,sampleCount_) ;
+    // BACON_1.5_ANALYZER_MIX (bacon-1.5, item 7, feedback): the analyzer is
+    // fed from the FINAL master buffer (the exact signal that reaches the
+    // speakers), so the EQ8 spectrum shows the whole mix.  Zero cost when
+    // the analyzer is disarmed.
+    if (hasSound_) {
+        SpectrumAnalyzer::Get().FeedMix(primarySoundBuffer_, sampleCount_) ;
+    }
     clipToMix();
     driver_->AddBuffer(mixBuffer_,sampleCount_) ;
 }

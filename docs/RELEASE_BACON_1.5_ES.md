@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 097bd4d36fb24461f83428ec007378a68e3baa6bcd291e49fc05dec209736432
+- lgpt_r36sx_u2523.so - SHA256 9faaa7134204832e0fe9aa3de47525257b3bdceb848c03cedb752a6741418f72
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...
@@ -32,6 +32,27 @@ Novedades Bacon 1.5:
    del valor marginal A = sw/(sw-4Q(1-cw)) y el filtro siempre acota la salida.
    Aplica a InstrumentEq (EQ8) y a ParametricEQ (master EQ).
 
+Novedades U2.52.4 (feedback de la prueba en R36SX):
+
+9. EQ8 fullscreen limpio: el canvas propietario cubre toda la pantalla bajo la
+   cabecera (filas 3+), se repinta el fondo completo cada frame (sin letras
+   residuales ni solapamiento con el texto del menú); la fila de estado lleva
+   los atajos y el estado de bypass.
+10. A+B resetea la banda seleccionada a su valor por defecto (frecuencia por
+    defecto, ganancia 0, Q 1.00, BELL, ON), misma semántica que los campos.
+11. Preescucha a C-3 (nota 60): el preview del sinth empezaba en C-2 (48);
+    ahora coincide con la convención "playbackNote = 60" de las samples.
+12. Volumen de preescucha +6 dB fijos (kAuditionGain): la audición era casi
+    inaudible junto a samples grabadas; el clip del master protege el tope.
+13. Espectro sobre el MIX final: el tap del analyzer se movió a la salida del
+    master (AudioOutDriver/DummyAudioOut, post-FxEngine) — el espectro muestra
+    toda la mezcla, no solo el instrumento en edición; sin taps por canal ni
+    targetInstrument_.
+14. Guard RBJ afinado (0.9 -> 99.5% del margen, BELL-only): el 90% dejaba los
+    boosts de bandas bajas casi mudos en el dispositivo (p. ej. +2 dB @250 Hz
+    Q1 quedaba a 0 dB); con el 99.5% los boosts habituales suenan y el filtro
+    sigue acotado (bordes marginales verificados por Jury: 1+a1+a2 > 1e-5).
+
 Fixes:
 
 - Fix FAST_MATH (audio estable): sinf/powf/expf fuera del bucle por muestra de
@@ -54,6 +75,6 @@ Fixes:
   con snap exacto (antes se quedaba a 63 LSBs del objetivo sin limpiar el flag).
 
 Regresión: AUDIT_CLEAN_MAIN_U2523_OK (tests/run_all.sh), F10_BASELINE_OK
-(golden core 097bd4d3), host bass 45 + piano 46 + eq8_struct 31 +
-analyzer_target 54 checks OK, TEST_FX_PHASE19_AUDITION_ISOLATED_OK,
+(golden core 9faaa713), host bass 45 + piano 46 + eq8_struct 63 +
+analyzer_mix 55 checks OK, TEST_FX_PHASE19_AUDITION_ISOLATED_OK,
 DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK, verify ERRORS=0.
