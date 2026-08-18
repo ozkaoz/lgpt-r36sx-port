@@ -5,6 +5,11 @@
 
 static const float kMinGainDb = -24.0f;
 static const float kMaxGainDb = 24.0f;
+// BACON_1.5_EQ8_STRUCTURAL: exponential coefficient smoothing step.
+// cur += (tgt - cur) >> kSmoothShift per frame -> -3 dB point after
+// kSmoothShift frames (~1.3 ms @ 48 kHz with shift 6), within 1 LSB after
+// ~7*kSmoothShift frames (~9 ms).  Inaudible, click-free edits.
+static const int kSmoothShift = 6;
 
 namespace FxEngine {
 
@@ -26,32 +31,85 @@ void InstrumentEq::Reset() {
     ResetChannelState();
     bypass_ = false;
     for (int b = 0; b < kNumBands; b++) {
-        bandCfg_[b].b0 = i2fp(1);
-        bandCfg_[b].b1 = 0;
-        bandCfg_[b].b2 = 0;
-        bandCfg_[b].a1 = 0;
-        bandCfg_[b].a2 = 0;
-        bandCfg_[b].hz = fl2fp(DefaultBandHz(b));
-        bandCfg_[b].db = 0;
-        bandCfg_[b].q = fl2fp(1.0f);
-        bandCfg_[b].enabled = false;
-        bandCfg_[b].type = TYPE_BELL;
+        BandCfg &bg = bandCfg_[b];
+        bg.b0 = i2fp(1);
+        bg.b1 = 0;
+        bg.b2 = 0;
+        bg.a1 = 0;
+        bg.a2 = 0;
+        bg.tB0 = bg.b0;
+        bg.tB1 = 0;
+        bg.tB2 = 0;
+        bg.tA1 = 0;
+        bg.tA2 = 0;
+        bg.smoothing = false;
+        bg.hz = fl2fp(DefaultBandHz(b));
+        bg.db = 0;
+        bg.q = fl2fp(1.0f);
+        bg.enabled = false;
+        bg.type = TYPE_BELL;
     }
     refreshFlat();
 }
 
 void InstrumentEq::ResetChannelState() {
     for (int c = 0; c < kMaxChannels; c++) {
-        ChanState &s = state_[c];
-        s.s1L = 0; s.s2L = 0;
-        s.s1R = 0; s.s2R = 0;
+        for (int b = 0; b < kNumBands; b++) {
+            ChanState &s = state_[c][b];
+            s.s1L = 0; s.s2L = 0;
+            s.s1R = 0; s.s2R = 0;
+        }
     }
 }
 
 void InstrumentEq::SetSampleRate(int rate) {
     if (rate < 8000 || rate > 96000) { rtViolations_++; return; }
+    if (rate == rate_) return;
     rate_ = rate;
-    for (int b = 0; b < kNumBands; b++) recomputeBand(b);
+    // New rate forces a full recompute of every band.
+    for (int b = 0; b < kNumBands; b++) {
+        recomputeBand(b);
+    }
+}
+
+// BACON_1.5_EQ8_STRUCTURAL: atomic edit entry point.  The fingerprint
+// (type, hz, db, q, rate) gates the float RBJ recompute; the enabled flag
+// is a free toggle that never touches the coefficient math.
+void InstrumentEq::ConfigureBand(int band, BandType type, fixed hz, fixed db,
+                                 fixed q, bool enabled) {
+    if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
+    if (type < 0 || type >= (BandType)kTypeCount) { rtViolations_++; return; }
+
+    BandCfg &bg = bandCfg_[band];
+
+    float f = fp2fl(hz);
+    if (f < 20.0f) f = 20.0f;
+    if (f > 20000.0f) f = 20000.0f;
+    hz = fl2fp(f);
+
+    float g = fp2fl(db);
+    if (g < kMinGainDb) g = kMinGainDb;
+    if (g > kMaxGainDb) g = kMaxGainDb;
+    db = fl2fp(g);
+
+    float qf = fp2fl(q);
+    if (qf < 0.1f) qf = 0.1f;
+    if (qf > 10.0f) qf = 10.0f;
+    q = fl2fp(qf);
+
+    bool paramsChanged = (bg.type != type || bg.hz != hz || bg.db != db ||
+                          bg.q != q);
+    bg.type = type;
+    bg.hz = hz;
+    bg.db = db;
+    bg.q = q;
+    bg.enabled = enabled;
+    edited_ = true;
+
+    if (paramsChanged) {
+        recomputeBand(band);
+    }
+    refreshFlat();
 }
 
 void InstrumentEq::SetBypass(bool on) { bypass_ = on; edited_ = true; refreshFlat(); }
@@ -63,32 +121,26 @@ void InstrumentEq::SetBandEnabled(int band, bool on) {
 
 void InstrumentEq::SetBandType(int band, BandType t) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
-    if (t < 0 || t >= (BandType)kTypeCount) { rtViolations_++; return; }
-    bandCfg_[band].type = t; edited_ = true; recomputeBand(band); refreshFlat();
+    ConfigureBand(band, t, bandCfg_[band].hz, bandCfg_[band].db,
+                  bandCfg_[band].q, bandCfg_[band].enabled);
 }
 
 void InstrumentEq::SetBandFreq(int band, fixed hz) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
-    float f = fp2fl(hz);
-    if (f < 20.0f) f = 20.0f;
-    if (f > 20000.0f) f = 20000.0f;
-    bandCfg_[band].hz = fl2fp(f); edited_ = true; recomputeBand(band); refreshFlat();
+    ConfigureBand(band, bandCfg_[band].type, hz, bandCfg_[band].db,
+                  bandCfg_[band].q, bandCfg_[band].enabled);
 }
 
 void InstrumentEq::SetBandGainDb(int band, fixed db) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
-    float g = fp2fl(db);
-    if (g < kMinGainDb) g = kMinGainDb;
-    if (g > kMaxGainDb) g = kMaxGainDb;
-    bandCfg_[band].db = fl2fp(g); edited_ = true; recomputeBand(band); refreshFlat();
+    ConfigureBand(band, bandCfg_[band].type, bandCfg_[band].hz, db,
+                  bandCfg_[band].q, bandCfg_[band].enabled);
 }
 
 void InstrumentEq::SetBandQ(int band, fixed q) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
-    float qf = fp2fl(q);
-    if (qf < 0.1f) qf = 0.1f;
-    if (qf > 10.0f) qf = 10.0f;
-    bandCfg_[band].q = fl2fp(qf); edited_ = true; recomputeBand(band); refreshFlat();
+    ConfigureBand(band, bandCfg_[band].type, bandCfg_[band].hz,
+                  bandCfg_[band].db, q, bandCfg_[band].enabled);
 }
 
 void InstrumentEq::SetAllFlat() {
@@ -103,13 +155,23 @@ void InstrumentEq::SetAllFlat() {
 }
 
 void InstrumentEq::refreshFlat() {
-    if (bypass_) { flat_ = true; return; }
+    if (bypass_) {
+        flat_ = true;
+        ResetChannelState();
+        return;
+    }
     bool any = false;
     for (int b = 0; b < kNumBands; b++) {
         if (!bandCfg_[b].enabled) continue;
         if (bandCfg_[b].db != 0 || (int)bandCfg_[b].type != TYPE_BELL) { any = true; break; }
     }
     flat_ = !any;
+    if (flat_) {
+        // BACON_1.5_EQ8_STRUCTURAL: entering the flat path leaves stale
+        // filter states behind; reset them so the next edit starts clean
+        // (no transient from the old filter when the band comes back).
+        ResetChannelState();
+    }
 }
 
 // FXP_INSTRUMENT_EQ_BP (bacon-1.5, item 2): the coefficient math lives in the
@@ -134,7 +196,14 @@ void InstrumentEq::recomputeBand(int band) {
     fixed b0, b1, b2, a1, a2;
     eqBiquadCoeffs(mapBandType((int)bg.type), rate_, fp2fl(bg.hz),
                    fp2fl(bg.db), fp2fl(bg.q), b0, b1, b2, a1, a2);
-    bg.b0 = b0; bg.b1 = b1; bg.b2 = b2; bg.a1 = a1; bg.a2 = a2;
+    // Set the target coefficients; the per-frame loop smooths cur -> tgt.
+    bg.tB0 = b0; bg.tB1 = b1; bg.tB2 = b2; bg.tA1 = a1; bg.tA2 = a2;
+    if (bg.b0 != bg.tB0 || bg.b1 != bg.tB1 || bg.b2 != bg.tB2 ||
+        bg.a1 != bg.tA1 || bg.a2 != bg.tA2) {
+        bg.smoothing = true;
+    } else {
+        bg.smoothing = false;
+    }
 }
 
 fixed InstrumentEq::saturate(fixed x) {
@@ -148,14 +217,42 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
     if (flat_) return;  // zero cost
     if (channel < 0 || channel >= kMaxChannels) { rtViolations_++; return; }
 
-    ChanState &st = state_[channel];
     int idx = 0;
     for (int i = 0; i < frames; i++) {
+        // BACON_1.5_EQ8_STRUCTURAL: per-frame exponential coefficient blend
+        // (only while a band is converging).
+        for (int b = 0; b < kNumBands; b++) {
+            BandCfg &bg = bandCfg_[b];
+            if (!bg.smoothing) continue;
+            fixed d0 = bg.tB0 - bg.b0;
+            fixed d1 = bg.tB1 - bg.b1;
+            fixed d2 = bg.tB2 - bg.b2;
+            fixed dA1 = bg.tA1 - bg.a1;
+            fixed dA2 = bg.tA2 - bg.a2;
+            bg.b0 += d0 >> kSmoothShift;
+            bg.b1 += d1 >> kSmoothShift;
+            bg.b2 += d2 >> kSmoothShift;
+            bg.a1 += dA1 >> kSmoothShift;
+            bg.a2 += dA2 >> kSmoothShift;
+            // Snap the last sub-2^-6 residual so convergence is EXACT
+            // (the (tgt-cur)>>6 step lands on zero while still apart).
+            if (bg.b0 != bg.tB0 && (d0 >> kSmoothShift) == 0) bg.b0 = bg.tB0;
+            if (bg.b1 != bg.tB1 && (d1 >> kSmoothShift) == 0) bg.b1 = bg.tB1;
+            if (bg.b2 != bg.tB2 && (d2 >> kSmoothShift) == 0) bg.b2 = bg.tB2;
+            if (bg.a1 != bg.tA1 && (dA1 >> kSmoothShift) == 0) bg.a1 = bg.tA1;
+            if (bg.a2 != bg.tA2 && (dA2 >> kSmoothShift) == 0) bg.a2 = bg.tA2;
+            if (bg.b0 == bg.tB0 && bg.b1 == bg.tB1 && bg.b2 == bg.tB2 &&
+                bg.a1 == bg.tA1 && bg.a2 == bg.tA2) {
+                bg.smoothing = false;
+            }
+        }
+
         fixed xL = buffer[idx];
         fixed xR = buffer[idx + 1];
         for (int b = 0; b < kNumBands; b++) {
             const BandCfg &bg = bandCfg_[b];
             if (!bg.enabled) continue;
+            ChanState &st = state_[channel][b];
             fixed tL = fp_mul(bg.b0, xL) + st.s1L;
             st.s1L = fp_mul(bg.b1, xL) - fp_mul(bg.a1, tL) + st.s2L;
             st.s2L = fp_mul(bg.b2, xL) - fp_mul(bg.a2, tL);

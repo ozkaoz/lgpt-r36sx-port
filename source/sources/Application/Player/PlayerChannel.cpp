@@ -4,6 +4,7 @@
 #include "Application/Mixer/MixerService.h"
 #include "Application/Model/Mixer.h"
 #include "Application/Audio/FxEngine/FxEngine.h"
+#include "Application/Audio/SpectrumAnalyzer.h"
 #include "Application/Utils/fixed.h"
 #include "System/System/System.h"
 #include <math.h>
@@ -49,6 +50,14 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
      bool tableSlice=SyncMaster::GetInstance()->TableSlice() ;
      bool status=instr_->Render(index_,buffer,samplecount,tableSlice) ;
       audible=((status)&&(!muted_)&&(volume_>0)) ;
+      // BACON_1.5_ANALYZER_TAP (bacon-1.5, item 7): common targeted spectrum
+      // tap, POST instrument (filter + EQ8 done inside Render) and PRE track
+      // gain/pan.  The analyzer records only when armed and when this
+      // channel's instrument is the current target.
+      if (audible) {
+          SpectrumAnalyzer::Get().FeedChannel(index_, instr_, buffer,
+                                              samplecount);
+      }
       if (audible&&((volume_!=100)||(pan_!=0))) {
         /* H38.7 OPT_PERF: scale the whole buffer once in fixed point.
          * The old ((long long)x * volume_)/100LL did a 64-bit division

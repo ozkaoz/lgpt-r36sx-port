@@ -9,7 +9,7 @@ Mirrors the reorganized fillSampleParameters() layout:
 - BASS_SYNTH_EQ8_MENU (bacon-1.5, feedback): the inherited LGPT PLAYBACK
   section (interpolation/loop mode/slices/start/loop start/loop end) was
   removed from the instrument page; the EQ8 block (EQ8 enable + band mask,
-  A on the row opens the graphic InstrumentEqModal) now occupies rows 15-16.
+  A on the row opens the fullscreen InstrumentEqView) now occupies rows 15-16.
 - Block headers are drawn by DrawView(), NOT inserted as UIStaticField, so
   T_SimpleList<UIField>::GetFirst() stays the sample field and GetLast() stays
   the table field (L2+A cut/clear depend on both).

@@ -1,5 +1,6 @@
 #include "SpectrumAnalyzer.h"
 
+#include "Application/Instruments/I_Instrument.h"
 #include <math.h>
 #include <string.h>
 
@@ -9,7 +10,8 @@ SpectrumAnalyzer &SpectrumAnalyzer::Get() {
 }
 
 SpectrumAnalyzer::SpectrumAnalyzer()
-    : ringPos_(0), armed_(false), generation_(0), lastSeenGeneration_(0) {
+    : ringPos_(0), armed_(false), targetInstrument_(0), generation_(0),
+      lastSeenGeneration_(0) {
     memset(ring_, 0, sizeof(ring_));
     memset(wre_, 0, sizeof(wre_));
     memset(wim_, 0, sizeof(wim_));
@@ -32,9 +34,16 @@ SpectrumAnalyzer::SpectrumAnalyzer()
 
 void SpectrumAnalyzer::SetArmed(bool armed) { armed_ = armed; }
 
-void SpectrumAnalyzer::Feed(const fixed *stereo, int frames) {
+// BACON_1.5_ANALYZER_TAP (bacon-1.5, item 7): common targeted tap.  The
+// channel is informational (the caller knows which track rendered this
+// buffer); the filter is the instrument pointer: only the instrument being
+// edited reaches the ring, so the mix of other instruments never leaks in.
+void SpectrumAnalyzer::FeedChannel(int channel, I_Instrument *instr,
+                                   const fixed *stereo, int frames) {
     if (!armed_) return;                     // zero cost
     if (!stereo || frames <= 0) return;
+    if (instr != targetInstrument_) return;
+    (void)channel;
     for (int i = 0; i < frames; i++) {
         fixed l = stereo[i * 2];
         fixed r = stereo[i * 2 + 1];

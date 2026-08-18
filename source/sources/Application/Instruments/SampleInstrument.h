@@ -11,7 +11,6 @@
 #include "Foundation/Types/Types.h"
 #include "Foundation/Variables/WatchedVariable.h"
 #include "Application/Audio/InstrumentEq.h"
-#include "Application/Audio/SpectrumAnalyzer.h"
 
 enum SampleInstrumentLoopMode {
     SILM_ONESHOT = 0,
@@ -93,6 +92,9 @@ public:
 	   // them from the base overrides above; DLYS/RVBS automation writes them.
 	   virtual int GetLiveDelaySend(int channel) ;
 	   virtual int GetLiveReverbSend(int channel) ;
+
+	   // BACON_1.5_EQ8_VIEW: the UI curve reads the real DSP module.
+	   virtual FxEngine::InstrumentEq *GetInstrumentEq() { return &eqDsp_ ; }
 
 	   bool IsMulti() ;
 

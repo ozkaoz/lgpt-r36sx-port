@@ -22,7 +22,6 @@ extern bool LGPTChopperGetChopRangeForSampleIndex(int sampleIndex, int chopIndex
 #include "Application/Model/Mixer.h"
 #include "Application/Audio/FxEngine/FxEngine.h"
 #include "Application/Mixer/FxPages.h" // bacon-1.5 item 5: fxParamFromByte
-#include "Application/Audio/SpectrumAnalyzer.h"
 
 // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: per-instrument 8-band EQ synced from the
 // persisted variables.  Fingerprint-cached so the audio thread recomputes the
@@ -1106,12 +1105,13 @@ for (int i=0;i<channelCount;i++) {
     // the finished interleaved stereo dry output (post-pan, pre-FX-send).
     // syncInstrumentEq() is fingerprint-cached: no float work unless an EQ
     // variable changed.  When all bands are neutral eqDsp_ bounces at Process()
-    // with a single branch (zero cost).  The warm spectrum feed is likewise a
-    // no-op unless the EQ modal is open.
+    // with a single branch (zero cost).  The spectrum tap is NOT here anymore:
+    // BACON_1.5_ANALYZER_TAP feeds the analyzer from PlayerChannel (and the
+    // audition channel) right after this EQ, pre track gain/pan, targeted to
+    // the instrument being edited.
     if (somethingToMix) {
         syncInstrumentEq() ;
         eqDsp_.Process(channel, buffer, size) ;
-        SpectrumAnalyzer::Get().Feed(buffer, size) ;
     }
 
     return somethingToMix ;

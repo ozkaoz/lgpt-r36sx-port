@@ -24,7 +24,7 @@ AUDIT = ROOT / "scripts/audit.sh"
 BUILD = Path("/mnt/d/R36S/PORT LPTRACKER/BUILD/U2523")
 
 GOLDENS = {
-    "lgpt_r36sx_u2523.so": "0935cb026824920e233335ab5feed670e0c7e913994a178d5ee73f6b32341438",
+    "lgpt_r36sx_u2523.so": "097bd4d36fb24461f83428ec007378a68e3baa6bcd291e49fc05dec209736432",
     "r36s_u2523_usb_audio_io": "f7140072f9b83573e03caf904d17de6227374823c3719757c7d11a438bb1417d",
     "r36s_sp404_host_audio_io": "968dfa61e561d348fd4ec8006e39b23b4dd56a49f1912f885c2731f118983b83",
     "r36s_midi_host_io": "3f0ea7a23db7390f1fb3b73cbda97f66316c6568d0c7574b838579a014baee80",
@@ -66,6 +66,10 @@ HOST_RUNNERS = [
     "run_host_audio_engine.sh",
     "run_host_storage_policy.sh",
     "run_host_action_scenarios.sh",
+    "run_host_bass_synth.sh",
+    "run_host_piano_synth.sh",
+    "run_host_eq8_struct.sh",
+    "run_host_analyzer_target.sh",
 ]
 
 failures = []

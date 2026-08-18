@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 0935cb026824920e233335ab5feed670e0c7e913994a178d5ee73f6b32341438
+- lgpt_r36sx_u2523.so - SHA256 097bd4d36fb24461f83428ec007378a68e3baa6bcd291e49fc05dec209736432
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...
@@ -14,12 +14,23 @@ Novedades Bacon 1.5:
 2. Preescucha con B en las páginas Bass/Piano (Player::PreviewNote/StopPreview/
    UpdatePreview con arm/desarm TreeFrogAudioSetPlaybackArmed, auto-stop ~0.9 s,
    cancelada por Start/Stop y por segundo B).
-3. EQ8 gráfico por instrumento (InstrumentEqModal, acepta IT_SYNTH/IT_PIANO,
-   título INSTR EQ8 INS-xx; PLAYBACK fuera del editor, parámetros en el modelo).
+3. EQ8 gráfico fullscreen por instrumento (InstrumentEqView, reemplaza el modal;
+   curva dibujada con los MISMOS coeficientes GetBandCoeffs que procesa el DSP;
+   acepta IT_SYNTH/IT_PIANO; PLAYBACK fuera del editor, parámetros en el modelo).
 4. Conversión de slot a sintetizador vía InstrumentView::ConvertCurrentToSynth
    (mismo protocolo seguro que el selector src: detach del observer, Stop,
    SetInstrumentType, rebuild; bloquea con sample asignado).
 5. Menú TRACK del Mixer salta a EQ8.
+6. Audición aislada: el preview suena por un canal/bus propios (AuditionService)
+   aunque la pista esté muteada o a volumen 0; StopPreview nunca toca los 8
+   PlayerChannel (aislamiento verificado por test estático).
+7. SpectrumAnalyzer dirigido común: tap post-EQ/pre-gain en PlayerChannel y en
+   la audición, solo cuando está armado y el instrumento es el objetivo.
+8. Guard de estabilidad RBJ bell en EqBiquad.h: el peaking de la receta RBJ
+   diverge con boost a baja frecuencia (verificado: +6 dB @1 kHz Q1, +2 dB
+   @250 Hz Q1, +12 dB @80 Hz Q1 explotaban); el boost queda limitado al 90%
+   del valor marginal A = sw/(sw-4Q(1-cw)) y el filtro siempre acota la salida.
+   Aplica a InstrumentEq (EQ8) y a ParametricEQ (master EQ).
 
 Fixes:
 
@@ -38,7 +49,11 @@ Fixes:
   dumps sean parseables.
 - H38.8 hilo de audio: scratch estático en AudioMixer::Render (sin malloc por
   buffer), pow(x,3)→x*x*x en softclip, fmodf del square de BassSynth→rama.
+- InstrumentEq: estados biquad por banda y por canal (la cascada ya no comparte
+  estado: antes el orden de las bandas cambiaba el sonido ~23k LSB); smoothing
+  con snap exacto (antes se quedaba a 63 LSBs del objetivo sin limpiar el flag).
 
 Regresión: AUDIT_CLEAN_MAIN_U2523_OK (tests/run_all.sh), F10_BASELINE_OK
-(golden core 0935cb02), host bass 45 + piano 46 checks OK,
+(golden core 097bd4d3), host bass 45 + piano 46 + eq8_struct 31 +
+analyzer_target 54 checks OK, TEST_FX_PHASE19_AUDITION_ISOLATED_OK,
 DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK, verify ERRORS=0.

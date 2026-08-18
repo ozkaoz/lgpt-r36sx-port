@@ -250,10 +250,10 @@ COMMONFILES := \
 	I_GUIWindowImp.o \
 	Application.o AppWindow.o SelectProjectDialog.o \
 	NewProjectDialog.o \
-	ImportSampleDialog.o SampleChopperModal.o SampleManagerDialog.o UsbRecordModal.o AudioDriverModal.o InstrumentEqModal.o \
+	ImportSampleDialog.o SampleChopperModal.o SampleManagerDialog.o UsbRecordModal.o AudioDriverModal.o \
 	TreeFrogTextEditor.o TreeFrogMenuModal.o HelpOverlay.o HelpRegistry.o \
 	MixerView.o NullView.o \
-	SongView.o ChainView.o PhraseView.o ViewData.o ConsoleView.o ProjectView.o InstrumentView.o UIController.o \
+	SongView.o ChainView.o PhraseView.o ViewData.o ConsoleView.o ProjectView.o InstrumentView.o InstrumentEqView.o UIController.o \
 	View.o ModalView.o FieldView.o UIField.o UIIntField.o \
 	UIIntVarOffField.o UIIntVarField.o UIPercentVarField.o UiDraw.o ViewEvent.o I_Action.o\
 	UITempoField.o UIActionField.o \
@@ -269,7 +269,7 @@ COMMONFILES := \
 	Observable.o SingletonRegistry.o \
 	Audio.o AudioMixer.o AudioOutDriver.o AudioDriver.o \
 	AudioOut.o \
-	DummyAudioOut.o PlayerChannel.o AudioFileStreamer.o FxEngine.o DelayLine.o Reverb.o ParametricEQ.o Compressor.o InstrumentEq.o SpectrumAnalyzer.o \
+	DummyAudioOut.o PlayerChannel.o AudioFileStreamer.o FxEngine.o DelayLine.o Reverb.o ParametricEQ.o Compressor.o InstrumentEq.o SpectrumAnalyzer.o AuditionService.o \
 	MixBus.o \
 	MixerService.o PlayerMixer.o \
 	Service.o ServiceRegistry.o SubService.o \

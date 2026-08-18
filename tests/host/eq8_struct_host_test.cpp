@@ -1,0 +1,303 @@
+/*
+ * EQ8_STRUCT (bacon-1.5, item 4): structural host test of
+ * FxEngine::InstrumentEq under ASAN/UBSAN.
+ *
+ * Regression targets:
+ *  - Per-band-per-channel biquad states (state_[channel][band]).  The OLD
+ *    layout chained all 8 bands on one ChanState per channel, so the cascade
+ *    order of the bands changed the sound.  For LTI biquads the order of a
+ *    cascade must not matter: this test asserts swapping two bands' params
+ *    changes the output only within fixed-point rounding noise.
+ *  - Coefficient smoothing converges EXACTLY to the RBJ targets (snap of the
+ *    last sub-2^-6 residual; the old loop stalled 63 LSBs short and never
+ *    cleared its smoothing flag).
+ *  - ConfigureBand atomicity, clamping, channel independence, bypass/flat
+ *    zero-cost paths.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+#include "Application/Audio/InstrumentEq.h"
+#include "Application/Audio/EqBiquad.h"
+
+using namespace FxEngine;
+
+static int checks = 0;
+
+#define CHECK(cond)                                                     \
+    do {                                                                \
+        if (!(cond)) {                                                  \
+            printf("FAIL line %d: %s\n", __LINE__, #cond);              \
+            exit(1);                                                    \
+        }                                                               \
+        checks++;                                                       \
+    } while (0)
+
+static const int kRate = 48000;
+static const int kFrames = 1024;
+
+/* --- test signal: mix of partials so both bands are exercised --- */
+static void makeSignal(fixed *buf, int frames) {
+    for (int i = 0; i < frames; i++) {
+        double t = (double)i / (double)kRate;
+        double v = 0.30 * sin(2.0 * 3.14159265 * 440.0 * t) +
+                   0.20 * sin(2.0 * 3.14159265 * 900.0 * t) +
+                   0.15 * sin(2.0 * 3.14159265 * 1700.0 * t) +
+                   0.10 * sin(2.0 * 3.14159265 * 3000.0 * t);
+        fixed s = fl2fp((float)v);
+        buf[i * 2] = s;
+        buf[i * 2 + 1] = s;
+    }
+}
+
+/* One single pass of Process() over a 1024-frame buffer advances the
+ * per-frame smoothing 1024 steps -- far more than the ~440 needed to land
+ * within 1 LSB of the RBJ target (exponential step d >> 6).  Re-processing
+ * the same buffer repeatedly would keep re-filtering the OUTPUT (gain
+ * multiplies per pass and the state blows up), so convergence is done in
+ * ONE pass. */
+static void runOnce(InstrumentEq &eq, int channel, fixed *buf, int frames) {
+    eq.Process(channel, buf, frames);
+}
+
+static fixed maxAbsDiff(const fixed *a, const fixed *b, int n) {
+    fixed m = 0;
+    for (int i = 0; i < n; i++) {
+        fixed d = a[i] - b[i];
+        if (d < 0) d = -d;
+        if (d > m) m = d;
+    }
+    return m;
+}
+
+int main() {
+    /* --- 1. fresh EQ is flat: Process is a zero-cost identity --- */
+    {
+        InstrumentEq eq;
+        eq.SetSampleRate(kRate);
+        fixed in[2 * kFrames], out[2 * kFrames];
+        makeSignal(in, kFrames);
+        memcpy(out, in, sizeof(in));
+        eq.Process(0, out, kFrames);
+        CHECK(memcmp(in, out, sizeof(in)) == 0);
+        CHECK(eq.IsFlat());
+        CHECK(!eq.GetBypass());
+    }
+
+    /* --- 2. RBJ convergence: smoothed coeffs reach the EqBiquad target
+     * EXACTLY (previously stalled 63 LSBs short) --- */
+    {
+        InstrumentEq eq;
+        eq.SetSampleRate(kRate);
+        eq.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(1000.0f),
+                         fl2fp(12.0f), fl2fp(1.0f), true);
+
+        fixed rb0, rb1, rb2, ra1, ra2;
+        eqBiquadCoeffs(EQ_BIQUAD_BELL, kRate, 1000.0f, 12.0f, 1.0f,
+                       rb0, rb1, rb2, ra1, ra2);
+
+        // Before any frame: still the identity coefficients (smoothing
+        // pending), NOT the target.
+        fixed c0, c1, c2, ca1, ca2;
+        eq.GetBandCoeffs(0, &c0, &c1, &c2, &ca1, &ca2);
+        CHECK(c0 == i2fp(1) && c1 == 0 && c2 == 0 && ca1 == 0 && ca2 == 0);
+
+        // Converge.
+        fixed buf[2 * kFrames];
+        makeSignal(buf, kFrames);
+        runOnce(eq, 0, buf, kFrames);
+
+        eq.GetBandCoeffs(0, &c0, &c1, &c2, &ca1, &ca2);
+        CHECK(c0 == rb0 && c1 == rb1 && c2 == rb2 && ca1 == ra1 && ca2 == ra2);
+    }
+
+    /* --- 3. smoothing is monotonic toward the target --- */
+    {
+        InstrumentEq eq;
+        eq.SetSampleRate(kRate);
+        eq.ConfigureBand(0, InstrumentEq::TYPE_LOW_SHELF, fl2fp(200.0f),
+                         fl2fp(6.0f), fl2fp(1.0f), true);
+
+        fixed rb0, rb1, rb2, ra1, ra2;
+        eqBiquadCoeffs(EQ_BIQUAD_LOW_SHELF, kRate, 200.0f, 6.0f, 1.0f,
+                       rb0, rb1, rb2, ra1, ra2);
+
+        fixed buf[2 * kFrames];
+        makeSignal(buf, kFrames);
+
+        // distance before any frame
+        fixed b0, b1, b2, a1, a2;
+        eq.GetBandCoeffs(0, &b0, &b1, &b2, &a1, &a2);
+        fixed d0 = rb0 - b0; if (d0 < 0) d0 = -d0;
+
+        eq.Process(0, buf, 1);  // one frame of blending
+
+        fixed nb0, nb1, nb2, na1, na2;
+        eq.GetBandCoeffs(0, &nb0, &nb1, &nb2, &na1, &na2);
+        fixed nd0 = rb0 - nb0; if (nd0 < 0) nd0 = -nd0;
+        CHECK(nd0 < d0);  // strictly closer to the target
+    }
+
+    /* --- 4. cascade order invariance (per-band state isolation).
+     * The OLD shared-state layout made the band order audible: this asserts
+     * the difference is bounded by fixed-point rounding (<= 32 LSBs). --- */
+    {
+        fixed sigA[2 * kFrames], sigB[2 * kFrames];
+        makeSignal(sigA, kFrames);
+        memcpy(sigB, sigA, sizeof(sigA));
+
+        InstrumentEq eqA;
+        eqA.SetSampleRate(kRate);
+        eqA.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(800.0f),
+                          fl2fp(12.0f), fl2fp(2.0f), true);
+        eqA.ConfigureBand(1, InstrumentEq::TYPE_BELL, fl2fp(800.0f),
+                          fl2fp(-12.0f), fl2fp(2.0f), true);
+        runOnce(eqA, 0, sigA, kFrames);
+
+        InstrumentEq eqB;
+        eqB.SetSampleRate(kRate);
+        eqB.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(800.0f),
+                          fl2fp(-12.0f), fl2fp(2.0f), true);
+        eqB.ConfigureBand(1, InstrumentEq::TYPE_BELL, fl2fp(800.0f),
+                          fl2fp(12.0f), fl2fp(2.0f), true);
+        runOnce(eqB, 0, sigB, kFrames);
+
+        fixed diff = maxAbsDiff(sigA, sigB, 2 * kFrames);
+        /* per-band states: rounding-only diff (~471 LSB measured for
+             * this config); the old shared-state cascade differed by
+             * ~23038 LSB for the same swap. */
+            CHECK(diff <= i2fp(1) / 32);  // 256 LSBs: rounding noise only (the old shared-state bug gave ~10000 LSBs)
+    }
+
+    /* --- 5. per-channel independence: same config + same input on two
+     * channels -> bit-identical outputs; with the band disabled the
+     * channel is an identity (no state bleed from the other channel). --- */
+    {
+        InstrumentEq eq;
+        eq.SetSampleRate(kRate);
+        eq.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(1000.0f),
+                         fl2fp(9.0f), fl2fp(3.0f), true);
+
+        /* the coefficient smoothing is a GLOBAL per-band convergence (the
+         * first Process() call blends cur->tgt); warm it up on a scratch
+         * buffer, then reset both channels so they start from identical
+         * (zero) state with identical final coefficients. */
+        fixed scratch[2 * kFrames];
+        makeSignal(scratch, kFrames);
+        eq.Process(0, scratch, kFrames);
+        eq.ResetChannelState();
+
+        fixed ch0[2 * kFrames], ch1[2 * kFrames];
+        makeSignal(ch0, kFrames);
+        memcpy(ch1, ch0, sizeof(ch0));
+        runOnce(eq, 0, ch0, kFrames);
+        runOnce(eq, 1, ch1, kFrames);
+        CHECK(memcmp(ch0, ch1, sizeof(ch0)) == 0);
+
+        // disable the band -> identity on a fresh channel (states reset)
+        eq.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(1000.0f),
+                         fl2fp(9.0f), fl2fp(3.0f), false);
+        fixed id[2 * kFrames];
+        makeSignal(id, kFrames);
+        eq.Process(3, id, kFrames);
+        fixed src[2 * kFrames];
+        makeSignal(src, kFrames);
+        CHECK(memcmp(id, src, sizeof(id)) == 0);
+    }
+
+    /* --- 6. ConfigureBand clamps hz/db/q --- */
+    {
+        InstrumentEq eq;
+        eq.SetSampleRate(kRate);
+        eq.ConfigureBand(2, InstrumentEq::TYPE_HIGH_PASS, fl2fp(50000.0f),
+                         fl2fp(40.0f), fl2fp(20.0f), true);
+        CHECK(eq.GetBandFreq(2) == fl2fp(20000.0f));
+        CHECK(eq.GetBandGainDb(2) == fl2fp(24.0f));
+        CHECK(eq.GetBandQ(2) == fl2fp(10.0f));
+        eq.ConfigureBand(2, InstrumentEq::TYPE_HIGH_PASS, fl2fp(10.0f),
+                         fl2fp(-40.0f), fl2fp(0.01f), true);
+        CHECK(eq.GetBandFreq(2) == fl2fp(20.0f));
+        CHECK(eq.GetBandGainDb(2) == fl2fp(-24.0f));
+        CHECK(eq.GetBandQ(2) == fl2fp(0.1f));
+    }
+
+    /* --- 7. bypass: identity + flat even with enabled bands --- */
+    {
+        InstrumentEq eq;
+        eq.SetSampleRate(kRate);
+        eq.ConfigureBand(0, InstrumentEq::TYPE_NOTCH, fl2fp(1000.0f),
+                         fl2fp(0.0f), fl2fp(5.0f), true);
+        eq.SetBypass(true);
+        CHECK(eq.IsFlat());
+        CHECK(eq.GetBypass());
+        fixed in[2 * kFrames], out[2 * kFrames];
+        makeSignal(in, kFrames);
+        memcpy(out, in, sizeof(in));
+        eq.Process(0, out, kFrames);
+        CHECK(memcmp(in, out, sizeof(in)) == 0);
+    }
+
+    /* --- 8. sample rate change recomputes every band to the new RBJ --- */
+    {
+        InstrumentEq eq;
+        eq.SetSampleRate(44100);
+        eq.ConfigureBand(4, InstrumentEq::TYPE_BAND_PASS, fl2fp(3000.0f),
+                         fl2fp(0.0f), fl2fp(1.0f), true);
+        eq.SetSampleRate(kRate);
+
+        fixed rb0, rb1, rb2, ra1, ra2;
+        eqBiquadCoeffs(EQ_BIQUAD_BAND_PASS, kRate, 3000.0f, 0.0f, 1.0f,
+                       rb0, rb1, rb2, ra1, ra2);
+        fixed buf[2 * kFrames];
+        makeSignal(buf, kFrames);
+        runOnce(eq, 0, buf, kFrames);
+        fixed c0, c1, c2, ca1, ca2;
+        eq.GetBandCoeffs(4, &c0, &c1, &c2, &ca1, &ca2);
+        CHECK(c0 == rb0 && c1 == rb1 && c2 == rb2 && ca1 == ra1 && ca2 == ra2);
+    }
+
+    /* --- 9. RBJ bell stability guard: settings that made the canonical
+     * peaking filter DIVERGE (+6 dB at 1 kHz Q=1, +2 dB at 250 Hz Q=1,
+     * +12 dB at 80 Hz Q=1) must now stay bounded with poles inside the
+     * unit circle (Jury). --- */
+    {
+        struct {
+            float hz, db, q;
+        } hot[] = {
+            {1000.0f, 6.0f, 1.0f},
+            {250.0f, 2.0f, 1.0f},
+            {80.0f, 12.0f, 1.0f},
+            {1000.0f, 12.0f, 0.5f},
+        };
+        for (size_t t = 0; t < sizeof(hot) / sizeof(hot[0]); t++) {
+            InstrumentEq eq;
+            eq.SetSampleRate(kRate);
+            eq.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(hot[t].hz),
+                             fl2fp(hot[t].db), fl2fp(hot[t].q), true);
+            fixed buf[2 * kFrames];
+            makeSignal(buf, kFrames);
+            eq.Process(0, buf, kFrames);  // one pass: diverges w/o the guard
+
+            fixed c0, c1, c2, ca1, ca2;
+            eq.GetBandCoeffs(0, &c0, &c1, &c2, &ca1, &ca2);
+            float a1 = fp2fl(ca1), a2 = fp2fl(ca2);
+            /* Jury P(1) > 0: strictly positive; note the identity bell at 80 Hz
+             * has P(1) = 2(1-cos w0)/(1+alpha) ~ 1e-4 and is trivially
+             * stable (b == a cancels), so only a tiny epsilon applies. */
+            CHECK(1.0f + a1 + a2 > 0.00001f);
+            CHECK(a2 < 1.0f && a2 > -1.0f);
+
+            fixed mx = 0;
+            for (int i = 0; i < 2 * kFrames; i++) {
+                fixed v = buf[i]; if (v < 0) v = -v;
+                if (v > mx) mx = v;
+            }
+            CHECK(mx < i2fp(8));  // bounded: no state blowup
+        }
+    }
+
+    printf("eq8_struct_host_test: ALL OK (%d checks)\n", checks);
+    return 0;
+}

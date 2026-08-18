@@ -40,6 +40,12 @@ public:
 	void Stop() ;
 
 	MixBus *GetMixBus(int i) ;	
+    // BACON_1.5_AUDITION_BUS (bacon-1.5, item 2): dedicated preview/audition
+    // bus, inserted into the master tree so instrument previews (B on the
+    // synth/piano pages, audition from the EQ8 view) reach the same master
+    // FX returns as everything else WITHOUT occupying a song channel and
+    // without the track mute/volume/pan.
+    MixBus *GetAuditionBus() { return &auditionBus_; }
 
 	virtual void Update(Observable &o,I_ObservableData *d) ;	
 
@@ -97,6 +103,7 @@ private:
   AudioOut *out_;
   MixBus master_;
   MixBus bus_[MAX_BUS_COUNT];
+  MixBus auditionBus_;
   // bacon-1.5 item 8: multitrack stems writers, owned by MixerService so the
   // FxEngine module keeps its zero-allocation RT contract.
   WavFileWriter *captureDelay_;

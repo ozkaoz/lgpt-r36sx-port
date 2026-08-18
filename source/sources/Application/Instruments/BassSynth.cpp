@@ -94,7 +94,7 @@ BassSynth::BassSynth() {
     Insert(rvbSend_);
 
     // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: same variable contract as
-    // SampleInstrument (names + SIP_EQ* FourCCs) so InstrumentEqModal
+    // SampleInstrument (names + SIP_EQ* FourCCs) so the EQ8 view
     // works unchanged through FindVariable().
     eqEnable_ = new Variable("eq bypass", SIP_EQEN, 1);
     Insert(eqEnable_);

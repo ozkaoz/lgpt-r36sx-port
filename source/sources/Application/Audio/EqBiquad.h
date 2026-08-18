@@ -45,6 +45,24 @@ inline void eqBiquadCoeffs(int type, int rate, float f0, float lvl, float qv,
     if (w0 < 1e-6f) w0 = 1e-6f;
     float cw = cosf(w0);
     float sw = sinf(w0);
+
+    // RBJ_BELL_STABILITY (bacon-1.5): the RBJ peaking filter is UNSTABLE
+    // for boosts at low normalized frequencies (a real pole exits the unit
+    // circle: P(1) = 1 + a1 + a2 < 0).  Verified divergent settings include
+    // +6 dB at 1 kHz Q=1 and +2 dB at 250 Hz Q=1 (44.1/48 kHz).  The
+    // marginal boost is A = sw/(sw - 4*Q*(1-cw)); cap the gain at 90% of it
+    // so the filter always stays bounded.  Cuts (A < 1) and shelves are
+    // unaffected.
+    if (type == EQ_BIQUAD_BELL && lvl > 0.0f) {
+        float denom = sw - 4.0f * qv * (1.0f - cw);
+        if (denom > 0.0f) {
+            float cap = (sw / denom) * 0.9f;
+            if (cap < 1.0f) cap = 1.0f;
+            float lvlCap = 40.0f * log10f(cap);
+            if (lvl > lvlCap) lvl = lvlCap;
+        }
+    }
+
     float A = powf(10.0f, lvl / 40.0f);
     float alpha = sw / (2.0f * qv);
 

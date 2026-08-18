@@ -7,6 +7,11 @@
 
 #include "Application/Player/TablePlayback.h"
 
+// BACON_1.5_EQ8_VIEW: forward decl for GetInstrumentEq().
+namespace FxEngine {
+class InstrumentEq;
+}
+
 enum InstrumentType {
 	IT_SAMPLE=0,
 	IT_MIDI,
@@ -137,6 +142,12 @@ public:
 
 	  virtual int GetLiveDelaySend(int) { return 0xFF; }
 	  virtual int GetLiveReverbSend(int) { return 0xFF; }
+
+	  // BACON_1.5_EQ8_VIEW (bacon-1.5, item 6): exposes the instrument's real
+	  // 8-band EQ module (the one that processes its audio) so the UI draws
+	  // the curve from the SAME coefficients the DSP applies.  Returns 0 for
+	  // instruments without an instrument EQ (Midi, ...).
+	  virtual FxEngine::InstrumentEq *GetInstrumentEq() { return 0; }
 
 };
 #endif

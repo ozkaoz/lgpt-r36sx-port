@@ -14,7 +14,7 @@ root = Path(__file__).resolve().parents[1]
 dialogs = root / "source/sources/Application/UI/Views/ModalDialogs"
 limits = {
     "AudioDriverModal.cpp": 36, "CommandSelectorModal.cpp": 36,
-    "ImportSampleDialog.cpp": 36, "InstrumentEqModal.cpp": 36,
+    "ImportSampleDialog.cpp": 36,
     "MessageBox.cpp": 36, "NewProjectDialog.cpp": 36,
     "SampleManagerDialog.cpp": 36, "SelectProjectDialog.cpp": 36,
     "TreeFrogMenuModal.cpp": 36, "TreeFrogTextEditor.cpp": 36,

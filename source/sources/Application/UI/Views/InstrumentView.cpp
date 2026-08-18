@@ -25,7 +25,6 @@ extern "C" void TreeFrogInputTrace_LogView(
 #include "Foundation/Variables/Variable.h"
 #include "ModalDialogs/ImportSampleDialog.h"
 #include "ModalDialogs/SampleChopperModal.h"
-#include "ModalDialogs/InstrumentEqModal.h"
 #include "ModalDialogs/MessageBox.h"
 #include "System/System/System.h"
 #include "System/FileSystem/FileSystem.h"
@@ -272,8 +271,8 @@ void InstrumentView::fillSampleParameters() {
 	// Block 4: EQ8 (graphic EQ, BASS_SYNTH_EQ8_MENU bacon-1.5 feedback).
 	// The inherited LGPT "PLAYBACK" section (interpolation, loop mode,
 	// slices, start, loop start, loop end) was removed from the instrument
-	// page and replaced by the EQ8 row: A on it opens the graphic
-	// InstrumentEqModal for the current instrument (sample, bass or piano).
+	// page and replaced by the EQ8 row: A on it opens the fullscreen
+	// InstrumentEqView for the current instrument (sample, bass or piano).
 	// ----------------------------------------------------------
 	position._y+=2 ;  // skip header row 15
 	col2=position ;
@@ -967,11 +966,15 @@ void InstrumentView::ProcessButtonMask(unsigned short mask,bool pressed) {
                     break;
                 }
                 case SIP_EQEN: {
+                    // BACON_1.5_EQ8_VIEW: A on the EQ8 row opens the
+                    // fullscreen graphic EQ editor (the old modal is gone).
                     if (getInstrumentType() == IT_SAMPLE ||
                         getInstrumentType() == IT_SYNTH ||
                         getInstrumentType() == IT_PIANO) {
-                        DoModal(new InstrumentEqModal(*this,
-                                 viewData_->currentInstrument_));
+                        ViewType vt = VT_INSTRUMENT_EQ;
+                        ViewEvent ve(VET_SWITCH_VIEW, &vt);
+                        SetChanged();
+                        NotifyObservers(&ve);
                         isDirty_ = true;
                     }
                     break ;
@@ -1155,7 +1158,7 @@ void InstrumentView::DrawView() {
         // BASS_SYNTH_EQ8_MENU (bacon-1.5, feedback): the inherited PLAYBACK
         // section was removed from the instrument page; the EQ8 block header
         // now sits where PLAYBACK used to be (A on the EQ8 row opens the
-        // graphic InstrumentEqModal, see InstrumentEqModal.cpp).
+        // fullscreen InstrumentEqView, see InstrumentEqView.cpp).
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 11, "EQ8");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 13, "EFFECT SENDS");
         UiDraw::DrawSectionHeader(*this, hp._x, hp._y + 17, "AUTOMATION");

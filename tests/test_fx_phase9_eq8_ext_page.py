@@ -27,7 +27,8 @@ EQ_CPP = (ROOT / "source/sources/Application/Audio/FxEngine/ParametricEQ.cpp").r
 BQ = (ROOT / "source/sources/Application/Audio/EqBiquad.h").read_text()
 IEQ_H = (ROOT / "source/sources/Application/Audio/InstrumentEq.h").read_text()
 IEQ_CPP = (ROOT / "source/sources/Application/Audio/InstrumentEq.cpp").read_text()
-IEQ_MODAL = (ROOT / "source/sources/Application/UI/Views/ModalDialogs/InstrumentEqModal.cpp").read_text()
+# BACON_1.5_EQ8_VIEW: the fullscreen view replaced the modal.
+IEQ_VIEW = (ROOT / "source/sources/Application/UI/Views/InstrumentEqView.cpp").read_text()
 SI_H = (ROOT / "source/sources/Application/Instruments/SampleInstrument.h").read_text()
 SI_CPP = (ROOT / "source/sources/Application/Instruments/SampleInstrument.cpp").read_text()
 SID = (ROOT / "source/sources/Application/Instruments/SampleInstrumentDatas.h").read_text()
@@ -109,14 +110,14 @@ def check_instrument_eq():
     assert "EqBiquad.h" in IEQ_CPP
     assert "eqBiquadCoeffs(" in IEQ_CPP
     assert "mapBandType" in IEQ_CPP
-    # Modal shows the 7th type and cycles 0..6.
-    assert '"BANDP"' in IEQ_MODAL
-    assert "kEqTypeNames[7]" in IEQ_MODAL
-    assert "% 7" in IEQ_MODAL
+    # Fullscreen view shows the 7th type and cycles 0..6.
+    assert '"BANDP"' in IEQ_VIEW
+    assert "kEqTypeNames[7]" in IEQ_VIEW
+    assert "% 7" in IEQ_VIEW
     # 48 kHz rebuild at the real driver rate.
     assert "eqRateCache_" in SI_H
     assert "GetSampleRate()" in SI_CPP and "SetSampleRate(rate)" in SI_CPP
-    print("5. InstrumentEq BAND_PASS + 48 kHz rate fix + modal OK")
+    print("5. InstrumentEq BAND_PASS + 48 kHz rate fix + EQ8 view OK")
 
 
 def check_filter_v2_wiring():

@@ -6,6 +6,7 @@
 #include "Application/UI/Views/ConsoleView.h"
 #include "Application/UI/Views/GrooveView.h"
 #include "Application/UI/Views/InstrumentView.h"
+#include "Application/UI/Views/InstrumentEqView.h"
 #include "Application/UI/Views/MixerView.h"
 #include "Application/UI/Views/NullView.h"
 #include "Application/UI/Views/PhraseView.h"
@@ -84,6 +85,8 @@ class AppWindow : public GUIWindow, I_Observer, Status {
     PhraseView *_phraseView;
     ProjectView *_projectView;
     InstrumentView *_instrumentView;
+    // BACON_1.5_EQ8_VIEW: fullscreen graphic instrument EQ editor.
+    InstrumentEqView *_instrumentEqView;
     TableView *_tableView;
     GrooveView *_grooveView;
     NullView *_nullView;

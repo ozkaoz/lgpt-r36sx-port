@@ -44,6 +44,9 @@ bool MixerService::Init() {
 	for (int i=0;i<MAX_BUS_COUNT;i++) {
 		master_.Insert(bus_[i]);
 	}
+	// BACON_1.5_AUDITION_BUS: the audition bus joins the master tree too, so
+	// a preview note reaches the same master/FX-return path as the song.
+	master_.Insert(auditionBus_);
 
 	// TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): channel/stream buses run
 	// UNCLIPPED so the master sum -- and its pre-clip meter -- reflects the
@@ -55,6 +58,7 @@ bool MixerService::Init() {
 	for (int i=0;i<MAX_BUS_COUNT;i++) {
 		bus_[i].SetClipBypass(true);
 	}
+	auditionBus_.SetClipBypass(true);
 
 	bool result = false;
 	if (out_) {
@@ -113,6 +117,7 @@ void MixerService::Close() {
    for (int i=0;i<MAX_BUS_COUNT;i++) {
 	   bus_[i].Empty() ;
    }
+   auditionBus_.Empty() ;
 	out_=0 ;
 	SDL_DestroyMutex(sync_) ;
 	sync_=0 ;

@@ -107,6 +107,8 @@ public:
     virtual int GetFxDry() ;
     virtual int GetLiveDelaySend(int channel) ;
     virtual int GetLiveReverbSend(int channel) ;
+    // BACON_1.5_EQ8_VIEW: the UI curve reads the real DSP module.
+    virtual FxEngine::InstrumentEq *GetInstrumentEq() { return &eqDsp_ ; }
 
 private:
     void syncInstrumentEq() ;

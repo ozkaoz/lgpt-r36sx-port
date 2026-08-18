@@ -26,7 +26,8 @@
 
 #if defined(PLATFORM_TREEFROG)
 extern "C" void TreeFrogChopperOverlayDraw(void);
-extern "C" void TreeFrogInstrumentEqOverlayDraw(void);
+// BACON_1.5_EQ8_VIEW: the instrument EQ overlay hook is gone -- the
+// fullscreen InstrumentEqView owns the pixel canvas now.
 #endif
 
 
@@ -437,7 +438,6 @@ void AppWindow::Flush() {
     long flushEnd = System::GetInstance()->GetClock();
 #if defined(PLATFORM_TREEFROG)
     TreeFrogChopperOverlayDraw();
-    TreeFrogInstrumentEqOverlayDraw();
 #endif
     // TREEFROG_MIXER_HALF_CELL_BARS_V1 (Bacon 1.1.1): after the char screen
     // is fully rendered, let the active view paint its pixel-level layer
@@ -515,6 +515,10 @@ void AppWindow::LoadProject(const Path &p) {
 
     _instrumentView = new InstrumentView((*this), _viewData);
     _instrumentView->AddObserver((*this));
+
+    // BACON_1.5_EQ8_VIEW: fullscreen graphic instrument EQ editor.
+    _instrumentEqView = new InstrumentEqView((*this), _viewData);
+    _instrumentEqView->AddObserver((*this));
 
     _tableView = new TableView((*this), _viewData);
     _tableView->AddObserver((*this));
@@ -1321,6 +1325,9 @@ void AppWindow::Update(Observable &o, I_ObservableData *d) {
             break;
         case VT_INSTRUMENT:
             _currentView = _instrumentView;
+            break;
+        case VT_INSTRUMENT_EQ:
+            _currentView = _instrumentEqView;
             break;
         case VT_TABLE:
             _currentView = _tableView;

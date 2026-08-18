@@ -1,5 +1,41 @@
 # Changelog
 
+## Update: Bacon 1.5 U2.52.3 - EQ8 fullscreen + audición aislada + guard RBJ
+
+- **Estado**: actualización de la pre-release Bacon 1.5 (Synths + EQ8).
+  Cierra la spec de 10 puntos: EQ8 fullscreen, audición aislada, analyzer
+  dirigido, sintetizadores preescuchables.
+- **EQ8 fullscreen** (`Application/UI/Views/InstrumentEqView`): reemplaza el
+  modal `InstrumentEqModal` (borrado). La curva de respuesta se dibuja con
+  `GetBandCoeffs` — los MISMOS coeficientes que procesa el DSP (curva ==
+  sonido). `freqToX/xToFreq` solo en PLATFORM_TREEFROG.
+- **Audición aislada** (`Application/Audio/AuditionService`): el preview se
+  rutea a un canal/bus propios (insertado en el árbol del master,
+  `SetClipBypass`); suena aunque la pista esté muteada o a volumen 0.
+  `Player::StopPreview` toca SOLO la audición — los 8 PlayerChannel nunca se
+  detienen (test estático `test_fx_phase19_audition_isolated.py`); el
+  desarm del hilo de audio está guardado por `!isRunning_`.
+- **SpectrumAnalyzer dirigido** (`FeedChannel` + `SetArmed` +
+  `SetTargetInstrument`): tap común post-EQ/pre-gain en `PlayerChannel::Render`
+  y en `AuditionChannel::Render`; graba solo si está armado y el instrumento
+  es el objetivo. Test host `analyzer_target_host_test` (54 checks).
+- **Guard de estabilidad RBJ** (`Application/Audio/EqBiquad.h`): el peaking
+  de la receta RBJ DIVERGE con boost en baja frecuencia — verificado en
+  simulación: +6 dB @1 kHz Q1, +2 dB @250 Hz Q1 y +12 dB @80 Hz Q1 explotan
+  (polo real fuera del círculo, P(1) < 0). El boost queda capeado al 90% del
+  valor marginal `A = sw/(sw - 4Q(1-cw))`; aplica a InstrumentEq y a
+  ParametricEQ. Cubierto por el test 9 de `eq8_struct_host_test` (31 checks).
+- **Estados biquad por banda/canal** (`InstrumentEq`): la cascada ya no
+  comparte estado — antes el orden de las bandas cambiaba el sonido (~23.038
+  LSB medidos en el swap; ahora ~471 LSB de redondeo).
+- **Smoothing con snap exacto** (`InstrumentEq.cpp`): el paso `d>>6` se
+  quedaba a 63 LSBs del objetivo sin limpiar el flag; ahora se ancla el último
+  residuo sub-2^-6 y la convergencia es exacta en una pasada.
+- **Build 100% limpio**: `DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS`, `BUILD_U2523_OK`.
+  Core `097bd4d36fb24461f83428ec007378a68e3baa6bcd291e49fc05dec209736432`.
+  Regresión completa: `AUDIT_CLEAN_MAIN_U2523_OK`, `F10_BASELINE_OK`, host
+  bass 45 + piano 46 + eq8_struct 31 + analyzer_target 54 checks OK.
+
 ## Release: Bacon 1.2 U2.72 - Mixer (final) - estabilización total 48k stereo
 
 - **Estado**: release final del port `stabilize-bacon-1.2.1` (rama

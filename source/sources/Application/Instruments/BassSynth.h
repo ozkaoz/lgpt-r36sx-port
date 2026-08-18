@@ -13,7 +13,7 @@
 // shared with the future polyphonic PianoSynth (4 voices).  One voice state
 // per player channel, osc + sub + noise -> drive -> TPT SVF (FilterV2, one
 // filter per channel) -> pan -> EQ8 (same variable contract as the sample
-// instrument so InstrumentEqModal works unchanged).
+// instrument so the EQ8 view works unchanged).
 //
 // All variables persist by NAME (XML PARAM NAME/VALUE), 0..100 % UI range.
 
@@ -112,6 +112,8 @@ public:
     virtual int GetFxDry() ;
     virtual int GetLiveDelaySend(int channel) ;
     virtual int GetLiveReverbSend(int channel) ;
+    // BACON_1.5_EQ8_VIEW: the UI curve reads the real DSP module.
+    virtual FxEngine::InstrumentEq *GetInstrumentEq() { return &eqDsp_ ; }
 
 private:
     void syncInstrumentEq() ;

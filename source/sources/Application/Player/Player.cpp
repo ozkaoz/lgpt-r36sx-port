@@ -24,6 +24,7 @@ static void TreeFrogStartTrace(const char *msg) {
 #include "Application/Player/TablePlayback.h"
 #include "Application/Model/Groove.h"
 #include "Application/UI/Views/ModalDialogs/SampleChopperModal.h"
+#include "Application/Audio/AuditionService.h"
 #include <math.h>
 #include <string.h>
 #include "Services/Midi/MidiService.h"
@@ -45,6 +46,9 @@ Player::Player() {
 	sequencerMode_=SM_SONG ;
 	lastPercentage_=0 ;
 	retrigAllImmediate_=false ;
+	// BACON_1.5_AUDITION: deterministic preview state from construction.
+	previewActive_=false ;
+	previewStopClock_=0 ;
 
 	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 		instrumentOnChannel_[i][0] = ' ';
@@ -70,6 +74,10 @@ bool Player::Init(Project *project,ViewData *viewData) {
 		return false ;
 	}
 
+	// BACON_1.5_AUDITION: the audition channel plugs into its own bus right
+	// after MixerService::Init (the master tree already exists).
+	AuditionService::GetInstance()->Init() ;
+
 	mixer_->AddObserver((*this)) ;
 	SyncMaster *sync=SyncMaster::GetInstance() ;
 	sync->SetTempo(project_->GetTempo()) ;
@@ -84,6 +92,7 @@ void Player::Reset() {
 } ;
 
 void Player::Close() {
+	AuditionService::GetInstance()->Close() ;
 	mixer_->Stop() ;
 	mixer_->Close() ;
 } ;
@@ -106,8 +115,13 @@ void Player::Start(PlayMode mode,bool forceSongMode) {
     TreeFrogStartTrace("Player::Start ENTER");
     
     // BASS_SYNTH_PREVIEW: a real playback run always cancels any active
-    // instrument preview note (it would hold a stale channel reference).
-    previewActive_ = false;
+    // instrument preview note.  BACON_1.5_AUDITION: the note is retired on
+    // its OWN audition channel (the audio thread is already armed above; no
+    // disarm must happen here).
+    if (previewActive_) {
+        AuditionService::GetInstance()->StopPreview() ;
+        previewActive_ = false;
+    }
 
 	TreeFrogStartTrace("V133_Player_Start_LOCK_BYPASS");
 #if !defined(PLATFORM_TREEFROG)
@@ -260,7 +274,13 @@ void Player::Stop() {
 
 	SyncMaster::GetInstance()->Stop() ;
 	isRunning_=false ;
-	previewActive_=false ;
+	// BACON_1.5_AUDITION: retire any preview note on the audition channel
+	// (the audio thread was already disarmed above; song channels are not
+	// involved here).
+	if (previewActive_) {
+		AuditionService::GetInstance()->StopPreview() ;
+		previewActive_=false ;
+	}
 	SetChanged() ;
 	PlayerEvent pe(PET_STOP) ;
 	NotifyObservers(&pe) ;
@@ -1424,19 +1444,16 @@ static const unsigned long kPreviewNoteDurationMs = 900 ;
 
 void Player::PreviewNote(int channel,I_Instrument *instrument,unsigned char note) {
 	if (isRunning_) return ;
-	if (channel<0 || channel>=SONG_CHANNEL_COUNT) return ;
 	if (!instrument) return ;
+	// BACON_1.5_AUDITION (bacon-1.5, item 2): the preview renders on the
+	// dedicated audition bus (AuditionService) with a fixed gain, immune to
+	// track mute/volume/pan, and NEVER occupies a song PlayerChannel.  The
+	// `channel` argument is kept for API compatibility and ignored.
+	(void)channel ;
 #if defined(PLATFORM_TREEFROG)
 	TreeFrogAudioSetPlaybackArmed(1) ;
 #endif
-	// The preview must never fight a live queue: clear any queued live
-	// states on the target channel before starting the note.
-	liveQueueingMode_[channel]=QM_NONE ;
-	timeToLive_[channel]=0 ;
-	timeToStart_[channel]=0 ;
-	TablePlayback::GetTablePlayback(channel).Stop() ;
-	mixer_->StartChannel(channel) ;
-	mixer_->StartInstrument(channel,instrument,note,true) ;
+	AuditionService::GetInstance()->Preview(instrument, note) ;
 	previewActive_=true ;
 	previewStopClock_=System::GetInstance()->GetClock()+kPreviewNoteDurationMs ;
 }
@@ -1444,9 +1461,9 @@ void Player::PreviewNote(int channel,I_Instrument *instrument,unsigned char note
 void Player::StopPreview() {
 	if (!previewActive_) return ;
 	previewActive_=false ;
-	for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
-		mixer_->StopChannel(i) ;
-	}
+	// BACON_1.5_AUDITION: stop ONLY the audition channel.  The 8 song
+	// PlayerChannels are never touched by a preview.
+	AuditionService::GetInstance()->StopPreview() ;
 #if defined(PLATFORM_TREEFROG)
 	if (!isRunning_) {
 		TreeFrogAudioSetPlaybackArmed(0) ;

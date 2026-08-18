@@ -57,7 +57,11 @@ enum ViewType {
     VT_CHOPPER,
     // F2 (0722cb2 validacion consola): submodo Pitch/Env del chopper; su
     // HelpOverlay debe abrir en la seccion CHOP PITCH.
-    VT_CHOPPITCH
+    VT_CHOPPITCH,
+    // BACON_1.5_EQ8_VIEW (bacon-1.5, item 5): fullscreen graphic 8-band
+    // instrument EQ editor.  Kept at the end so existing VT_* ordinals are
+    // unaffected.
+    VT_INSTRUMENT_EQ
 };
 
 enum ViewMode {
@@ -108,7 +112,10 @@ class View : public Observable {
         OnFocus();
     };
 
-    void LooseFocus() { hasFocus_ = false; };
+    // BACON_1.5_EQ8_VIEW: made virtual so the EQ8 view can disarm the
+    // spectrum analyzer (and its live edits state) when the view loses
+    // focus.
+    virtual void LooseFocus() { hasFocus_ = false; };
 
     void Clear();
 
