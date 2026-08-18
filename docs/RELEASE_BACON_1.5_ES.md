@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 814e4b3a716bf263d1e35e3daa84e04c5abbd846ff898b503b605f674a43c4af
+- lgpt_r36sx_u2523.so - SHA256 e54a5694308458bbb4aba4301a9b0f581415bdcd27fe1e4e9671414d136d0fe1
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...
@@ -160,17 +160,41 @@ Fixes:
   FFT de 1024; el test de silencio alimenta 2048 ceros (antes 512 dejaba
   mitad de la ventana con audio viejo).
 
-Pendiente de verificar en dispositivo (prueba #4):
+Novedades U2.52.7 (feedback de la prueba en R36SX #4):
 
-- "Sinths en Phrase no se muestran en el mixer": el VU del mixer muestrea los
-  picos de los 8 PlayerChannel (post-render, audible && !muted && volume>0),
-  sin distinción sample/sinth — si la frase suena pero la barra no se mueve,
-  el detalle está en el caso de uso exacto (frase lanzada desde la pantalla
-  Phrase vs canción corriendo, canal mudo, o audición por bus propio).
-  Protocolo de prueba: cargar proyecto, asignar sinth a un canal, lanzar la
-  CANCIÓN (START en Song, no solo la frase) y observar las barras del canal.
+26. FIX DEFINITIVO del VU del mixer: las barras estaban VACÍAS para todo
+    instrumento (no solo sinths) desde H38.7-r4. El scan de picos medía
+    `fp2fl(c)*(1.0f/32767.0f)`: fp2fl ya normaliza a 0..1 (Q15: val/32768)
+    y el factor extra dividía DOS veces, dejando todo pico real en ~1e-6;
+    el piso 0.002 del decaimiento lo anulaba → la barra nunca se movía.
+    Corregido en el scan post-pan de los 8 canales (PlayerChannel.cpp) y en
+    el scan pre-clip del master (AudioMixer.cpp): el nivel medido vuelve a
+    ser la amplitud lineal 0..1, y mixVULevel/dB de la MIX page funcionan
+    como estaban diseñados (barra llena = ~+3 dBFS). BACON_1.5_VU_SCALE_FIX.
+    Verificación host con la cadena REAL (PlayerChannel + BassSynth + scan +
+    MixerMeters, 44.1 kHz y 48 kHz): pico del sinth ~0.09, barra 69%
+    (vol 100) / 87% (vol 127), paneo hard L/R correcto, mute/volumen 0/
+    transporte parado/ocioso vacían la barra — nuevo runner
+    run_host_mixer_vu_chain.sh (46 checks) registrado en el audit.
+    EL MUCHOS "no se muestra en el mixer" reportado era ESTE bug: la frase
+    sonaba (el bus mezcla el audio aunque el VU esté roto) y el mute
+    silenciaba (Render devuelve audible=false y el bus descarta el buffer)
+    — ambas observaciones son consistentes con la causa raíz.
+
+Fixes:
+
+- Fix EQ8 0 dB (U2.52.6): refreshFlat() y el lazo de Process() aplican la
+  misma regla (banda activa ⇔ enabled && ganancia != 0) — la curva y el DSP
+  nunca pueden divergir por el tipo seleccionado a 0 dB.
+- Fix spectro (U2.52.6): anillo del analyzer 512→2048 frames para ventana
+  FFT de 1024; el test de silencio alimenta 2048 ceros (antes 512 dejaba
+  mitad de la ventana con audio viejo).
+- Fix VU del mixer (U2.52.7): ver punto 26 — doble división en el scan de
+  picos de PlayerChannel y del master (AudioMixer); el golden anterior de
+  mixer_meters cubría solo la matemática de MixerMeters, no el scan, por
+  eso la regresión pasó los gates.
 
 Regresión: AUDIT_CLEAN_MAIN_U2523_OK (tests/run_all.sh), F10_BASELINE_OK
-(golden core 814e4b3a), host bass 72 + piano 46 + eq8_struct 68 +
-analyzer_mix 64 checks OK (UBSAN limpio), DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS,
-BUILD_U2523_OK, verify ERRORS=0.
+(golden core e54a5694), host bass 72 + piano 46 + eq8_struct 68 +
+analyzer_mix 64 + mixer_vu_chain 46 checks OK (UBSAN limpio),
+DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK, verify ERRORS=0.

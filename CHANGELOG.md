@@ -1,6 +1,26 @@
 # Changelog
 
-## Update: Bacon 1.5 U2.52.6 - EQ8 0 dB transparente, espectro 20 Hz-20 kHz real, sinths +6 dB
+## Update: Bacon 1.5 U2.52.7 - Fix del VU del mixer (barras vacías desde H38.7-r4)
+
+- **Estado**: quinta iteración de la pre-release Bacon 1.5 tras el cuarto
+  feedback del dispositivo: "los sinths no se muestran en el mixer" (barra
+  vacía a volumen 100-127, aunque mutear sí silenciaba). Reproducido en host
+  con la cadena REAL (PlayerChannel + BassSynth + scan + MixerMeters a
+  44.1 kHz y 48 kHz): el buffer tenía audio (pico 0.116) pero el scan leía
+  0.0000. Corregido + regresión nueva clavada en test.
+- **Fix VU del mixer** (`PlayerChannel.cpp` scan post-pan + `AudioMixer.cpp`
+  scan pre-clip del master): el scan media `fp2fl(c)*(1.0f/32767.0f)` —
+  fp2fl ya normaliza a 0..1 (Q15: val/32768), el factor extra dividía DOS
+  veces y todo pico real caía a ~1e-6, que el piso 0.002 del decaimiento
+  anulaba → la barra NUNCA se movía, para samples y sinths igual. El bug
+  venía de H38.7-r4 (premisa errónea de que fp2fl era identidad); el golden
+  de mixer_meters solo cubría la matemática de MixerMeters (SmoothFrame/
+  BarLevel), no el scan, por eso pasó todos los gates. `BACON_1.5_VU_SCALE_FIX`.
+- **Verificación**: el mute sí silenciaba (Render devuelve audible=false y
+  el bus descarta el buffer) — consistente con la causa raíz. Tras el fix:
+  pico del sinth ~0.09, barra 69% (vol 100) / 87% (vol 127), paneo hard L/R
+  correcto, mute/volumen 0/transporte parado/ocioso vacían la barra. Nuevo
+  runner `run_host_mixer_vu_chain.sh` (46 checks) registrado en audit.sh.
 
 - **Estado**: cuarta iteración de la pre-release Bacon 1.5 tras el tercer
   feedback del dispositivo. En samples el EQ seguía "matando el sonido" al

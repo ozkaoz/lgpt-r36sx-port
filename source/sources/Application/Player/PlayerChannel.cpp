@@ -159,10 +159,15 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
            // sides are measured and the pan shows on the bars.
             fixed *c=buffer+off ;
             for (int i=0;i<n;i+=8) {
-               float vL=fp2fl(c[0])*(1.0f/32767.0f) ;
+               // BACON_1.5_VU_SCALE_FIX (U2.52.7): fp2fl() already returns
+               // the true linear 0..1 level (Q15: val/32768).  The old
+               // extra *(1/32767) divided twice, so every real peak fell to
+               // ~1e-6 and the 0.002 floor zeroed it: the bars were ALWAYS
+               // empty since H38.7-r4.
+               float vL=fp2fl(c[0]) ;
                if (vL<0.0f) vL=-vL ;
                if (vL>blockPeakL) blockPeakL=vL ;
-               float vR=fp2fl(c[1])*(1.0f/32767.0f) ;
+               float vR=fp2fl(c[1]) ;
                if (vR<0.0f) vR=-vR ;
                if (vR>blockPeakR) blockPeakR=vR ;
                c+=8 ;
