@@ -21,12 +21,13 @@ public:
 	// TREEFROG_MIXER_COMPACT_BARS_V1 (Bacon 1.1.1 V13): each level is 3 px
 	// tall (2 px fill + 1 px gap).
 	static const int kLevelHeight = 3 ;
-	// BACON_1.5_VU_LINEAR_SCALE (U2.52.8): the red band is the top cell of
-	// the bar: the 0 dBFS ceiling zone (fills at level > 36/39, i.e. a real
-	// pre-clip level at/over ~0 dBFS).  Kept at 36/39 so the geometry
-	// (red band = 1 top cell, ~7.5% of the bar) is unchanged from the old
-	// rebased scale.
-	static float ZeroDbLevel() { return 36.0f / 39.0f ; }
+	// BACON_1.5_VU_DB_SCALE (U2.52.9, feedback #6): the red band is the top
+	// +3 dB zone of the CUE scale: 0 dBFS sits at 24/27 of the bar, so the
+	// band above the 0 mark is exactly 3/27 (1.67 of the 15 cells) -- the
+	// "0 dB" CUE mark at row 7 with the +3 zone (2 cells) above it.  The
+	// bar fill reaching the top cell means a real pre-clip sum at/over
+	// +3 dBFS (the CUE+3 lamp), and a 0 dBFS sum tops the "0" mark.
+	static float ZeroDbLevel() { return 24.0f / 27.0f ; }
 
 	MixerMeters() {
 		for (int i = 0 ; i < kChannels ; i++) {
@@ -65,15 +66,16 @@ public:
 	float LevelL(int ch) const { return vuL_[ch] ; }
 	float LevelR(int ch) const { return vuR_[ch] ; }
 
-	// BACON_1.5_VU_LINEAR_SCALE (U2.52.8): normalized level of one side,
-	// rendered by drawMeterBar and PostFlushDraw.  The level is the true
-	// linear peak ONLY (mixVULevel is linear, see FxPages.h).  The volume
-	// parameter is kept for API stability but IGNORED: the scanned peaks
-	// already include their fader (the channel scan runs on the post-volume
-	// buffer in PlayerChannel::Render, and the master damp is applied
-	// pre-scan on the master bus in MixerService::SetMasterVolume), so the
-	// old *volume/100 double-applied it -- with the hot rebased scale it
-	// pushed a volume-20 track to 87%+ of the master bar (red +3 cell).
+	// BACON_1.5_VU_DB_SCALE (U2.52.9): normalized level of one side, rendered
+	// by drawMeterBar and PostFlushDraw.  The level is the TRUE peak mapped
+	// onto its dB position (mixVULevel, see FxPages.h: (20*log10(p)+24)/27
+	// over -24..+3 dBFS).  The volume parameter is kept for API stability
+	// but IGNORED: the scanned peaks already include their fader (the
+	// channel scan runs on the post-volume buffer in PlayerChannel::Render,
+	// and the master damp is applied pre-scan on the master bus in
+	// MixerService::SetMasterVolume), so the old *volume/100 double-applied
+	// it -- with the hot rebased scale it pushed a volume-20 track to 87%+
+	// of the master bar (red +3 cell).
 	static float BarLevel(float peak, int volume) {
 		(void)volume ;
 		float level = mixVULevel(peak) ;
@@ -106,10 +108,10 @@ public:
 			g.filledRLevels = 0 ;
 			return g ;
 		}
-		// BACON_1.5_VU_LINEAR_SCALE (U2.52.8): 0 dB+ zone: the top cell of
-		// the bar above the 0 dBFS ceiling (see ZeroDbLevel), rendered solid
-		// red.  On the linear scale it lights when the fill reaches the
-		// ceiling (a real pre-clip level at/over ~0 dBFS).
+		// BACON_1.5_VU_DB_SCALE (U2.52.9): 0 dB+ zone: the top cells above
+		// the 0 dBFS row (see ZeroDbLevel = 24/27, the +3 zone), rendered
+		// solid red.  On the dB scale it lights when the fill reaches the
+		// 0 dBFS row (a real pre-clip level at/over ~0 dBFS).
 		g.redBandLevels = g.totalLevels - (int)(ZeroDbLevel() * (float)g.totalLevels + 0.5f) ;
 		if (g.redBandLevels < 1) g.redBandLevels = 1 ;
 		g.redBandPx = g.redBandLevels * kLevelHeight ;

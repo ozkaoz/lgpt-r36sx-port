@@ -8,6 +8,14 @@
  * onto a single FFT bin and any sample lit them all through spectral
  * leakage ("las barras no miden 20 Hz-20 kHz").  Test 4 pins the
  * regression: a 1 kHz tone must NOT light the bars below ~300 Hz.
+ *
+ * BACON_1.5_ANALYZER_SCALE (U2.52.9, feedback #6): FeedMix takes the
+ * MASTER bus, which is int16 DAC counts shifted <<15 (count<<15).  The
+ * mono average is taken in counts ((l>>16)+(r>>16)), so fp2fl() on the
+ * ring yields the true -1..1 audio: a 0 dBFS sine peaks at ~0.25 in the
+ * bins (Hann window), and a quiet hat lights its bars low while a kick
+ * lights the lows.  The harness feeds master scale (i2fp(count)), the
+ * same byte layout the real AudioMixer/recorder path writes.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,8 +40,13 @@ static void feedTone(SpectrumAnalyzer &sp, double hz, float amp,
     static fixed buf[2 * 2048];
     if (frames > 2048) frames = 2048;
     for (int i = 0; i < frames; i++) {
-        fixed s = fl2fp((float)(amp * sin(2.0 * 3.14159265 * hz *
-                                          (double)i / 48000.0)));
+        // BACON_1.5_ANALYZER_SCALE: the master mix is int16 DAC counts <<15,
+        // so the harness feeds i2fp(count) -- fp2fl() on the ring must read
+        // back the real 0..1 audio (feeding fl2fp(amp) here would vanish
+        // through the (l>>16)+(r>>16) count average).
+        int c = (int)(amp * 32767.0 * sin(2.0 * 3.14159265 * hz *
+                                          (double)i / 48000.0));
+        fixed s = i2fp(c);
         buf[i * 2] = s;
         buf[i * 2 + 1] = s;
     }
@@ -75,10 +88,12 @@ int main() {
     {
         static fixed buf[2 * 2048];
         for (int i = 0; i < 2048; i++) {
-            fixed s = fl2fp((float)(0.3 * sin(2.0 * 3.14159265 * 300.0 *
-                                              (double)i / 48000.0) +
-                                    0.3 * sin(2.0 * 3.14159265 * 3000.0 *
-                                              (double)i / 48000.0)));
+            int c = (int)(32767.0 *
+                          (0.3 * sin(2.0 * 3.14159265 * 300.0 *
+                                     (double)i / 48000.0) +
+                           0.3 * sin(2.0 * 3.14159265 * 3000.0 *
+                                     (double)i / 48000.0)));
+            fixed s = i2fp(c);
             buf[i * 2] = s;
             buf[i * 2 + 1] = s;
         }

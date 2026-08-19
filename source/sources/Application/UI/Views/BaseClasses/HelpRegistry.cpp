@@ -174,6 +174,11 @@ static const HelpLine kEq8Lines_[] = {
     {"L/R", "band"},
     {"X+L/R", "frequency"},
     {"X+UP/DN", "gain +-1 dB"},
+    // BACON_1.5_EQ8_FAST_COARSE (U2.52.9, feedback #6): L1+X+arrows = fast
+    // displacement (~1 octave per step, 10 dB per step) like the rest of
+    // the port; no conflict with the L1+X global undo (no arrows).
+    {"L1+X L/R", "freq ~1 oct"},
+    {"L1+X UP/DN", "gain +-10 dB"},
     {"Y+L/R", "Q wider/narrower"},
     {"Y+UP/DN", "intensity all"},
     {"A", "band on/off"},

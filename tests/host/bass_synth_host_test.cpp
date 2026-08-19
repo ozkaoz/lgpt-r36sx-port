@@ -323,18 +323,21 @@ int main() {
     rmsS100 = bufferRms(buffer, 512 * 2);
     // sustain 100 must be clearly louder than sustain 60 (>= 1.3x).
     check(rmsS100 > rmsS60 * 1.3f, "sustain 100 >= 1.3x louder than 60");
-    // ... and reach the ~0 dBFS level: full-scale saw (RMS 0.577) through
-    // the BACON_1.5_SYNTH_LEVEL +6 dB boost and monotonic piecewise
-    // clipper (RMS ~0.68 pre-pan, peak 1.0) and the equal-power center
-    // pan (0.707) -> ~0.48 (the old hard-clip+cubic cascade capped at
-    // 0.667 and measured ~0.31, i.e. 3-4 dB below the samples).
-    check(rmsS100 > 0.42, "sustained note at 0 dBFS level");
+    // ... and sit at the kit-sample-equivalent level: BACON_1.5_VOL_SYNTHS_PAD
+    // (U2.52.9, feedback #6) pads the master-scale write by -20 dB (x0.1):
+    // the full-scale saw (RMS ~0.577 pre-pad) measured ~19 dB RMS louder
+    // than a reference kit sample (HI HAT 01) at the same volume, so the
+    // sustained note now reads rms ~0.045 (peak ~0.113), the level of a
+    // typical kit sample at instrument volume 100.
+    check(rmsS100 > 0.03, "sustained note at kit-sample level");
     // The device edit flow: X+UP (gain +1) on every band, rendered each
     // time -- the sound must never collapse after ANY single edit.
     for (int b = 0; b < 8; b++) {
         eqG[b]->SetInt(1);
         synth.Render(0, buffer, 512, false);
-        check(bufferRms(buffer, 512 * 2) > 0.05,
+        // Audibility floor on the padded scale: a dead signal measures
+        // < 0.001, a +1 dB edit on a 0.045-rms saw stays above 0.02.
+        check(bufferRms(buffer, 512 * 2) > 0.02,
               "single +1dB edit stays audible");
     }
     // B (type cycle): every EQ type must remain audible, not just BELL.
@@ -347,7 +350,7 @@ int main() {
             for (int i = 0; i < 6; i++) {
                 synth.Render(0, buffer, 512, false);
             }
-            check(bufferRms(buffer, 512 * 2) > 0.05,
+            check(bufferRms(buffer, 512 * 2) > 0.02,
                   "EQ type remains audible");
         }
     }
@@ -360,7 +363,7 @@ int main() {
             int g = ((e >> 3) & 1) ? 1 : -1;
             eqG[b]->SetInt(g);
             synth.Render(0, buffer, 512, false);
-            if (bufferRms(buffer, 512 * 2) <= 0.05) audible = false;
+            if (bufferRms(buffer, 512 * 2) <= 0.02) audible = false;
         }
         check(audible, "32 sequential EQ edits never kill the sound");
     }

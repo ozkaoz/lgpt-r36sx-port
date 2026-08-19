@@ -45,13 +45,21 @@ void SpectrumAnalyzer::SetArmed(bool armed) { armed_ = armed; }
 // master bus and the master FxEngine stage).  No instrument filtering: the
 // spectrum shows the whole mix so the EQ8 view reflects what is actually
 // sounding.
+// BACON_1.5_ANALYZER_SCALE (U2.52.9, feedback #6): the master mix is int16
+// DAC counts shifted <<15, so the mono average must be taken in COUNTS
+// ((l>>16)+(r>>16)): fp2fl() on the ring then yields the true -1..1 audio
+// and the FFT bins map 0 dBFS sine -> peak ~0.25 (Hann window), which the
+// view scales x4 to a full bar.  The old (l>>1)+(r>>1) stored the raw
+// count<<15 bus value, so fp2fl() returned up to 32767 and EVERY bin
+// clamped at 1.0: kick/snare/hat all lit every bar ("las barras no
+// reflejan la dinamica real", bars 100% full for any signal).
 void SpectrumAnalyzer::FeedMix(const fixed *stereo, int frames) {
     if (!armed_) return;                     // zero cost
     if (!stereo || frames <= 0) return;
     for (int i = 0; i < frames; i++) {
         fixed l = stereo[i * 2];
         fixed r = stereo[i * 2 + 1];
-        ring_[ringPos_] = (l >> 1) + (r >> 1);
+        ring_[ringPos_] = (l >> 16) + (r >> 16);
         if (++ringPos_ >= kRingFrames) ringPos_ = 0;
     }
     generation_++;

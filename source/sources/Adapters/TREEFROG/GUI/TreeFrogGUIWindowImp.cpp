@@ -47,6 +47,35 @@ uint16_t *TreeFrogGetFramebuffer() {
     return g_window_imp ? g_window_imp->GetFramebuffer() : g_fallback_framebuffer;
 }
 
+void TreeFrogDrawText8(const char *text, int x, int y, uint16_t fg) {
+    if (!text) return;
+    uint16_t *fb = TreeFrogGetFramebuffer();
+    if (!fb) return;
+    const size_t FONT_SCANLINE_WIDTH = 128 * 8;
+    const size_t fontSize = sizeof(treefrog_font);
+    int px = x;
+    for (const char *s = text; *s; ++s) {
+        unsigned int ch = (unsigned char)*s;
+        if (ch >= 128) ch = (unsigned int)'?';
+        const size_t glyphBase = (size_t)ch * 8;
+        for (int yg = 0; yg < 8; ++yg) {
+            int yy = y + yg;
+            if (yy < 0 || yy >= TREEFROG_LGPT_HEIGHT) continue;
+            if ((size_t)yg * FONT_SCANLINE_WIDTH + glyphBase + 8 > fontSize) continue;
+            const unsigned char *row =
+                treefrog_font + (size_t)yg * FONT_SCANLINE_WIDTH + glyphBase;
+            uint16_t *dst = fb + (size_t)yy * TREEFROG_LGPT_WIDTH;
+            for (int xg = 0; xg < 8; ++xg) {
+                int xx = px + xg;
+                if (xx < 0 || xx >= TREEFROG_LGPT_WIDTH) continue;
+                // ZERO_IS_INK (TreeFrogGUIWindowImp.cpp:13): ink = byte 0.
+                if (row[xg] == 0) dst[xx] = fg;
+            }
+        }
+        px += 8;
+    }
+}
+
 uint16_t TreeFrogGUIWindowImp::rgb565(const GUIColor &c) {
     uint16_t r = (uint16_t)((c._r & 0xff) >> 3);
     uint16_t g = (uint16_t)((c._g & 0xff) >> 2);

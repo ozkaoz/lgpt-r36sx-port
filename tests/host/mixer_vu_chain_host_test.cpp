@@ -5,8 +5,9 @@
 // song channel:
 //   PlayerChannel::StartInstrument -> PlayerChannel::Render (instrument
 //   renders, post-pan buffer) -> per-block peak scan -> GetPeakValueL/R ->
-//   MixerMeters::SmoothFrame -> MixerMeters::BarLevel (linear mixVULevel,
-//   volume ignored: the scanned peak already includes the fader).
+//   MixerMeters::SmoothFrame -> MixerMeters::BarLevel (dB mixVULevel, the
+//   peak mapped onto its -24..+3 dBFS position; volume ignored: the
+//   scanned peak already includes the fader).
 //
 // Checks:
 //   1. the scan sees the synth audio on BOTH sides at the device rate
@@ -20,6 +21,15 @@
 //      empty (stereo meters reflect the pan);
 //   7. transport stopped (SmoothFrame running=false) -> bar empties;
 //   8. wall-clock idle decay in GetPeakValueL/R (player stopped).
+//
+// BACON_1.5_VOL_SYNTHS_PAD (U2.52.9, feedback #6): the synth output is
+// padded to the kit-sample level (sustained peak ~0.1), so the harness
+// sets a 0 attack: the level sits AT sustain right away (the default
+// ~200 ms attack would put the 1024-frame measurement inside the ramp at
+// ~0.013).  The first-buffer snapshot is phase-dependent (a 60 Hz tone
+// over 1024 frames can peak as low as ~0.05 at 48 kHz, below the -24 dBFS
+// meter floor), so the bar section reads the scan after 3 warmup buffers,
+// at the sustained level.
 //
 // Compiles the real PlayerChannel.cpp + BassSynth.cpp (+ FilterV2,
 // InstrumentEq, TablePlayback) with the same stub pattern as
@@ -184,6 +194,9 @@ static void runChain(int rate, const char *tag) {
 
     BassSynth synth;
     check(synth.Init(), "synth Init");
+    // BACON_1.5_VOL_SYNTHS_PAD: measure AT sustain (see header note).
+    synth.FindVariable(SBP_ATTACK)->SetInt(0);
+    synth.FindVariable(SBP_DECAY)->SetInt(0);
 
     // Direct render first: the synth must write non-zero audio in this
     // harness before the channel is involved.
@@ -221,12 +234,24 @@ static void runChain(int rate, const char *tag) {
     check(pL > 0.02f, "scan sees synth audio on L");
     check(pR > 0.02f, "scan sees synth audio on R");
 
+    // ---- 1b. warmup: the first 1024-frame snapshot is phase-dependent
+    // (see header note), so render 3 more buffers and re-read the scan at
+    // the sustained level before the bar checks.
+    for (int i = 0; i < 3; i++) {
+        pc.Render(buffer, 1024);
+    }
+    pL = pc.GetPeakValueL();
+    pR = pc.GetPeakValueR();
+    printf("[%s] sustained peakL=%.4f peakR=%.4f\n", tag, pL, pR);
+    check(pL > 0.02f, "sustained scan keeps the peak on L");
+    check(pR > 0.02f, "sustained scan keeps the peak on R");
+
     // ---- 2. bar level through the real MixerMeters path (what the MIX
-    // page draws): BACON_1.5_VU_LINEAR_SCALE (U2.52.8) -- the bar equals
-    // the true scanned peak (the fader is already inside the peak), so a
-    // quiet synth at volume 100 reads ~5% of the bar, not the ~56% the old
-    // +12 dB hot rebase showed.  Visible above the 0.002 floor, never
-    // double-scaled by the volume.
+    // page draws): BACON_1.5_VU_DB_SCALE (U2.52.9) -- the bar equals the
+    // dB POSITION of the true scanned peak over -24..+3 dBFS
+    // ((20*log10(peak)+24)/27, see FxPages.h), so a ~0.1-peak synth at
+    // volume 100 reads ~15% of the bar (its ~-20 dBFS row, between the
+    // -12 and -24 CUE marks), never double-scaled by the volume.
     MixerMeters meters;
     float peaksL[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     float peaksR[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -236,8 +261,16 @@ static void runChain(int rate, const char *tag) {
     float lvl100 = MixerMeters::BarLevel(meters.LevelL(0), 100);
     float lvl127 = MixerMeters::BarLevel(meters.LevelL(0), 127);
     printf("[%s] barLevel vol100=%.3f vol127=%.3f\n", tag, lvl100, lvl127);
-    check(closef(lvl100, pL), "bar level equals the scanned peak (linear)");
-    check(closef(lvl127, pL), "volume 127 does not double-scale the peak");
+    // Mirror the exact clamps of mixVULevel (floor 0.002 -> -54 dBFS, the
+    // -24 dBFS meter floor and the +3 dBFS ceiling).
+    float dBpos = 0.0f;
+    if (pL > 0.002f) {
+        dBpos = (20.0f * log10f(pL) + 24.0f) / 27.0f;
+        if (dBpos < 0.0f) dBpos = 0.0f;
+        if (dBpos > 1.0f) dBpos = 1.0f;
+    }
+    check(closef(lvl100, dBpos), "bar level = dB position of the scanned peak");
+    check(closef(lvl127, lvl100), "volume 127 does not double-scale the peak");
     check(lvl100 > 0.02f, "bar visibly above the 0.002 floor");
 
     // ---- 3. sustained buffers: the peaks must stay up (the sub-block

@@ -407,22 +407,29 @@ inline bool fxIsDiscreteParam(int id) {
 	}
 }
 // TREEFROG_MIXER_VU_DB_SCALE_V5 (Bacon 1.1.1):
-// BACON_1.5_VU_LINEAR_SCALE (U2.52.8, feedback): the bar level is now the
-// TRUE 0..1 peak, linearly (level = peak).  The old -36..+3 DAW rebase
-// (displayed dB = real dB + 12, 0 dB row at 36/39) was calibrated for the
-// double-divided peaks of the old scan: after the U2.52.7 scan fix the same
-// mapping pushed a volume-20 track (real pre-clip ~0.2 = -14 dBFS) to 87% of
-// the bar, lighting the +3 red cell on the master with a single track.  The
-// linear scale shows the reality the user expects: a track at volume 20 on a
-// full-scale instrument reads 20%, and the top red cell (the +3 zone of the
-// CUE column) lights only when the fill reaches the 0 dBFS ceiling -- i.e.
-// a real pre-clip sum at/over 1.0.  Sub-0.002 peaks (-54 dBFS) read 0, the
-// same floor the channel scan itself applies.
+// BACON_1.5_VU_LINEAR_SCALE (U2.52.8, feedback): the bar level is the TRUE
+// 0..1 peak, linearly (level = peak).  See the note at MixerMeters.h.
+// BACON_1.5_VU_DB_SCALE (U2.52.9, feedback #6): the bar maps the TRUE peak
+// onto its dB POSITION over the -24..+3 dBFS range of the CUE scale (each dB
+// = 1/27 of the bar), so the -24/-12/-6/0/+3 CUE marks sit at their real dB
+// rows and the fill reaches the mark of the level that is really playing (a
+// volume-20 track on a full-scale instrument = -13.98 dBFS = 37% of the bar;
+// a pre-clip 0 dBFS sum = 88.9% = the top cell under +3).  The linear fill
+// with dB labels made the -6..0 dB zone look like a huge empty gap ("el
+// mixer se ve mal, hueco enorme entre -6 y 0") because 6 dB are 17% of the
+// bar while the old dB marks assumed a log scale.  The peak is NOT
+// pre-clamped to 1.0: inputs above +3 dBFS (pre-clip overs) read 1.0 and
+// fill the red top cells; in practice the master bus clamp caps the scan at
+// 0 dBFS, so the bar tops at 24/27 with the +3 zone as headroom margin.
+// Sub-0.002 peaks (-54 dBFS) read 0, the same floor the channel scan
+// applies.
 inline float mixVULevel(float peak) {
 	if (peak <= 0.0f) return 0.0f ;
 	if (peak < 0.002f) return 0.0f ;
-	if (peak > 1.0f) peak = 1.0f ;
-	return peak ;
+	float db = 20.0f * log10f(peak) ;
+	if (db < -24.0f) return 0.0f ;
+	if (db > 3.0f) return 1.0f ;
+	return (db + 24.0f) / 27.0f ;
 }
 
 // TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9):

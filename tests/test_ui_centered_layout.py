@@ -231,19 +231,21 @@ def check_set_window_30():
 # 8. MIX page: 9 meters (MST + 8 ch) one-cell columns, inside 0..39
 # ---------------------------------------------------------------------------
 # NOTE: updated for the golden baseline (Bacon 1.1.1 V16 + RC6, stereo
-# meters): layout constants are masterX=4, channel0X=8, channelPitch=4,
-# chLabelX=38, barHeight=15 (bars 5..19); each meter is a single cell
-# column (L/R drawn on the same x by drawMeterBar(side 0/1)).
+# meters) and BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): layout
+# constants are masterX=4, channel0X=8, channelPitch=4, labelY=4 (hex
+# labels), barY=labelY+2=6, barHeight=19 (bars 7..25, 27% taller), the
+# volume numbers at row 5 and the pan/mute marker at row 26; each meter is
+# a single cell column (L/R drawn on the same x by drawMeterBar(side 0/1)).
 def check_mixer_meters():
     draw = MIX_CPP[MIX_CPP.index("void MixerView::drawFxPages"):
                    MIX_CPP.index("void MixerView::DrawView")]
     assert "masterX=4" in draw and "channel0X=8" in draw
-    assert "channelPitch=4" in draw and "chLabelX=38" in draw
-    assert "barHeight=15" in draw
+    assert "channelPitch=4" in draw and "barHeight=19" in draw
+    assert "chLabelX=38" not in draw
     # 9 meters: 8 channels in a loop + 1 master bar.
     assert "for (int i=0;i<SONG_CHANNEL_COUNT;i++)" in draw
-    assert "drawVolumeBar(i,channel0X+i*channelPitch,labelY,barHeight)" in draw
-    assert "drawMasterBar(masterX,labelY,barHeight)" in draw
+    assert "drawVolumeBar(i,channel0X+i*channelPitch,barY,barHeight)" in draw
+    assert "drawMasterBar(masterX,barY,barHeight)" in draw
     # Uniform positions: MST at 4, channels 8..36 pitch 4 -> 9 columns,
     # all inside 0..39, no overlap.
     positions = [4] + [8 + i * 4 for i in range(8)]
@@ -260,31 +262,32 @@ def check_mixer_meters():
     # F3-4b: the L/R levels come from the MixerMeters layer.
     assert "drawMeterBar(x,y,height,meters_.LevelL(channel)" in bar
     assert "drawMeterBar(x,y,height,meters_.LevelR(channel)" in bar
-    assert "DrawString(x-1,y,hex,props)" in bar
-    assert "DrawString(x-1,y+height+2" in bar
-    assert "DrawString(x-1,y,\"MST\",props)" in mbar
+    assert "DrawString(x-1,y-2,hex,props)" in bar
+    assert "DrawString(x-1,y+height+1" in bar
+    assert "DrawString(x-1,y-2,\"MST\",props)" in mbar
     assert "meterRecords_[SONG_CHANNEL_COUNT]" in mbar   # master meter slot
     print("8. 9 one-column meters (8ch pitch 4 + MST) in 0..39 OK")
 
 
 # ---------------------------------------------------------------------------
-# 9. Mixer block layout: centered vertically, FX RETURNS own row, no 27..29
+# 9. Mixer block layout: fullscreen DAW strips, FX RETURNS on the title row
 # ---------------------------------------------------------------------------
 def check_mixer_block_bounds():
     draw = MIX_CPP[MIX_CPP.index("void MixerView::drawFxPages"):
                    MIX_CPP.index("void MixerView::DrawView")]
-    # Constants used by the block (Bacon 1.1.1 V16: header 3, labels 4,
-    # bars 5..19, volumes 21, pan/mute row 22).
-    assert "labelY=4" in draw and "barHeight=15" in draw
-    assert "numY=labelY+barHeight+2" in draw
-    assert "retY=3" in draw
-    # The whole block stays inside the safe band: FX RETURNS 3, labels 4,
-    # bars 5..19, numbers 21, pan 22 -- never rows 26..29.
-    label_y, bar_h = 4, 15
-    num_y = label_y + bar_h + 2
-    ret_y = 3
+    # Constants used by the block (U2.53 MIXER-FULLSCREEN: title/transport
+    # rows 0-3, hex labels 4, volume numbers 5, bars 7..25, pan row 26; the
+    # played-notes block + view map keep rows 27..29).
+    assert "labelY=4" in draw and "barHeight=19" in draw
+    assert "barY=labelY+2" in draw
+    assert "retY=1" in draw
+    # The whole strip block stays inside the safe band: FX RETURNS 1 (title
+    # row), labels 4, volume 5, bars 7..25, pan 26 -- never rows 27..29.
+    label_y, bar_h = 4, 19
+    bar_y = label_y + 2
+    ret_y = 1
     assert label_y >= KBAND_TOP
-    assert bar_h <= KBAND_BOT - label_y
+    assert bar_y + bar_h <= KBAND_BOT
     assert ret_y <= KBAND_BOT
     assert ret_y < 26
     # FX RETURNS is drawn on its own parametrized row (drawMixReturns(retY)).
@@ -298,7 +301,7 @@ def check_mixer_block_bounds():
             ("COMP", "void MixerView::drawCompPage", "void MixerView::drawMixReturns")):
         seg = MIX_CPP[MIX_CPP.index(start_marker):MIX_CPP.index(end_marker)]
         assert "DrawString(...,2" not in seg
-    print("9. mixer block centered in 3..25; FX RETURNS own row; nothing in 27..29 OK")
+    print("9. DAW strips in rows 4..26; FX RETURNS on row 1; nothing in 27..29 OK")
 
 
 # ---------------------------------------------------------------------------

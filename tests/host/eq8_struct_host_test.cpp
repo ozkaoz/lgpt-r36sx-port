@@ -84,6 +84,21 @@ static double rmsTail(const fixed *buf, int frames) {
     return (n > 0) ? sqrt(acc / n) : 0.0;
 }
 
+/* Goertzel amplitude (Q15 counts) of one frequency over the L-side tail. */
+static double goertzel(const fixed *buf, int frames, double f) {
+    double w = 2.0 * 3.14159265 * f / (double)kRate;
+    double c = 2.0 * cos(w);
+    double s0 = 0, s1 = 0, s2 = 0;
+    for (int i = frames / 2; i < frames; i++) {
+        double x = fp2fl(buf[2 * i]);
+        s0 = x + c * s1 - s2;
+        s2 = s1;
+        s1 = s0;
+    }
+    double mag = sqrt(s1 * s1 + s2 * s2 - c * s1 * s2);
+    return 2.0 * mag / (double)(frames / 2);
+}
+
 int main() {
     /* --- 1. fresh EQ is flat: Process is a zero-cost identity --- */
     {
@@ -437,6 +452,128 @@ int main() {
                              fl2fp(0.0f), fl2fp(1.0f), true);
             eq.Process(0, buf, kFrames);
             CHECK(rmsTail(buf, kFrames) > 0.05);
+        }
+    }
+
+    /* --- 11. BACON_1.5_EQ8_BLOCKLIMIT (U2.53, feedback #7): the per-block
+     * soft limiter replaces the old per-sample saturate at +/-1.0.  A hot
+     * block (over 2.0 linear) is scaled so its peak lands EXACTLY on 65535
+     * Q15 -- shape preserved, no flat-topping -- while blocks at or under
+     * the ceiling pass through untouched. --- */
+    {
+        /* 11a/11b. BACON_1.5_EQ8_BLOCKLIMIT: the limiter is a pure GAIN --
+         * the hot block must be a scaled copy of the clean filter output
+         * (no flat-topping).  Both runs use the same +24 dB @ 100 Hz Q=1
+         * config: a QUIET run (0.1/0.06 two-tone, clean peak ~1.7 < 2.0)
+         * measures the reference spectrum ratios, a HOT run (0.9/0.6,
+         * clean peak ~15.4) must show the same ratios at an exact 65535
+         * ceiling.  A flat-topping saturate would break them (3rd harmonic
+         * of the 100 Hz peak ~ 1/3 of the fundamental). */
+        {
+            /* quiet reference: no limiting (peak ~1.7 linear) */
+            double rqRatio = 0.0, rq3 = 0.0;
+            {
+                InstrumentEq eq;
+                eq.SetSampleRate(kRate);
+                eq.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(100.0f),
+                                 fl2fp(24.0f), fl2fp(1.0f), true);
+                fixed buf[2 * kFrames];
+                for (int p = 0; p < 2; p++) {
+                    for (int i = 0; i < kFrames; i++) {
+                        double t = (double)i / (double)kRate;
+                        fixed s = fl2fp((float)(
+                            0.1 * sin(2.0 * 3.14159265 * 100.0 * t) +
+                            0.06 * sin(2.0 * 3.14159265 * 1000.0 * t)));
+                        buf[i * 2] = s;
+                        buf[i * 2 + 1] = s;
+                    }
+                    eq.Process(0, buf, kFrames);
+                }
+                fixed mx = 0;
+                for (int i = 0; i < 2 * kFrames; i++) {
+                    fixed v = buf[i]; if (v < 0) v = -v;
+                    if (v > mx) mx = v;
+                }
+                printf("quiet limiter run: mx=%d\n", mx);
+                CHECK(mx < 65535);          // below the ceiling: no limiting
+                CHECK(mx > 40000 && mx < 64000);  // clean peak ~1.4 linear
+                double g100 = goertzel(buf, kFrames, 100.0);
+                double g1k = goertzel(buf, kFrames, 1000.0);
+                double g300 = goertzel(buf, kFrames, 300.0);
+                rqRatio = g1k > 0.0 ? g100 / g1k : 0.0;
+                rq3 = g100 > 0.0 ? g300 / g100 : 0.0;
+            }
+
+            /* hot run: same config, 9x hotter -> limiter engages */
+            {
+                InstrumentEq eq;
+                eq.SetSampleRate(kRate);
+                eq.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(100.0f),
+                                 fl2fp(24.0f), fl2fp(1.0f), true);
+                fixed buf[2 * kFrames];
+                for (int p = 0; p < 2; p++) {
+                    for (int i = 0; i < kFrames; i++) {
+                        double t = (double)i / (double)kRate;
+                        fixed s = fl2fp((float)(
+                            0.9 * sin(2.0 * 3.14159265 * 100.0 * t) +
+                            0.6 * sin(2.0 * 3.14159265 * 1000.0 * t)));
+                        buf[i * 2] = s;
+                        buf[i * 2 + 1] = s;
+                    }
+                    eq.Process(0, buf, kFrames);
+                }
+                fixed mx = 0;
+                for (int i = 0; i < 2 * kFrames; i++) {
+                    fixed v = buf[i]; if (v < 0) v = -v;
+                    if (v > mx) mx = v;
+                }
+                CHECK(mx == 65535);         // peak lands exactly on the ceiling
+                CHECK(mx <= 65535);         // and never above it
+                double g100 = goertzel(buf, kFrames, 100.0);
+                double g1k = goertzel(buf, kFrames, 1000.0);
+                double g300 = goertzel(buf, kFrames, 300.0);
+                double rRatio = g1k > 0.0 ? g100 / g1k : 0.0;
+                double r3 = g100 > 0.0 ? g300 / g100 : 0.0;
+                printf("limiter: mx=%d hotRatio=%.2f qRatio=%.2f hot3rd=%.4f q3rd=%.4f\n",
+                       mx, rRatio, rqRatio, r3, rq3);
+                /* the hot block is a scaled copy of the clean one: both
+                 * ratios match the quiet reference within rounding.  A
+                 * flat-topping saturate would push r3 to ~0.33. */
+                CHECK(rqRatio > 0.0 && rRatio > 0.8 * rqRatio &&
+                      rRatio < 1.2 * rqRatio);
+                CHECK(r3 >= 0.0 && r3 < rq3 * 1.5 + 0.02);
+            }
+        }
+
+        /* 11c. the linear region is bit-preserving: +6 dB @ 1 kHz Q=1 on a
+         * 0.5 sine at the center -> the output is the input times the RBJ
+         * gain (~1.995) with no limiter rounding, no flat-topping. */
+        {
+            InstrumentEq eq;
+            eq.SetSampleRate(kRate);
+            eq.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(1000.0f),
+                             fl2fp(6.0f), fl2fp(1.0f), true);
+            fixed in[2 * kFrames], out[2 * kFrames];
+            for (int i = 0; i < kFrames; i++) {
+                fixed s = fl2fp((float)(0.5 * sin(2.0 * 3.14159265 * 1000.0 *
+                                                  (double)i / kRate)));
+                in[i * 2] = s;
+                in[i * 2 + 1] = s;
+            }
+            memcpy(out, in, sizeof(in));
+            eq.Process(0, out, kFrames);  // warm (smoothing + state)
+            memcpy(out, in, sizeof(in));
+            eq.Process(0, out, kFrames);  // measured pass
+            double rmsOut = rmsTail(out, kFrames);
+            double rmsIn = rmsTail(in, kFrames);
+            CHECK(rmsIn > 0.3 && rmsOut > 0.6);         // both audible
+            CHECK(rmsOut > 1.9 * rmsIn && rmsOut < 2.1 * rmsIn);  // x~2 boost
+            fixed mx = 0;
+            for (int i = 0; i < 2 * kFrames; i++) {
+                fixed v = out[i]; if (v < 0) v = -v;
+                if (v > mx) mx = v;
+            }
+            CHECK(mx < 65535);            // under the ceiling: untouched
         }
     }
 

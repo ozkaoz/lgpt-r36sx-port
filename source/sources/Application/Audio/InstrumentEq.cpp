@@ -5,6 +5,13 @@
 
 static const float kMinGainDb = -24.0f;
 static const float kMaxGainDb = 24.0f;
+// BACON_1.5_EQ8_BLOCKLIMIT (U2.53, feedback #7): per-block soft limiter
+// ceiling = 2.0 linear (65535 Q15 = just under i2fp(2)).  65535 is the max
+// value that survives the sample path's <<15 restore into the int16<<15
+// buffer (65535<<15 = 2147450880 < INT32_MAX, 65536<<15 would overflow).
+// The int32 sample pipeline wraps at +/-2.0 (see AudioMixer::Render), so
+// 2.0 is the absolute headroom of the chain.
+static const int kBlockLimit = (1 << 15) * 2 - 1;
 // BACON_1.5_EQ8_STRUCTURAL: exponential coefficient smoothing step.
 // cur += (tgt - cur) >> kSmoothShift per frame -> -3 dB point after
 // kSmoothShift frames (~1.3 ms @ 48 kHz with shift 6), within 1 LSB after
@@ -223,18 +230,22 @@ void InstrumentEq::recomputeBand(int band) {
     }
 }
 
-fixed InstrumentEq::saturate(fixed x) {
-    if (x > i2fp(1)) return i2fp(1);
-    if (x < -i2fp(1)) return -i2fp(1);
-    return x;
-}
+// BACON_1.5_EQ8_BLOCKLIMIT (U2.53, feedback #7): see the kBlockLimit
+// comment above; the old per-sample saturate at +/-1.0 was removed.
+// Process() applies the limiter inline at the end of the block.
 
 void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
     if (frames <= 0 || !buffer) { rtViolations_++; return; }
     if (flat_) return;  // zero cost
     if (channel < 0 || channel >= kMaxChannels) { rtViolations_++; return; }
 
+    // BACON_1.5_EQ8_BLOCKLIMIT (U2.53, feedback #7): the per-block soft
+    // limiter ceiling.  The int32 sample pipeline wraps at +/-2.0 when two
+    // full-scale signals meet (the master sum now accumulates in 64 bits,
+    // AudioMixer::Render), so 2.0 is the absolute headroom of the chain and
+    // this limiter is the last line of defense for the instrument EQ path.
     int idx = 0;
+    int maxAbs = 0;
     for (int i = 0; i < frames; i++) {
         // BACON_1.5_EQ8_STRUCTURAL: per-frame exponential coefficient blend
         // (only while a band is converging).
@@ -291,9 +302,29 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
             xL = tL;
             xR = tR;
         }
-        buffer[idx] = saturate(xL);
-        buffer[idx + 1] = saturate(xR);
+        buffer[idx] = xL;
+        buffer[idx + 1] = xR;
+        int aL = (xL < 0) ? -xL : xL;
+        int aR = (xR < 0) ? -xR : xR;
+        if (aL > maxAbs) maxAbs = aL;
+        if (aR > maxAbs) maxAbs = aR;
         idx += 2;
+    }
+
+    if (maxAbs > kBlockLimit) {
+        // BACON_1.5_EQ8_BLOCKLIMIT (U2.53, feedback #7): hot block -> scale
+        // the WHOLE block down so its peak lands exactly on 2.0 (65535 Q15).
+        // Linked L/R keeps the stereo balance; the wave shape is preserved
+        // (no flat-topping).  Only runs while the block is over the ceiling,
+        // and the 64-bit division handles the full int32 input range.
+        idx = 0;
+        for (int i = 0; i < frames; i++) {
+            fixed vL = buffer[idx];
+            fixed vR = buffer[idx + 1];
+            buffer[idx] = (fixed)(((long long)vL * kBlockLimit) / maxAbs);
+            buffer[idx + 1] = (fixed)(((long long)vR * kBlockLimit) / maxAbs);
+            idx += 2;
+        }
     }
 }
 

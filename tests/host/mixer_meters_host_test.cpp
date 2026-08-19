@@ -80,17 +80,23 @@ int main() {
     for (int i = 0 ; i < 20 ; i++) m.SmoothFrame(false, MixerMeters::kChannels, peakL, peakR) ;
     check(m.LevelL(2) == 0.0f && m.LevelR(2) == 0.0f, "stop resets to 0") ;
 
-    // ---- BarLevel (BACON_1.5_VU_LINEAR_SCALE, U2.52.8): the level is the
-    // true linear peak only -- the scanned peaks already include their
-    // fader (post-volume channel scan, pre-scan master damp), so the old
-    // *volume/100 double-applied it (a volume-20 track read ~87% + red).
-    // The volume param stays for API stability but is ignored.
+    // ---- BarLevel (BACON_1.5_VU_DB_SCALE, U2.52.9): the level is the dB
+    // position of the true linear peak over -24..+3 dBFS
+    // ((20*log10(peak)+24)/27, clamped 0..1 -- the scanned peaks already
+    // include their fader (post-volume channel scan, pre-scan master
+    // damp), so the old *volume/100 double-applied it (a volume-20 track
+    // read ~87% + red).  The volume param stays for API stability but is
+    // ignored.
     check(m.BarLevel(0.0f, 100) == 0.0f, "BarLevel 0 peak -> 0") ;
-    check(closeOr(m.BarLevel(1.0f, 100), 1.0f), "BarLevel full -> 1") ;
-    check(closeOr(m.BarLevel(0.5f, 50), 0.5f), "BarLevel 0.5 -> 0.5 (volume already in peak)") ;
-    check(closeOr(m.BarLevel(0.2f, 100), 0.2f), "BarLevel vol-20 track reads 20%") ;
-    check(m.BarLevel(1.0f, 300) == 1.0f, "BarLevel clamps at 1") ;
-    check(m.BarLevel(1.0f, 0) == 1.0f, "BarLevel ignores the volume param") ;
+    // 0 dBFS = the 24/27 row (below the +3 red zone), NOT 1.0: the fill
+    // only reaches the top cell with a pre-clip sum over 0 dBFS.
+    check(closeOr(m.BarLevel(1.0f, 100), 24.0f / 27.0f), "BarLevel 0dBFS -> 24/27") ;
+    // -6.02 dB -> (-6.02+24)/27 = 0.6659
+    check(closeOr(m.BarLevel(0.5f, 50), 0.6659f), "BarLevel 0.5 -> 0.666 (dB)") ;
+    // -13.98 dB (volume-20 track on a full-scale instrument) -> 10.02/27 = 0.3711
+    check(closeOr(m.BarLevel(0.2f, 100), 0.3711f), "BarLevel vol-20 track reads 37%") ;
+    check(m.BarLevel(10.0f, 100) == 1.0f, "BarLevel over +3dBFS clamps to 1") ;
+    check(closeOr(m.BarLevel(1.0f, 0), 24.0f / 27.0f), "BarLevel ignores the volume param") ;
     check(m.BarLevel(-1.0f, 100) == 0.0f, "BarLevel negative peak -> 0") ;
 
     // ---- GeometryFor golden: height 12 cells ----
@@ -98,9 +104,11 @@ int main() {
         MixerMeters::Geometry g = MixerMeters::GeometryFor(12, 0.5f, 0.25f) ;
         check(g.totalPx == 96, "G totalPx 96") ;
         check(g.totalLevels == 32, "G totalLevels 32") ;
-        // 32 - round(36/39*32)=round(29.54)=30 -> 2
-        check(g.redBandLevels == 2, "G redBandLevels 2") ;
-        check(g.redBandPx == 6, "G redBandPx 6") ;
+        // BACON_1.5_VU_DB_SCALE: red band = the +3 zone above 0 dBFS:
+        // 32 - (int)(24/27*32+0.5) = 32 - (int)(28.94) = 32 - 28 -> 4
+        // (was 2 with the 36/39 ceiling).
+        check(g.redBandLevels == 4, "G redBandLevels 4") ;
+        check(g.redBandPx == 12, "G redBandPx 12") ;
         // round(0.5*32)=16 levels -> 16
         check(g.filledLLevels == 16, "G filledLLevels 16") ;
         // round(0.25*32)=8
@@ -121,7 +129,7 @@ int main() {
     {
         MixerMeters::Geometry g = MixerMeters::GeometryFor(1, 1.0f, 1.0f) ;
         check(g.totalPx == 8 && g.totalLevels == 2, "G height1: 8px/2 levels") ;
-        // 2 - round(36/39*2)=round(1.846)=2 -> 0 -> min 1
+        // 2 - round(24/27*2)=round(1.778)=2 -> 0 -> min 1
         check(g.redBandLevels == 1, "G height1 redBand min 1") ;
         check(g.redBandPx == 3, "G height1 redBandPx 3") ;
     }

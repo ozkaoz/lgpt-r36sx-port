@@ -1,11 +1,13 @@
 #include "InstrumentEqView.h"
 
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
+#include "Application/AppWindow.h"
 #include "Application/Audio/EqBiquad.h"
 #include "Application/Audio/InstrumentEq.h"
 #include "Application/Audio/SpectrumAnalyzer.h"
 #include "Application/Instruments/InstrumentBank.h"
 #include "Application/Instruments/I_Instrument.h"
+#include "Application/Mixer/FxPages.h"
 #include "Application/Player/Player.h"
 #include "Application/UI/Views/ViewData.h"
 #include "Application/UI/Views/BaseClasses/ViewEvent.h"
@@ -254,36 +256,48 @@ void InstrumentEqView::DrawView() {
     GUITextProperties props;
     props.invert_ = false;
 
-    SetColor(CD_HILITE2);
     char title[80];
-    const char *name = instr_ ? instr_->GetName() : "--";
-    // BACON_1.5_EQ8_VIEW: the instrument id is shown WITHOUT the old 0x3F
-    // mask (the full index fits the 16-col title).
-    sprintf(title, "EQ8 %s INS-%02X", name, viewData_->currentInstrument_);
+    char line[96];
+    char status[96];
+    buildHeader(title, sizeof(title), line, sizeof(line), status,
+                sizeof(status));
+
+    SetColor(CD_HILITE2);
     DrawString(0, 0, title, props);
 
     SetColor(CD_NORMAL);
-    char line[96];
-    sprintf(line, "B%1d %s %4.0fHz %+3.1fdB Q%.2f %s",
-            selected_ + 1, kEqTypeNames[type_[selected_]],
-            freqHz_[selected_], gainDb_[selected_], q_[selected_],
-            bandOn_[selected_] ? "ON" : "OFF");
     DrawString(0, 1, line, props);
 
     // BACON_1.5_EQ8_FULLSCREEN (bacon-1.5, feedback): row 2 carries the
     // bypass/status line; the ENTIRE screen below the header (rows 3+,
     // y >= 24) belongs to the pixel canvas, so no menu text can ever show
     // under or behind the EQ preview.
-    char status[96];
-    if (status_[0]) {
-        strncpy(status, status_, sizeof(status) - 1);
-        status[sizeof(status) - 1] = 0;
-    } else if (bypass_) {
-        strcpy(status, "EQ BYPASSED");
-    } else {
-        strcpy(status, "L/R band  X f/g  Y Q  A on/off  B type  SEL bypass");
-    }
     DrawString(0, 2, status, props);
+}
+
+// BACON_1.5_EQ8_PIXEL_HEADER (U2.53, feedback #7): single source for the
+// three header lines, shared by the char screen (DrawView) and the pixel
+// overlay (PostFlushDraw).
+void InstrumentEqView::buildHeader(char *title, size_t titleSz, char *line,
+                                   size_t lineSz, char *status,
+                                   size_t statusSz) const {
+    const char *name = instr_ ? instr_->GetName() : "--";
+    // BACON_1.5_EQ8_VIEW: the instrument id is shown WITHOUT the old 0x3F
+    // mask (the full index fits the 16-col title).
+    snprintf(title, titleSz, "EQ8 %s INS-%02X", name,
+             viewData_->currentInstrument_);
+    snprintf(line, lineSz, "B%1d %s %4.0fHz %+3.1fdB Q%.2f %s",
+             selected_ + 1, kEqTypeNames[type_[selected_]],
+             freqHz_[selected_], gainDb_[selected_], q_[selected_],
+             bandOn_[selected_] ? "ON" : "OFF");
+    if (status_[0]) {
+        snprintf(status, statusSz, "%s", status_);
+    } else if (bypass_) {
+        snprintf(status, statusSz, "EQ BYPASSED");
+    } else {
+        snprintf(status, statusSz,
+                 "L/R band  X f/g  Y Q  A on/off  B type  SEL bypass");
+    }
 }
 
 void InstrumentEqView::OnPlayerUpdate(PlayerEventType, unsigned int) {
@@ -292,6 +306,15 @@ void InstrumentEqView::OnPlayerUpdate(PlayerEventType, unsigned int) {
 
 void InstrumentEqView::PostFlushDraw() {
 #if defined(PLATFORM_TREEFROG)
+    // BACON_1.5_EQ8_HELP_ON_TOP (U2.52.9, feedback #6): AppWindow::Flush
+    // calls PostFlushDraw on the current view every frame even while a
+    // modal is up, and this canvas repaints the whole screen below the
+    // char header -- so the SELECT+R1 help overlay (a centered modal
+    // window) was drawn first and instantly erased by the canvas below
+    // it ("el menu de ayuda se ve por debajo de la pantalla del EQ").
+    // Same guard as MixerView::PostFlushDraw: no canvas work under a
+    // modal.
+    if (GetModal()) return;
     if (!instr_) return;
 
     const unsigned short bgC    = tf565(8, 9, 22);
@@ -303,19 +326,48 @@ void InstrumentEqView::PostFlushDraw() {
     const unsigned short lblC   = tf565(170, 178, 205);
     const unsigned short guideC = tf565(46, 52, 80);
 
+    // BACON_1.5_EQ8_PIXEL_HEADER (U2.53, feedback #7): the three header
+    // rows are re-rendered HERE in pixels every frame, directly into the
+    // framebuffer AFTER the char screen was blitted (Flush -> PostFlushDraw),
+    // instead of living only on the char layer.  The char screen has a
+    // dirty-cell cache (_preScreen) and the pixel canvas repaints the screen
+    // below y=24 on every frame; a header that stayed in char cells could
+    // therefore end up erased or out of sync with the canvas repaints (the
+    // band/bell/freq menu "behind the screen" report).  Painting the strip
+    // background + text in pixels every frame makes the header the last
+    // thing drawn, always on top, always current.
+    {
+        const AppWindow *app = (const AppWindow *)&w_;
+        tfFill(0, 0, 320, 24, bgC);
+        char title[80];
+        char line[96];
+        char status[96];
+        buildHeader(title, sizeof(title), line, sizeof(line), status,
+                    sizeof(status));
+        TreeFrogDrawText8(title, 0, 0, app->ResolveColor565(CD_HILITE2));
+        TreeFrogDrawText8(line, 0, 8, app->ResolveColor565(CD_NORMAL));
+        TreeFrogDrawText8(status, 0, 16, app->ResolveColor565(CD_NORMAL));
+    }
+
     // BACON_1.5_EQ8_FULLSCREEN (bacon-1.5, feedback): the canvas owns the
     // full screen below the char header.  The header is 3 rows = 24 px;
     // everything below is repainted every frame with the background color
     // first, so stale pixels or leftover glyphs from other views can never
     // survive under/behind the EQ preview.
+    // BACON_1.5_EQ8_FULLSCREEN_EXT (U2.52.9, feedback #6): the canvas
+    // bottom moves from row 19 (y=156, "la mitad inferior de la pantalla
+    // era un recuadro negro vacio") down to y=232, leaving only the last
+    // 8 px for the frequency axis labels; the curve/spectrum now fill the
+    // whole screen under the header.
     const int headerH = 24;
 
     // Full-screen background below the header (rows 3+ => y >= 24).
     tfFill(0, headerH, 320, 240 - headerH, bgC);
 
-    // Curve canvas below the char header (rows 3..19 => 24..160).
+    // Curve canvas below the pixel header (y 24..232, only the 8 px of the
+    // frequency axis labels remain below it).
     const int cX0 = 6,   cX1 = 314;
-    const int cY0 = 24,  cY1 = 156;      // curve canvas
+    const int cY0 = 24,  cY1 = 232;      // curve canvas
     const int cMid = (cY0 + cY1) / 2;    // 0 dB
     // BACON_1.5_EQ8_24DB (U2.52.5, feedback): the gain range is +/-24 dB,
     // so the canvas maps the FULL range (pxPerDb over 48 dB).  Previously
@@ -335,32 +387,57 @@ void InstrumentEqView::PostFlushDraw() {
     // bars live BEHIND the EQ curve, not in a separate strip below it).
     // specC (90,190,130) blended 30/70 over bgC (8,9,22) -> (33,63,54).
     // The opaque grid/axis/curve drawn afterwards stay fully readable.
+    // BACON_1.5_ANALYZER_SCALE (U2.52.9, feedback #6): with the analyzer
+    // fed in DAC counts (see SpectrumAnalyzer::FeedMix), fp2fl() now yields
+    // the true -1..1 audio: the bins reflect the REAL dynamics of the mix
+    // (a kick lights the lows, a hat the highs) and a 0 dBFS sine peaks at
+    // ~0.25 (Hann window) -> the x4 below maps it to a full bar.
+    // BACON_1.5_EQ8_SPECTRUM_BARS (U2.52.9, feedback #6): the 24 log bins
+    // render as thin 3-px bars with gaps plus a 1-px outline on top of each
+    // bar, so the spectrum reads as a filled line tracing the wave shape
+    // (FabFilter Pro-Q style) instead of chunky blocks.
     {
         const unsigned short specBlend = tf565(33, 63, 54);
+        const unsigned short specTop = tf565(63, 132, 92);
         SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
         sp.Compute();
         const fixed *bb = sp.Bins();
         const int n = sp.BinCount();
         int bw = (cX1 - cX0) / n;
+        int barW = 3;
         for (int i = 0; i < n; i++) {
             // BACON_1.5_ANALYZER_20HZ: a 0 dBFS sine peaks around 0.25 in
             // the normalized FFT bins (Hann window), so scale x4 to make a
-            // full bar mean 0 dBFS; clamp to the canvas height.
-            int h = (int)(fp2fl(bb[i]) * 4.0f * (float)(cY1 - cY0));
+            // full bar mean 0 dBFS.
+            // BACON_1.5_ANALYZER_DB (U2.53, feedback #7): the bars used to
+            // be LINEAR (fp2fl(bb)*4 over the canvas), so a +1 dB EQ boost
+            // on loud low content moved the low bars by ~12% of the canvas
+            // ("+1 dB sube demasiado las barras").  The height is now the
+            // mixVULevel dB mapping (-24..+3 dB over the canvas, the same
+            // scale as the mixer bars), so bar height moves with perceived
+            // loudness and the EQ curve stays the reference.
+            int h = (int)(mixVULevel(fp2fl(bb[i]) * 4.0f) *
+                          (float)(cY1 - cY0));
             if (h < 2) h = 2;
             if (h > cY1 - cY0) h = cY1 - cY0;
-            tfFill(cX0 + i * bw, cY1 - h, bw - 1, h, specBlend);
+            int bx = cX0 + i * bw + (bw - barW) / 2;
+            tfFill(bx, cY1 - h, barW, h, specBlend);
+            tfFill(bx, cY1 - h, barW, 1, specTop);
         }
     }
 
-    tfFill(cX0 - 2, cY0 - 2, cX1 - cX0 + 5, 1, border);
+    // BACON_1.5_EQ8_PIXEL_HEADER (U2.53, feedback #7): the top border moves
+    // from cY0-2 (which clipped the last 2 px of the header strip) to the
+    // canvas edge y=24; the +24 dB grid line is dropped because the border
+    // now marks the +24 dB top edge.
+    tfFill(cX0 - 2, cY0, cX1 - cX0 + 5, 1, border);
     tfFill(cX0 - 2, cY1 + 2, cX1 - cX0 + 5, 1, border);
-    tfFill(cX0 - 2, cY0 - 2, 1, cY1 - cY0 + 5, border);
-    tfFill(cX1 + 2, cY0 - 2, 1, cY1 - cY0 + 5, border);
+    tfFill(cX0 - 2, cY0, 1, cY1 - cY0 + 3, border);
+    tfFill(cX1 + 2, cY0, 1, cY1 - cY0 + 3, border);
 
-    // dB grid: 0 dB axis + +/-12/+/-24 lines
+    // dB grid: 0 dB axis + +/-12 lines (+24 is the canvas top border)
     tfFill(cX0, cMid, cX1 - cX0, 1, axisC);
-    for (int g = -24; g <= 24; g += 12) {
+    for (int g = -24; g < 24; g += 12) {
         int yy = cMid - (int)(g * pxPerDb);
         tfFill(cX0, yy, cX1 - cX0 + 1, 1, gridC);
     }
@@ -442,10 +519,27 @@ void InstrumentEqView::PostFlushDraw() {
         }
     }
 
-    // Frequency axis labels under the canvas
-    tfTinyText(freqToX(100) - 3, cY1 + 3, "100", lblC);
-    tfTinyText(freqToX(1000) - 2, cY1 + 3, "1k", lblC);
-    tfTinyText(freqToX(10000) - 5, cY1 + 3, "10k", lblC);
+    // Frequency axis labels under the canvas.  BACON_1.5_EQ8_AXIS_LABELS
+    // (U2.52.9, feedback #6): 11 labels over the 20 Hz..20 kHz log axis
+    // (40 80 120 200 500 1k 2k 5k 10k 15k 20k), each centered on its
+    // frequency, at the 8 px that remain below the canvas (y 235..239).
+    {
+        static const char *kAxisLabels[11] = {
+            "40", "80", "120", "200", "500",
+            "1k", "2k", "5k", "10k", "15k", "20k",
+        };
+        static const float kAxisFreq[11] = {
+            40, 80, 120, 200, 500,
+            1000, 2000, 5000, 10000, 15000, 20000,
+        };
+        for (int i = 0; i < 11; i++) {
+            int lx = freqToX(kAxisFreq[i]) - (int)strlen(kAxisLabels[i]) * 2;
+            if (lx < 0) lx = 0;
+            if (lx + (int)strlen(kAxisLabels[i]) * 4 > 320)
+                lx = 320 - (int)strlen(kAxisLabels[i]) * 4;
+            tfTinyText(lx, cY1 + 3, kAxisLabels[i], lblC);
+        }
+    }
 #endif
 }
 
@@ -460,6 +554,7 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
     bool b     = (mask & EPBM_B)     != 0;
     bool x     = (mask & EPBM_X)     != 0;
     bool y     = (mask & EPBM_Y)     != 0;
+    bool l1    = (mask & EPBM_L)     != 0;
     bool r1    = (mask & EPBM_R)     != 0;
     bool start = (mask & EPBM_START) != 0;
     bool select= (mask & EPBM_SELECT)!= 0;
@@ -511,6 +606,16 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
         refreshDraw();
         return;
     }
+
+    // BACON_1.5_EQ8_FAST_COARSE (U2.52.9, feedback #6): L1+X+arrows = fast
+    // displacement like the rest of the port (L1 = coarse): L1+X+L/R jumps
+    // the selected band ~1 octave (6 of the 59 log steps), L1+X+UP/DN steps
+    // the gain by 10 dB (band turns on, same as X+UP/DN).  No conflict with
+    // the global undo (L1+X alone, without arrows).
+    if (l1 && x && left)  { freqHz_[selected_] = freqFromIndex(indexFromFreq(freqHz_[selected_]) - 6); setStatus("freq -1 oct"); refreshDraw(); return; }
+    if (l1 && x && right) { freqHz_[selected_] = freqFromIndex(indexFromFreq(freqHz_[selected_]) + 6); setStatus("freq +1 oct"); refreshDraw(); return; }
+    if (l1 && x && up)    { gainDb_[selected_] += 10.0f; if (gainDb_[selected_] > 24.0f) gainDb_[selected_] = 24.0f; bandOn_[selected_] = true; setStatus("gain +10 dB"); refreshDraw(); return; }
+    if (l1 && x && down)  { gainDb_[selected_] -= 10.0f; if (gainDb_[selected_] < -24.0f) gainDb_[selected_] = -24.0f; bandOn_[selected_] = true; setStatus("gain -10 dB"); refreshDraw(); return; }
 
     if (x && left)  { freqHz_[selected_] = freqFromIndex(indexFromFreq(freqHz_[selected_]) - 1); refreshDraw(); return; }
     if (x && right) { freqHz_[selected_] = freqFromIndex(indexFromFreq(freqHz_[selected_]) + 1); refreshDraw(); return; }

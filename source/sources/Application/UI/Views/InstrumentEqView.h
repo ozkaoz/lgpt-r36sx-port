@@ -24,9 +24,13 @@ class I_Instrument;
  *   - START toggles playback with the exact Player::OnStartButton() contract
  *     used by InstrumentView; R+START stops (item 3).
  *   - 8 draggable nodes, 7 filter types, log frequency scale 20 Hz-20 kHz,
- *     live spectrum from the common targeted analyzer tap drawn as a 30%
- *     opacity backdrop BEHIND the curve canvas (item 7, feedback (F)).
- *   - SELECT+R1 opens its own EQ8 help section (feedback (E)).
+ *     live spectrum from the common targeted analyzer tap drawn as thin
+ *     3-px bars (Pro-Q style, 24 log bins) BEHIND the curve canvas, on the
+ *     true 0..1 audio scale (item 7, feedback (F) + #6).
+ *   - The canvas fills the whole screen under the char header (feedback
+ *     #6); the frequency axis labels (40..20k) sit in the last 8 px.
+ *   - SELECT+R1 opens its own EQ8 help section (feedback (E)); the canvas
+ *     is skipped while a modal is open so the help stays on top (#6).
  *   - The instrument id is shown WITHOUT the old 0x3F mask (item 6).
  */
 
@@ -52,6 +56,13 @@ private:
 	void setStatus(const char *msg) ;
 	void cycleBandType() ;
 	void refreshDraw() ;
+	// BACON_1.5_EQ8_PIXEL_HEADER (U2.53, feedback #7): builds the three
+	// header strings (title / selected-band line / status) from the view
+	// state.  DrawView() sends them to the char screen and PostFlushDraw()
+	// re-renders the same strings in pixels on top, so both layers always
+	// agree.
+	void buildHeader(char *title, size_t titleSz, char *line, size_t lineSz,
+	                 char *status, size_t statusSz) const ;
 	float freqFromIndex(int idx) const ;
 	int indexFromFreq(float hz) const ;
 

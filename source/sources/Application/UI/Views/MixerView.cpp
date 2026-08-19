@@ -6,6 +6,7 @@
 #include "Application/Model/Project.h"
 #include "Application/Model/ProjectDatas.h"
 #include "Application/Instruments/SampleInstrument.h"
+#include "Application/Player/Player.h"
 #include "Application/UI/Views/UIController.h"
 #include "Application/UI/Views/BaseClasses/UiDraw.h"
 #include "Application/UI/Views/BaseClasses/ModalView.h"
@@ -205,6 +206,46 @@ void MixerView::JumpToFxPage(FxPage page) {
 	((AppWindow &)w_).SetDirty() ;
 }
 
+// BACON_1.5_MIXER_JUMP_REAL_INSTRUMENT (U2.52.9, feedback #6): L1+A (track
+// section) and R2+A on a mixer bar open the instrument that REALLY sounds on
+// that channel, not the channel index (bar 3 used to open instrument 02
+// while the track was playing instrument 20).  Resolution order:
+//   1. Player::GetPlayedInstrument(channel) -- the hex instrument byte of
+//      the row currently sounding; it persists after STOP, so it is also
+//      the best guess when the transport is idle after a run;
+//   2. the song data at the cursor row (chain/phrase instr of the track),
+//      the same layout Player::updateSongPos reads;
+//   3. the channel index as the last resort.
+static int mixerChannelInstrumentIndex(ViewData *viewData, int channel) {
+    Player *player = Player::GetInstance();
+    if (player) {
+        char *s = player->GetPlayedInstrument(channel);
+        if (s && s[0] != ' ') {
+            int hi = (s[0] >= 'A') ? s[0] - 'A' + 10 : s[0] - '0';
+            int lo = (s[1] >= 'A') ? s[1] - 'A' + 10 : s[1] - '0';
+            int index = hi * 16 + lo;
+            if (index >= 0 && index < MAX_INSTRUMENT_COUNT) return index;
+        }
+    }
+    if (viewData && viewData->song_) {
+        int pos = viewData->songX_;
+        if (pos < 0 || pos >= SONG_ROW_COUNT) pos = 0;
+        unsigned char chain = viewData->song_->data_[channel + 8 * pos];
+        if (chain != 0xFF && viewData->song_->chain_) {
+            int chainPos = viewData->chainRow_;
+            if (chainPos < 0 || chainPos >= 16) chainPos = 0;
+            unsigned char phrase =
+                viewData->song_->chain_->data_[16 * chain + chainPos];
+            if (phrase != 0xFF && viewData->song_->phrase_) {
+                unsigned char ins =
+                    viewData->song_->phrase_->instr_[16 * phrase + chainPos];
+                if (ins != 0xFF && ins < MAX_INSTRUMENT_COUNT) return ins;
+            }
+        }
+    }
+    return channel;
+}
+
 void MixerActionMenuApplyCallback(View &view, ModalView &dialog) {
     MixerActionMenuModal *menu = (MixerActionMenuModal *)&dialog ;
     MixerView &mixer = menu->mixer_ ;
@@ -220,7 +261,12 @@ void MixerActionMenuApplyCallback(View &view, ModalView &dialog) {
         unsigned int hintId = mixerMenuSectionHint(section) ;
         int channel = mixer.viewData_->mixerCol_ ;
         if (channel >= 0 && channel < SONG_CHANNEL_COUNT) {
-            mixer.viewData_->currentInstrument_ = channel ;
+            // BACON_1.5_MIXER_JUMP_REAL_INSTRUMENT (U2.52.9, feedback #6):
+            // open the instrument the channel REALLY plays (hex byte of the
+            // sounding row, then the song/chain/phrase data at the cursor),
+            // not the channel index.
+            mixer.viewData_->currentInstrument_ =
+                mixerChannelInstrumentIndex(mixer.viewData_, channel) ;
             mixer.viewData_->instrumentFocusHint_ = hintId ;
             ViewType vt = VT_INSTRUMENT ;
             ViewEvent ve(VET_SWITCH_VIEW, &vt) ;
@@ -811,9 +857,13 @@ void MixerView::showInstrumentFxMenu() {
 	// 8 sample instruments).  The old InstrumentFxModal is removed: the
 	// per-instrument FX sends (DRY/DLY/RVB) and the legacy comb/offline FX
 	// live directly in InstrumentView now.
+	// BACON_1.5_MIXER_JUMP_REAL_INSTRUMENT (U2.52.9, feedback #6): resolve
+	// the instrument the channel REALLY plays (see mixerChannelInstrumentIndex
+	// above) instead of the channel index.
 	int channel=viewData_->mixerCol_ ;
 	if (channel>=0 && channel<SONG_CHANNEL_COUNT) {
-		viewData_->currentInstrument_=channel ;
+		viewData_->currentInstrument_=
+			mixerChannelInstrumentIndex(viewData_,channel) ;
 	}
 	ViewType vt=VT_INSTRUMENT ;
 	ViewEvent ve(VET_SWITCH_VIEW,&vt) ;
@@ -851,7 +901,10 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	}
 	// RC6: the 2-cell channel label is drawn at x-1 so its right cell sits
 	// on the 1-cell meter axis (same rule as MST/%3d).
-	DrawString(x-1,y,hex,props) ;
+	// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): the label moves two
+	// rows above the bar (row y-2) and the volume number one row above it
+	// (row y-1): the strips read top-down like a DAW (hex, volume, bar).
+	DrawString(x-1,y-2,hex,props) ;
 	props.invert_=false ;
 
 	// TREEFROG_MIXER_LIVE_BAR_V4 (H38.7) + RC5:
@@ -861,14 +914,15 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// numeric value below. Selected bars stay purple, muted bars dim.  RC5:
 	// each row is a single cell (one-column meter) so the 9 meters of the
 	// MIX page fit the centered bank; totalCells == height.
-	// BACON_1.5_VU_LINEAR_SCALE (U2.52.8, feedback):
-	// The bar fill = mixVULevel(peak) on the linear scale (true 0..1 peak,
-	// see FxPages.h; the scanned peak already includes the track volume, so
-	// no extra volume factor).  A track at volume 20 on a full-scale
-	// instrument reads 20% of the bar -- exactly what is heard.  The bar
-	// turns red (CD_ERROR) only when the fill reaches the 0 dBFS ceiling
-	// (the top +3 cell of the CUE scale), i.e. a real pre-clip level
-	// at/over 0 dBFS -- the condition that produces the clipped sound.
+	// BACON_1.5_VU_DB_SCALE (U2.52.9, feedback #6):
+	// The bar fill = mixVULevel(peak) on the dB scale ((20*log10(p)+24)/27
+	// over -24..+3 dBFS, see FxPages.h; the scanned peak already includes
+	// the track volume, so no extra volume factor).  A track at volume 20
+	// on a full-scale instrument reads ~37% of the bar, and 0 dBFS reads
+	// 24/27 with the +3 zone as headroom.  The bar turns red (CD_ERROR)
+	// only when the fill reaches the 0 dBFS ceiling (the top +3 cell of the
+	// CUE scale), i.e. a real pre-clip level at/over 0 dBFS -- the
+	// condition that produces the clipped sound.
 	// The 4-cell pitch separates
 	// the 3-digit volume numbers ("100 100" instead of "100100").
 	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1) + TREEFROG_MIXER_HALF_CELL_BARS_V2:
@@ -889,7 +943,7 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	SetColor(selected?CD_HILITE2:(muted?CD_BORDER:CD_NORMAL)) ;
 	props.invert_=selected ;
 	sprintf(buffer,"%3d",volume) ;
-	DrawString(x-1,y+height+2,buffer,props) ;
+	DrawString(x-1,y-1,buffer,props) ;
 	props.invert_=false ;
 
 	// TREEFROG_MIXER_PAN_V1 (Bacon 1.1.1):
@@ -900,20 +954,23 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// marker instead -- its pan is inaudible anyway.  Center pans sit at
 	// the same digit column as the L/R values (right-aligned value).
 	int pan=mixer->GetChannelPan(channel) ;
+	// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): the pan/mute marker
+	// row moves one row under the taller bar (y+height+1, the last free row
+	// above the played-notes block at rows 27-29).
 	if (muted) {
 		SetColor(CD_HILITE2) ;
-		DrawString(x,y+height+3,"M",props) ;
+		DrawString(x,y+height+1,"M",props) ;
 	} else {
 		SetColor(selected?CD_HILITE2:CD_NORMAL) ;
 		props.invert_=selected ;
 		if (pan==0) {
-			DrawString(x-1,y+height+3,"  C",props) ;
+			DrawString(x-1,y+height+1,"  C",props) ;
 		} else if (pan<0) {
 			sprintf(buffer,"L%3d",-pan) ;
-			DrawString(x-1,y+height+3,buffer,props) ;
+			DrawString(x-1,y+height+1,buffer,props) ;
 		} else {
 			sprintf(buffer,"R%3d",pan) ;
-			DrawString(x-1,y+height+3,buffer,props) ;
+			DrawString(x-1,y+height+1,buffer,props) ;
 		}
 		props.invert_=false ;
 	}
@@ -925,15 +982,17 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	GUITextProperties props ;
 	char buffer[8] ;
 
-	// BACON_1.5_VU_LINEAR_SCALE (U2.52.8, feedback):
-	// Master bars = mixVULevel(master peak) on the linear scale (true 0..1
-	// peak, see FxPages.h).  The peak already includes the master fader
-	// (applied pre-scan on the master bus, MixerService::SetMasterVolume),
-	// so the bar shows the real loudness: one track at volume 20 on a
-	// full-scale instrument reads 20%.  It turns red (CD_ERROR) only when
-	// the fill reaches the 0 dBFS ceiling (the top +3 cell of the CUE
+	// BACON_1.5_VU_DB_SCALE (U2.52.9, feedback #6):
+	// Master bars = mixVULevel(master peak) on the dB scale
+	// ((20*log10(p)+24)/27 over -24..+3 dBFS, see FxPages.h).  The peak
+	// already includes the master fader (applied pre-scan on the master
+	// bus, MixerService::SetMasterVolume), so the bar shows the real
+	// loudness: one track at volume 20 on a full-scale instrument reads
+	// ~37%, 0 dBFS reads 24/27.  It turns red (CD_ERROR) only when the
+	// fill reaches the 0 dBFS ceiling (the top +3 cell of the CUE
 	// scale), i.e. the pre-clip mix sum is really at/over 0 dBFS
-	// (MixerService::GetMasterPeak, true pre-clip mix sum, can exceed 1.0).
+	// (MixerService::GetMasterPeak, true pre-clip mix sum, can exceed 1.0,
+	// which maps past the +3 dBFS top row).
 	// Two bars are drawn (L at x, R at x+2, one-cell gap) so
 	// the stereo balance of the mix is visible live.
 	MixerService *ms=MixerService::GetInstance() ;
@@ -942,9 +1001,11 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	// Master (MST) bar drawn live on the left of the channel bars, in cyan so
 	// it stands out from the white channel fills. When selected it lights
 	// purple like a selected channel.
+	// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): MST label and volume
+	// move above the bar like the channel strips (y-2 / y-1).
 	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
 	props.invert_=false ;
-	DrawString(x-1,y,"MST",props) ;
+	DrawString(x-1,y-2,"MST",props) ;
 
 	drawMeterBar(x,y,height,ms->GetMasterPeakL(),volume,masterSelected_,false,props,CD_PLAY,0,meterRecords_[SONG_CHANNEL_COUNT]) ;
 	drawMeterBar(x,y,height,ms->GetMasterPeakR(),volume,masterSelected_,false,props,CD_PLAY,1,meterRecords_[SONG_CHANNEL_COUNT]) ;
@@ -959,7 +1020,7 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
 	props.invert_=masterSelected_ ;
 	sprintf(buffer,"%3d",volume) ;
-	DrawString(x-1,y+height+2,buffer,props) ;
+	DrawString(x-1,y-1,buffer,props) ;
 	props.invert_=false ;
 }
 
@@ -1633,48 +1694,49 @@ void MixerView::drawFxPages() {
 		// (Bacon 1.1.1): the MIX page lays out 10 columns: the static CUE
 		// scale (+3/0/-6/-12/-24/-36 dB, compact, right-aligned to the
 		// master), the MST live bar, the 8 channel bars one cell each 4
-		// columns apart, and the CH/VL labels right of the last channel.
-		// The bank spans the CUE scale at x=0..1 .. the CH label at x=38..39.
-		// The whole block (labels, bars, volume numbers, pan/mute markers and
-		// the centered FX RETURNS line) stays in the safe band 3..25 of the
-		// 40x30 screen.  TREEFROG_MIXER_TALL_BARS_V1 (Bacon 1.1.1 V16): the
-		// 15-cell bars reclaim the rows freed by the RET/FX RETURNS move to
-		// the top: header at 3, labelY 4, bars 5..19, volumes at 21.
+		// columns apart.  The bank spans the CUE scale at x=0..1 .. the
+		// last channel at x=36.
+		// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): fullscreen DAW
+		// channel-strip layout.  Rows 0-3 keep the title/transport block
+		// (title + Song/Live at x=0/21, RET/FX RETURNS at row 1, and the
+		// clip/%/batt/time overlay at x=35..39); rows 27-29 keep the played
+		// notes + view map (drawNotes/drawMap, shared base-class overlays).
+		// The channel strips now read top-down like a DAW: hex label at
+		// row 4, volume number at row 5, the 19-cell live bar at rows
+		// 7..25, pan/mute marker at row 26.  The bars are 27% taller than
+		// the old 15-cell ones and the CUE scale marks their true dB rows.
 		const int masterX=4 ;
 		const int channel0X=8 ;
 		const int channelPitch=4 ;
-		const int chLabelX=38 ;
-		const int labelY=4 ;
-		const int barHeight=15 ;
-		const int numY=labelY+barHeight+2 ;
-		const int retY=3 ;
-		DrawString(chLabelX,labelY,"CH",props) ;
-		DrawString(chLabelX,numY,"VL",props) ;
-// BACON_1.5_VU_LINEAR_SCALE (U2.52.8, feedback):
+		const int labelY=4 ;        // hex label row (above the bars)
+		const int barY=labelY+2 ;   // bars start on the row below the labels
+		const int barHeight=19 ;    // bar cells = barY+1 .. barY+barHeight
+		const int retY=1 ;
+// BACON_1.5_VU_DB_SCALE (U2.52.9, feedback #6):
 	// Static CUE scale drawn to the LEFT of the master, right-aligned to
 	// the master column so the marks sit as close to the bars as possible
-	// (compact 2-3 cell labels).  The bars are now linear (mixVULevel =
-	// true 0..1 peak, see FxPages.h), so the marks sit on their true dBFS
-	// rows of the 15-cell bar: "+3" is the top red cell = the 0 dBFS
-	// ceiling/over zone (lights when the fill reaches the ceiling), "0" is
-	// the 0 dBFS reference right below it, and -6/-12/-24 dB sit at their
-	// real linear positions (46.7% / 26.7% / 6.7% of the bar, -6.6 / -11.5 /
-	// -23.5 dBFS).  The old -36 row is gone (it fell below the bar bottom).
-	// The scale never moves with the volume; the bars move against this
-	// fixed reference.
+	// (compact 2-3 cell labels).  The bars are dB now (mixVULevel maps the
+	// true peak onto its dB position over -24..+3 dBFS, 1 dB per 1/27 of
+	// the bar, see FxPages.h), so each mark sits on its REAL dB row of the
+	// bar: "+3" is the top cell (the red zone = the CUE+3 lamp), "0" is
+	// the 0 dBFS reference, and -6/-12/-24 dB sit at their log positions
+	// (the linear fill with dB labels made the -6..0 zone look like a huge
+	// empty gap: 6 dB were 17% of the bar while the marks assumed the log
+	// scale).  The scale never moves with the volume; the bars move
+	// against this fixed reference.
 	SetColor(CD_NORMAL) ;
 	DrawString(masterX-3,labelY,"C",props) ;
 	SetColor(CD_ERROR) ;
-	DrawString(masterX-3,labelY+1+0,"+3",props) ;
+	DrawString(masterX-3,barY+1+0,"+3",props) ;
 	SetColor(CD_HILITE2) ;
-	DrawString(masterX-3,labelY+1+1,"0",props) ;
+	DrawString(masterX-3,barY+1+2,"0",props) ;
 	SetColor(CD_HILITE1) ;
-	DrawString(masterX-3,labelY+1+8,"-6",props) ;
-	DrawString(masterX-4,labelY+1+11,"-12",props) ;
-	DrawString(masterX-4,labelY+1+14,"-24",props) ;
-		drawMasterBar(masterX,labelY,barHeight) ;
+	DrawString(masterX-3,barY+1+6,"-6",props) ;
+	DrawString(masterX-4,barY+1+11,"-12",props) ;
+	DrawString(masterX-4,barY+1+18,"-24",props) ;
+		drawMasterBar(masterX,barY,barHeight) ;
 		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
-			drawVolumeBar(i,channel0X+i*channelPitch,labelY,barHeight) ;
+			drawVolumeBar(i,channel0X+i*channelPitch,barY,barHeight) ;
 		}
 		drawMixReturns(retY) ;
 	} else {
@@ -1722,7 +1784,11 @@ void MixerView::OnPlayerUpdate(PlayerEventType ,unsigned int tick) {
 
 	GUITextProperties props ;
 	SetColor(CD_NORMAL) ;
-	GUIPoint pos(30,0) ;
+	// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): the transport readout
+	// (clip / % / batt / time) moves to the far right edge (x=35..39, rows
+	// 0..3) so it no longer collides with the RET line (row 1) and the
+	// channel strips (labels at rows 4-5).
+	GUIPoint pos(35,0) ;
 	
 	if (player->Clipped()) {
         DrawString(pos._x,pos._y,"clip",props); 

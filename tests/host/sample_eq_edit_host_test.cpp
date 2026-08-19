@@ -323,7 +323,8 @@ static bool bufferFinite(const fixed *b, int n) {
 
 // Q15 fixed point: unity audio == 32768 counts.  A "bounded" buffer must
 // stay within +-65536 counts (a +24 dB EQ boost can legitimately exceed
-// unity while the 64-bit Df2 stays clean; the device saturates at 32767).
+// unity while the 64-bit Df2 stays clean; BACON_1.5_EQ8_BLOCKLIMIT caps the
+// per-block output at 65535 = just under 2.0, the int32 pipeline limit).
 static bool bufferBounded(const fixed *b, int n) {
     for (int i = 0; i < n; i++) {
         if (fabs((double)fp2fl(b[i])) > 65536.0) return false;
@@ -485,7 +486,11 @@ int main() {
     // (1.0 == 32768): the compare below is the real loudness at the output.
     // Before BACON_1.5_VOL_SYNTHS_FIX the synth rendered Q15 and its fp2fl
     // peak read ~1.1 while the sample read 11122 counts -- the check caught
-    // the ~90 dB gap.
+    // the ~90 dB gap.  BACON_1.5_VOL_SYNTHS_PAD (U2.52.9, feedback #6) then
+    // padded the master-scale write by -20 dB (x0.1): a full-scale saw at
+    // volume 100 measured peak 1.0 / rms 0.452 vs the hat's 0.339 / 0.051
+    // (~19 dB RMS louder on the device), so the pad brings the synth to the
+    // kit level (measured here: peak 3276 counts = 0.1, rms 1482 = 0.0452).
     printf("-- (A) synth vs sample level --\n");
     {
         BassSynth synth;
@@ -507,7 +512,12 @@ int main() {
         }
         double sRms = sqrt(sAcc / (double)sN);
         printf("synth vol100 sustained: peak=%.3f rms=%.3f\n", sPk, sRms);
-        check(sPk > 0.9, "synth sustained peak >= 0.9 (0 dBFS)");
+        // Padded range in int16 counts (fp2fl of the master-scale buffer =
+        // the DAC count; 1.0 == 32768): the pad x0.1 maps the full-scale saw
+        // to a peak of 3276.8 counts (0.1) -- a regression to the un-padded
+        // 32768, or a double pad at 328, both fail.  Bounds: [0.05, 0.5] of
+        // full scale = [1638.4, 16384].
+        check(sPk > 1638.4 && sPk < 16384.0, "synth sustained peak in padded range");
 
         if (g_hihat) {
             SampleInstrument sh;
@@ -530,8 +540,13 @@ int main() {
             double hRms = hN ? sqrt(hAcc / (double)hN) : 0.0;
             printf("hihat vol100: peak=%.3f rms=%.3f\n", hPk, hRms);
             check(hPk > 0.0, "hi-hat renders audio");
-            check(sPk > hPk * 0.7,
-                  "synth within ~3 dB of the reference sample peak");
+            // Within ~[-12, +3.5] dB of the reference peak and ~[-6, +9.5]
+            // dB of its rms (the expected 0.113/0.045 sit at -9.5 / -1 dB
+            // from the hat; the un-padded 1.0/0.452 fail the upper band).
+            check(sPk > hPk * 0.25 && sPk < hPk * 1.5,
+                  "synth peak near the reference sample peak");
+            check(sRms > hRms * 0.5 && sRms < hRms * 3.0,
+                  "synth rms near the reference sample rms");
         } else {
             printf("SD sample not mounted - hi-hat compare skipped\n");
         }

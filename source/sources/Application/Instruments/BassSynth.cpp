@@ -544,11 +544,18 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     // the master scale at the exit, AFTER the Q15 FV2/EQ kernels, clamped to
     // +-i2fp(1)-1 so the DAC's short(fp2i()) never wraps: a peak-1.0 synth is
     // full scale, like a peak sample.
+    // BACON_1.5_VOL_SYNTHS_PAD (U2.52.9, feedback #6): the U2.52.8 fix scaled
+    // the synth to 0 dBFS peak, but a SUSTAINED saw at peak 1.0 measures
+    // rms ~0.45 while a reference kit sample (HI HAT 01) at the same volume
+    // measures peak 0.339 / rms 0.051: the synth ended ~19 dB louder at
+    // volume 100 (on the device "instrument volume 10" was the closest).
+    // Pad the master-scale write by -20 dB (x0.1) so a synth at 100 sits at
+    // the level of a kit sample at 100 (rms ~0.045 vs the hat's 0.051).
     for (int i = 0; i < size * 2; i++) {
         fixed v = buffer[i];
         if (v > i2fp(1) - 1) v = i2fp(1) - 1;
         else if (v < -(i2fp(1) - 1)) v = -(i2fp(1) - 1);
-        buffer[i] = v << FIXED_SHIFT;
+        buffer[i] = fp_mul(v, fl2fp(0.1f)) << FIXED_SHIFT;
     }
 
     return true;

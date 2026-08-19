@@ -4,10 +4,10 @@
 Verifica que:
 1. MixerMeters.h (Application/Mixer) contiene el smoothing golden
    (SmoothFrame: ataque instantaneo, release *0.6, piso 0.001, stop->0),
-   BarLevel (lineal BACON_1.5_VU_LINEAR_SCALE: mixVULevel(pico) sin factor
-   de volumen -- el pico escaneado ya incluye su fader; clamp 0..1),
+   BarLevel (escala dB BACON_1.5_VU_DB_SCALE: (20*log10(pico)+24)/27 sin
+   factor de volumen -- el pico escaneado ya incluye su fader; clamp 0..1),
    GeometryFor/RowStateFor
-   (metrica half-cell: LEVEL_H 3, banda roja 0 dB+ 36/39, fill 2-px) y
+   (metrica half-cell: LEVEL_H 3, banda roja 0 dB+ 24/27, fill 2-px) y
    kChannels == 8.
 2. MixerMeters.h NO depende de GUI/audio/Player/framebuffer (capa pura).
 3. MixerView.cpp ya no contiene el smoothing inline (vuDisplayL_/R_),
@@ -26,7 +26,7 @@ MV_H = ROOT / "source/sources/Application/UI/Views/MixerView.h"
 TOKENS = [
     "class MixerMeters", "SmoothFrame", "BarLevel", "GeometryFor",
     "RowStateFor", "kLevelHeight", "ZeroDbLevel", "kChannels",
-    "0.6f", "0.001f", "36.0f / 39.0f", "levelL", "levelR",
+    "0.6f", "0.001f", "24.0f / 27.0f", "levelL", "levelR",
 ]
 
 FORBIDDEN = [

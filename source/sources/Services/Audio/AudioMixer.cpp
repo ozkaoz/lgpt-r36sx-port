@@ -15,6 +15,25 @@
 #define AUDIO_MIXER_MAX_RENDER_FRAMES 10000
 static fixed s_moduleMixScratch[AUDIO_MIXER_MAX_RENDER_FRAMES * 2];
 
+// BACON_1.5_64BIT_MASTER_SUM (U2.53, feedback #7): the master sum used to
+// accumulate INTO the int32 output buffer, so it WRAPPED at +/-2.0 linear
+// (2 channels at full scale = 2.147e9 = INT32_MAX).  A hot mix (full-scale
+// channels + EQ boosts up to 2x, see InstrumentEq kBlockLimit) wrapped into
+// garbage -- and the pre-clip meters could never show a true level above
+// 0 dB.  The sum now accumulates in 64 bits; the int32 buffer is written at
+// the very end (clamped, never wrapped).
+static long long s_moduleSumScratch[AUDIO_MIXER_MAX_RENDER_FRAMES * 2];
+
+// BACON_1.5_64BIT_MASTER_SUM (U2.53, feedback #7): 64-bit -> int32 with a
+// CLAMP instead of the old wraparound.  Values inside the int32 range pass
+// through bit-exact (the normal path is untouched); only values beyond
+// +/-2.0 linear are clamped.
+static fixed clamp32(long long v) {
+    if (v > 2147483647LL) return 2147483647;
+    if (v < -2147483648LL) return -2147483648LL;
+    return (fixed)v;
+}
+
 AudioMixer::AudioMixer(const char *name):
 	T_SimpleList<AudioModule>(false),
 	enableRendering_(0),
@@ -82,29 +101,29 @@ void AudioMixer::EnableRendering(bool enable) {
 bool AudioMixer::Render(fixed *buffer,int samplecount) {
     clipped_ = false;
 
+    // BACON_1.5_64BIT_MASTER_SUM (U2.53, feedback #7): the module sum lands
+    // in s_moduleSumScratch (64-bit) instead of wrapping inside `buffer`.
+    // The first module's output is copied in, subsequent modules are added.
+    // samplecount is bounded by the primary mix buffer (10000 stereo
+    // frames), so the scratch never overflows.
+    long long *sum64 = s_moduleSumScratch;
     fixed *mixBuffer = 0;
     bool gotData = false;
     IteratorPtr<AudioModule> it(GetIterator());
     for (it->Begin(); !it->IsDone(); it->Next()) {
         AudioModule &current = it->CurrentItem();
         if (!gotData) {
-            gotData=current.Render(buffer,samplecount) ;           
+            gotData=current.Render(buffer,samplecount) ;
+            if (gotData) {
+                for (int i = 0; i < samplecount * 2; i++) sum64[i] = buffer[i];
+            }
          } else {
             if (!mixBuffer) {
                 // H38.8 OPT_PERF: static scratch (see s_moduleMixScratch).
-                // samplecount is bounded by the primary mix buffer (10000
-                // stereo frames), so the scratch never overflows.
                 mixBuffer = s_moduleMixScratch;
-            } 
+            }
             if (current.Render(mixBuffer,samplecount)) {
-               fixed *dst=buffer ;
-               fixed *src=mixBuffer ;
-               int count=samplecount*2 ;
-               while (count--) {
-                 *dst+=*src ;
-                 dst++ ;
-                 src++ ;
-               }
+                for (int i = 0; i < samplecount * 2; i++) sum64[i] += mixBuffer[i];
             }
          }
      }
@@ -112,7 +131,6 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
      //  Apply volume
 
      if (gotData) {
-         fixed *c = buffer;
          // H38.7 OPT_PERF: pow() was recomputed on every buffer. Cache it and
          // only recompute when the master volume actually changes.
          if (masterVolume_ != masterVolumeCached_) {
@@ -121,10 +139,17 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
          }
          float damp = dampCached_;
 
-         if (volume_ != i2fp(1)) {
+         // BACON_1.5_64BIT_MASTER_SUM (U2.53, feedback #7): volume and damp
+         // are applied in the 64-bit domain (same math as the old int32
+         // path: fp_mul's truncating >>15, and damp*c as a float product),
+         // so the pre-clip meter below reads the TRUE headroom instead of
+         // the wrapped int32 value.
+         if (volume_ != i2fp(1) || damp != 1.0f) {
              for (int i = 0; i < samplecount * 2; i++) {
-                 fixed v = fp_mul(*c, volume_);
-                 *c++ = v;
+                 long long v = sum64[i];
+                 if (volume_ != i2fp(1)) v = (v * (long long)volume_) >> 15;
+                 if (damp != 1.0f) v = (long long)((double)damp * (double)v);
+                 sum64[i] = v;
              }
          }
 
@@ -136,12 +161,9 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
          // then measure the TRUE pre-clip level (which CAN exceed 0 dB), then
          // clamp for the int16 output (the driver conversion wraps above 1.0,
          // so the clip itself must stay).
-         if (damp != 1.0f) {
-             for (int i = 0; i < samplecount * 2; i++) {
-                 fixed v = fl2fp(damp * fp2fl(*c));
-                 *c++ = v;
-             }
-         }
+         // BACON_1.5_64BIT_MASTER_SUM (U2.53, feedback #7): the scan reads
+         // the 64-bit sum, so sums above +/-2.0 linear (which the old int32
+         // buffer could not even hold) still show on the meter.
 
          // TREEFROG_VU_METERS_V1 + TREEFROG_MIXER_STEREO_METERS_V1:
          // Track the smoothed peak of the output (audible level).  Fast
@@ -149,9 +171,9 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
          // The scan runs in short sub-blocks with a decay between them, so
          // the meters dip between closely-spaced notes (hi-hats) instead of
          // staying pinned at the held peak of the whole buffer.  Measured on
-         // the post-damp, PRE-CLIP buffer and split per side (even samples =
-         // L, odd = R in the interleaved buffer), so each bar reflects the
-         // true level of its side -- including mix sums above 0 dB.
+         // the post-damp, PRE-CLIP sum and split per side (even samples = L,
+         // odd = R in the interleaved buffer), so each bar reflects the true
+         // level of its side -- including mix sums above 0 dB.
          {
              const int block = 128 ; // stereo samples
              for (int off = 0; off < samplecount * 2; off += block) {
@@ -159,74 +181,88 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
                  if (n > block) n = block ;
                  float peakL = 0.0f ;
                  float peakR = 0.0f ;
-                  if (gotData) {
-                      // H38.7 OPT_PERF: sample every 4th sample for the peak (see
-                      // PlayerChannel::Render for rationale).
-                      // TREEFROG_MIXER_STEREO_METERS_V3 (Bacon 1.1.1): a stride-4
-                      // scan can only ever visit EVEN indices (0,4,8,...), so
-                      // any per-index parity test classifies everything as L and
-                      // the R side stayed dead.  The buffer is interleaved and
-                      // off is always even (block is even), so c[0] is always L
-                      // and c[1] always R: take the pair per 8 samples (same
-                      // density as the old stride 4) and measure both sides.
-                      fixed *c = buffer + off ;
-                      for (int i = 0; i < n; i += 8) {
-// BACON_1.5_VU_SCALE_FIX (U2.52.7) +
-                           // BACON_1.5_VOL_SYNTHS_FIX (U2.52.8): the master
-                           // bus is int16<<15 (count<<15) scale, so fp2fl()
-                           // returns the DAC count; /32768 gives the linear
-                           // 0..1 audio level the bars draw (see
-                           // PlayerChannel::Render for the full rationale).
-                           float vL = fp2fl(c[0]) / 32768.0f ;
-                           if (vL < 0.0f) vL = -vL ;
-                           if (vL > peakL) peakL = vL ;
-                           float vR = fp2fl(c[1]) / 32768.0f ;
-                          if (vR < 0.0f) vR = -vR ;
-                          if (vR > peakR) peakR = vR ;
-                          c += 8 ;
-                      }
-                  }
-                 if (peakL > peakValueL_) {
-                     peakValueL_ = peakL;
-                 } else {
-                     // Fast release so the master bar empties in a few ms of
-                     // quiet, giving a live-meter feel even for dense patterns.
-                     peakValueL_ *= 0.5f;
-                     if (peakValueL_ < 0.002f) peakValueL_ = 0.0f;
+                 if (gotData) {
+                     // H38.7 OPT_PERF: sample every 4th sample for the peak (see
+                     // PlayerChannel::Render for rationale).
+                     // TREEFROG_MIXER_STEREO_METERS_V3 (Bacon 1.1.1): a stride-4
+                     // scan can only ever visit EVEN indices (0,4,8,...), so
+                     // any per-index parity test classifies everything as L and
+                     // the R side stayed dead.  The buffer is interleaved and
+                     // off is always even (block is even), so sum64[0] is always
+                     // L and sum64[1] always R: take the pair per 8 samples
+                     // (same density as the old stride 4) and measure both
+                     // sides.
+                     long long *c = sum64 + off ;
+                     for (int i = 0; i < n; i += 8) {
+                         // BACON_1.5_VU_SCALE_FIX (U2.52.7) +
+                         // BACON_1.5_VOL_SYNTHS_FIX (U2.52.8): the master
+                         // bus is int16<<15 (count<<15) scale, so /2^30
+                         // gives the linear 0..1 audio level the bars draw
+                         // (see PlayerChannel::Render for the rationale).
+                         float vL = (float)((double)c[0] / 1073741824.0) ;
+                         if (vL < 0.0f) vL = -vL ;
+                         if (vL > peakL) peakL = vL ;
+                         float vR = (float)((double)c[1] / 1073741824.0) ;
+                        if (vR < 0.0f) vR = -vR ;
+                        if (vR > peakR) peakR = vR ;
+                        c += 8 ;
+                    }
                  }
-                 if (peakR > peakValueR_) {
-                     peakValueR_ = peakR;
-                 } else {
-                     peakValueR_ *= 0.5f;
-                     if (peakValueR_ < 0.002f) peakValueR_ = 0.0f;
-                 }
-             }
-             lastPeakClock_ = System::GetInstance()->GetClock() ;
-         }
+                if (peakL >= peakValueL_) {
+                    // BACON_1.5_64BIT_MASTER_SUM (U2.53, feedback #7): >=
+                    // (was >): with a constant signal every sub-block has
+                    // the EXACT same peak, and strict > decayed the meter
+                    // to half on every equal sub-block (the master bar
+                    // flickered between full and half on a sustained tone).
+                    peakValueL_ = peakL;
+                } else {
+                    // Fast release so the master bar empties in a few ms of
+                    // quiet, giving a live-meter feel even for dense patterns.
+                    peakValueL_ *= 0.5f;
+                    if (peakValueL_ < 0.002f) peakValueL_ = 0.0f;
+                }
+                if (peakR >= peakValueR_) {
+                    peakValueR_ = peakR;
+                } else {
+                    peakValueR_ *= 0.5f;
+                    if (peakValueR_ < 0.002f) peakValueR_ = 0.0f;
+                }
+            }
+            lastPeakClock_ = System::GetInstance()->GetClock() ;
+        }
 
-         // Apply soft/hard clipping before recording.
-         // H38.7 OPT_PERF: when the softclipper is bypassed the per-sample
-         // path is a pure fixed-point hard clip; when active, soft then hard.
-         // The damp has already been applied above, so the clip loop is
-         // float-free.
-         // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): with clipBypass_
-         // (channel/stream buses) the sum is left UNCLIPPED so the master bus
-         // -- and its pre-clip meter -- reads the real level of every channel;
-         // the master bus and the audio out keep the clip below.
-         if (!clipBypass_) {
-            c = buffer;
+        // Apply soft/hard clipping before recording.
+        // H38.7 OPT_PERF: when the softclipper is bypassed the per-sample
+        // path is a pure fixed-point hard clip; when active, soft then hard.
+        // The damp has already been applied above, so the clip loop is
+        // float-free.
+        // TREEFROG_MIXER_STEREO_METERS_V2 (Bacon 1.1.1): with clipBypass_
+        // (channel/stream buses) the sum is left UNCLIPPED so the master bus
+        // -- and its pre-clip meter -- reads the real level of every channel;
+        // the master bus and the audio out keep the clip below.
+        // BACON_1.5_64BIT_MASTER_SUM (U2.53, feedback #7): the 64-bit sum is
+        // narrowed to int32 HERE.  clipBypass_ buses clamp at +/-INT32_MAX
+        // (never wrap); the master bus hard-clips at +/-1.0 (32767 counts)
+        // for the int16 DAC path as before.
+        if (!clipBypass_) {
+            fixed *c = buffer;
             if (softclip_ == -1) {
                 for (int i = 0; i < samplecount * 2; i++) {
-                    fixed sample = *c;
+                    fixed sample = clamp32(sum64[i]);
                     *c++ = hardClip(sample);
                 }
             } else {
                 for (int i = 0; i < samplecount * 2; i++) {
-                    fixed sample = *c;
+                    fixed sample = clamp32(sum64[i]);
                     *c++ = hardClip(softClip(sample));
                 }
             }
-         }
+        } else {
+            fixed *c = buffer;
+            for (int i = 0; i < samplecount * 2; i++) {
+                *c++ = clamp32(sum64[i]);
+            }
+        }
      }
     if (enableRendering_&&writer_) {
 		if (!gotData) {

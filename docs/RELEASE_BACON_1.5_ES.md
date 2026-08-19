@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 e54a5694308458bbb4aba4301a9b0f581415bdcd27fe1e4e9671414d136d0fe1
+- lgpt_r36sx_u2523.so - SHA256 fcc02d6bda2a8cbe6bb588efc2c9343901a03cf974d46228739f361411608420
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...

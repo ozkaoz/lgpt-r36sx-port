@@ -481,11 +481,14 @@ bool PianoSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     // rendered Q15 and the master/DAC pipeline runs at int16<<15, so the
     // synth was ~90 dB below a sample at the same volume; clamp +-i2fp(1)-1
     // before the shift keeps the DAC's short(fp2i()) from wrapping.
+    // BACON_1.5_VOL_SYNTHS_PAD (U2.52.9, feedback #6): -20 dB pad (x0.1) on
+    // the master-scale write, same as BassSynth -- a full-scale saw/piano
+    // sustained is ~19 dB RMS louder than a kit sample at the same volume.
     for (int i = 0; i < size * 2; i++) {
         fixed v = buffer[i];
         if (v > i2fp(1) - 1) v = i2fp(1) - 1;
         else if (v < -(i2fp(1) - 1)) v = -(i2fp(1) - 1);
-        buffer[i] = v << FIXED_SHIFT;
+        buffer[i] = fp_mul(v, fl2fp(0.1f)) << FIXED_SHIFT;
     }
 
     return true;

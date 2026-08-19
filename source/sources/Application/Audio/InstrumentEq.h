@@ -105,7 +105,6 @@ public:
     void ClearEdited() { edited_ = false; }
 
 private:
-    static fixed saturate(fixed x);
     void refreshFlat();
     void recomputeBand(int band);
 

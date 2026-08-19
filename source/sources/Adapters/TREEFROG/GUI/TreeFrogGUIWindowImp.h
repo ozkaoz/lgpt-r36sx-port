@@ -45,4 +45,14 @@ private:
 TreeFrogGUIWindowImp *TreeFrogGetWindowImp();
 uint16_t *TreeFrogGetFramebuffer();
 
+// BACON_1.5_EQ8_PIXEL_HEADER (U2.53, feedback #7): renders a char string
+// DIRECTLY into the framebuffer at pixel coordinates (8x8 glyphs, same
+// treefrog_font/ZERO_IS_INK as DrawCharInternal).  Unlike the char screen
+// (AppWindow::_charScreen -> Flush), the result is repainted every frame by
+// whoever calls it, so it can never be left behind by the screen cache or
+// covered by a pixel canvas (the EQ8 header lived on the char layer while
+// the canvas below repainted every frame).  Only the glyph pixels are
+// written; the caller paints the cell background first.
+void TreeFrogDrawText8(const char *text, int x, int y, uint16_t fg);
+
 #endif
