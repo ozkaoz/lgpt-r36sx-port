@@ -177,10 +177,17 @@ int main() {
           HelpRegistry::GetSectionAt(8));
     CHECK(HelpRegistry::GetSection(VT_CHOPPITCH) ==
           HelpRegistry::GetSectionAt(9));
+    // BACON_1.5_EQ8_HELP (U2.52.8, feedback (E)): the EQ8 editor must open
+    // its own help section (the R1 browser cycles through all of them).
+    CHECK(HelpRegistry::GetSection(VT_INSTRUMENT_EQ) ==
+          HelpRegistry::GetSectionAt(10));
     CHECK(strcmp(HelpRegistry::GetSection(VT_MIXER)->title, "MIXER") == 0);
     CHECK(strcmp(HelpRegistry::GetSection(VT_TABLE)->title, "TABLE") == 0);
     CHECK(strcmp(HelpRegistry::GetSection(VT_CHOPPITCH)->title,
                  "CHOP PITCH") == 0);
+    CHECK(strcmp(HelpRegistry::GetSection(VT_INSTRUMENT_EQ)->title,
+                 "EQ8") == 0);
+    CHECK(HelpRegistry::GetSection(VT_INSTRUMENT_EQ)->lineCount >= 12);
 
     FakeImp imp;
     FakeWindow win(imp);

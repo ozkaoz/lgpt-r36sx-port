@@ -167,6 +167,27 @@ static const HelpLine kChopperPitchLines_[] = {
     {"L1+X R1+X", "undo redo"},
 };
 
+// BACON_1.5_EQ8_HELP (U2.52.8, feedback (E)): the EQ8 editor is a fullscreen
+// view of its own (VT_INSTRUMENT_EQ) with dedicated combos; SELECT+R1 on the
+// EQ screen must explain them instead of opening with an empty section.
+static const HelpLine kEq8Lines_[] = {
+    {"L/R", "band"},
+    {"X+L/R", "frequency"},
+    {"X+UP/DN", "gain +-1 dB"},
+    {"Y+L/R", "Q wider/narrower"},
+    {"Y+UP/DN", "intensity all"},
+    {"A", "band on/off"},
+    {"B", "filter type"},
+    {"A+B", "reset band"},
+    {"SELECT", "bypass EQ"},
+    {"START", "play/stop"},
+    {"R+START", "stop"},
+    {"R+B", "back to instr"},
+    {"SELECT+R1", "help"},
+    {"SELECT+R2", "audio driver"},
+    {"L1+X R1+X", "undo redo"},
+};
+
 static const HelpSection kSections_[] = {
     {"SONG", kSongLines_, (int)(sizeof(kSongLines_) / sizeof(HelpLine))},
     {"CHAIN", kChainLines_, (int)(sizeof(kChainLines_) / sizeof(HelpLine))},
@@ -181,6 +202,8 @@ static const HelpSection kSections_[] = {
      (int)(sizeof(kChopperLines_) / sizeof(HelpLine))},
     {"CHOP PITCH", kChopperPitchLines_,
      (int)(sizeof(kChopperPitchLines_) / sizeof(HelpLine))},
+    // BACON_1.5_EQ8_HELP (U2.52.8, feedback (E))
+    {"EQ8", kEq8Lines_, (int)(sizeof(kEq8Lines_) / sizeof(HelpLine))},
 };
 static const int kSectionCount_ =
     (int)(sizeof(kSections_) / sizeof(HelpSection));
@@ -216,6 +239,10 @@ const HelpSection *HelpRegistry::GetSection(ViewType vt) {
             return &kSections_[8];
         case VT_CHOPPITCH:
             return &kSections_[9];
+        // BACON_1.5_EQ8_HELP (U2.52.8, feedback (E)): EQ8 maps to its own
+        // help section (kept at the end, like the VT_* enum member).
+        case VT_INSTRUMENT_EQ:
+            return &kSections_[10];
         default:
             return 0;
     }

@@ -537,6 +537,20 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     syncInstrumentEq();
     eqDsp_.Process(channel, buffer, size);
 
+    // BACON_1.5_VOL_SYNTHS_FIX (U2.52.8, feedback (A)): the master pipeline
+    // (mixer sum, FX sends, recorder, DAC clip) runs at int16<<15 scale
+    // (count<<15); the synths rendered Q15, so at volume 100 a synth reached
+    // the DAC at ~1 LSB -- ~90 dB below a sample at the same volume.  Restore
+    // the master scale at the exit, AFTER the Q15 FV2/EQ kernels, clamped to
+    // +-i2fp(1)-1 so the DAC's short(fp2i()) never wraps: a peak-1.0 synth is
+    // full scale, like a peak sample.
+    for (int i = 0; i < size * 2; i++) {
+        fixed v = buffer[i];
+        if (v > i2fp(1) - 1) v = i2fp(1) - 1;
+        else if (v < -(i2fp(1) - 1)) v = -(i2fp(1) - 1);
+        buffer[i] = v << FIXED_SHIFT;
+    }
+
     return true;
 }
 

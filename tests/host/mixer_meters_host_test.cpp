@@ -80,15 +80,17 @@ int main() {
     for (int i = 0 ; i < 20 ; i++) m.SmoothFrame(false, MixerMeters::kChannels, peakL, peakR) ;
     check(m.LevelL(2) == 0.0f && m.LevelR(2) == 0.0f, "stop resets to 0") ;
 
-    // ---- BarLevel: mixVULevel(peak) * volume/100 clamped 0..1 ----
+    // ---- BarLevel (BACON_1.5_VU_LINEAR_SCALE, U2.52.8): the level is the
+    // true linear peak only -- the scanned peaks already include their
+    // fader (post-volume channel scan, pre-scan master damp), so the old
+    // *volume/100 double-applied it (a volume-20 track read ~87% + red).
+    // The volume param stays for API stability but is ignored.
     check(m.BarLevel(0.0f, 100) == 0.0f, "BarLevel 0 peak -> 0") ;
     check(closeOr(m.BarLevel(1.0f, 100), 1.0f), "BarLevel full -> 1") ;
-    {
-        float expected = mixVULevel(0.5f) * 50.0f * 0.01f ;
-        check(closeOr(m.BarLevel(0.5f, 50), expected), "BarLevel 0.5/50") ;
-    }
+    check(closeOr(m.BarLevel(0.5f, 50), 0.5f), "BarLevel 0.5 -> 0.5 (volume already in peak)") ;
+    check(closeOr(m.BarLevel(0.2f, 100), 0.2f), "BarLevel vol-20 track reads 20%") ;
     check(m.BarLevel(1.0f, 300) == 1.0f, "BarLevel clamps at 1") ;
-    check(m.BarLevel(1.0f, 0) == 0.0f, "BarLevel volume 0 -> 0") ;
+    check(m.BarLevel(1.0f, 0) == 1.0f, "BarLevel ignores the volume param") ;
     check(m.BarLevel(-1.0f, 100) == 0.0f, "BarLevel negative peak -> 0") ;
 
     // ---- GeometryFor golden: height 12 cells ----

@@ -300,7 +300,6 @@ void InstrumentEqView::PostFlushDraw() {
     const unsigned short gridC  = tf565(34, 38, 60);
     const unsigned short bandC  = tf565(150, 185, 235);
     const unsigned short selC   = tf565(255, 244, 120);
-    const unsigned short specC  = tf565(90, 190, 130);
     const unsigned short lblC   = tf565(170, 178, 205);
     const unsigned short guideC = tf565(46, 52, 80);
 
@@ -330,6 +329,30 @@ void InstrumentEqView::PostFlushDraw() {
 
     // Canvas background + border
     tfFill(cX0 - 2, cY0 - 2, cX1 - cX0 + 5, cY1 - cY0 + 5, bgC);
+
+    // BACON_1.5_EQ8_SPECTRUM_BACKDROP (U2.52.8, feedback (F)): the live
+    // spectrum is drawn INSIDE the canvas as a 30% opacity backdrop (the
+    // bars live BEHIND the EQ curve, not in a separate strip below it).
+    // specC (90,190,130) blended 30/70 over bgC (8,9,22) -> (33,63,54).
+    // The opaque grid/axis/curve drawn afterwards stay fully readable.
+    {
+        const unsigned short specBlend = tf565(33, 63, 54);
+        SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
+        sp.Compute();
+        const fixed *bb = sp.Bins();
+        const int n = sp.BinCount();
+        int bw = (cX1 - cX0) / n;
+        for (int i = 0; i < n; i++) {
+            // BACON_1.5_ANALYZER_20HZ: a 0 dBFS sine peaks around 0.25 in
+            // the normalized FFT bins (Hann window), so scale x4 to make a
+            // full bar mean 0 dBFS; clamp to the canvas height.
+            int h = (int)(fp2fl(bb[i]) * 4.0f * (float)(cY1 - cY0));
+            if (h < 2) h = 2;
+            if (h > cY1 - cY0) h = cY1 - cY0;
+            tfFill(cX0 + i * bw, cY1 - h, bw - 1, h, specBlend);
+        }
+    }
+
     tfFill(cX0 - 2, cY0 - 2, cX1 - cX0 + 5, 1, border);
     tfFill(cX0 - 2, cY1 + 2, cX1 - cX0 + 5, 1, border);
     tfFill(cX0 - 2, cY0 - 2, 1, cY1 - cY0 + 5, border);
@@ -423,26 +446,6 @@ void InstrumentEqView::PostFlushDraw() {
     tfTinyText(freqToX(100) - 3, cY1 + 3, "100", lblC);
     tfTinyText(freqToX(1000) - 2, cY1 + 3, "1k", lblC);
     tfTinyText(freqToX(10000) - 5, cY1 + 3, "10k", lblC);
-
-    // Live spectrum (analyzer on the FINAL master mix; BACON_1.5_ANALYZER_MIX)
-    const int sY0 = 168, sY1 = 208;
-    tfFill(cX0 - 2, sY0 - 2, cX1 - cX0 + 5, sY1 - sY0 + 5, bgC);
-    tfFill(cX0 - 2, sY0 - 2, cX1 - cX0 + 5, 1, border);
-
-    SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
-    sp.Compute();
-    const fixed *bb = sp.Bins();
-    const int n = sp.BinCount();
-    int bw = (cX1 - cX0) / n;
-    for (int i = 0; i < n; i++) {
-        // BACON_1.5_ANALYZER_20HZ: a 0 dBFS sine peaks around 0.25 in the
-        // normalized FFT bins (Hann window), so scale x4 to make the full
-        // bar mean 0 dBFS; clamp to the strip height.
-        int h = (int)(fp2fl(bb[i]) * 4.0f * (float)(sY1 - sY0));
-        if (h < 2) h = 2;
-        if (h > sY1 - sY0) h = sY1 - sY0;
-        tfFill(cX0 + i * bw, sY1 - h, bw - 1, h, specC);
-    }
 #endif
 }
 

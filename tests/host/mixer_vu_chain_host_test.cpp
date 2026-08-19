@@ -5,7 +5,8 @@
 // song channel:
 //   PlayerChannel::StartInstrument -> PlayerChannel::Render (instrument
 //   renders, post-pan buffer) -> per-block peak scan -> GetPeakValueL/R ->
-//   MixerMeters::SmoothFrame -> MixerMeters::BarLevel (mixVULevel * vol/100).
+//   MixerMeters::SmoothFrame -> MixerMeters::BarLevel (linear mixVULevel,
+//   volume ignored: the scanned peak already includes the fader).
 //
 // Checks:
 //   1. the scan sees the synth audio on BOTH sides at the device rate
@@ -172,6 +173,12 @@ static bool bufferFinite(const fixed *b, int n) {
     return true;
 }
 
+static bool closef(float a, float b) {
+    float d = a - b;
+    if (d < 0.0f) d = -d;
+    return d < 0.001f;
+}
+
 static void runChain(int rate, const char *tag) {
     fixed buffer[1024 * 2];
 
@@ -215,7 +222,11 @@ static void runChain(int rate, const char *tag) {
     check(pR > 0.02f, "scan sees synth audio on R");
 
     // ---- 2. bar level through the real MixerMeters path (what the MIX
-    // page draws): volume 100 and 127 must produce a visibly filled bar.
+    // page draws): BACON_1.5_VU_LINEAR_SCALE (U2.52.8) -- the bar equals
+    // the true scanned peak (the fader is already inside the peak), so a
+    // quiet synth at volume 100 reads ~5% of the bar, not the ~56% the old
+    // +12 dB hot rebase showed.  Visible above the 0.002 floor, never
+    // double-scaled by the volume.
     MixerMeters meters;
     float peaksL[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     float peaksR[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -225,8 +236,9 @@ static void runChain(int rate, const char *tag) {
     float lvl100 = MixerMeters::BarLevel(meters.LevelL(0), 100);
     float lvl127 = MixerMeters::BarLevel(meters.LevelL(0), 127);
     printf("[%s] barLevel vol100=%.3f vol127=%.3f\n", tag, lvl100, lvl127);
-    check(lvl100 > 0.5f, "bar more than half full at volume 100");
-    check(lvl127 > 0.5f, "bar more than half full at volume 127");
+    check(closef(lvl100, pL), "bar level equals the scanned peak (linear)");
+    check(closef(lvl127, pL), "volume 127 does not double-scale the peak");
+    check(lvl100 > 0.02f, "bar visibly above the 0.002 floor");
 
     // ---- 3. sustained buffers: the peaks must stay up (the sub-block
     // decay must never pull a sounding channel down between buffers).

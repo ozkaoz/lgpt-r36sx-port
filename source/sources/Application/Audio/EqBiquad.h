@@ -5,18 +5,23 @@
 #include "Application/Utils/fixed.h"
 
 /*
- * EqBiquad -- shared RBJ Audio EQ Cookbook coefficient computation
- * (bacon-1.5, item 2).  Used by BOTH FxEngine::InstrumentEq and
- * FxEngine::ParametricEQ so the instrument EQ8 and the master EQ use the
- * same DSP primitive for their band coefficients.  Pure inline: no state,
- * no dependencies beyond fixed.h and <math.h>.
+ * EqBiquad -- shared biquad coefficient computation (bacon-1.5, item 2).
+ * Used by BOTH FxEngine::InstrumentEq and FxEngine::ParametricEQ so the
+ * instrument EQ8 and the master EQ use the same DSP primitive for their
+ * band coefficients.  Pure inline: no state, no dependencies beyond
+ * fixed.h and <math.h>.
  *
  * Coefficients are normalized by a0 (a0 = 1) and emitted in Q15.
- * The math mirrors the golden recomputeBand() of InstrumentEq.cpp /
- * recompute() of ParametricEQ.cpp exactly (RBJ Audio EQ Cookbook), plus the
- * missing LOW_PASS / BAND_PASS types.  The Nyquist clamp uses 0.9*pi
- * (ParametricEQ golden); at 48 kHz the engine never reaches it (max band
- * 20 kHz < 0.9*pi), so both existing paths are bit-identical.
+ * The shelf/filter types mirror the golden recomputeBand() of
+ * InstrumentEq.cpp / recompute() of ParametricEQ.cpp exactly (RBJ Audio
+ * EQ Cookbook), plus the missing LOW_PASS / BAND_PASS types.  The BELL
+ * type deviates from the cookbook since U2.52.8 (BACON_1.5_BELL_PREWARPED):
+ * the RBJ peaking formula is asymmetric at low/mid frequencies and never
+ * reaches its set gain at the center, so it was replaced by the
+ * prewarped-bilinear analog peaking prototype (exact gain at w0, 0 dB at
+ * DC/Nyquist, log-symmetric).  The Nyquist clamp uses 0.9*pi (ParametricEQ
+ * golden); at 48 kHz the engine never reaches it (max band 20 kHz <
+ * 0.9*pi), so both existing paths are bit-identical for the other types.
  */
 
 namespace FxEngine {
@@ -47,26 +52,7 @@ inline void eqBiquadCoeffs(int type, int rate, float f0, float lvl, float qv,
     float cw = cosf(w0);
     float sw = sinf(w0);
 
-    // RBJ_BELL_STABILITY (bacon-1.5): the RBJ peaking filter is UNSTABLE
-    // for boosts at low normalized frequencies (a real pole exits the unit
-    // circle: P(1) = 1 + a1 + a2 < 0).  Verified divergent settings include
-    // +6 dB at 1 kHz Q=1 and +2 dB at 250 Hz Q=1 (44.1/48 kHz).  The
-    // marginal boost is A = sw/(sw - 4*Q*(1-cw)); cap the gain at 99.5% of
-    // it so the filter always stays bounded.  Cuts (A < 1) and all other
-    // types are unaffected (their poles are gain-independent; the earlier
-    // 90% cap over-limited the shelves/filters and made low-band boosts
-    // inaudible on the device: U2.52.4 relaxes to 99.5%, BELL only).
-    if (type == EQ_BIQUAD_BELL && lvl > 0.0f) {
-        float denom = sw - 4.0f * qv * (1.0f - cw);
-        if (denom > 0.0f) {
-            float cap = (sw / denom) * 0.995f;
-            if (cap < 1.0f) cap = 1.0f;
-            float lvlCap = 40.0f * log10f(cap);
-            if (lvl > lvlCap) lvl = lvlCap;
-        }
-    }
-
-    float A = powf(10.0f, lvl / 40.0f);
+    float A = powf(10.0f, lvl / 20.0f);
     float alpha = sw / (2.0f * qv);
 
     float fb0, fb1, fb2, fa0, fa1, fa2;
@@ -128,15 +114,43 @@ inline void eqBiquadCoeffs(int type, int rate, float f0, float lvl, float qv,
         fa1 = -2.0f * cw;
         fa2 = 1.0f - alpha;
         break;
+    // BACON_1.5_BELL_PREWARPED (U2.52.8, feedback): the old RBJ peaking
+    // formula was asymmetric at low/mid frequencies: the gain at w0 is NOT
+    // A (the peak migrates to a gain-dependent "magic" frequency), DC and
+    // Nyquist never return to 0 dB, and at low f0 the filter became a huge
+    // shelf toward DC with the center DIPPING below 0 dB.  Measured on the
+    // device path (48 kHz): +6 dB at 1 kHz Q=1 -> center +0.2 dB, DC
+    // +37 dB; +6 dB at 100 Hz -> center -1.9 dB, DC +14 dB.  That is
+    // exactly the reported "lifts the left side and drops the right side".
+    // The replacement is the analog peaking prototype bilinear-transformed
+    // with prewarping (K = w0/tan(w0/2), so s = j w0 maps to z = e^{jw0}):
+    // H(s) = (s^2 + (A/Q) w0 s + w0^2) / (s^2 + (1/(A Q)) w0 s + w0^2).
+    // Properties: gain EXACTLY A (20log10(A) = lvl) at w0, exactly 0 dB at
+    // DC and Nyquist, symmetric in log-frequency.  The poles are the
+    // bilinear images of the stable analog poles, so the filter is stable
+    // for every A>0, Q>0 and the old low-f0 stability cap (which limited
+    // boosts to ~0.4-1 dB below ~1 kHz) is gone.
+    // Numerically well-conditioned at low f0 (K -> 2 as w0 -> 0; the old
+    // alpha = sw/(2Q) denominators collapsed there).  At lvl=0 it is the
+    // exact identity (num == den).
     case EQ_BIQUAD_BELL:
-    default:
-        fb0 = 1.0f + alpha * A;
-        fb1 = -2.0f * cw;
-        fb2 = 1.0f - alpha * A;
-        fa0 = 1.0f + alpha / A;
-        fa1 = -2.0f * cw;
-        fa2 = 1.0f - alpha;
+    default: {
+        // sqrt(A) in the s-terms so the peak gain at w0 is A exactly
+        // (the prototype with plain A peaks at A^2 = lvl*2 dB).
+        float sA = powf(10.0f, lvl / 40.0f);
+        float K = w0 / tanf(w0 / 2.0f);
+        float kk = K * K;
+        float ww = w0 * w0;
+        float bw = sA * w0 * K / qv;
+        float aw = w0 * K / (sA * qv);
+        fb0 = kk + ww + bw;
+        fb1 = 2.0f * (ww - kk);
+        fb2 = kk + ww - bw;
+        fa0 = kk + ww + aw;
+        fa1 = 2.0f * (ww - kk);
+        fa2 = kk + ww - aw;
         break;
+    }
     }
     if (fa0 != 0.0f) {
         b0 = fl2fp(fb0 / fa0);

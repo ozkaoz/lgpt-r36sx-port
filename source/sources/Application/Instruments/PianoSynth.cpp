@@ -476,6 +476,18 @@ bool PianoSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     syncInstrumentEq();
     eqDsp_.Process(channel, buffer, size);
 
+    // BACON_1.5_VOL_SYNTHS_FIX (U2.52.8, feedback (A)): same master-scale
+    // restore as BassSynth -- see there for the rationale.  The synth
+    // rendered Q15 and the master/DAC pipeline runs at int16<<15, so the
+    // synth was ~90 dB below a sample at the same volume; clamp +-i2fp(1)-1
+    // before the shift keeps the DAC's short(fp2i()) from wrapping.
+    for (int i = 0; i < size * 2; i++) {
+        fixed v = buffer[i];
+        if (v > i2fp(1) - 1) v = i2fp(1) - 1;
+        else if (v < -(i2fp(1) - 1)) v = -(i2fp(1) - 1);
+        buffer[i] = v << FIXED_SHIFT;
+    }
+
     return true;
 }
 

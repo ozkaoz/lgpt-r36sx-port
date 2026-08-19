@@ -1111,7 +1111,15 @@ for (int i=0;i<channelCount;i++) {
     // the instrument being edited.
     if (somethingToMix) {
         syncInstrumentEq() ;
+        // The instrument buffer is int16<<15 (master) scale, the EQ DSP is
+        // Q15 (range +-1.0 = +-i2fp(1)): normalize, process, restore.  The
+        // >>FIXED_SHIFT / <<FIXED_SHIFT round trip is the exact one FxEngine
+        // uses for its DSP kernels; without it the EQ saturate() clamps the
+        // whole sample output to ~1 LSB and the sound dies on ANY edit.
+        int eqN = size * 2;
+        for (int i = 0; i < eqN; i++) buffer[i] >>= FIXED_SHIFT;
         eqDsp_.Process(channel, buffer, size) ;
+        for (int i = 0; i < eqN; i++) buffer[i] <<= FIXED_SHIFT;
     }
 
     return somethingToMix ;

@@ -21,8 +21,11 @@ public:
 	// TREEFROG_MIXER_COMPACT_BARS_V1 (Bacon 1.1.1 V13): each level is 3 px
 	// tall (2 px fill + 1 px gap).
 	static const int kLevelHeight = 3 ;
-	// TREEFROG_MIXER_VU_DB_SCALE_V5: the displayed 0 dB row is at level 36/39
-	// on the -36..+3 rebased scale (see FxPages.h mixVULevel).
+	// BACON_1.5_VU_LINEAR_SCALE (U2.52.8): the red band is the top cell of
+	// the bar: the 0 dBFS ceiling zone (fills at level > 36/39, i.e. a real
+	// pre-clip level at/over ~0 dBFS).  Kept at 36/39 so the geometry
+	// (red band = 1 top cell, ~7.5% of the bar) is unchanged from the old
+	// rebased scale.
 	static float ZeroDbLevel() { return 36.0f / 39.0f ; }
 
 	MixerMeters() {
@@ -62,10 +65,18 @@ public:
 	float LevelL(int ch) const { return vuL_[ch] ; }
 	float LevelR(int ch) const { return vuR_[ch] ; }
 
-	// TREEFROG_MIXER_COMPACT_BARS_V1: normalized post-volume level of one
-	// side, recorded by drawMeterBar and rendered by PostFlushDraw.
+	// BACON_1.5_VU_LINEAR_SCALE (U2.52.8): normalized level of one side,
+	// rendered by drawMeterBar and PostFlushDraw.  The level is the true
+	// linear peak ONLY (mixVULevel is linear, see FxPages.h).  The volume
+	// parameter is kept for API stability but IGNORED: the scanned peaks
+	// already include their fader (the channel scan runs on the post-volume
+	// buffer in PlayerChannel::Render, and the master damp is applied
+	// pre-scan on the master bus in MixerService::SetMasterVolume), so the
+	// old *volume/100 double-applied it -- with the hot rebased scale it
+	// pushed a volume-20 track to 87%+ of the master bar (red +3 cell).
 	static float BarLevel(float peak, int volume) {
-		float level = mixVULevel(peak) * float(volume) * 0.01f ;
+		(void)volume ;
+		float level = mixVULevel(peak) ;
 		if (level < 0.0f) level = 0.0f ;
 		if (level > 1.0f) level = 1.0f ;
 		return level ;
@@ -95,8 +106,10 @@ public:
 			g.filledRLevels = 0 ;
 			return g ;
 		}
-		// 0 dB+ zone: the top of the bar above the 0 dB row on the shared
-		// -36..+3 scale (mixVULevel(0 dB) = 36/39), rendered solid red.
+		// BACON_1.5_VU_LINEAR_SCALE (U2.52.8): 0 dB+ zone: the top cell of
+		// the bar above the 0 dBFS ceiling (see ZeroDbLevel), rendered solid
+		// red.  On the linear scale it lights when the fill reaches the
+		// ceiling (a real pre-clip level at/over ~0 dBFS).
 		g.redBandLevels = g.totalLevels - (int)(ZeroDbLevel() * (float)g.totalLevels + 0.5f) ;
 		if (g.redBandLevels < 1) g.redBandLevels = 1 ;
 		g.redBandPx = g.redBandLevels * kLevelHeight ;

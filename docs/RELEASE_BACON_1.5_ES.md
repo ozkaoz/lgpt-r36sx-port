@@ -198,3 +198,81 @@ Regresión: AUDIT_CLEAN_MAIN_U2523_OK (tests/run_all.sh), F10_BASELINE_OK
 (golden core e54a5694), host bass 72 + piano 46 + eq8_struct 68 +
 analyzer_mix 64 + mixer_vu_chain 46 checks OK (UBSAN limpio),
 DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK, verify ERRORS=0.
+
+Novedades U2.52.8 (feedback de la prueba en R36SX #5):
+
+27. VOLUMEN REAL DE LOS SINTHS (feedback #5-A): el "sinth bajo vs samples"
+    no era un ajuste de 3 dB — era un desajuste de ESCALA de ~90 dB. Los
+    instrumentos escriben su buffer en escala master int16<<15 (count<<15,
+    la del mixer, los sends, la grabación y el DAC: short(fp2i(v)) = >>15);
+    los sinths (BassSynth/PianoSynth) renderizaban en Q15 (±1.0 = ±32768),
+    así que a vol 100 un sinth llegaba al DAC a ~1 count mientras un sample
+    llegaba a 11122 counts (medido con el HI HAT 01 real del SD) — por eso
+    el sinth era inaudible al lado de una sample. Ningún test llegaba a la
+    conversión fp2i() del DAC y por eso no se detectó. Fix: el sinth
+    restaura la escala master a la salida de su Render (después de los
+    kernels Q15 FV2/EQ, clamp ±i2fp(1)-1 para que el int16 del DAC nunca
+    envuelva): un sinth a vol 100 es ahora full scale (32767 counts =
+    0 dBFS), igual que un sample a pico pleno. Verificación host (extendido
+    el runner del EQ8): sinth sostenido peak 32767 / rms 14822 counts vs
+    HI HAT 11122 / 577 — la brecha de 90 dB desapareció.
+    BACON_1.5_VOL_SYNTHS_FIX.
+28. VU del mixer con la escala master real (feedback #5-G, complemento del
+    26): el scan de picos usaba fp2fl() directamente, que para un buffer
+    int16<<15 devuelve los COUNTS del DAC (1.0 == 32768), no la amplitud
+    0..1 — con el fix del punto 27 el sinth pasó a leer 2867 counts (barra
+    clavada al 100%) y las samples siempre habían sobreleído ~32768x
+    (barra siempre llena, master en rojo con cualquier track). Ahora el
+    scan divide por 32768 (count -> audio): track a vol 20 con instrumento
+    full scale lee 20%, y el rojo +3 solo con una suma pre-clip real
+    >= 0 dBFS — exactamente lo que prometía el diseño del
+    BACON_1.5_VU_LINEAR_SCALE. PlayerChannel.cpp y AudioMixer.cpp.
+29. EQ8 único funcional para samples+sinths (feedback #5-C): editar el EQ
+    mataba el sonido porque el buffer del instrumento es int16<<15 pero el
+    DSP del EQ es Q15: sin normalizar, el saturate() a ±i2fp(1) convertía
+    toda la salida a ~1 LSB. El fix es el round-trip >>FIXED_SHIFT /
+    <<FIXED_SHIFT alrededor del Process() (el mismo que FxEngine usa para
+    sus kernels), aplicado en SampleInstrument y replicado en la cadena de
+    los sinths. Test host dedicado de 28 checks: +12@100 Hz ×3.67, +6@1 kHz
+    ×2.06, LP@500 corta el 1 kHz a ×0.24, +24 dB@100 Hz Q10 sin DC
+    (dc=-1218 < 1500), reset vuelve a identidad ×0.91/×0.99, sinth vs
+    HI HAT en escala DAC (punto 27). Nuevo runner
+    run_host_sample_eq_edit.sh registrado en el audit.
+30. Helper del EQ8 (feedback #5-E): SELECT+R1 en la pantalla del EQ8 abre
+    ahora su propia sección de ayuda (título "EQ8", antes caía en la
+    sección vacía por defecto) con los combos reales: L/R banda, X+L/R
+    frecuencia, X+UP/DN ganancia ±1 dB, Y+L/R Q, Y+UP/DN intensidad todas
+    las bandas, A on/off, B tipo de filtro, A+B reset de banda, SELECT
+    bypass, START play, R+START stop, R+B volver al instrumento. El test
+    host del HelpOverlay verifica el mapeo GetSection(VT_INSTRUMENT_EQ) ->
+    sección 10 y el título.
+31. Espectro DETRÁS del EQ8 (feedback #5-F): las barras del analyzer ya no
+    viven en un strip separado bajo la pantalla: se dibujan DENTRO del
+    canvas del EQ como fondo al 30% de opacidad (color mezclado 30/70 sobre
+    el fondo, specC(90,190,130) sobre bgC(8,9,22) -> (33,63,54)) y encima se
+    pintan la cuadrícula, ejes, asas y curva opacos — la curva sigue 100%
+    legible y el espectro acompaña sin tapar nada. La escala ×4 (barra
+    llena = 0 dBFS) se conserva, con clamp a la altura del canvas.
+    BACON_1.5_EQ8_SPECTRUM_BACKDROP.
+32. (feedback #5-B, #5-D, #5-H) verificados en esta build: campana bell con
+    coeffs prewarped (centro exacto, sin asimetría), EQ8 fullscreen (todo
+    el área bajo el header de 3 filas es canvas), mixer a pantalla completa
+    (SongView -> VT_MIXER como vista de pantalla completa).
+
+Fixes:
+
+- Fix escala sinths (U2.52.8): ver punto 27 — BassSynth/PianoSynth
+  restauran la escala master a la salida del Render con clamp ±i2fp(1)-1;
+  el FV2 y el EQ de los sinths siguen operando en Q15 (el shift ocurre
+  después de los kernels).
+- Fix VU scan (U2.52.8): ver punto 28 — fp2fl()/32768 en el scan post-pan
+  de PlayerChannel y en el scan pre-clip del master (AudioMixer); el fix
+  del 26 (U2.52.7) era correcto para buffers Q15, pero los buffers son
+  int16<<15 desde el 27 — la división count->audio es ahora explícita.
+
+Regresión: AUDIT_CLEAN_MAIN_U2523_OK (tests/run_all.sh), host
+SAMPLE_EQ_EDIT 28 + MIXER_VU_CHAIN 48 + bass 72 + piano 46 + HelpOverlay +
+analyzer checks OK (UBSAN limpio), git diff --check limpio,
+DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK,
+SD_MOUNT=/mnt/g install/verify OK (BACKUP en
+/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260818_213642).

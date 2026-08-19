@@ -159,15 +159,19 @@ bool PlayerChannel::Render(fixed *buffer,int samplecount) {
            // sides are measured and the pan shows on the bars.
             fixed *c=buffer+off ;
             for (int i=0;i<n;i+=8) {
-               // BACON_1.5_VU_SCALE_FIX (U2.52.7): fp2fl() already returns
-               // the true linear 0..1 level (Q15: val/32768).  The old
-               // extra *(1/32767) divided twice, so every real peak fell to
-               // ~1e-6 and the 0.002 floor zeroed it: the bars were ALWAYS
-               // empty since H38.7-r4.
-               float vL=fp2fl(c[0]) ;
+               // BACON_1.5_VU_SCALE_FIX (U2.52.7) + BACON_1.5_VOL_SYNTHS_FIX
+               // (U2.52.8): the rendered buffers are int16<<15 (master
+               // scale), so fp2fl() returns the DAC count (1.0 == 32768).
+               // Dividing by 32768 converts back to the linear 0..1 audio
+               // level the bars draw.  Until U2.52.8 the synths rendered
+               // Q15, where fp2fl() was already audio and the extra
+               // division made every bar empty; with the master scale
+               // restored everywhere the count->audio conversion is the
+               // one true reading (samples were over-reading ~32768x).
+               float vL=fp2fl(c[0]) / 32768.0f ;
                if (vL<0.0f) vL=-vL ;
                if (vL>blockPeakL) blockPeakL=vL ;
-               float vR=fp2fl(c[1]) ;
+               float vR=fp2fl(c[1]) / 32768.0f ;
                if (vR<0.0f) vR=-vR ;
                if (vR>blockPeakR) blockPeakR=vR ;
                c+=8 ;

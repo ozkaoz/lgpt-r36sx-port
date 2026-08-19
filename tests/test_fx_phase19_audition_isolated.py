@@ -142,9 +142,12 @@ def check_analyzer_mix():
 
 def check_eq_curve_dsp():
     # U2.52.5 (BACON_1.5_EQ8_LIVE_CURVE): the EQ8 view draws the curve from
-    # its own state (freqHz_/gainDb_/type_/q_/bandOn_) via the SAME RBJ math
-    # the DSP uses (FxEngine::eqBiquadCoeffs), so the canvas updates live
-    # while editing (the old DSP readbacks only synced while audio rendered).
+    # its own state (freqHz_/gainDb_/type_/q_/bandOn_) via the SAME shared
+    # math the DSP uses (FxEngine::eqBiquadCoeffs), so the canvas updates
+    # live while editing (the old DSP readbacks only synced while audio
+    # rendered).  U2.52.8: the bell inside the primitive is the prewarped
+    # peaking prototype (BACON_1.5_BELL_PREWARPED), so the drawn curve
+    # shows the corrected symmetric shape too.
     assert "eqBiquadCoeffs" in IEQ_VIEW
     assert "BACON_1.5_EQ8_LIVE_CURVE" in IEQ_VIEW
     # U2.52.5 (BACON_1.5_EQ8_24DB): the canvas maps the full +/-24 dB range.
@@ -163,19 +166,21 @@ def check_eq_curve_dsp():
     # on the device any EQ edit "killed" the sound).
     assert "BACON_1.5_EQ8_DF2_64BIT" in IEQ_CPP
     assert "(long long)fp_mul(bg.b1, xL)" in IEQ_CPP
-    print("6. InstrumentEq: view-state curve (RBJ), +/-24 dB, exact snap, Df2 64-bit OK")
+    print("6. InstrumentEq: view-state curve (shared eqBiquadCoeffs), +/-24 dB, exact snap, Df2 64-bit OK")
 
 
 def check_bell_guard():
-    # Shared RBJ bell stability guard (protects InstrumentEq AND ParametricEQ).
-    assert "RBJ_BELL_STABILITY" in BQ
-    assert "if (type == EQ_BIQUAD_BELL && lvl > 0.0f)" in BQ
-    assert "denom > 0.0f" in BQ
-    # U2.52.4: 99.5% of the marginal boost (the 90% cap made low-band
-    # boosts inaudible on the device); BELL only.
-    assert "(sw / denom) * 0.995f" in BQ
+    # U2.52.8 (BACON_1.5_BELL_PREWARPED): the RBJ peaking bell was replaced
+    # by the prewarped-bilinear analog peaking prototype (exact gain at w0,
+    # 0 dB at DC/Nyquist, log-symmetric, stable for every A>0/Q>0), so the
+    # old RBJ_BELL_STABILITY cap is gone: it capped low boosts to ~0.4-1 dB
+    # and left the asymmetric DC-shelf shape ("lifts left, drops right").
+    assert "BACON_1.5_BELL_PREWARPED" in BQ
+    assert "RBJ_BELL_STABILITY" not in BQ
+    assert "K = w0 / tanf(w0 / 2.0f)" in BQ
+    assert "sA = powf(10.0f, lvl / 40.0f)" in BQ
     assert "EQ_BIQUAD_BELL" in IEQ_CPP  # InstrumentEq maps to the shared primitive
-    print("7. EqBiquad RBJ bell stability guard (99.5%, BELL only) OK")
+    print("7. EqBiquad prewarped bell (BACON_1.5_BELL_PREWARPED) OK")
 
 
 def check_build_and_audit():

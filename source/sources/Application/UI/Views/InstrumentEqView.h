@@ -24,7 +24,9 @@ class I_Instrument;
  *   - START toggles playback with the exact Player::OnStartButton() contract
  *     used by InstrumentView; R+START stops (item 3).
  *   - 8 draggable nodes, 7 filter types, log frequency scale 20 Hz-20 kHz,
- *     live spectrum from the common targeted analyzer tap (item 7).
+ *     live spectrum from the common targeted analyzer tap drawn as a 30%
+ *     opacity backdrop BEHIND the curve canvas (item 7, feedback (F)).
+ *   - SELECT+R1 opens its own EQ8 help section (feedback (E)).
  *   - The instrument id is shown WITHOUT the old 0x3F mask (item 6).
  */
 

@@ -861,13 +861,15 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// numeric value below. Selected bars stay purple, muted bars dim.  RC5:
 	// each row is a single cell (one-column meter) so the 9 meters of the
 	// MIX page fit the centered bank; totalCells == height.
-	// TREEFROG_MIXER_ZERO_DB_CLIP_V5 (Bacon 1.1.1):
-	// The bar fill = mixVULevel(peak) * volume/100 * cells on the rebased
-	// DAW scale shared with the master bar and the CUE column.  At volume
-	// 100 the 0 dB row (cell 11 of 12) is the real level of loud material,
-	// so it is genuinely reachable; the bar turns red (CD_ERROR) only when
-	// the fill passes 0 dB into the +3 zone (the top cell), exactly the
-	// condition that produces the clipped sound.  The 4-cell pitch separates
+	// BACON_1.5_VU_LINEAR_SCALE (U2.52.8, feedback):
+	// The bar fill = mixVULevel(peak) on the linear scale (true 0..1 peak,
+	// see FxPages.h; the scanned peak already includes the track volume, so
+	// no extra volume factor).  A track at volume 20 on a full-scale
+	// instrument reads 20% of the bar -- exactly what is heard.  The bar
+	// turns red (CD_ERROR) only when the fill reaches the 0 dBFS ceiling
+	// (the top +3 cell of the CUE scale), i.e. a real pre-clip level
+	// at/over 0 dBFS -- the condition that produces the clipped sound.
+	// The 4-cell pitch separates
 	// the 3-digit volume numbers ("100 100" instead of "100100").
 	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1) + TREEFROG_MIXER_HALF_CELL_BARS_V2:
 	// The channel bar is TWO independent bars sharing ONE cell column (8 px):
@@ -923,17 +925,16 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 	GUITextProperties props ;
 	char buffer[8] ;
 
-	// TREEFROG_MIXER_MASTER_VU_V5 (Bacon 1.1.1) + TREEFROG_MIXER_STEREO_METERS_V1:
-	// Master bars = mixVULevel(master peak) * masterVolume/100 on the rebased
-	// DAW scale shared with the channel bars and the CUE column.  At master
-	// volume 100 the 0 dB row is the real level of loud output
-	// (MixerService::GetMasterPeak, true pre-clip mix sum, can exceed 1.0);
-	// lower volumes scale the fill so the bar always reads like the
-	// loudness you actually hear.  It turns red (CD_ERROR) only when the
-	// fill passes 0 dB into the +3 zone (the top cell), i.e. the output
-	// really exceeds the 0 dB row.  The peak is measured pre-clip (Bacon
-	// 1.1.1: the mix sum can exceed 0 dB), so the red zone is genuinely
-	// reachable.  Two bars are drawn (L at x, R at x+2, one-cell gap) so
+	// BACON_1.5_VU_LINEAR_SCALE (U2.52.8, feedback):
+	// Master bars = mixVULevel(master peak) on the linear scale (true 0..1
+	// peak, see FxPages.h).  The peak already includes the master fader
+	// (applied pre-scan on the master bus, MixerService::SetMasterVolume),
+	// so the bar shows the real loudness: one track at volume 20 on a
+	// full-scale instrument reads 20%.  It turns red (CD_ERROR) only when
+	// the fill reaches the 0 dBFS ceiling (the top +3 cell of the CUE
+	// scale), i.e. the pre-clip mix sum is really at/over 0 dBFS
+	// (MixerService::GetMasterPeak, true pre-clip mix sum, can exceed 1.0).
+	// Two bars are drawn (L at x, R at x+2, one-cell gap) so
 	// the stereo balance of the mix is visible live.
 	MixerService *ms=MixerService::GetInstance() ;
 
@@ -1649,26 +1650,28 @@ void MixerView::drawFxPages() {
 		const int retY=3 ;
 		DrawString(chLabelX,labelY,"CH",props) ;
 		DrawString(chLabelX,numY,"VL",props) ;
-		// TREEFROG_MIXER_ZERO_DB_CLIP_V5 (Bacon 1.1.1):
-		// Static CUE scale drawn to the LEFT of the master, right-aligned to
-		// the master column so the marks sit as close to the bars as possible
-		// (compact 2-3 cell labels).  The labels mark the +3, 0, -6, -12, -24
-		// and -36 dB rows of the 15-cell bar using the same mixVULevel mapping
-		// the master and channel bars use, so the 0 dB row is exactly the row
-		// where the fills sit at volume 100 and the +3 row (red) is the cell
-		// where they turn red.  The scale never moves with the volume; the
-		// bars move against this fixed reference.
-		SetColor(CD_NORMAL) ;
-		DrawString(masterX-3,labelY,"C",props) ;
-		SetColor(CD_ERROR) ;
-		DrawString(masterX-3,labelY+1+0,"+3",props) ;
-		SetColor(CD_HILITE2) ;
-		DrawString(masterX-3,labelY+1+1,"0",props) ;
-		SetColor(CD_HILITE1) ;
-		DrawString(masterX-3,labelY+1+2,"-6",props) ;
-		DrawString(masterX-4,labelY+1+3,"-12",props) ;
-		DrawString(masterX-4,labelY+1+6,"-24",props) ;
-		DrawString(masterX-4,labelY+1+14,"-36",props) ;
+// BACON_1.5_VU_LINEAR_SCALE (U2.52.8, feedback):
+	// Static CUE scale drawn to the LEFT of the master, right-aligned to
+	// the master column so the marks sit as close to the bars as possible
+	// (compact 2-3 cell labels).  The bars are now linear (mixVULevel =
+	// true 0..1 peak, see FxPages.h), so the marks sit on their true dBFS
+	// rows of the 15-cell bar: "+3" is the top red cell = the 0 dBFS
+	// ceiling/over zone (lights when the fill reaches the ceiling), "0" is
+	// the 0 dBFS reference right below it, and -6/-12/-24 dB sit at their
+	// real linear positions (46.7% / 26.7% / 6.7% of the bar, -6.6 / -11.5 /
+	// -23.5 dBFS).  The old -36 row is gone (it fell below the bar bottom).
+	// The scale never moves with the volume; the bars move against this
+	// fixed reference.
+	SetColor(CD_NORMAL) ;
+	DrawString(masterX-3,labelY,"C",props) ;
+	SetColor(CD_ERROR) ;
+	DrawString(masterX-3,labelY+1+0,"+3",props) ;
+	SetColor(CD_HILITE2) ;
+	DrawString(masterX-3,labelY+1+1,"0",props) ;
+	SetColor(CD_HILITE1) ;
+	DrawString(masterX-3,labelY+1+8,"-6",props) ;
+	DrawString(masterX-4,labelY+1+11,"-12",props) ;
+	DrawString(masterX-4,labelY+1+14,"-24",props) ;
 		drawMasterBar(masterX,labelY,barHeight) ;
 		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 			drawVolumeBar(i,channel0X+i*channelPitch,labelY,barHeight) ;

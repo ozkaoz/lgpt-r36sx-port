@@ -175,22 +175,16 @@ int main() {
     v = fxEditCurveValue(rvb, 0.0f, 1, false) ;
     check(fabsf(v - (1.0f * 1.05946309436f)) < 0.001f, "RVB PRE 0->+1 starts 1%*st") ;
 
-    // ---- mixVULevel golden ----
+    // ---- mixVULevel golden (BACON_1.5_VU_LINEAR_SCALE, U2.52.8: the bar
+    // level is the true 0..1 peak, linearly) ----
     check(mixVULevel(0.0f) == 0.0f, "VU 0 -> 0") ;
-    check(fabsf(mixVULevel(1.0f) - 1.0f) < 0.0001f, "VU 1.0 -> 1.0 (clamped)") ;
-    // peak such that 20*log10(p)+12 = 0 -> p = 10^-0.6 = 0.25118..., level=(36)/39.
-    {
-        float p = powf(10.0f, -0.6f) ;
-        float l = mixVULevel(p) ;
-        check(fabsf(l - 36.0f / 39.0f) < 0.0001f, "VU 0 dB -> 36/39") ;
-    }
-    // peak = 10^-1.2 -> db=-12, level=(24)/39.
-    {
-        float p = powf(10.0f, -1.2f) ;
-        float l = mixVULevel(p) ;
-        check(fabsf(l - 24.0f / 39.0f) < 0.0001f, "VU -12 dB -> 24/39") ;
-    }
-    check(mixVULevel(1e-9f) == 0.0f, "VU tiny -> 0") ;
+    check(fabsf(mixVULevel(1.0f) - 1.0f) < 0.0001f, "VU 1.0 -> 1.0") ;
+    check(fabsf(mixVULevel(0.5f) - 0.5f) < 0.0001f, "VU 0.5 -> 0.5 (linear)") ;
+    // a volume-20 track on a full-scale instrument reads 20% (feedback: the
+    // old +12 dB rebase showed ~87% and lit the +3 red cell).
+    check(fabsf(mixVULevel(0.2f) - 0.2f) < 0.0001f, "VU 0.2 -> 0.2 (vol-20 track)") ;
+    check(fabsf(mixVULevel(0.93f) - 0.93f) < 0.0001f, "VU 0.93 -> 0.93 (red band edge)") ;
+    check(mixVULevel(0.001f) == 0.0f, "VU sub-floor -> 0") ;
     check(mixVULevel(10.0f) == 1.0f, "VU over 1 clamps to 1") ;
     check(mixVULevel(-1.0f) == 0.0f, "VU negative -> 0") ;
 

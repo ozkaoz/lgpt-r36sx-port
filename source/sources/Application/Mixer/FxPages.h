@@ -407,24 +407,22 @@ inline bool fxIsDiscreteParam(int id) {
 	}
 }
 // TREEFROG_MIXER_VU_DB_SCALE_V5 (Bacon 1.1.1):
-// DAW/VU-style rebased scale.
-// The displayed 0 dB row corresponds to the
-// typical loud output at volume 100 (measured ~-12 dBFS real peaks for loud
-// material on the normalized 0..1 peaks), so at volume 100 the bar genuinely
-// reaches the 0 dB row and strong material pushes into the red +3 dB zone
-// above it -- 0 dB is reachable, red means over 0 dB.  Displayed dB = real
-// dB + 12 on a -36..+3 span (39 dB): level = (db+36)/39 maps 0 dB to cell
-// 11 of 12 and +3 dB to the top cell, which is exactly where the fill turns
-// red (filledCells >= totalCells).  The V3 -50..0 scale was honest but made
-// red unreachable: loud material read 9/12 cells at volume 100 and the +3
-// zone did not exist.
+// BACON_1.5_VU_LINEAR_SCALE (U2.52.8, feedback): the bar level is now the
+// TRUE 0..1 peak, linearly (level = peak).  The old -36..+3 DAW rebase
+// (displayed dB = real dB + 12, 0 dB row at 36/39) was calibrated for the
+// double-divided peaks of the old scan: after the U2.52.7 scan fix the same
+// mapping pushed a volume-20 track (real pre-clip ~0.2 = -14 dBFS) to 87% of
+// the bar, lighting the +3 red cell on the master with a single track.  The
+// linear scale shows the reality the user expects: a track at volume 20 on a
+// full-scale instrument reads 20%, and the top red cell (the +3 zone of the
+// CUE column) lights only when the fill reaches the 0 dBFS ceiling -- i.e.
+// a real pre-clip sum at/over 1.0.  Sub-0.002 peaks (-54 dBFS) read 0, the
+// same floor the channel scan itself applies.
 inline float mixVULevel(float peak) {
 	if (peak <= 0.0f) return 0.0f ;
-	float db = 20.0f * log10f(peak) + 12.0f ;
-	float level = (db + 36.0f) / 39.0f ;
-	if (level < 0.0f) level = 0.0f ;
-	if (level > 1.0f) level = 1.0f ;
-	return level ;
+	if (peak < 0.002f) return 0.0f ;
+	if (peak > 1.0f) peak = 1.0f ;
+	return peak ;
 }
 
 // TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9):
