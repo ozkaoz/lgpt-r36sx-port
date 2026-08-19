@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 bf8cf44c339392f5c8c3afef3de2ab7cb738571acf91b4e795fdd5b0d4955e66
+- lgpt_r36sx_u2523.so - SHA256 c73685b4a05cddbcee269024be8ad3a2aecacff6f6d134b99c18a28de1c8758f
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...
@@ -368,3 +368,53 @@ DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK,
 SD_MOUNT=/mnt/g install/verify OK (BACKUP en
 /mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260819_094512).
 Core bf8cf44c instalado en SD.
+
+Novedades U2.56 (feedback de la prueba en R36SX #9 - "el sonido de la
+consola se rompió, saturado en extremo"):
+
+44. PROTECTOR DE ALTAVOZ DEL MASTER (feedback #9): con los niveles FL del
+    U2.55 (instrumento 128 = unidad, canal 127 = +2 dB) la mezcla por
+    defecto suma más allá de 1.0 (kick + 4 sinths ~3.8x, un sinth solo a
+    vol 100 / canal 127 = 1.27x) y el camino por defecto del master era un
+    hard clip puro a +/-1.0: la salida se convertía en onda cuadrada a
+    plena escala int16 ("sonido roto / saturado en extremo", riesgo para
+    el altavoz). El nuevo BACON_1.5_MASTER_SAFETY reemplaza el hard clip
+    por defecto con una rodilla suave:
+      |x| <= 0.85  -> transparente (nada bajo -1.4 dB se toca);
+      0.85..1.7    -> rodilla lineal 0.85 -> 1.0 (un exceso de +4.6 dB
+                      llega al techo);
+      > 1.7        -> techo plano en 1.0 (nunca más).
+    La salida NUNCA supera +/-32767 counts sin importar la suma (DAC y
+    altavoz seguros), el exceso moderado suena a limitador de master en
+    vez de onda cuadrada, y el exceso extremo queda aplastado pero SEGURO.
+    El medidor pre-clip sigue leyendo el nivel real (rojo honesto, el
+    usuario ve la verdad en las barras). Los modos softclip del menú del
+    mixer conservan su tono (ya limitan a +/-1.0). La rodilla se calcula
+    en fixed point puro (knee 0.85 x i2fp(32767), techo exacto en
+    i2fp(32767) sin perder ni un count).
+45. Verificación host MASTER_SAFETY (24 checks): el master REAL
+    (AudioMixer.cpp, no stub) con sines deterministas y con un BassSynth
+    real a vol 100 / canal 127 — el caso exacto del usuario: antes
+    flatTop=34 (onda cuadrada), ahora 0 con salida <= 1.0; suma moderada
+    1.3x -> 0.92 sin flat top; suma 3.8x y 5x -> <= 1.0 y finita; pista a
+    0.5 transparente; medidor honesto (1.3x -> 1.2993); modos softclip
+    siguen limitando a 1.0. Nuevo runner run_host_master_safety.sh en el
+    audit. MIXER_64BIT_SUM actualizado a la nueva semántica (techo exacto
+    i2fp(32767), sumas sobre la rodilla comprimidas ~0.86/0.87, medidor
+    leyendo la suma real).
+
+Fixes:
+
+- Fix saturación del master (U2.56): ver punto 44 — el hard clip por
+  defecto (softclip desactivado) aplastaba la mezcla caliente a onda
+  cuadrada; la rodilla de seguridad lo sustituye. AudioMixer.cpp.
+- Fix techo exacto (U2.56): el span de la rodilla se calcula como
+  i2fp(32767) - knee (exacto), el techo cae en i2fp(32767) exacto.
+
+Regresión U2.56: AUDIT_CLEAN_MAIN_U2523_OK (gate completo), host
+MASTER_SAFETY 24 + MIXER_64BIT_SUM 22 + SAMPLE_EQ_EDIT 62 + eq8 77 +
+MIXER_VU_CHAIN 52 + bass 72 + piano 46 checks OK (ASAN/UBSAN limpio),
+git diff --check limpio, DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS,
+BUILD_U2523_OK, SD_MOUNT=/mnt/g install/verify OK (BACKUP en
+/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260819_110135).
+Core c73685b4 instalado en SD.

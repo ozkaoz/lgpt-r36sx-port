@@ -44,6 +44,48 @@ static fixed clamp32(long long v) {
     return (fixed)v;
 }
 
+// BACON_1.5_MASTER_SAFETY (U2.56, feedback #9): speaker protection on the
+// master bus.  With the FL-style unity levels (U2.55) the default mix sums
+// past 1.0 (instrument vol 128 = unity, channel 127 = +2 dB, 5 tracks) and
+// the old DEFAULT path was a pure hard clip at +/-1.0 (32767 counts): the
+// output became a flat-topped square wave at full int16 scale -- the
+// "broken / extremely saturated" report -- and the DAC/speaker took full
+// power square edges.  The safety stage replaces the default hard clip
+// with a soft knee:
+//   |x| <= 0.85      -> x            (transparent, nothing below -1.4 dB
+//                                      is touched)
+//   0.85 < |x| <= 1.7 -> linear knee 0.85 -> 1.0 (a +4.6 dB excess reaches
+//                                      the ceiling)
+//   |x| > 1.7        -> 1.0           (flat ceiling: NEVER more)
+// The output NEVER exceeds +/-32767 counts whatever the sum, so the DAC and
+// the console speaker are safe; moderate excess sounds like a master
+// limiter instead of square waves; extreme excess is crushed but SAFE.
+// The pre-clip meter above still reads the true level, so the mixer bars
+// honestly show the red.  The user-selectable softclip modes (mixer menu)
+// keep their tone: they run in the other branch and already cap at +/-1.0.
+// Fixed point: the master bus is in the count<<15 scale (i2fp(32767) =
+// full scale = 0 dBFS), so the knee and ceiling are fractions of
+// i2fp(32767): 0.85 and 1.7.  The full-scale sample value is
+// 1073709056 (= 32767 * 32768); 0.85 * that = 912652697, 1.7 * that =
+// 1825305401.
+static const fixed kSafetyKnee = (fixed)((long long)i2fp(32767) * 85 / 100);
+static const fixed kSafetyTop  = (fixed)((long long)i2fp(32767) * 170 / 100);
+// Exact span (i2fp(32767) - knee): at the ceiling the output lands on
+// EXACTLY i2fp(32767) (full scale), never one count short.
+static const fixed kSafetySpan = (fixed)((long long)i2fp(32767) - kSafetyKnee);
+
+static fixed safetyLimit(fixed sample) {
+    // Magnitude in long long: -INT_MIN overflows int32, and clamp32 can
+    // legitimately return INT_MIN for a huge negative sum.
+    long long m = sample < 0 ? -(long long)sample : (long long)sample;
+    if (m <= (long long)kSafetyKnee) return sample;   // transparent below 0.85
+    if (m > (long long)kSafetyTop) m = (long long)kSafetyTop;  // ceiling at 1.7
+    fixed lim = kSafetyKnee + (fixed)(((long long)kSafetySpan *
+                                       (m - (long long)kSafetyKnee)) /
+                                      ((long long)kSafetyTop - (long long)kSafetyKnee));
+    return sample < 0 ? -lim : lim;
+}
+
 AudioMixer::AudioMixer(const char *name):
 	T_SimpleList<AudioModule>(false),
 	enableRendering_(0),
@@ -262,9 +304,17 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
         if (!clipBypass_) {
             fixed *c = buffer;
             if (softclip_ == -1) {
+                // BACON_1.5_MASTER_SAFETY (U2.56, feedback #9): the DEFAULT
+                // path was a pure hard clip (flat-topped square waves on a
+                // hot mix).  The safety knee replaces it: output NEVER
+                // exceeds +/-32767 counts, moderate excess is compressed
+                // instead of clipped (see safetyLimit above).
                 for (int i = 0; i < samplecount * 2; i++) {
                     fixed sample = clamp32(sum64[i]);
-                    *c++ = hardClip(sample);
+                    // The safety ceiling is a true clip (output pinned at
+                    // +/-1.0): flag it so the mixer CLIP indicator lights.
+                    if (sample > kSafetyTop || sample < -kSafetyTop) clipped_ = true;
+                    *c++ = safetyLimit(sample);
                 }
             } else {
                 for (int i = 0; i < samplecount * 2; i++) {

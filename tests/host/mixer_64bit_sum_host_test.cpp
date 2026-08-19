@@ -11,12 +11,14 @@
 //
 // Scenarios:
 //   1. 3 channels at 0.8 on the master bus: sum 2.4 -> the OLD int32 sum
-//      wrapped (output garbage, meter ~0.8); the 64-bit sum hard-clips at
-//      +/-32767 counts and the meter shows the true 2.4.
+//      wrapped (output garbage, meter ~0.8); the 64-bit sum pins at
+//      +/-32767 counts (BACON_1.5_MASTER_SAFETY ceiling) and the meter
+//      shows the true 2.4.
 //   2. same sum on a clipBypass_ bus: clamped at INT32_MAX, clip flag NOT
 //      set (the master bus decides the clip).
 //   3. master volume damp applied in the 64-bit domain: 2.4 x damp(80) ->
-//      ~0.983, no clip, meter reads the damped pre-clip level.
+//      ~0.983, safety-compressed to ~0.87 (above the 0.85 knee), meter
+//      reads the damped pre-clip level.
 //   4. idle path is bit-exact: one module below unity, volume 1, damp 1 ->
 //      the output equals the input, sample for sample.
 //   5. empty mixer: Render returns false.
@@ -26,7 +28,8 @@
 //      master accumulator), so ONLY the last bus survived -> ONE audible
 //      track.  BACON_1.5_64BIT_SUM_DEPTH (U2.54, feedback #8) indexes the
 //      accumulator by render depth; here 3 buses at 0.4/0.3/0.2 MUST sum to
-//      0.9 (not 0.4) and 8 buses at 0.1 MUST sum to 0.8 (not 0.2).
+//      0.9 (safety-compressed to ~0.86, meter reads the full 0.9) and 8
+//      buses at 0.1 MUST sum to 0.8 (below the knee, bit-exact).
 #include "Services/Audio/AudioMixer.h"
 #include "System/System/System.h"
 #include "Application/Utils/fixed.h"
@@ -97,8 +100,10 @@ int main() {
         mix.Insert(c);
         memset(buf, 0, sizeof(buf));
         check(mix.Render(buf, kFrames), "hot master renders");
-        check(buf[0] == i2fp(32767), "hot master clamps to +full scale (L)");
-        check(buf[1] == i2fp(32767), "hot master clamps to +full scale (R)");
+        // BACON_1.5_MASTER_SAFETY (U2.56): the hot sum (2.4x) exceeds the
+        // limiter ceiling (1.7x) so the output pins at EXACTLY full scale.
+        check(buf[0] == i2fp(32767), "hot master pins at +full scale (L)");
+        check(buf[1] == i2fp(32767), "hot master pins at +full scale (R)");
         check(mix.Clipped(), "hot master reports clipping");
         float pkL = mix.GetPeakValueL();
         float pkR = mix.GetPeakValueR();
@@ -140,8 +145,11 @@ int main() {
         // to -1.6 and the damped output was NEGATIVE; the 64-bit sum
         // produces the true positive ~0.983 level (float pow() precision
         // makes the last ~50 of 1e9 vary, so assert the level, not bits).
-        check(buf[0] > 1050000000 && buf[0] < 1060000000,
-              "damp applied to the 64-bit sum (no wrap, no clip)");
+        // BACON_1.5_MASTER_SAFETY (U2.56): the damped level (0.983) is above
+        // the safety knee (0.85) so the output is softly compressed (~0.87),
+        // never clipped; the pre-clip METER still reads the true 0.983.
+        check(buf[0] > 930000000 && buf[0] < 945000000,
+              "damp applied to the 64-bit sum (safety-compressed, no clip)");
         check(!mix.Clipped(), "damped sum does not clip");
         float pk = mix.GetPeakValueL();
         printf("damped master: peakL=%.3f out=%d\n", pk, buf[0]);
@@ -198,8 +206,11 @@ int main() {
         check(master.Render(buf, kFrames), "nested master renders");
         // All three buses MUST be in the sum: 0.4+0.3+0.2 = 0.9.  The old
         // flat-scratch bug left only the last bus (0.2+0.2 = 0.4).
-        check(buf[0] == i2fp(29491) || (buf[0] >= 29300 && buf[0] <= 29600),
-              "nested sum keeps ALL buses (0.9, not 0.4)");
+        // BACON_1.5_MASTER_SAFETY (U2.56): the 0.9 sum is above the safety
+        // knee (0.85) so the master output is softly compressed (~0.86);
+        // the pre-clip METER still reads the full 0.9 sum.
+        check(buf[0] > 915000000 && buf[0] < 930000000,
+              "nested sum keeps ALL buses (safety-compressed ~0.86)");
         float pk = master.GetPeakValueL();
         printf("nested 3ch: peakL=%.3f out=%d\n", pk, buf[0]);
         check(pk > 0.88f && pk < 0.92f, "nested meter reads the full 0.9 sum");
