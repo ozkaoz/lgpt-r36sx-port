@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 fcc02d6bda2a8cbe6bb588efc2c9343901a03cf974d46228739f361411608420
+- lgpt_r36sx_u2523.so - SHA256 bf8cf44c339392f5c8c3afef3de2ab7cb738571acf91b4e795fdd5b0d4955e66
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...
@@ -276,3 +276,95 @@ analyzer checks OK (UBSAN limpio), git diff --check limpio,
 DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK,
 SD_MOUNT=/mnt/g install/verify OK (BACKUP en
 /mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260818_213642).
+
+Novedades U2.53 (feedback de la prueba en R36SX #7):
+
+33. EQ8 menú header en píxeles (feedback #7): el menú de cabecera del EQ8
+    se dibuja con coordenadas en píxeles (no celdas), alineado con el resto
+    de la vista; verificado por host test.
+34. Limiter del EQ8 (feedback #7): clamp del Df2 a kBlockLimit = 65535
+    (2.0) por banda/canal, reemplazando el saturate a ±1 que distorsionaba
+    en boost de baja frecuencia (la campana prewarped puede pasar de 1.0).
+35. Suma master 64-bit con medidor >= (feedback #7): la suma del mixer es
+    int64 con acumulador pre-clip y el medidor del master marca >= 0 dBFS
+    antes del clamp (sin flicker en el límite); ver punto 36 para la
+    profundidad del scratch. BACON_1.5_MIXER_FULLSCREEN.
+36. Analizador dB sobre el mix (feedback #7): el espectro del analyzer se
+    alimenta de la mezcla maestra final (post master bus y post FxEngine,
+    DummyAudioOut::primarySoundBuffer_) con escala correcta (counts >> 16 +
+    >> 16), así las barras leen exactamente lo que se oye.
+37. Mixer DAW fullscreen (feedback #7): layout del mixer a pantalla
+    completa con labels hex, volumen, barras 27% más altas y marcador M/C;
+    ver U2.54 para el volumen debajo de la barra.
+
+Regresión U2.53: AUDIT_CLEAN_MAIN_U2523_OK, host eq8 77 + analyzer 64 +
+mixer_meters checks OK (UBSAN limpio), BUILD_U2523_OK, verify ERRORS=0.
+Core fcc02d6b instalado en SD.
+
+Novedades U2.54 (feedback de la prueba en R36SX #8):
+
+38. Suma master 64-bit por profundidad (feedback #8): el scratch de la suma
+    int64 era único y plano, así que los Render() anidados de los buses
+    hijos lo pisaban (cada bus reutilizaba el mismo buffer) y la
+    polifonía colapsaba; ahora el scratch es por nivel de anidamiento
+    (s_moduleSumScratch[4][] con s_moduleSumDepth). BACON_1.5_64BIT_SUM_DEPTH.
+39. Volumen debajo de la barra (feedback #8): el número de volumen se dibuja
+    DEBAJO de la barra (fila y+height+1) y el marcador pan/mute una fila
+    más abajo (y+height+2), con barHeight 19→18 (barras 7..24): orden DAW
+    hex, barra, volumen, M/C. BACON_1.5_MIXER_VOL_BELOW. Layout verificado
+    por test_ui_centered_layout.py (constantes barHeight=18, filas 25/26).
+
+Fixes:
+
+- Fix polifonía (U2.54): ver punto 38 — el scratch plano se clobberaba en
+  el render anidado de buses; el test mixer_64bit_sum ahora verifica los
+  niveles de profundidad.
+
+Regresión U2.54: AUDIT_CLEAN_MAIN_U2523_OK, host MIXER_64BIT_SUM 22 +
+MIXER_VU_CHAIN 52 + eq8 77 + bass 72 + piano 46 checks OK (UBSAN limpio),
+git diff --check limpio, BUILD_U2523_OK.
+
+Novedades U2.55 (feedback de la prueba en R36SX #8):
+
+40. Niveles estilo FL (feedback #8): la escala de volumen del instrumento
+    era 1/255, así que a vol 100 un instrumento full scale llegaba a
+    -6.2 dB con el canal a 127 (100/255 x 1.27) — exactamente la queja de
+    "barras que no suben"; ahora el volumen usa 1/128 (128 = unidad,
+    como FL Studio) y el attenuate del filtro conserva su propia escala
+    /255 (default 255 = unidad, sin boost fantasma).
+    BACON_1.5_VOL_LEVELS_FL (SampleInstrument.cpp).
+41. Sinths a unidad (feedback #8): se elimina el pad x0.1 que los sinths
+    aplicaban tras la escala master del U2.52.8 (heredado de la
+    comparación 0..255 vs 0..100, dejaba el sinth a -20 dB); un sinth a
+    vol 100 es ahora full scale igual que un sample a pico pleno.
+    BACON_1.5_VOL_SYNTHS_UNITY (BassSynth/PianoSynth).
+42. Validación EQ ±1 dB (feedback #8): el runner SAMPLE_EQ_EDIT pasa de 28
+    a 62 checks: sección B1 (cada tipo de filtro a ±1 dB @ 100 Hz: bell y
+    shelves en sqrt(A)/A, LP/HP con verificación de corte real en 2*f0 y
+    f0/2, NOTCH y BP con ganancia no nula — una banda a 0 dB es identidad
+    para TODO tipo, BACON_1.5_EQ8_0DB_TRANSPARENT) y sección B2 (kick real
+    del SD a través del EQ ±1 dB @ 80 Hz: la barra sube ~8 puntos por
+    +1 dB y a canal 127 el kick queda a ~-1 dB barra 85%, sobre la marca
+    -6 dB; el DC del bucle es artefacto del loop-click, relajado a
+    < 0.15 x 32768). El análisis confirmó el flujo: los ±1 dB se respetan
+    (bell 1.117/0.903, shelves 1.115/0.926/1.169, LP 1.009, HP 1.236,
+    NOTCH 0.259, BP 0.994).
+43. Límite Q15 de LP/HP documentado (feedback #8): con RBJ cookbook a baja
+    frecuencia (80-100 Hz) los numeradores (1-cw)/2 se cuantizan a 1-3
+    counts Q15 y la ganancia en el centro puede desviarse ~±2 dB (medido
+    +2.4 dB a 100 Hz) — límite de fidelidad del formato, no defecto de
+    diseño (shelves/bell intactos, el sonido nunca se destruye); comentado
+    en EqBiquad.h.
+
+Fixes:
+
+- Fix niveles FL (U2.55): ver punto 40 — volscale 1/128 separada del
+  attenuate /255 en ambos sitios de render de SampleInstrument.
+
+Regresión U2.55: AUDIT_CLEAN_MAIN_U2523_OK (gate completo), host
+SAMPLE_EQ_EDIT 62 + eq8 77 + MIXER_VU_CHAIN 52 + bass 72 + piano 46 +
+MIXER_64BIT_SUM 22 checks OK (UBSAN limpio), git diff --check limpio,
+DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK,
+SD_MOUNT=/mnt/g install/verify OK (BACKUP en
+/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260819_094512).
+Core bf8cf44c instalado en SD.

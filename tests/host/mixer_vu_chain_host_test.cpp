@@ -22,14 +22,14 @@
 //   7. transport stopped (SmoothFrame running=false) -> bar empties;
 //   8. wall-clock idle decay in GetPeakValueL/R (player stopped).
 //
-// BACON_1.5_VOL_SYNTHS_PAD (U2.52.9, feedback #6): the synth output is
-// padded to the kit-sample level (sustained peak ~0.1), so the harness
-// sets a 0 attack: the level sits AT sustain right away (the default
-// ~200 ms attack would put the 1024-frame measurement inside the ramp at
-// ~0.013).  The first-buffer snapshot is phase-dependent (a 60 Hz tone
-// over 1024 frames can peak as low as ~0.05 at 48 kHz, below the -24 dBFS
-// meter floor), so the bar section reads the scan after 3 warmup buffers,
-// at the sustained level.
+// BACON_1.5_VOL_SYNTHS_UNITY (U2.55, feedback #8): the synth output sits
+// at FL-style unity (sustained peak ~1.0; the U2.52.9 -20 dB pad is
+// gone), so the harness sets a 0 attack: the level sits AT sustain right
+// away (the default ~200 ms attack would put the 1024-frame measurement
+// inside the ramp at ~0.013).  The first-buffer snapshot is
+// phase-dependent (a 60 Hz tone over 1024 frames can peak as low as
+// ~0.05 at 48 kHz, below the -24 dBFS meter floor), so the bar section
+// reads the scan after 3 warmup buffers, at the sustained level.
 //
 // Compiles the real PlayerChannel.cpp + BassSynth.cpp (+ FilterV2,
 // InstrumentEq, TablePlayback) with the same stub pattern as

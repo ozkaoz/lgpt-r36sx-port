@@ -277,6 +277,7 @@ class TestSourceWav : public SoundSource {
 };
 
 static TestSourceWav *g_hihat;
+static TestSourceWav *g_kick;
 
 class TestPool : public SamplePool {
   public:
@@ -286,7 +287,7 @@ class TestPool : public SamplePool {
         names_[0][0] = 'T';
         names_[0][1] = 0;
         wav_[0] = new TestSource();
-        // Feedback (A): the reference sample on the SD, when reachable.
+        // Feedback (A): the reference samples on the SD, when reachable.
         g_hihat = TestSourceWav::TryLoad(
             "/mnt/g/lgpt/samples/Drum Kit LGPT/HI HAT 01.wav");
         if (g_hihat) {
@@ -295,6 +296,15 @@ class TestPool : public SamplePool {
             names_[1][1] = 0;
             wav_[1] = g_hihat;
             count_ = 2;
+        }
+        g_kick = TestSourceWav::TryLoad(
+            "/mnt/g/lgpt/samples/Drum Kit LGPT/KICK 01.wav");
+        if (g_kick) {
+            names_[2] = (char *)malloc(2);
+            names_[2][0] = 'K';
+            names_[2][1] = 0;
+            wav_[2] = g_kick;
+            count_ = 3;
         }
     }
     static void Install() { T_Singleton<SamplePool>::instance_ = new TestPool(); }
@@ -355,12 +365,24 @@ static double meanAbs(const fixed *buf, int n) {
 }
 
 static int g_renderSize = 512;
+static const int kAccBlocks = 40;   // 40 x 512 frames ~0.43 s window
 
 // Render enough buffers for the EQ coefficient smoothing to converge.
 static void renderBlocks(SampleInstrument &si, fixed *buf, int blocks) {
     for (int b = 0; b < blocks; b++) {
         memset(buf, 0, sizeof(fixed) * 2 * g_renderSize);
         si.Render(0, buf, g_renderSize, false);
+    }
+}
+
+// Render into a concatenated window (each block appended, no overwrite) so
+// one goertzel/peak pass covers the whole window.
+static void renderAccumulate(SampleInstrument &si, fixed *out, int blocks) {
+    fixed tmp[512 * 2];
+    for (int b = 0; b < blocks; b++) {
+        memset(tmp, 0, sizeof(tmp));
+        si.Render(0, tmp, g_renderSize, false);
+        memcpy(out + b * 2 * g_renderSize, tmp, sizeof(fixed) * 2 * g_renderSize);
     }
 }
 
@@ -481,16 +503,16 @@ int main() {
     // The reference sample is HI HAT 01 on the SD (skipped when /mnt/g is
     // not mounted).  The synth is measured SUSTAINED (the first rendered
     // buffer sits inside the attack envelope, ~6% of the peak), through the
-    // same fixed-point chain, both at instrument volume 100.  Both buffers
-    // are int16<<15 (master scale), so fp2fl() returns the DAC int16 count
-    // (1.0 == 32768): the compare below is the real loudness at the output.
-    // Before BACON_1.5_VOL_SYNTHS_FIX the synth rendered Q15 and its fp2fl
-    // peak read ~1.1 while the sample read 11122 counts -- the check caught
-    // the ~90 dB gap.  BACON_1.5_VOL_SYNTHS_PAD (U2.52.9, feedback #6) then
-    // padded the master-scale write by -20 dB (x0.1): a full-scale saw at
-    // volume 100 measured peak 1.0 / rms 0.452 vs the hat's 0.339 / 0.051
-    // (~19 dB RMS louder on the device), so the pad brings the synth to the
-    // kit level (measured here: peak 3276 counts = 0.1, rms 1482 = 0.0452).
+    // same fixed-point chain.  Both buffers are int16<<15 (master scale),
+    // so fp2fl() returns the DAC int16 count (1.0 == 32768): the compare
+    // below is the real loudness at the output.
+    // BACON_1.5_VOL_LEVELS_FL (U2.55, feedback #8): FL-style unity levels.
+    // The synth at volume 100 renders a full-scale saw (peak 1.0) and the
+    // sample at instrument volume 128 (its default, now unity) renders the
+    // full-scale hat at peak ~0.68: both sit at 0 dBFS-class peaks, the
+    // level the VU bars read at mixer volume 127 (~0 dB, FL-style).  The
+    // old U2.52.9 -20 dB pad (peak 0.1 / rms 0.0452) is gone; a regression
+    // to it (peak 3276.8 counts) fails the unity bound below.
     printf("-- (A) synth vs sample level --\n");
     {
         BassSynth synth;
@@ -512,12 +534,12 @@ int main() {
         }
         double sRms = sqrt(sAcc / (double)sN);
         printf("synth vol100 sustained: peak=%.3f rms=%.3f\n", sPk, sRms);
-        // Padded range in int16 counts (fp2fl of the master-scale buffer =
-        // the DAC count; 1.0 == 32768): the pad x0.1 maps the full-scale saw
-        // to a peak of 3276.8 counts (0.1) -- a regression to the un-padded
-        // 32768, or a double pad at 328, both fail.  Bounds: [0.05, 0.5] of
-        // full scale = [1638.4, 16384].
-        check(sPk > 1638.4 && sPk < 16384.0, "synth sustained peak in padded range");
+        // Unity range in int16 counts (fp2fl of the master-scale buffer =
+        // the DAC count; 1.0 == 32768): a full-scale saw at volume 100
+        // reads peak 32768 -- a regression to the -20 dB pad (3276.8), or
+        // a double boost (65536+), both fail.  Bounds: [0.5, 2.0] of full
+        // scale = [16384, 65536].
+        check(sPk > 16384.0 && sPk < 65536.0, "synth sustained peak in unity range");
 
         if (g_hihat) {
             SampleInstrument sh;
@@ -538,18 +560,154 @@ int main() {
                 }
             }
             double hRms = hN ? sqrt(hAcc / (double)hN) : 0.0;
-            printf("hihat vol100: peak=%.3f rms=%.3f\n", hPk, hRms);
+            printf("hihat vol128: peak=%.3f rms=%.3f\n", hPk, hRms);
             check(hPk > 0.0, "hi-hat renders audio");
-            // Within ~[-12, +3.5] dB of the reference peak and ~[-6, +9.5]
-            // dB of its rms (the expected 0.113/0.045 sit at -9.5 / -1 dB
-            // from the hat; the un-padded 1.0/0.452 fail the upper band).
-            check(sPk > hPk * 0.25 && sPk < hPk * 1.5,
+            // Both at FL-style unity: the synth peak ~1.0 against the hat
+            // peak ~0.68 (+3.3 dB, the hat transients pass the resampler
+            // peak at 0.987).  No RMS compare: the crest factor of a
+            // SUSTAINED saw (~1.5 dB) vs a DECAYING hat (~26 dB) makes the
+            // RMS ratio meaningless by nature.
+            check(sPk > hPk * 0.5 && sPk < hPk * 2.0,
                   "synth peak near the reference sample peak");
-            check(sRms > hRms * 0.5 && sRms < hRms * 3.0,
-                  "synth rms near the reference sample rms");
         } else {
             printf("SD sample not mounted - hi-hat compare skipped\n");
         }
+    }
+
+    // ============ (B) feedback #8: EQ +-1 dB edits (the "EQ destroys the
+// sound" repro) ============
+// The device complaint: "cualquier modificacion de EQ, bell, hi, low, de
+// +1 o -1 dB destruye el sonido y las barras de volumen suben mucho".
+// B1 checks EVERY band type at +-1 dB @ 100 Hz on the synthetic 100 Hz +
+// 1 kHz source: the 100 Hz component must move by the SET gain (a buggy
+// low-f0 coefficient set explodes the low end -- the U2.52.8 DC shelf --
+// and fails these ratios by an order of magnitude).  B2 runs the REAL
+// KICK 01.wav (full-scale) at instrument volume 128 (FL-style unity)
+// through BELL/LSHELF +-1 dB @ 80 Hz: the output stays bounded (the block
+// limiter at 2.0 must NOT engage), finite, and the peak/bar move by ~1 dB
+// -- not a loudness explosion.  With the mixer channel at 127 the kick
+// peaks scale x1.27: 0.7 -> 0.89 (bar ~85%, past the -6 dB mark) and a
+// +1 dB edit pushes them into the master clip (FL-like red at the top),
+// which is the only "damage" a +1 dB edit can do to a hot kick.
+    printf("-- (B1) every EQ type at +-1 dB @ 100 Hz --\n");
+    {
+        fixed *acc = (fixed *)malloc(sizeof(fixed) * 2 * g_renderSize * kAccBlocks);
+        renderAccumulate(si, acc, kAccBlocks);
+        double b100 = goertzel(acc, g_renderSize * kAccBlocks, 100.0);
+        printf("B1 baseline: 100Hz=%.4f\n", b100);
+        // type, gain, expected 100 Hz ratio (RBJ design: shelves sit at
+        // sqrt(A) at f0, LP/HP at Q (0 dB for Q=1, the Q15 numerator
+        // quantization at 100 Hz can wander the center up to ~+2.5 dB so
+        // the f0 band is wide), BP peak gain 1, NOTCH a deep dip).  The
+        // LP/HP/NOTCH/BP cases need a NONZERO gain: a 0 dB band is the
+        // identity filter for every type (BACON_1.5_EQ8_0DB_TRANSPARENT).
+        // LP/HP get an extra cutoff check at 2*f0 / f0/2 (the real test:
+        // the filter must CUT the side it is supposed to cut).
+        struct B1Case { const char *name; int type; int gain;
+                        double expect; double tol; bool upperOnly;
+                        double cutRatio; bool checkCut; };
+        B1Case cases[] = {
+            { "BELL +1", 0, 1, 1.122, 0.25, false, 0, false },
+            { "BELL -1", 0, -1, 0.891, 0.25, false, 0, false },
+            { "LSHELF +1", 1, 1, 1.059, 0.25, false, 0, false },
+            { "LSHELF -1", 1, -1, 0.944, 0.25, false, 0, false },
+            { "HSHELF +1", 2, 1, 1.059, 0.25, false, 0, false },
+            { "LOW_PASS", 3, -6, 1.000, 0.45, false, 0.50, true },
+            { "HIGH_PASS", 4, -6, 1.000, 0.45, false, 0.50, true },
+            { "NOTCH", 5, -6, 0.300, 0.00, true, 0, false },
+            { "BAND_PASS", 6, -6, 1.000, 0.25, false, 0, false },
+        };
+        for (int t = 0; t < 9; t++) {
+            B1Case &c = cases[t];
+            si.FindVariable(SIP_EQT0)->SetInt(c.type);
+            si.FindVariable(SIP_EQG0)->SetInt(c.gain);
+            si.FindVariable(SIP_EQF0)->SetInt(10000);   // 100 Hz * 100
+            si.FindVariable(SIP_EQ_Q0)->SetInt(100);    // Q 1.00
+            renderBlocks(si, acc, 120);
+            renderAccumulate(si, acc, kAccBlocks);
+            double r = goertzel(acc, g_renderSize * kAccBlocks, 100.0) / b100;
+            bool ok = c.upperOnly ? (r < c.expect)
+                                  : (fabs(r - c.expect) < c.expect * c.tol);
+            printf("B1 %s: 100Hz ratio=%.3f %s\n", c.name, r, ok ? "ok" : "FAIL");
+            check(ok, "EQ type gain matches the set dB at 100 Hz");
+            check(bufferFinite(acc, 2 * g_renderSize * kAccBlocks),
+                  "EQ type output finite");
+            if (c.checkCut) {
+                double fc = (c.type == 3) ? 200.0 : 50.0;   // 2*f0 / f0/2
+                renderAccumulate(si, acc, kAccBlocks);
+                double rc = goertzel(acc, g_renderSize * kAccBlocks, fc) / b100;
+                printf("B1 %s: %5.0fHz ratio=%.3f %s\n", c.name, fc, rc,
+                       rc < c.cutRatio ? "ok" : "FAIL");
+                check(rc < c.cutRatio, "LP/HP really cuts the filtered side");
+            }
+        }
+        si.FindVariable(SIP_EQG0)->SetInt(0);
+        si.FindVariable(SIP_EQT0)->SetInt(0);
+        free(acc);
+    }
+    printf("-- (B2) real kick EQ +-1 dB @ 80 Hz --\n");
+    if (g_kick) {
+        SampleInstrument sk;
+        sk.FindVariable(SIP_SAMPLE)->SetInt(2);
+        sk.FindVariable(SIP_LOOPMODE)->SetInt(1);   // SILM_LOOP
+        sk.FindVariable(SIP_END)->SetInt(g_kick->GetSize(0));
+        sk.Init();
+        check(sk.Start(0, 60, true), "kick Start");
+        fixed *acc = (fixed *)malloc(sizeof(fixed) * 2 * g_renderSize * kAccBlocks);
+        const int accN = 2 * g_renderSize * kAccBlocks;
+        double basePeak = 0, base80 = 0, baseDc = 0;
+        renderAccumulate(sk, acc, kAccBlocks);
+        for (int i = 0; i < accN; i++) {
+            double v = fabs((double)fp2fl(acc[i]));
+            if (v > basePeak) basePeak = v;
+            baseDc += (double)fp2fl(acc[i]);
+        }
+        baseDc /= (double)accN;
+        base80 = goertzel(acc, g_renderSize * kAccBlocks, 80.0);
+        printf("kick baseline: peak=%.4f 80Hz=%.4f dc=%.1f bar=%.1f%%\n",
+               basePeak, base80, baseDc,
+               100.0 * (20.0 * log10(basePeak / 32768.0) + 24.0) / 27.0);
+        // At the mixer channel at 127 the baseline scales x1.27: 0.70 ->
+        // 0.89 (-1.0 dB, bar ~85%) -- the -6 dB complaint is gone.
+        check(basePeak * 1.27 > 0.5 * 32768.0,
+              "kick at channel 127 sits above -6 dBFS");
+
+        // +-1 dB BELL @ 80 Hz Q=1, then LOW_SHELF +1 (the reported types).
+        const char *names[] = { "BELL +1", "BELL -1", "LSHELF +1" };
+        const int types[] = { 0, 0, 1 };
+        const int gains[] = { 1, -1, 1 };
+        for (int t = 0; t < 3; t++) {
+            sk.FindVariable(SIP_EQG0)->SetInt(gains[t]);
+            sk.FindVariable(SIP_EQT0)->SetInt(types[t]);
+            sk.FindVariable(SIP_EQF0)->SetInt(8000);   // 80 Hz * 100
+            sk.FindVariable(SIP_EQ_Q0)->SetInt(100);   // Q 1.00
+            renderBlocks(sk, acc, 120);                // converge the smoothing
+            double pk = 0, dc = 0;
+            renderAccumulate(sk, acc, kAccBlocks);
+            for (int i = 0; i < accN; i++) {
+                double v = fabs((double)fp2fl(acc[i]));
+                if (v > pk) pk = v;
+                dc += (double)fp2fl(acc[i]);
+            }
+            dc /= (double)accN;
+            double dB = 20.0 * log10(pk / 32768.0);
+            printf("kick %s: peak=%.4f (%.1f dB) dc=%.1f bar=%.1f%%\n",
+                   names[t], pk, dB, dc,
+                   100.0 * (dB + 24.0) / 27.0);
+            check(bufferFinite(acc, accN), "kick EQ output finite");
+            check(pk < 65536.0, "kick EQ output bounded (limiter off)");
+            // The loop click (kick tail -> sample start) adds a window DC
+            // that shifts with the EQ phase; a loose sanity bound keeps the
+            // "no EQ-generated DC" claim on the synthetic-source checks.
+            check(fabs(dc) < 0.15 * 32768.0, "kick EQ output has no gross DC");
+            check(pk > basePeak * 0.8 && pk < basePeak * 1.6,
+                  "kick peak moves by ~1 dB, not a loudness explosion");
+        }
+        sk.FindVariable(SIP_EQG0)->SetInt(0);
+        sk.FindVariable(SIP_EQT0)->SetInt(0);
+        free(acc);
+    } else {
+        printf("SD sample not mounted - kick EQ scenario skipped\n");
     }
 
     free(buf);

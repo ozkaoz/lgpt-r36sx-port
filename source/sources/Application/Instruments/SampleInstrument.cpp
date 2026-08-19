@@ -735,11 +735,17 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 
 		// Get volume factor and pan
 
-		fixed volscale=fl2fp(0.003921568627450980392156862745098f) ;
+		// BACON_1.5_VOL_LEVELS_FL (U2.55, feedback #8): FL-style levels.
+		// Instrument volume 128 (the default) is unity (was 255 = unity): a
+		// full-scale kit sample at volume 128 with the mixer channel at 127
+		// reaches ~0 dBFS on the VU bars, like FL Studio.  The filter
+		// attenuate keeps its own /255 scale so its default 255 (no cut)
+		// stays unity (at 1/128 it would boost +6 dB).
+		fixed volscale=fl2fp(1.0f/128.0f) ;
 		fixed volfactor=fp_mul(rp->volume_,volscale) ;
 
 		// Filter attenuate
-		fixed fpattenuate=fp_mul(rp->attenuate_,volscale) ;
+		fixed fpattenuate=fp_mul(rp->attenuate_,fl2fp(1.0f/255.0f)) ;
 
 	  int pan=fp2i(rp->pan_) ;
 		fixed fixedpanl=panlaw[pan] ;
@@ -938,7 +944,7 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 						feedbackEta=fp_mul(rp->fbMix_,fl2fp(4.0f));
 
 						volfactor=fp_mul(rp->volume_,volscale) ;
-						fpattenuate=fp_mul(rp->attenuate_,volscale) ;
+						fpattenuate=fp_mul(rp->attenuate_,fl2fp(1.0f/255.0f)) ;
 						pan=fp2i(rp->pan_) ;
 						fixed fixedpanl=panlaw[pan] ;
 						fixed fixedpanr=panlaw[254-pan] ;

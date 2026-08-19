@@ -81,6 +81,13 @@ inline void eqBiquadCoeffs(int type, int rate, float f0, float lvl, float qv,
         fa2 = (A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqA * as;
         break;
     }
+    // RBJ cookbook LP/HP (the golden recomputeBand): the corner frequency is
+    // the design center; the response AT f0 is Q (0 dB for Q=1), with the
+    // -3 dB point at ~1.27*f0 (Q=1).  The numerators are exact (1-cw)
+    // forms; at low f0 (80-100 Hz) the Q15 quantization leaves b0..b2 at
+    // 1-3 counts, so the center gain can wander ~+-2 dB (measured +2.4 dB
+    // at 100 Hz) -- a fidelity limit of the Q15 format, not a design
+    // defect (the shelves/bell are unaffected; the sound is never killed).
     case EQ_BIQUAD_LOW_PASS:
         fb0 = (1.0f - cw) / 2.0f;
         fb1 = 1.0f - cw;

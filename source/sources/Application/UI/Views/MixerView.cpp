@@ -901,9 +901,11 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	}
 	// RC6: the 2-cell channel label is drawn at x-1 so its right cell sits
 	// on the 1-cell meter axis (same rule as MST/%3d).
-	// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): the label moves two
-	// rows above the bar (row y-2) and the volume number one row above it
-	// (row y-1): the strips read top-down like a DAW (hex, volume, bar).
+	// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7) + BACON_1.5_MIXER_VOL_BELOW
+	// (U2.54, feedback #8): the 2-cell channel label is drawn two rows
+	// above the bar (row y-2) and the volume number BELOW the bar (row
+	// y+height+1, over the M/C marker): the strips read top-down like a
+	// DAW (hex, bar, volume, M/C).
 	DrawString(x-1,y-2,hex,props) ;
 	props.invert_=false ;
 
@@ -942,8 +944,12 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 
 	SetColor(selected?CD_HILITE2:(muted?CD_BORDER:CD_NORMAL)) ;
 	props.invert_=selected ;
+	// BACON_1.5_MIXER_VOL_BELOW (U2.54, feedback #8): the volume number
+	// moves BELOW the bar (row y+height+1, the first free row under it),
+	// with the pan/mute marker one row under the number (y+height+2) --
+	// DAW order: hex label, bar, volume, M/C.
 	sprintf(buffer,"%3d",volume) ;
-	DrawString(x-1,y-1,buffer,props) ;
+	DrawString(x-1,y+height+1,buffer,props) ;
 	props.invert_=false ;
 
 	// TREEFROG_MIXER_PAN_V1 (Bacon 1.1.1):
@@ -954,23 +960,24 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// marker instead -- its pan is inaudible anyway.  Center pans sit at
 	// the same digit column as the L/R values (right-aligned value).
 	int pan=mixer->GetChannelPan(channel) ;
-	// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): the pan/mute marker
-	// row moves one row under the taller bar (y+height+1, the last free row
-	// above the played-notes block at rows 27-29).
+	// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7) + BACON_1.5_MIXER_VOL_BELOW
+	// (U2.54, feedback #8): the pan/mute marker row sits at the bottom of
+	// the strip (y+height+2, the last free row above the played-notes
+	// block at rows 27-29), with the volume number directly above it.
 	if (muted) {
 		SetColor(CD_HILITE2) ;
-		DrawString(x,y+height+1,"M",props) ;
+		DrawString(x,y+height+2,"M",props) ;
 	} else {
 		SetColor(selected?CD_HILITE2:CD_NORMAL) ;
 		props.invert_=selected ;
 		if (pan==0) {
-			DrawString(x-1,y+height+1,"  C",props) ;
+			DrawString(x-1,y+height+2,"  C",props) ;
 		} else if (pan<0) {
 			sprintf(buffer,"L%3d",-pan) ;
-			DrawString(x-1,y+height+1,buffer,props) ;
+			DrawString(x-1,y+height+2,buffer,props) ;
 		} else {
 			sprintf(buffer,"R%3d",pan) ;
-			DrawString(x-1,y+height+1,buffer,props) ;
+			DrawString(x-1,y+height+2,buffer,props) ;
 		}
 		props.invert_=false ;
 	}
@@ -1019,8 +1026,10 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 
 	SetColor(masterSelected_?CD_HILITE2:CD_PLAY) ;
 	props.invert_=masterSelected_ ;
+	// BACON_1.5_MIXER_VOL_BELOW (U2.54, feedback #8): MST volume number
+	// under the bar like the channel strips (row y+height+1).
 	sprintf(buffer,"%3d",volume) ;
-	DrawString(x-1,y-1,buffer,props) ;
+	DrawString(x-1,y+height+1,buffer,props) ;
 	props.invert_=false ;
 }
 
@@ -1701,16 +1710,19 @@ void MixerView::drawFxPages() {
 		// (title + Song/Live at x=0/21, RET/FX RETURNS at row 1, and the
 		// clip/%/batt/time overlay at x=35..39); rows 27-29 keep the played
 		// notes + view map (drawNotes/drawMap, shared base-class overlays).
-		// The channel strips now read top-down like a DAW: hex label at
-		// row 4, volume number at row 5, the 19-cell live bar at rows
-		// 7..25, pan/mute marker at row 26.  The bars are 27% taller than
-		// the old 15-cell ones and the CUE scale marks their true dB rows.
+		// The channel strips read top-down like a DAW: hex label at
+		// row 4, the 18-cell live bar at rows 7..24, the volume number
+		// BELOW the bar (row 25) and the pan/mute marker under it (row
+		// 26) -- BACON_1.5_MIXER_VOL_BELOW (U2.54, feedback #8): the
+		// volume reads under the bar like FL Studio (M/C sits at the
+		// bottom, the number right above it).  The bars are 20% taller
+		// than the old 15-cell ones and the CUE scale marks their dB rows.
 		const int masterX=4 ;
 		const int channel0X=8 ;
 		const int channelPitch=4 ;
 		const int labelY=4 ;        // hex label row (above the bars)
 		const int barY=labelY+2 ;   // bars start on the row below the labels
-		const int barHeight=19 ;    // bar cells = barY+1 .. barY+barHeight
+		const int barHeight=18 ;    // bar cells = barY+1 .. barY+barHeight
 		const int retY=1 ;
 // BACON_1.5_VU_DB_SCALE (U2.52.9, feedback #6):
 	// Static CUE scale drawn to the LEFT of the master, right-aligned to
@@ -1732,8 +1744,8 @@ void MixerView::drawFxPages() {
 	DrawString(masterX-3,barY+1+2,"0",props) ;
 	SetColor(CD_HILITE1) ;
 	DrawString(masterX-3,barY+1+6,"-6",props) ;
-	DrawString(masterX-4,barY+1+11,"-12",props) ;
-	DrawString(masterX-4,barY+1+18,"-24",props) ;
+	DrawString(masterX-4,barY+1+9,"-12",props) ;
+	DrawString(masterX-4,barY+1+17,"-24",props) ;
 		drawMasterBar(masterX,barY,barHeight) ;
 		for (int i=0;i<SONG_CHANNEL_COUNT;i++) {
 			drawVolumeBar(i,channel0X+i*channelPitch,barY,barHeight) ;

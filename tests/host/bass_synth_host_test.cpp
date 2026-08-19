@@ -323,20 +323,19 @@ int main() {
     rmsS100 = bufferRms(buffer, 512 * 2);
     // sustain 100 must be clearly louder than sustain 60 (>= 1.3x).
     check(rmsS100 > rmsS60 * 1.3f, "sustain 100 >= 1.3x louder than 60");
-    // ... and sit at the kit-sample-equivalent level: BACON_1.5_VOL_SYNTHS_PAD
-    // (U2.52.9, feedback #6) pads the master-scale write by -20 dB (x0.1):
-    // the full-scale saw (RMS ~0.577 pre-pad) measured ~19 dB RMS louder
-    // than a reference kit sample (HI HAT 01) at the same volume, so the
-    // sustained note now reads rms ~0.045 (peak ~0.113), the level of a
-    // typical kit sample at instrument volume 100.
-    check(rmsS100 > 0.03, "sustained note at kit-sample level");
+    // ... and sit at the FL-style unity level: BACON_1.5_VOL_SYNTHS_UNITY
+    // (U2.55, feedback #8) removed the U2.52.9 -20 dB pad: the full-scale
+    // saw sustains at peak ~1.0 / rms ~0.577, the same 0 dBFS peak class as
+    // a full-scale kit sample at instrument volume 128.  A dead signal
+    // measures < 0.001, so the unity saw stays far above the floor.
+    check(rmsS100 > 0.03, "sustained note at FL-style unity level");
     // The device edit flow: X+UP (gain +1) on every band, rendered each
     // time -- the sound must never collapse after ANY single edit.
     for (int b = 0; b < 8; b++) {
         eqG[b]->SetInt(1);
         synth.Render(0, buffer, 512, false);
-        // Audibility floor on the padded scale: a dead signal measures
-        // < 0.001, a +1 dB edit on a 0.045-rms saw stays above 0.02.
+        // Audibility floor: a dead signal measures < 0.001, a +1 dB edit on
+        // the unity saw stays far above 0.02.
         check(bufferRms(buffer, 512 * 2) > 0.02,
               "single +1dB edit stays audible");
     }

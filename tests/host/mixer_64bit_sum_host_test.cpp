@@ -20,6 +20,13 @@
 //   4. idle path is bit-exact: one module below unity, volume 1, damp 1 ->
 //      the output equals the input, sample for sample.
 //   5. empty mixer: Render returns false.
+//   6. NESTED graph (the device shape: master_ -> bus_[i] -> PlayerChannel):
+//      every bus contributes to the master.  The OLD single flat scratch was
+//      clobbered by the nested child renders (each bus.Render() re-used the
+//      master accumulator), so ONLY the last bus survived -> ONE audible
+//      track.  BACON_1.5_64BIT_SUM_DEPTH (U2.54, feedback #8) indexes the
+//      accumulator by render depth; here 3 buses at 0.4/0.3/0.2 MUST sum to
+//      0.9 (not 0.4) and 8 buses at 0.1 MUST sum to 0.8 (not 0.2).
 #include "Services/Audio/AudioMixer.h"
 #include "System/System/System.h"
 #include "Application/Utils/fixed.h"
@@ -167,6 +174,61 @@ int main() {
         AudioMixer mix("Master");
         memset(buf, 0, sizeof(buf));
         check(!mix.Render(buf, kFrames), "empty mixer renders nothing");
+    }
+
+    // 6. NESTED graph (device shape): master -> buses -> channel.  This is
+    //    the POLYPHONY regression: the flat scratch made every child bus
+    //    clobber the master accumulator, so only the LAST rendered bus was
+    //    audible (the last non-muted track).  Each bus here carries ONE
+    //    source (one track), exactly like the device.
+    {
+        AudioMixer master("Master");
+        AudioMixer bus0("Ch0"), bus1("Ch1"), bus2("Ch2");
+        bus0.SetClipBypass(true);
+        bus1.SetClipBypass(true);
+        bus2.SetClipBypass(true);
+        TestModule a0(i2fp(13107)), a1(i2fp(9830)), a2(i2fp(6554)); // 0.4/0.3/0.2
+        bus0.Insert(a0);
+        bus1.Insert(a1);
+        bus2.Insert(a2);
+        master.Insert(bus0);
+        master.Insert(bus1);
+        master.Insert(bus2);
+        memset(buf, 0, sizeof(buf));
+        check(master.Render(buf, kFrames), "nested master renders");
+        // All three buses MUST be in the sum: 0.4+0.3+0.2 = 0.9.  The old
+        // flat-scratch bug left only the last bus (0.2+0.2 = 0.4).
+        check(buf[0] == i2fp(29491) || (buf[0] >= 29300 && buf[0] <= 29600),
+              "nested sum keeps ALL buses (0.9, not 0.4)");
+        float pk = master.GetPeakValueL();
+        printf("nested 3ch: peakL=%.3f out=%d\n", pk, buf[0]);
+        check(pk > 0.88f && pk < 0.92f, "nested meter reads the full 0.9 sum");
+    }
+
+    // 7. Full 8-track device graph: 8 buses x 0.1 -> 0.8.  The bug left
+    //    only the LAST track (0.2); the fix sums every track.
+    {
+        AudioMixer master("Master");
+        AudioMixer buses[8] = { AudioMixer("B0"), AudioMixer("B1"), AudioMixer("B2"),
+                                AudioMixer("B3"), AudioMixer("B4"), AudioMixer("B5"),
+                                AudioMixer("B6"), AudioMixer("B7") };
+        TestModule *sources[8];
+        for (int i = 0; i < 8; i++) {
+            buses[i].SetClipBypass(true);
+            sources[i] = new TestModule(i2fp(3277));   // 0.1
+            buses[i].Insert(*sources[i]);
+            master.Insert(buses[i]);
+        }
+        memset(buf, 0, sizeof(buf));
+        check(master.Render(buf, kFrames), "8-bus master renders");
+        // 8 x 0.1 = 0.8 (26216 counts << 15); the buggy flat scratch gave
+        // 0.2 (last bus doubled).
+        check(buf[0] == i2fp(26216) || (buf[0] >= 859000000 && buf[0] <= 859100000),
+              "8-track polyphony: ALL tracks in the sum (0.8)");
+        float pk = master.GetPeakValueL();
+        printf("nested 8ch: peakL=%.3f out=%d\n", pk, buf[0]);
+        check(pk > 0.78f && pk < 0.82f, "8-track meter reads the full 0.8 sum");
+        for (int i = 0; i < 8; i++) delete sources[i];
     }
 
     if (failures == 0) {

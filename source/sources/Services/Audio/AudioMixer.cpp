@@ -22,7 +22,17 @@ static fixed s_moduleMixScratch[AUDIO_MIXER_MAX_RENDER_FRAMES * 2];
 // garbage -- and the pre-clip meters could never show a true level above
 // 0 dB.  The sum now accumulates in 64 bits; the int32 buffer is written at
 // the very end (clamped, never wrapped).
-static long long s_moduleSumScratch[AUDIO_MIXER_MAX_RENDER_FRAMES * 2];
+// BACON_1.5_64BIT_SUM_DEPTH (U2.54, feedback #8): the accumulator is indexed
+// by render depth.  The audio graph is nested (AudioOut -> master_ -> bus_[i]
+// -> PlayerChannel), and a single flat scratch was CLOBBERED by the child
+// buses: every nested Render() re-uses the same s_moduleSumScratch, so the
+// master accumulator was overwritten by the last bus that rendered -- only
+// ONE track was audible (the last non-muted channel).  The mix buffer can
+// never hold more than 10000 stereo frames, and the nesting never exceeds
+// master->bus->channel, so 4 slots cover any pipeline depth.  No dynamic
+// allocation, no freeing.
+static long long s_moduleSumScratch[4][AUDIO_MIXER_MAX_RENDER_FRAMES * 2];
+static int s_moduleSumDepth = 0;
 
 // BACON_1.5_64BIT_MASTER_SUM (U2.53, feedback #7): 64-bit -> int32 with a
 // CLAMP instead of the old wraparound.  Values inside the int32 range pass
@@ -106,7 +116,12 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
     // The first module's output is copied in, subsequent modules are added.
     // samplecount is bounded by the primary mix buffer (10000 stereo
     // frames), so the scratch never overflows.
-    long long *sum64 = s_moduleSumScratch;
+    // BACON_1.5_64BIT_SUM_DEPTH (U2.54, feedback #8): each nesting level
+    // takes its own slot; children (buses) render while this level's
+    // accumulator is still live, so they must not share it (see the
+    // declaration for the polyphony loss this fixed).
+    long long *sum64 = s_moduleSumScratch[s_moduleSumDepth];
+    s_moduleSumDepth++;
     fixed *mixBuffer = 0;
     bool gotData = false;
     IteratorPtr<AudioModule> it(GetIterator());
@@ -272,6 +287,7 @@ bool AudioMixer::Render(fixed *buffer,int samplecount) {
 	}
 
      // H38.8 OPT_PERF: no free -- s_moduleMixScratch is a static buffer.
+     s_moduleSumDepth-- ;
      return gotData ;
 } ;
 
