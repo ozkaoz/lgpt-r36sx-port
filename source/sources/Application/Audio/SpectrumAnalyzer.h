@@ -51,16 +51,16 @@ class I_Instrument;
 
 class SpectrumAnalyzer {
 public:
-    static const int kRingFrames = 4096;
-    static const int kFftSize = 4096;
-    // BACON_1.5_ANALYZER_96BARS (U2.59, feedback #12): the log bars go from
-    // 24 to 96 (4x, like a VST Spectrum Analyzer) over the SAME 20 Hz..20
-    // kHz span.  The FFT grows to 4096 points (11.7 Hz/bin at 48 kHz) so
-    // every bar still resolves several real FFT bins (a 1 kHz tone lands on
-    // bin 85, ~85 bins of resolution across the 20 Hz..20 kHz log span) --
-    // the bar count is no longer limited by the FFT resolution, and the
-    // 20 Hz..70 Hz floor (the first ~3 bars) is preserved.
-    static const int kLogBins = 96;
+    // BACON_1.5_ANALYZER_FINE (U2.61, feedback #13): 8192 points (5.86 Hz/bin
+    // at 48 kHz, 170 ms window) so the log bars each resolve 2+ real bins
+    // even at 20 Hz (bar 0 covers bins 2..5) and the PEAK marker can be
+    // interpolated to ~1 Hz precision.  154 log bars at 2 px each fill the
+    // 308 px EQ canvas with a contiguous spectrum line -- the hipass/boost
+    // cuts and the click harmonics show as real spectral shape, not
+    // staircase ("analizador mas fino, milimetrico").
+    static const int kRingFrames = 8192;
+    static const int kFftSize = 8192;
+    static const int kLogBins = 154;
     static const int kRate = 48000;
 
     static SpectrumAnalyzer &Get();
@@ -92,6 +92,13 @@ public:
 
     const fixed *Bins() const { return bins_; }
     int BinCount() const { return kLogBins; }
+
+    // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): frequency in Hz of the
+    // strongest FFT bin within 20 Hz..20 kHz from the LAST Compute(), with
+    // parabolic interpolation between the two neighbours -- ~1 Hz precision
+    // at the 5.86 Hz/bin grid.  Returns 0 when no window has run yet.  The
+    // EQ8 view uses it to place the L2+R2 peak marker.
+    float PeakFrequency() const;
 
 private:
     SpectrumAnalyzer();

@@ -559,8 +559,15 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     // Raise the post-EQ level x8 so the peak at volume 100 lands at ~0.9
     // (90% bar, like the drums at the same volume); the instrument volume
     // then scales the bar down linearly, matching the perceived level.
+    // BACON_1.5_VOL_70_TO_100 (U2.61, feedback #13): "70 actual = 100 de
+    // la proxima version" -- volume 100 sounded excessive.  The whole
+    // synth level is remapped x8 -> x5.6 (1434>>8 = 5.6016, exactly 0.7x
+    // the current gain), so today's volume 70 output IS tomorrow's 100.
+    // The linear scale keeps the equivalence exact at every accent; the
+    // mixer bar scans the same post-fader peak, so it follows the new
+    // level automatically (100 reads what 70 read before).
     for (int i = 0; i < size * 2; i++) {
-        int v = (int)buffer[i] * 8;
+        int v = (int)buffer[i] * 1434 >> 8;
         if (v > i2fp(1) - 1) v = i2fp(1) - 1;
         else if (v < -(i2fp(1) - 1)) v = -(i2fp(1) - 1);
         buffer[i] = (fixed)(v << FIXED_SHIFT);

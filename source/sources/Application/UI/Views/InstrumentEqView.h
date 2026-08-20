@@ -69,6 +69,13 @@ private:
 	I_Instrument *instr_ ;
 	int selected_ ;
 	bool bypass_ ;
+	// BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): L2+R2 toggles a peak
+	// marker at the strongest frequency of the targeted analyzer tap (the
+	// instrument being edited, post-EQ); L2+X+arrows steps it 1 Hz at a
+	// time and moves the selected band to it ("marcar el pico de frecuencia
+	// del sample y ajustar de 1 en 1 los hz a ecualizar").
+	bool peakMarkerOn_ ;
+	float peakHz_ ;
 	bool bandOn_[8] ;
 	int type_[8] ;
 	float freqHz_[8] ;

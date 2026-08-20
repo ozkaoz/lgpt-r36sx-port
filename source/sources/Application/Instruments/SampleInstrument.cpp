@@ -833,11 +833,16 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
                         // its center frequency -- the saved lgpt_KAOZ snare
                         // (BELL -8 dB @ 45.39 Hz) LIFTED its 45 Hz content
                         // x7 in a looped window ("bajar db sigue subiendo
-                        // esas frecuencias").  Flush the per-channel EQ
-                        // state at the wrap so the output is loop-periodic
-                        // again; the residual is one short transient at the
-                        // loop point, far smaller than the ring.
-                        eqDsp_.ResetChannelState();
+                        // esas frecuencias").  Fade the per-channel EQ state
+                        // at the wrap so the output is loop-periodic again.
+                        // BACON_1.5_EQ8_LOOPFADE (U2.61): the U2.59 hard
+                        // flush was a 1-sample step; with a HIPASS below
+                        // 80 Hz the state holds large low-frequency
+                        // cancellation values, so the step clicked at the
+                        // loop point ("el kick clipea al final del sonido").
+                        // FadeChannelState ramps the state to ~0 over 32
+                        // samples -- periodic without the discontinuity.
+                        eqDsp_.FadeChannelState(channel);
                         rpReverse = (loopPosition > lastSample);
                         if (rpReverse) {
                             fpSpeed = -rp->speed_;
@@ -850,13 +855,13 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
                             if (input <= lastSample || input >= loopPosition) {
                                 rpReverse = !rpReverse;
                                 fpSpeed = -fpSpeed;
-                                eqDsp_.ResetChannelState();
+                                eqDsp_.FadeChannelState(channel);
                             }
                         } else {
                             if (input >= lastSample || input <= loopPosition) {
                                 rpReverse = !rpReverse;
                                 fpSpeed = -fpSpeed;
-                                eqDsp_.ResetChannelState();
+                                eqDsp_.FadeChannelState(channel);
                             }
                         }
                         break;
@@ -888,10 +893,11 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
                     case SILM_OSC:
                     case SILM_LOOPSYNC:
                         input = loopPosition;
-                        // BACON_1.5_EQ8_LOOPFLUSH (U2.59): see the forward
-                        // loop branch -- the filter tail must not ring
-                        // across a direction change either.
-                        eqDsp_.ResetChannelState();
+                        // BACON_1.5_EQ8_LOOPFLUSH (U2.59) / LOOPFADE (U2.61):
+                        // see the forward loop branch -- the filter tail
+                        // must not ring across a direction change; the state
+                        // is faded (not stepped) to keep it click-free.
+                        eqDsp_.FadeChannelState(channel);
                         rpReverse = (loopPosition > lastSample);
                         if (rpReverse) {
                             fpSpeed = -rp->speed_;

@@ -62,8 +62,9 @@ static void tfFill(int x, int y, int w, int h, unsigned short c) {
 }
 
 // 3x5 pixel font used to label the canvas (band numbers, dB scale, frequency
-// axis).  Glyphs: 0-9 (indices 0..9), '+' (10), '-' (11), 'k' (12).
-static const unsigned char kTinyGlyphs[13][5] = {
+// axis, peak marker).  Glyphs: 0-9 (indices 0..9), '+' (10), '-' (11),
+// 'k' (12), '.' (13).
+static const unsigned char kTinyGlyphs[14][5] = {
     {0x7, 0x5, 0x5, 0x5, 0x7},   // 0
     {0x2, 0x6, 0x2, 0x2, 0x7},   // 1
     {0x7, 0x1, 0x7, 0x4, 0x7},   // 2
@@ -77,6 +78,7 @@ static const unsigned char kTinyGlyphs[13][5] = {
     {0x0, 0x2, 0x7, 0x2, 0x0},   // +
     {0x0, 0x0, 0x7, 0x0, 0x0},   // -
     {0x5, 0x5, 0x6, 0x6, 0x5},   // k
+    {0x0, 0x0, 0x0, 0x0, 0x2},   // .
 };
 
 static int tfTinyIndex(char c) {
@@ -84,7 +86,20 @@ static int tfTinyIndex(char c) {
     if (c == '+') return 10;
     if (c == '-') return 11;
     if (c == 'k') return 12;
+    if (c == '.') return 13;
     return -1;
+}
+
+// BACON_1.5_ANALYZER_PEAK (U2.61): formats the marker frequency for the
+// 3x5 font: "85", "1.3k", "20k" ('.' only where it adds precision).
+static void tfFormatHz(char *out, size_t n, float hz) {
+    if (hz < 1000.0f) {
+        snprintf(out, n, "%d", (int)hz);
+    } else if (hz < 10000.0f) {
+        snprintf(out, n, "%.1fk", hz / 1000.0f);
+    } else {
+        snprintf(out, n, "%dk", (int)(hz / 1000.0f + 0.5f));
+    }
 }
 
 static void tfTinyText(int x, int y, const char *s, unsigned short c) {
@@ -131,7 +146,8 @@ static double xToFreq(int x) {
 // ---------------------------------------------------------------------------
 
 InstrumentEqView::InstrumentEqView(GUIWindow &w, ViewData *data)
-    : View(w, data), instr_(0), selected_(0), bypass_(false) {
+    : View(w, data), instr_(0), selected_(0), bypass_(false),
+      peakMarkerOn_(false), peakHz_(0.0f) {
     status_[0] = 0;
     for (int i = 0; i < 8; i++) {
         freqHz_[i] = kDefaultFreq8[i];
@@ -336,11 +352,15 @@ void InstrumentEqView::PostFlushDraw() {
     const unsigned short guideC = tf565(46, 52, 80);
     // BACON_1.5_EQ8_WAVE_PURPLE (U2.60, feedback #12): the composite
     // response curve was a SOLID light-blue fill ("tono solido azul claro,
-    // casi blanco"); it is now a ~30% opacity purple wash -- (190,110,220)
-    // blended 30/70 over the canvas bg (8,9,22) -> (63,39,81) -- so the
-    // live spectrum backdrop shows through the curve.  waveTop is the pure
-    // purple 1-px edge that keeps the curve line readable on the wash.
-    const unsigned short waveC   = tf565(63, 39, 81);
+    // casi blanco"); it is now a purple wash behind the spectrum so the two
+    // layers are distinguishable ("el morado mas transparente respecto a
+    // las barras azules").  U2.61 (feedback #13): the wash drops from 30%
+    // to ~15% -- (190,110,220) blended 15/85 over the canvas bg (8,9,22)
+    // -> (35,24,52) -- so the blue spectrum bars stay clearly visible
+    // THROUGH the curve and the hipass/boost cuts read as real drops in
+    // the bars, FabFilter Pro-Q style.  waveTop is the pure purple 1-px
+    // edge that keeps the curve line readable on the wash.
+    const unsigned short waveC   = tf565(35, 24, 52);
     const unsigned short waveTop = tf565(190, 110, 220);
 
     // BACON_1.5_EQ8_NO_FRAME (U2.57b, feedback #10): the chopper frame is
@@ -430,20 +450,23 @@ void InstrumentEqView::PostFlushDraw() {
     // de barras al triple o cuádruple, como analizadores VST"): 96 bars
     // over the 308 px canvas -> 3 px per bar, contiguous (a solid
     // spectrum line, exactly the VST Spectrum Analyzer look).
+    // BACON_1.5_ANALYZER_FINE (U2.61, feedback #13 "analizador mas
+    // detallado, milimetrico"): 154 bars at 2 px each, filling the canvas
+    // edge to edge (308/154 = 2) -- a continuous spectrum line where the
+    // hipass cuts and click harmonics read as real spectral shape.
     {
         const unsigned short specBlend = tf565(24, 42, 81);
         const unsigned short specTop = tf565(90, 170, 255);
         SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
-        // BACON_1.5_ANALYZER_96BARS (U2.59): a 4096-point FFT every frame
-        // is ~4x the old cost, so the compute is throttled to every 5
-        // frames (~12 fps at 60 fps UI) -- the analyzer stays live, the UI
-        // thread stays light.
+        // BACON_1.5_ANALYZER_FINE (U2.61): an 8192-point FFT every 5
+        // frames (~12 fps at 60 fps UI) is still ~2x the 4096 cost -- the
+        // analyzer stays live, the UI thread stays light.
         static int fftThrottle = 0;
         if ((++fftThrottle % 5) == 0) sp.Compute();
         const fixed *bb = sp.Bins();
         const int n = sp.BinCount();
         int bw = (cX1 - cX0) / n;
-        int barW = 3;
+        int barW = 2;
         for (int i = 0; i < n; i++) {
             // BACON_1.5_ANALYZER_20HZ: a 0 dBFS sine peaks around 0.25 in
             // the normalized FFT bins (Hann window), so scale x4 to make a
@@ -589,6 +612,30 @@ void InstrumentEqView::PostFlushDraw() {
         }
     }
 
+    // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): the L2+R2 peak marker
+    // -- a yellow 1-px line at the marked frequency with a bright cap and
+    // a Hz label, drawn AFTER the curve so the tuned frequency is always
+    // on top.  The selected band follows the marker (freqHz_[selected_]),
+    // so the marker IS the frequency being EQ'd.  Drawn also while
+    // bypassed: it only marks the spectrum, it does not edit anything.
+    if (peakMarkerOn_) {
+        const unsigned short peakC = tf565(255, 244, 120);
+        int px = freqToX(peakHz_);
+        if (px < cX0) px = cX0;
+        if (px > cX1) px = cX1;
+        tfFill(px, cY0, 1, cY1 - cY0 + 1, peakC);
+        tfFill(px - 1, cY0, 3, 2, peakC);
+        tfFill(px - 1, cY1 - 1, 3, 2, peakC);
+        char hzTxt[8];
+        tfFormatHz(hzTxt, sizeof(hzTxt), peakHz_);
+        int lx = px + 3;
+        int tw = (int)strlen(hzTxt) * 4;
+        if (lx + tw > 320) lx = px - tw - 3;
+        if (lx < 0) lx = 0;
+        tfFill(lx, cY0, tw + 1, 6, bgC);
+        tfTinyText(lx, cY0, hzTxt, peakC);
+    }
+
     // Frequency axis labels under the canvas.  BACON_1.5_EQ8_AXIS_LABELS
     // (U2.52.9, feedback #6): 11 labels over the 20 Hz..20 kHz log axis
     // (40 80 120 200 500 1k 2k 5k 10k 15k 20k), each centered on its
@@ -652,6 +699,53 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
     }
 
     if (!instr_) return;
+
+    // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): L2+R2 marks the peak
+    // frequency of the instrument's post-EQ spectrum (the targeted analyzer
+    // tap) and snaps the selected band to it -- the same combo toggles the
+    // marker off.  L2+X+arrows steps the marker 1 Hz at a time (SIP_EQF
+    // units are 0.01 Hz, so 1 Hz = 100 units) for precise EQ tuning.
+    // Handled BEFORE the plain X+arrows so the chord is unambiguous.
+    bool l2 = (mask & EPBM_L2) != 0;
+    bool r2 = (mask & EPBM_R2) != 0;
+    if (l2 && r2) {
+        if (peakMarkerOn_) {
+            peakMarkerOn_ = false;
+            setStatus("PEAK OFF");
+        } else {
+            float p = SpectrumAnalyzer::Get().PeakFrequency();
+            if (p > 0.0f) {
+                peakMarkerOn_ = true;
+                peakHz_ = p;
+                freqHz_[selected_] = p;
+                bandOn_[selected_] = true;
+                char buf[88];
+                sprintf(buf, "PEAK %5.0fHz  B%1d synced", p, selected_ + 1);
+                setStatus(buf);
+            } else {
+                setStatus("PEAK: no signal yet (play the instrument)");
+            }
+        }
+        refreshDraw();
+        return;
+    }
+    if (l2 && x && (left || right)) {
+        if (!peakMarkerOn_) {
+            peakMarkerOn_ = true;
+            peakHz_ = freqHz_[selected_];
+        }
+        if (left) peakHz_ -= 1.0f;
+        if (right) peakHz_ += 1.0f;
+        if (peakHz_ < 20.0f) peakHz_ = 20.0f;
+        if (peakHz_ > 20000.0f) peakHz_ = 20000.0f;
+        freqHz_[selected_] = peakHz_;
+        bandOn_[selected_] = true;
+        char buf[88];
+        sprintf(buf, "PEAK %5.0fHz  (1 Hz steps)", peakHz_);
+        setStatus(buf);
+        refreshDraw();
+        return;
+    }
 
     // BACON_1.5_EQ8_A_B_DEFAULT (bacon-1.5, feedback): A+B resets the
     // SELECTED band to its default (default frequency, gain 0, Q 1.00,

@@ -23,9 +23,11 @@ SpectrumAnalyzer::SpectrumAnalyzer()
     // bottom nine bars all collapsed onto a single FFT bin and any sample
     // lit them all through spectral leakage ("las barras no miden
     // 20 Hz-20 kHz").
-    // BACON_1.5_ANALYZER_96BARS (U2.59, feedback #12): 4096 points
-    // (11.7 Hz/bin) so the 96 log bars each still cover 2+ real bins at
-    // every frequency (the top 20 kHz bar covers bins ~1549..2171).
+    // BACON_1.5_ANALYZER_96BARS (U2.59, feedback #12) -> BACON_1.5_ANALYZER_
+    // FINE (U2.61, feedback #13): 8192 points (5.86 Hz/bin, 170 ms window)
+    // so the 154 log bars each cover 2+ real bins at every frequency (the
+    // 20 kHz top bar covers bins ~2982..4178) and the FFT bin grid is fine
+    // enough for the ~1 Hz peak interpolation of the EQ view's marker.
     static const float fLo = 20.0f;
     static const float fHi = 20000.0f;
     const float step = logf(fHi / fLo) / (kLogBins - 1);
@@ -185,4 +187,40 @@ bool SpectrumAnalyzer::Compute() {
         bins_[i] = fl2fp(peak);
     }
     return true;
+}
+
+// BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): strongest FFT bin in the
+// audible range with parabolic interpolation.  The bins_ grid is LOG-spaced
+// (spacing 1.4% at 85 Hz -> +-6 Hz at best), so the marker would be coarse
+// if it came from the bars; the raw 8192-bin spectrum gives 5.86 Hz spacing
+// and the parabola between the two neighbouring bins lands within ~1 Hz.
+float SpectrumAnalyzer::PeakFrequency() const {
+    int lo = binLo_[0];
+    int hi = binHi_[kLogBins - 1];
+    if (hi >= kFftSize / 2) hi = kFftSize / 2 - 1;
+    if (lo > hi) return 0.0f;
+    int best = lo;
+    float best2 = -1.0f;
+    for (int b = lo; b <= hi; b++) {
+        float m = wre_[b] * wre_[b] + wim_[b] * wim_[b];
+        if (m > best2) { best2 = m; best = b; }
+    }
+    if (best2 <= 0.0f) return 0.0f;
+    float a = (best > lo)
+                  ? wre_[best - 1] * wre_[best - 1] + wim_[best - 1] * wim_[best - 1]
+                  : 0.0f;
+    float c = (best < hi)
+                  ? wre_[best + 1] * wre_[best + 1] + wim_[best + 1] * wim_[best + 1]
+                  : 0.0f;
+    float den = a - 2.0f * best2 + c;
+    float delta = 0.0f;
+    if (den != 0.0f) {
+        delta = 0.5f * (a - c) / den;
+        if (delta < -1.0f) delta = -1.0f;
+        if (delta > 1.0f) delta = 1.0f;
+    }
+    float hz = (best + delta) * (float)kRate / (float)kFftSize;
+    if (hz < 20.0f) hz = 20.0f;
+    if (hz > 20000.0f) hz = 20000.0f;
+    return hz;
 }

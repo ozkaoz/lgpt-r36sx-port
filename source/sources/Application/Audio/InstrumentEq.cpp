@@ -45,6 +45,18 @@ static const int kSmoothShift = 6;
 
 namespace FxEngine {
 
+// BACON_1.5_EQ8_LOOPFADE (U2.61, feedback #12): linear state-fade ramp.
+// At sample n (0..kFadeFrames-1) the biquad states of the fading channel
+// are scaled by (kFadeFrames-n)/kFadeFrames * 2^15, so the state reaches
+// ~0 at the end of the fade (the last step is 1/32 of the original, a
+// jump 32x smaller than the old hard flush).  Q15 fractions of 32.
+static const fixed kFadeRampQ15[InstrumentEq::kFadeFrames] = {
+    32768, 31744, 30720, 29696, 28672, 27648, 26624, 25600,
+    24576, 23552, 22528, 21504, 20480, 19456, 18432, 17408,
+    16384, 15360, 14336, 13312, 12288, 11264, 10240,  9216,
+     8192,  7168,  6144,  5120,  4096,  3072,  2048,  1024,
+};
+
 float InstrumentEq::DefaultBandHz(int band) {
     static const float kBandHz[kNumBands] = {
         80.0f, 160.0f, 320.0f, 640.0f, 1250.0f, 2500.0f, 5000.0f, 10000.0f,
@@ -61,6 +73,7 @@ InstrumentEq::InstrumentEq()
 
 void InstrumentEq::Reset() {
     ResetChannelState();
+    for (int c = 0; c < kMaxChannels; c++) fade_[c] = 0;
     bypass_ = false;
     for (int b = 0; b < kNumBands; b++) {
         BandCfg &bg = bandCfg_[b];
@@ -92,6 +105,15 @@ void InstrumentEq::ResetChannelState() {
             s.s1R = 0; s.s2R = 0;
         }
     }
+}
+
+// BACON_1.5_EQ8_LOOPFADE (U2.61): see the header.  Sets a per-channel fade
+// counter; Process() scales that channel's states to zero over the next
+// kFadeFrames samples.  The hard reset (ResetChannelState) stays for the
+// init/bypass/flat paths where no audio is playing.
+void InstrumentEq::FadeChannelState(int channel) {
+    if (channel < 0 || channel >= kMaxChannels) { rtViolations_++; return; }
+    fade_[channel] = kFadeFrames;
 }
 
 void InstrumentEq::SetSampleRate(int rate) {
@@ -270,7 +292,24 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
     // before it ever reaches the bus, so the master safety never engages
     // on account of one instrument's EQ.
     int idx = 0;
+    int fade = fade_[channel];
     for (int i = 0; i < frames; i++) {
+        // BACON_1.5_EQ8_LOOPFADE (U2.61): scale this channel's states toward
+        // zero across a sample-loop wrap.  Runs BEFORE the band loop so the
+        // current sample already reads the faded state; the hard zero step
+        // of the old loop flush became an audible click at the loop point
+        // with a HIPASS below 80 Hz (the state holds large low-frequency
+        // cancellation values).
+        if (fade > 0) {
+            fixed r = kFadeRampQ15[kFadeFrames - (fade--)];
+            for (int b = 0; b < kNumBands; b++) {
+                ChanState &st = state_[channel][b];
+                st.s1L = fp_mul(st.s1L, r);
+                st.s2L = fp_mul(st.s2L, r);
+                st.s1R = fp_mul(st.s1R, r);
+                st.s2R = fp_mul(st.s2R, r);
+            }
+        }
         // BACON_1.5_EQ8_STRUCTURAL: per-frame exponential coefficient blend
         // (only while a band is converging).
         for (int b = 0; b < kNumBands; b++) {
@@ -374,6 +413,7 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
         buffer[idx + 1] = xR;
         idx += 2;
     }
+    fade_[channel] = fade;
 }
 
 } // namespace FxEngine

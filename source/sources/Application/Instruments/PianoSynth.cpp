@@ -492,11 +492,17 @@ bool PianoSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     // mixed the 0..255 sample volume scale with the 0..100 synth scale).
     // With FL-style unity levels a synth at volume 100 reads 0 dBFS on the
     // VU bars, like a full-scale kit sample at instrument volume 128.
+    // BACON_1.5_VOL_70_TO_100 (U2.61, feedback #13): same remap as
+    // BassSynth -- today's volume 70 must equal the next version's 100.
+    // The piano never had the x8 bar boost, so this ADDS the same x5.6
+    // post-EQ gain (1434>>8), which puts its volume-100 peak at 0.56 =
+    // the bass's volume-70 peak today; the linear scale preserves the
+    // equivalence at every velocity/accent.
     for (int i = 0; i < size * 2; i++) {
-        fixed v = buffer[i];
+        int v = (int)buffer[i] * 1434 >> 8;
         if (v > i2fp(1) - 1) v = i2fp(1) - 1;
         else if (v < -(i2fp(1) - 1)) v = -(i2fp(1) - 1);
-        buffer[i] = v << FIXED_SHIFT;
+        buffer[i] = (fixed)(v << FIXED_SHIFT);
     }
     // BACON_1.5_ANALYZER_INSTRUMENT (U2.59): post-EQ dry output in master
     // scale, same contract as SampleInstrument::Render -- see there.

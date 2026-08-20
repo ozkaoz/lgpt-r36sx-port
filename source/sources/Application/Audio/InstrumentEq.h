@@ -57,6 +57,16 @@ public:
     void Reset();
     void ResetChannelState();
 
+    // BACON_1.5_EQ8_LOOPFADE (U2.61, feedback #12): fade ONE channel's
+    // biquad states to zero over kFadeFrames samples instead of the hard
+    // ResetChannelState() step.  With a HIPASS below 80 Hz the state holds
+    // large low-frequency cancellation values, so the instant zero was a
+    // click at the loop point ("el kick clipea al final del sonido").
+    // The ramp (1.0 -> ~0 over 32 frames) keeps the loop periodic without
+    // the discontinuity.  Apply at sample-loop wraps / note retriggers.
+    static const int kFadeFrames = 32;
+    void FadeChannelState(int channel);
+
     void SetSampleRate(int rate);
 
     // BACON_1.5_EQ8_STRUCTURAL: single atomic entry point for every edit.
@@ -127,6 +137,9 @@ private:
     // BACON_1.5_EQ8_STRUCTURAL: one INDEPENDENT biquad state per channel AND
     // per band (state_[channel][band]).
     ChanState state_[kMaxChannels][kNumBands];
+    // BACON_1.5_EQ8_LOOPFADE: frames of fade left for each channel
+    // (0 = no fade pending).
+    int fade_[kMaxChannels];
 
     int rate_;
     bool bypass_;   // global EQ off -> zero cost

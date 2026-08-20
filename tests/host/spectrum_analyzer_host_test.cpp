@@ -4,10 +4,10 @@
 //
 // The analyzer (SpectrumAnalyzer.cpp) is fed the final master buffer in DAC
 // counts <<15; FeedMix stores the mono average as (l>>16)+(r>>16), which for
-// two identical full-scale channels is ~1.0 after fp2fl().  A 4096-point
-// Hann-windowed FFT (BACON_1.5_ANALYZER_96BARS, U2.59) then maps a 0 dBFS
-// sine at an exact FFT bin to a peak of N*A/4 / N = 0.25; the EQ8 view
-// scales x4 to a full bar (0 dBFS = full).
+// two identical full-scale channels is ~1.0 after fp2fl().  An 8192-point
+// Hann-windowed FFT (BACON_1.5_ANALYZER_FINE, U2.61 -- 5.86 Hz/bin) then
+// maps a 0 dBFS sine at an exact FFT bin to a peak of N*A/4 / N = 0.25;
+// the EQ8 view scales x4 to a full bar (0 dBFS = full).
 //
 // U2.57b perceptual model (feedback #10: "las barras no se dibujan en
 // sonidos altos; en los graves (kick) si se dibujan"):
@@ -21,14 +21,14 @@
 //   - INSTANT_PEAK: bins are the instantaneous per-window peak, NO temporal
 //     smoothing.
 //
-// U2.59 grid: 96 log bars over 20 Hz..20 kHz, FFT 4096 (11.719 Hz/bin at
-// 48 kHz).  The window covers the newest 4096 of a 4096-frame ring, so a
+// U2.61 grid: 154 log bars over 20 Hz..20 kHz, FFT 8192 (5.86 Hz/bin at
+// 48 kHz).  The window covers the newest 8192 of an 8192-frame ring, so a
 // full feed fills the window exactly.  Reference bar indices (log grid
-// 20*1000^(i/95)):
-//   - 46.875 Hz (bin 4)  -> bar 12 (fc ~47.9 Hz)
-//   - 100 Hz (bin 8.5)   -> bar 22 (fc ~99 Hz)
-//   - 984.375 Hz (bin 84)-> bar 54 (fc ~1015 Hz)
-//   - 16 kHz (bin 1365)  -> bar 92 (fc ~16.1 kHz)
+// 20*1000^(i/153)):
+//   - 46.875 Hz (bin 8)   -> bar 19 (fc ~47.9 Hz)
+//   - 100 Hz (bin 17)     -> bar 36 (fc ~100 Hz)
+//   - 984.375 Hz (bin 168)-> bar 86 (fc ~1015 Hz)
+//   - 16 kHz (bin 2731)   -> bar 148 (fc ~16.1 kHz)
 //
 // Scenarios:
 //   1. silence -> every bin is 0.

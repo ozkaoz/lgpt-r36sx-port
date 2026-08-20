@@ -553,11 +553,13 @@ int main() {
         }
         double sRms = sqrt(sAcc / (double)sN);
         printf("synth vol100 sustained: peak=%.3f rms=%.3f\n", sPk, sRms);
-        // New bar policy: the synth at volume 100 peaks at ~0.9 of full
-        // scale (90% bar, like the drums at the same volume).  A regression
-        // to the -20 dB saw (0.1) or a double boost (1.8) both fail.
-        // Bounds: [0.8, 1.0] of full scale = [26214, 32767].
-        check(sPk > 26214.0 && sPk < 32768.0, "synth sustained peak at the 90% bar level");
+        // BACON_1.5_VOL_70_TO_100 (U2.61, feedback #13): the synth level is
+        // remapped so today's volume 70 equals the next version's 100.
+        // Volume 100 now peaks at ~0.56 of full scale (18350 counts) =
+        // what volume 70 read with the U2.60 x8 boost.  A regression to
+        // the old x8 level (26214) or a missing boost (3277) both fail.
+        // Bounds: [0.5, 0.65] of full scale = [16384, 21299].
+        check(sPk > 16384.0 && sPk < 21299.0, "synth vol100 peak = the old vol70 level (70->100 remap)");
 
         if (g_hihat) {
             SampleInstrument sh;
@@ -580,12 +582,12 @@ int main() {
             double hRms = hN ? sqrt(hAcc / (double)hN) : 0.0;
             printf("hihat vol128: peak=%.3f rms=%.3f\n", hPk, hRms);
             check(hPk > 0.0, "hi-hat renders audio");
-            // The synth at volume 100 now peaks at ~0.9 (90% bar, the new
-            // BAR_LEVEL policy) vs the hat at 0.68 -- the bass can reach
-            // the top of the bar like the drums, and the instrument volume
-            // scales the bar down from there.
-            check(sPk > hPk * 0.8 && sPk < hPk * 1.5,
-                  "synth peak now matches the reference sample peak");
+            // The synth at the new unity level peaks at ~0.56 (the old
+            // volume-70 level) vs the hat's transient 0.68 -- same ballpark
+            // (transients read higher than a sustained saw), and the
+            // instrument volume scales the bar down from there.
+            check(sPk > hPk * 0.4 && sPk < hPk * 1.5,
+                  "synth peak stays in the reference sample ballpark");
         } else {
             printf("SD sample not mounted - hi-hat compare skipped\n");
         }
@@ -997,6 +999,60 @@ int main() {
         } else {
             printf("B4 snare skipped (no SD sample)\n");
         }
+    }
+
+    // ============ (B5) U2.61, feedback #13: HIPASS < 80 Hz "clips" the
+    // kick at the END of the sound ============
+    // The user's fix request: "el hipass cortando por debajo de 80hz hace
+    // que el kick clipee al final del sonido".  Root cause: the U2.59
+    // loop-flush ZEROED the per-channel biquad state in one step; a HIPASS
+    // state holds LARGE low-frequency cancellation values (the filter
+    // actively removes a strong kick body), so the zero step became a
+    // click at every loop wrap / retrigger -- audible at the end of the
+    // kick as a "clip".  BACON_1.5_EQ8_LOOPFADE replaces the step with a
+    // 32-sample ramp to ~0.  Measure the sample-to-sample discontinuity
+    // AT THE BLOCK BOUNDARIES of a looped kick: the loop-periodic output
+    // must not jump, and nothing may exceed unity (the knee holds).
+    printf("-- (B5) kick + HIPASS 80Hz looped: no clip at the loop --\n");
+    if (g_kick) {
+        SampleInstrument sk;
+        sk.FindVariable(SIP_SAMPLE)->SetInt(2);
+        sk.FindVariable(SIP_LOOPMODE)->SetInt(1);
+        sk.FindVariable(SIP_END)->SetInt(g_kick->GetSize(0));
+        sk.Init();
+        check(sk.Start(0, 60, true), "B5 kick Start");
+        fixed *acc = (fixed *)malloc(sizeof(fixed) * 2 * g_renderSize * kAccBlocks);
+        sk.FindVariable(SIP_EQT0)->SetInt(4);       // HIGH_PASS
+        sk.FindVariable(SIP_EQF0)->SetInt(8000);    // 80 Hz * 100
+        sk.FindVariable(SIP_EQG0)->SetInt(-12);     // active (non-zero)
+        sk.FindVariable(SIP_EQ_Q0)->SetInt(100);
+        renderBlocks(sk, acc, 120);                 // converge the smoothing
+        renderAccumulate(sk, acc, kAccBlocks);
+        double maxAbs = 0, maxBoundaryJump = 0;
+        for (int i = 0; i < 2 * g_renderSize * kAccBlocks; i++) {
+            double a = fabs((double)fp2fl(acc[i]));
+            if (a > maxAbs) maxAbs = a;
+            // block boundaries are where the loop wrap lands
+            if (i > 0 && i % (2 * g_renderSize) == 0) {
+                double d = fabs((double)fp2fl(acc[i]) - (double)fp2fl(acc[i - 1]));
+                if (d > maxBoundaryJump) maxBoundaryJump = d;
+            }
+        }
+        printf("B5 HIPASS80 looped: maxAbs=%.1f counts maxBoundaryJump=%.1f counts\n",
+               maxAbs, maxBoundaryJump);
+        check(bufferFinite(acc, 2 * g_renderSize * kAccBlocks), "B5 finite");
+        check(maxAbs <= 32768.0, "B5 HIPASS80 output never exceeds unity (no clip)");
+        // A hard state flush jumps by the full state magnitude (~1.4e6 Q15
+        // counts of state were measured pre-fix -> an output step of many
+        // thousands of counts); the fade keeps the boundary step at ~326
+        // counts (~-40 dBFS).  This gate FAILS on the U2.59 hard flush.
+        check(maxBoundaryJump < 32768.0 * 0.02,
+              "B5 no click at the loop point (state fades, not steps)");
+        sk.FindVariable(SIP_EQG0)->SetInt(0);
+        renderBlocks(sk, acc, 120);
+        free(acc);
+    } else {
+        printf("B5 skipped (no SD sample)\n");
     }
 
     free(buf);

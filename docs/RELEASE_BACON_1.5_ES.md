@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 2541cbe598298c1a59cdafd0dec222f5bafbdb99783c92def7816357e9d66431
+- lgpt_r36sx_u2523.so - SHA256 6a909dd1386be4079577a16dc5faa724b9d5b406b8b810248d4c3fba84002e52
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...
@@ -513,8 +513,74 @@ bash -n de scripts/ y device/ OK, git diff --check limpio,
 DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK (0 errors/0
 warnings), SD_MOUNT=/mnt/g install/verify OK (ERRORS=0, config.xml azul
 BORDER 3F5FBF + config.stock.xml presentes), daemons byte-idénticos
-(f7140072, 968dfa61, 3f0ea7a2).  Core 2541cbe5 instalado en SD.
+(f7140072, 968dfa61, 3f0ea7a2).  Core 6a909dd1 instalado en SD.
 NOTA (feedback #10): NO hace falta recompilar kernel/.ko — todos los
 cambios de esta ronda viven en el core .so (lgpt_r36sx_u2523.so, la
 aplicación); el kernel y los módulos del stack de audio ya instalados no
 intervienen en colores, layout ni analizador.
+
+U2.61 (feedback #13): "el volumen total del bajo esta un poco excesivo,
+querria que el 70 fuera el 100; el hipass cortando por debajo de 80hz
+hace que el kick clipee al final del sonido; el morado mas transparente
+respecto a las barras azules; que el morado muestre el efecto del EQ en
+las barras (Pro-Q); L2+R2 para marcar el pico de frecuencia del sample
+y mostrarla, toggle con la misma combinacion, y L2+X+Flechas para
+cambiar de 1 en 1 el valor a ecualizar; analizador mas detallado,
+picos mas precisos, milimetrico"):
+
+55. (U2.61) Remapeo de volumen sintetizadores 70->100
+    (BACON_1.5_VOL_70_TO_100): el nivel post-EQ del BassSynth baja de x8 a
+    x5.6 (1434>>8 = 5.6016, exactamente 0.7x) y el PianoSynth, que nunca
+    tuvo el boost x8, recibe el MISMO x5.6.  La escala lineal preserva la
+    equivalencia exacta en cada accent/velocity: lo que hoy produce el
+    volumen 70 es AHORA el volumen 100 de ambos sintetizadores (bajo y
+    piano), y la barra del mixer (pico post-fader, escala dB) lee lo mismo
+    que leia el 70 de la version anterior.
+
+56. (U2.61) Fix clip del hipass al final del kick
+    (BACON_1.5_EQ8_LOOPFADE): el flush de estado del EQ8 en el wrap del
+    loop (U2.59) ponía a CERO los biquads de un salto; con un HIPASS por
+    debajo de 80 Hz el estado acumula valores grandes de cancelación del
+    cuerpo grave, y ese escalón se oía como click/clipeo al final del
+    sonido.  El flush se sustituye por un FADE del estado por canal
+    (FadeChannelState, rampa lineal a ~0 en 32 muestras), aplicado en los
+    4 puntos de wrap (forward/backward/ping-pong) de SampleInstrument.
+    Medido en host: con kick real + HIPASS 80 Hz en loop el salto en el
+    punto de loop baja de ~1.4e6 Q15 (flush) a ~326 counts (~-40 dBFS) y
+    la salida nunca supera unity (knee).  Ademas, el ResetChannelState()
+    que antes limpiaba TODOS los canales ahora solo afecta al canal
+    correcto (el bug de polifonía desaparece por diseño).
+
+57. (U2.61) Morado mas transparente + el morado muestra el corte del EQ
+    (BACON_1.5_EQ8_WAVE_PURPLE): el relleno de la curva baja de 30% a ~15%
+    de opacidad ((35,24,52) sobre el fondo) manteniendo el borde morado
+    puro (190,110,220); las barras azules del analizador se ven A TRAVÉS
+    de la curva.  El analizador ya se alimenta del dry POST-EQ del
+    instrumento, así que un hipass por debajo de 80 Hz hace caer las
+    barras de ese rango y el boost sube las suyas (estilo Pro-Q).
+
+58. (U2.61) Marcador de pico L2+R2 + ajuste fino 1 Hz
+    (BACON_1.5_ANALYZER_PEAK): en el EQ8, L2+R2 detecta la frecuencia de
+    pico del espectro del instrumento (bins FFT 8192 con interpolación
+    parabólica, precision ~1 Hz), dibuja una línea amarilla vertical con
+    su etiqueta de Hz sobre el canvas y sincroniza la banda seleccionada
+    a ese pico (se enciende sola); la misma combinación apaga el marcador.
+    L2+X+Left/Right ajusta el marcador de 1 en 1 Hz (100 unidades del
+    SIP_EQF) con la banda siguiéndolo.  Nuevo glifo '.' en la fuente tiny
+    para etiquetas tipo "1.3k".  Ayuda del EQ8 (SELECT+R1) documenta las
+    dos combinaciones.
+
+59. (U2.61) Analizador refinado (BACON_1.5_ANALYZER_FINE): FFT de 4096 a
+    8192 puntos (5.86 Hz/bin a 48 kHz, ventana de 170 ms) y 154 barras log
+    de 2 px contiguas que llenan el canvas — el espectro se ve como una
+    línea continua (estilo VST) y la detección de pico del marcador L2+R2
+    interpola a ~1 Hz de precisión.  El costo del FFT (12 fps de UI, ~6%
+    del hilo) sigue siendo ligero.
+
+Regresión U2.61: host SAMPLE_EQ_EDIT 94 (incluye B5: HIPASS 80 Hz en el
+kick looped sin clip ni salto en el loop) + EQ8_STRUCT 80 + ANALYZER_MIX
+540 + EQ8_SPECTRUM_VERIFY 16 + bass 72 + piano 46 + MASTER_SAFETY 24
+(incluye BassSynth real por el canal 127 en el master, ahora 0.79 de
+pico) + MIXER_VU_CHAIN 56 OK (ASAN/UBSAN limpio), DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS,
+BUILD_U2523_OK (0 errors/0 warnings), audit limpio, SD install/verify OK.
+Core 6a909dd1 instalado en SD.
