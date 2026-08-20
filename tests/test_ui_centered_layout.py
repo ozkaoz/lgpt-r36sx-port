@@ -273,39 +273,50 @@ def check_mixer_meters():
 
 
 # ---------------------------------------------------------------------------
-# 9. Mixer block layout: fullscreen DAW strips, FX RETURNS on the title row
+# 9. Mixer block layout: fullscreen DAW strips, no frame, no overlays
 # ---------------------------------------------------------------------------
 def check_mixer_block_bounds():
     draw = MIX_CPP[MIX_CPP.index("void MixerView::drawFxPages"):
                    MIX_CPP.index("void MixerView::DrawView")]
-    # Constants used by the block (U2.53 MIXER-FULLSCREEN + U2.54
-    # MIXER-VOL-BELOW: title/transport rows 0-3, hex labels 4, bars 7..24,
-    # volume numbers 25, pan/mute row 26; the played-notes block + view
-    # map keep rows 27..29).
+    # Constants used by the block (BACON_1.5_MIXER_FULLSCREEN U2.53/2.54 +
+    # BACON_1.5_MIXER_NO_FRAME U2.57b, feedback #10: the chopper frame was
+    # REMOVED -- "quitemos el recuadro, mantengamos el aspecto full screen"
+    # -- so the strips own rows 4..26 of the whole width: hex labels 4,
+    # bars 7..24, volume numbers 25, pan/mute row 26, FX RETURNS row 1,
+    # transport rows 0..3; drawNotes/drawMap stay removed and nothing is
+    # drawn on rows 27-29).
     assert "labelY=4" in draw and "barHeight=18" in draw
     assert "barY=labelY+2" in draw
     assert "retY=1" in draw
-    # The whole strip block stays inside the safe band: FX RETURNS 1 (title
-    # row), labels 4, bars 7..24, volume 25, pan 26 -- never rows 27..29.
+    # The whole strip block stays on rows 4..26: FX RETURNS row 1, labels
+    # 4, bars 7..24, volume 25, pan 26 -- never rows 0 or 27-29.
     label_y, bar_h = 4, 18
     bar_y = label_y + 2
     ret_y = 1
     assert label_y >= KBAND_TOP
-    assert bar_y + bar_h <= KBAND_BOT
+    assert bar_y + bar_h <= 27
     assert ret_y <= KBAND_BOT
     assert ret_y < 26
     # FX RETURNS is drawn on its own parametrized row (drawMixReturns(retY)).
     assert "drawMixReturns(retY)" in draw
     assert "void MixerView::drawMixReturns(int y)" in MIX_CPP
-    # Nothing on these pages reaches the footer rows 27..29.
-    for seg_name, start_marker, end_marker in (
-            ("MIX", "void MixerView::drawFxPages", "void MixerView::DrawView"),
-            ("DELAY", "void MixerView::drawDelayPage", "void MixerView::drawReverbPage"),
-            ("EQ", "void MixerView::drawEqPage", "void MixerView::drawCompPage"),
-            ("COMP", "void MixerView::drawCompPage", "void MixerView::drawMixReturns")):
-        seg = MIX_CPP[MIX_CPP.index(start_marker):MIX_CPP.index(end_marker)]
-        assert "DrawString(...,2" not in seg
-    print("9. DAW strips in rows 4..26; FX RETURNS on row 1; nothing in 27..29 OK")
+    # The bottom overlays are gone (feedback #10: "quitar los recuadros
+    # de notas y las letras SCPI PG M TT").
+    assert "drawNotes()" not in draw
+    assert "drawMap()" not in draw
+    # The frame is GONE from DrawView (U2.57b): plain title row only.
+    dv = MIX_CPP[MIX_CPP.index("void MixerView::DrawView"):
+                 MIX_CPP.index("void MixerView::OnPlayerUpdate")]
+    assert '"Mixer",props' in dv
+    assert "DrawString(16,0,\"MIXER\",props)" not in dv
+    assert "DrawString(0,1,\"                                        \",props)" not in dv
+    assert "DrawString(39,r,\" \",props)" not in dv
+    # The transport readout sits at the plain title row (35,0), no frame
+    # offset.
+    upd = MIX_CPP[MIX_CPP.index("void MixerView::OnPlayerUpdate(PlayerEventType"):
+                  MIX_CPP.index("void MixerView::OnFrameUpdate")]
+    assert "GUIPoint pos(35,0)" in upd
+    print("9. Fullscreen DAW strips rows 4..26; frame removed; no notes/map OK")
 
 
 # ---------------------------------------------------------------------------

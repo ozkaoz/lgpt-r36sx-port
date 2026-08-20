@@ -23,6 +23,7 @@ g++ -std=gnu++03 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
   "$SRC/Application/Instruments/BassSynth.cpp" \
   "$SRC/Application/Instruments/FilterV2.cpp" \
   "$SRC/Application/Audio/InstrumentEq.cpp" \
+  "$SRC/Application/Audio/SpectrumAnalyzer.cpp" \
   "$SRC/Application/Player/TablePlayback.cpp" \
   "$SRC/Foundation/Variables/Variable.cpp" \
   "$SRC/Foundation/Variables/VariableContainer.cpp" \

@@ -22,6 +22,18 @@ extern bool LGPTChopperGetChopRangeForSampleIndex(int sampleIndex, int chopIndex
 #include "Application/Model/Mixer.h"
 #include "Application/Audio/FxEngine/FxEngine.h"
 #include "Application/Mixer/FxPages.h" // bacon-1.5 item 5: fxParamFromByte
+#include "Application/Audio/SpectrumAnalyzer.h" // BACON_1.5_ANALYZER_INSTRUMENT (U2.59)
+
+// BACON_1.5_PANLAW_COMP (U2.57, feedback #10): FL-style pan law for the
+// instrument pan.  The legacy table is equal-power sqrt(i/254): at CENTER
+// (pan 127) it reads 0x5a82 = 0.7071, so a full-scale sample at volume 128
+// lost -3.01 dB on BOTH channels even fully centered -- the headroom the
+// mixer showed ("127/255 no clip").  Compensate so center = 1.0 (0 dB, like
+// the track pan in PlayerChannel, which is cos/sin*sqrt(2)) and hard pan =
+// +3 dB (sqrt(2), the same law as the track pan).  The master safety
+// (U2.56) stays the ceiling: sums above 1.0 are compressed, never clipped
+// square.  46343 = 32768 / panlaw[127](23170), in Q15 (1.4142 = sqrt 2).
+static const fixed kPanlawComp = 46343;
 
 // TREEFROG_INSTRUMENT_GRAPHIC_EQ_V1: per-instrument 8-band EQ synced from the
 // persisted variables.  Fingerprint-cached so the audio thread recomputes the
@@ -748,8 +760,8 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 		fixed fpattenuate=fp_mul(rp->attenuate_,fl2fp(1.0f/255.0f)) ;
 
 	  int pan=fp2i(rp->pan_) ;
-		fixed fixedpanl=panlaw[pan] ;
-		fixed fixedpanr=panlaw[254-pan] ;
+		fixed fixedpanl=fp_mul(panlaw[pan],kPanlawComp) ;
+		fixed fixedpanr=fp_mul(panlaw[254-pan],kPanlawComp) ;
 
 		// Get pan multiplicators, and take volume into account
 
@@ -815,6 +827,17 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
                     case SILM_OSC:
                     case SILM_LOOPSYNC:
                         input = loopPosition;
+                        // BACON_1.5_EQ8_LOOPFLUSH (U2.59, feedback #12): a
+                        // low band's filter tail (~22 ms at 45 Hz, Q 1)
+                        // crosses the loop boundary every pass and rings at
+                        // its center frequency -- the saved lgpt_KAOZ snare
+                        // (BELL -8 dB @ 45.39 Hz) LIFTED its 45 Hz content
+                        // x7 in a looped window ("bajar db sigue subiendo
+                        // esas frecuencias").  Flush the per-channel EQ
+                        // state at the wrap so the output is loop-periodic
+                        // again; the residual is one short transient at the
+                        // loop point, far smaller than the ring.
+                        eqDsp_.ResetChannelState();
                         rpReverse = (loopPosition > lastSample);
                         if (rpReverse) {
                             fpSpeed = -rp->speed_;
@@ -827,11 +850,13 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
                             if (input <= lastSample || input >= loopPosition) {
                                 rpReverse = !rpReverse;
                                 fpSpeed = -fpSpeed;
+                                eqDsp_.ResetChannelState();
                             }
                         } else {
                             if (input >= lastSample || input <= loopPosition) {
                                 rpReverse = !rpReverse;
                                 fpSpeed = -fpSpeed;
+                                eqDsp_.ResetChannelState();
                             }
                         }
                         break;
@@ -863,6 +888,10 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
                     case SILM_OSC:
                     case SILM_LOOPSYNC:
                         input = loopPosition;
+                        // BACON_1.5_EQ8_LOOPFLUSH (U2.59): see the forward
+                        // loop branch -- the filter tail must not ring
+                        // across a direction change either.
+                        eqDsp_.ResetChannelState();
                         rpReverse = (loopPosition > lastSample);
                         if (rpReverse) {
                             fpSpeed = -rp->speed_;
@@ -946,8 +975,8 @@ bool SampleInstrument::Render(int channel,fixed *buffer,int size,bool updateTick
 						volfactor=fp_mul(rp->volume_,volscale) ;
 						fpattenuate=fp_mul(rp->attenuate_,fl2fp(1.0f/255.0f)) ;
 						pan=fp2i(rp->pan_) ;
-						fixed fixedpanl=panlaw[pan] ;
-						fixed fixedpanr=panlaw[254-pan] ;
+						fixed fixedpanl=fp_mul(panlaw[pan],kPanlawComp) ;
+						fixed fixedpanr=fp_mul(panlaw[254-pan],kPanlawComp) ;
 
 						if (rpReverse) {
 							fpSpeed=-rp->speed_ ;
@@ -1111,23 +1140,32 @@ for (int i=0;i<channelCount;i++) {
     // the finished interleaved stereo dry output (post-pan, pre-FX-send).
     // syncInstrumentEq() is fingerprint-cached: no float work unless an EQ
     // variable changed.  When all bands are neutral eqDsp_ bounces at Process()
-    // with a single branch (zero cost).  The spectrum tap is NOT here anymore:
-    // BACON_1.5_ANALYZER_TAP feeds the analyzer from PlayerChannel (and the
-    // audition channel) right after this EQ, pre track gain/pan, targeted to
-    // the instrument being edited.
+    // with a single branch (zero cost).
+    // BACON_1.5_ANALYZER_INSTRUMENT (U2.59, feedback #12): the spectrum tap
+    // lives HERE, right after this EQ -- the post-EQ dry output in the same
+    // count<<15 scale and mono average as the master tap, so when the EQ8
+    // view targets this instrument the bars show EXACTLY what the drawn EQ
+    // curve does to it.  When the view targets nothing, WantsInstrument()
+    // bounces on a pointer compare and the master mix tap feeds instead.
     if (somethingToMix) {
         syncInstrumentEq() ;
         // The instrument buffer is int16<<15 (master) scale, the EQ DSP is
         // Q15 (range +-1.0 = +-i2fp(1)): normalize, process, restore.  The
         // >>FIXED_SHIFT / <<FIXED_SHIFT round trip is the exact one FxEngine
-        // uses for its DSP kernels.  BACON_1.5_EQ8_BLOCKLIMIT (U2.53,
-        // feedback #7): the EQ output is capped at 65535 Q15 (just under
-        // 2.0), so the <<FIXED_SHIFT restore (65535<<15 = 2147450880) fits
-        // the int32 master scale without overflow.
+        // uses for its DSP kernels.
+        // BACON_1.5_EQ8_SOFTKNEE (U2.59, feedback #12): the old block limiter
+        // let a single instrument reach 2.0 and push the master bus past the
+        // 1.7 flat ceiling of the safety limiter -- the saved lgpt_KAOZ kick
+        // (BELL +11 dB @ 2500 Hz, Q 1.0) crushed on the SP404-adjacent mix.
+        // InstrumentEq::Process now applies a per-sample soft knee capped at
+        // unity: an instrument can NEVER exceed full scale on its own, so the
+        // master stays in its transparent region no matter what the EQ does.
         int eqN = size * 2;
         for (int i = 0; i < eqN; i++) buffer[i] >>= FIXED_SHIFT;
         eqDsp_.Process(channel, buffer, size) ;
         for (int i = 0; i < eqN; i++) buffer[i] <<= FIXED_SHIFT;
+        SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
+        if (sp.WantsInstrument(this)) sp.FeedInstrument(buffer, size);
     }
 
     return somethingToMix ;

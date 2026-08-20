@@ -175,23 +175,23 @@ int main() {
     v = fxEditCurveValue(rvb, 0.0f, 1, false) ;
     check(fabsf(v - (1.0f * 1.05946309436f)) < 0.001f, "RVB PRE 0->+1 starts 1%*st") ;
 
-    // ---- mixVULevel golden (BACON_1.5_VU_DB_SCALE, U2.52.9: the bar maps
-    // the true peak onto its dB position over -24..+3 dBFS, 1 dB per 1/27
-    // of the bar, so the -24/-12/-6/0/+3 CUE marks sit on their real rows;
-    // the old linear fill with dB labels left a huge empty gap -6..0) ----
+    // ---- mixVULevel golden (BACON_1.5_VU_TOP0DB, U2.59: 0 dBFS is the TOP
+    // of the bar over -24..0 dBFS, 1 dB per 1/24 of the bar, so the
+    // -24/-12/-6/0 CUE marks sit on their real rows and a 0 dBFS mix reads
+    // a FULL bar like the meters of other consoles/DAWs; the +3 dB zone is
+    // gone) ----
     check(mixVULevel(0.0f) == 0.0f, "VU 0 -> 0") ;
-    // 0 dBFS = 24/27 (the 0 dB mark row); only >+3 dBFS fills the top cell.
-    check(fabsf(mixVULevel(1.0f) - 24.0f / 27.0f) < 0.0001f, "VU 1.0 -> 24/27") ;
-    // -6.02 dB -> (-6.02+24)/27 = 0.6659
-    check(fabsf(mixVULevel(0.5f) - 0.6659f) < 0.0001f, "VU 0.5 -> 0.666 (dB)") ;
-    // a volume-20 track on a full-scale instrument = -13.98 dBFS -> 10.02/27
-    check(fabsf(mixVULevel(0.2f) - 0.3711f) < 0.0001f, "VU 0.2 -> 0.371 (vol-20 track)") ;
-    // -0.63 dB -> 23.37/27 = 0.8655 (just under the 0 dB row, in the red
-    // band edge zone... actually still below 24/27: the red +3 zone starts
-    // at the 0 dB row).
-    check(fabsf(mixVULevel(0.93f) - 0.8655f) < 0.0001f, "VU 0.93 -> 0.866 (0 dB row edge)") ;
+    // 0 dBFS = the top cell (the full bar); only a real pre-clip level
+    // at/over 0 dBFS fills the top red cell (the clip lamp).
+    check(fabsf(mixVULevel(1.0f) - 1.0f) < 0.0001f, "VU 1.0 -> 1.0 (0 dBFS = full bar)") ;
+    // -6.02 dB -> (-6.02+24)/24 = 0.7492
+    check(fabsf(mixVULevel(0.5f) - 0.7492f) < 0.0001f, "VU 0.5 -> 0.749 (dB)") ;
+    // a volume-20 track on a full-scale instrument = -13.98 dBFS -> 10.02/24
+    check(fabsf(mixVULevel(0.2f) - 0.4175f) < 0.0001f, "VU 0.2 -> 0.418 (vol-20 track)") ;
+    // -0.63 dB -> 23.37/24 = 0.9737 (just under the 0 dB row)
+    check(fabsf(mixVULevel(0.93f) - 0.9737f) < 0.0001f, "VU 0.93 -> 0.974 (0 dB row edge)") ;
     check(mixVULevel(0.001f) == 0.0f, "VU sub-floor -> 0") ;
-    check(mixVULevel(10.0f) == 1.0f, "VU over +3dBFS clamps to 1") ;
+    check(mixVULevel(10.0f) == 1.0f, "VU over 0 dBFS clamps to 1 (clip lamp)") ;
     check(mixVULevel(-1.0f) == 0.0f, "VU negative -> 0") ;
 
     // ---- Return percent conversions (Q15 fixed 0..1 <-> 0..100) ----

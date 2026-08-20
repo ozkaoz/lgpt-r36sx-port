@@ -423,13 +423,23 @@ inline bool fxIsDiscreteParam(int id) {
 // 0 dBFS, so the bar tops at 24/27 with the +3 zone as headroom margin.
 // Sub-0.002 peaks (-54 dBFS) read 0, the same floor the channel scan
 // applies.
+// BACON_1.5_VU_TOP0DB (U2.59, feedback #12 "el 0 dB percibido en otras
+// consolas/PC debe ser el que marque la consola"): the +3 dB headroom zone
+// is REMOVED and 0 dBFS moves to the TOP of the bar, like the meters of
+// other consoles/DAWs (SP404MKII, FL Studio, etc.): 0 dBFS = the full bar,
+// the red top cell lights only at a real pre-clip level at/over 0 dBFS
+// (1 dB per 1/24 of the bar over -24..0 dBFS, the -24/-12/-6/0 CUE marks
+// sit on their real rows).  The measured level is unchanged (still the
+// true peak in dB); only the reference moved so a 0 dBFS mix reads 0 dB on
+// the bar like everywhere else.  Peaks above 0 dBFS (pre-clip overs) read
+// 1.0 and fill the red top cell (clip lamp).
 inline float mixVULevel(float peak) {
 	if (peak <= 0.0f) return 0.0f ;
 	if (peak < 0.002f) return 0.0f ;
 	float db = 20.0f * log10f(peak) ;
 	if (db < -24.0f) return 0.0f ;
-	if (db > 3.0f) return 1.0f ;
-	return (db + 24.0f) / 27.0f ;
+	if (db >= 0.0f) return 1.0f ;
+	return (db + 24.0f) / 24.0f ;
 }
 
 // TREEFROG_FX_PAGES_V3 (PLAN_FX_REDESIGN_ES.md, Fase 9):

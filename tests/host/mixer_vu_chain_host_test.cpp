@@ -247,10 +247,11 @@ static void runChain(int rate, const char *tag) {
     check(pR > 0.02f, "sustained scan keeps the peak on R");
 
     // ---- 2. bar level through the real MixerMeters path (what the MIX
-    // page draws): BACON_1.5_VU_DB_SCALE (U2.52.9) -- the bar equals the
-    // dB POSITION of the true scanned peak over -24..+3 dBFS
-    // ((20*log10(peak)+24)/27, see FxPages.h), so a ~0.1-peak synth at
-    // volume 100 reads ~15% of the bar (its ~-20 dBFS row, between the
+    // page draws): BACON_1.5_VU_DB_SCALE + BACON_1.5_VU_TOP0DB (U2.52.9 +
+    // U2.59) -- the bar equals the dB POSITION of the true scanned peak
+    // over -24..0 dBFS, 0 dBFS = the top of the bar
+    // ((20*log10(peak)+24)/24, see FxPages.h), so a ~0.1-peak synth at
+    // volume 100 reads ~17% of the bar (its ~-20 dBFS row, between the
     // -12 and -24 CUE marks), never double-scaled by the volume.
     MixerMeters meters;
     float peaksL[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -262,16 +263,25 @@ static void runChain(int rate, const char *tag) {
     float lvl127 = MixerMeters::BarLevel(meters.LevelL(0), 127);
     printf("[%s] barLevel vol100=%.3f vol127=%.3f\n", tag, lvl100, lvl127);
     // Mirror the exact clamps of mixVULevel (floor 0.002 -> -54 dBFS, the
-    // -24 dBFS meter floor and the +3 dBFS ceiling).
+    // -24 dBFS meter floor and the 0 dBFS ceiling = the top of the bar).
     float dBpos = 0.0f;
     if (pL > 0.002f) {
-        dBpos = (20.0f * log10f(pL) + 24.0f) / 27.0f;
+        dBpos = (20.0f * log10f(pL) + 24.0f) / 24.0f;
         if (dBpos < 0.0f) dBpos = 0.0f;
         if (dBpos > 1.0f) dBpos = 1.0f;
     }
     check(closef(lvl100, dBpos), "bar level = dB position of the scanned peak");
     check(closef(lvl127, lvl100), "volume 127 does not double-scale the peak");
-    check(lvl100 > 0.02f, "bar visibly above the 0.002 floor");
+    // The meter is honest on the -24..0 dBFS scale: a -20 dBFS reference
+    // peak (0.1) must read ~17% of the bar, and a peak BELOW the -24 dBFS
+    // floor (0.05, -26 dB) must read 0 -- the bar only moves when the
+    // level is actually audible at/above its -24 dBFS row.
+    float refLvl = MixerMeters::BarLevel(0.1f, 100);
+    check(closef(refLvl, (20.0f * log10f(0.1f) + 24.0f) / 24.0f),
+          "0.1 peak (-20 dBFS) reads its dB row on the -24..0 scale");
+    check(closef(MixerMeters::BarLevel(0.05f, 100), 0.0f),
+          "0.05 peak (-26 dBFS) is below the -24 dBFS floor -> 0");
+    check(refLvl > 0.15f, "bar visibly filled at -20 dBFS");
 
     // ---- 3. sustained buffers: the peaks must stay up (the sub-block
     // decay must never pull a sounding channel down between buffers).

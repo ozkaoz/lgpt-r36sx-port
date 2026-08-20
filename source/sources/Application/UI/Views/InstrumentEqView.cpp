@@ -105,7 +105,8 @@ static void tfTinyText(int x, int y, const char *s, unsigned short c) {
 
 #endif  // PLATFORM_TREEFROG
 
-// Log frequency mapping of the canvas, 20 Hz .. 20 kHz over x = 6..314.
+// Log frequency mapping of the canvas, 20 Hz .. 20 kHz over x = 6..314
+// (full width inside the screen, BACON_1.5_EQ8_NO_FRAME U2.57b).
 // (Only used by the pixel canvas: PLATFORM_TREEFROG.)
 #if defined(PLATFORM_TREEFROG)
 static int freqToX(double f) {
@@ -143,6 +144,7 @@ InstrumentEqView::InstrumentEqView(GUIWindow &w, ViewData *data)
 
 InstrumentEqView::~InstrumentEqView() {
     SpectrumAnalyzer::Get().SetArmed(false);
+    SpectrumAnalyzer::Get().SetInstrumentTarget(0);
 }
 
 float InstrumentEqView::freqFromIndex(int idx) const {
@@ -231,15 +233,22 @@ void InstrumentEqView::refreshDraw() {
 
 void InstrumentEqView::OnFocus() {
     loadFromInstrument();
-    // BACON_1.5_ANALYZER_MIX: the spectrum shows the master mix; arming the
-    // analyzer here starts the (zero-cost when disarmed) master tap.
+    // BACON_1.5_ANALYZER_MIX: the analyzer shows the master mix...
+    // BACON_1.5_ANALYZER_INSTRUMENT (U2.59, feedback #12): ...unless the
+    // view is editing an instrument: while this view has focus, the tap is
+    // redirected to the instrument being edited (its post-EQ dry output),
+    // so the spectrum and the drawn EQ curve are the SAME signal -- boosts
+    // visibly raise the bars, cuts visibly lower them (the kick's 2500 Hz
+    // click finally shows, the snare's low cut finally drops the low bars).
     SpectrumAnalyzer::Get().SetArmed(true);
+    SpectrumAnalyzer::Get().SetInstrumentTarget(instr_);
     setStatus(0);
     isDirty_ = true;
 }
 
 void InstrumentEqView::LooseFocus() {
     SpectrumAnalyzer::Get().SetArmed(false);
+    SpectrumAnalyzer::Get().SetInstrumentTarget(0);
     View::LooseFocus();
 }
 
@@ -325,17 +334,29 @@ void InstrumentEqView::PostFlushDraw() {
     const unsigned short selC   = tf565(255, 244, 120);
     const unsigned short lblC   = tf565(170, 178, 205);
     const unsigned short guideC = tf565(46, 52, 80);
+    // BACON_1.5_EQ8_WAVE_PURPLE (U2.60, feedback #12): the composite
+    // response curve was a SOLID light-blue fill ("tono solido azul claro,
+    // casi blanco"); it is now a ~30% opacity purple wash -- (190,110,220)
+    // blended 30/70 over the canvas bg (8,9,22) -> (63,39,81) -- so the
+    // live spectrum backdrop shows through the curve.  waveTop is the pure
+    // purple 1-px edge that keeps the curve line readable on the wash.
+    const unsigned short waveC   = tf565(63, 39, 81);
+    const unsigned short waveTop = tf565(190, 110, 220);
 
-    // BACON_1.5_EQ8_PIXEL_HEADER (U2.53, feedback #7): the three header
-    // rows are re-rendered HERE in pixels every frame, directly into the
-    // framebuffer AFTER the char screen was blitted (Flush -> PostFlushDraw),
-    // instead of living only on the char layer.  The char screen has a
-    // dirty-cell cache (_preScreen) and the pixel canvas repaints the screen
-    // below y=24 on every frame; a header that stayed in char cells could
-    // therefore end up erased or out of sync with the canvas repaints (the
-    // band/bell/freq menu "behind the screen" report).  Painting the strip
-    // background + text in pixels every frame makes the header the last
-    // thing drawn, always on top, always current.
+    // BACON_1.5_EQ8_NO_FRAME (U2.57b, feedback #10): the chopper frame is
+    // REMOVED ("quitemos el recuadro rosado, pero mantengamos el estilo
+    // full screen"): the EQ8 keeps the U2.53 fullscreen canvas (header 3
+    // rows = 24 px, curve canvas y 24..232, axis labels at y 235..239).
+    // The three header rows are re-rendered HERE in pixels every frame,
+    // directly into the framebuffer AFTER the char screen was blitted
+    // (Flush -> PostFlushDraw), instead of living only on the char layer.
+    // The char screen has a dirty-cell cache (_preScreen) and the pixel
+    // canvas repaints the screen below y=24 on every frame; a header that
+    // stayed in char cells could therefore end up erased or out of sync
+    // with the canvas repaints (the band/bell/freq menu "behind the
+    // screen" report).  Painting the strip background + text in pixels
+    // every frame makes the header the last thing drawn, always on top,
+    // always current.
     {
         const AppWindow *app = (const AppWindow *)&w_;
         tfFill(0, 0, 320, 24, bgC);
@@ -364,10 +385,16 @@ void InstrumentEqView::PostFlushDraw() {
     // Full-screen background below the header (rows 3+ => y >= 24).
     tfFill(0, headerH, 320, 240 - headerH, bgC);
 
-    // Curve canvas below the pixel header (y 24..232, only the 8 px of the
-    // frequency axis labels remain below it).
+    // Curve canvas below the pixel header.  BACON_1.5_EQ8_HEADER_CLEAR
+    // (U2.59, feedback #12 "el dibujo del EQ tapa las letras del menu"):
+    // the canvas top moves DOWN 4 px (cY0 = 28) so the curve, handles,
+    // band numbers and spectrum bars can NEVER touch the 3 header rows
+    // (y 0..23: EQ8 / Bell / L/R band).  Every canvas element clamps to
+    // y >= 28; the header text is the last thing painted each frame and is
+    // always fully readable ("las letras deben ser claramente
+    // identificables, no superpuestas").
     const int cX0 = 6,   cX1 = 314;
-    const int cY0 = 24,  cY1 = 232;      // curve canvas
+    const int cY0 = 28,  cY1 = 232;      // curve canvas (4 px clear of the header)
     const int cMid = (cY0 + cY1) / 2;    // 0 dB
     // BACON_1.5_EQ8_24DB (U2.52.5, feedback): the gain range is +/-24 dB,
     // so the canvas maps the FULL range (pxPerDb over 48 dB).  Previously
@@ -386,21 +413,33 @@ void InstrumentEqView::PostFlushDraw() {
     // spectrum is drawn INSIDE the canvas as a 30% opacity backdrop (the
     // bars live BEHIND the EQ curve, not in a separate strip below it).
     // specC (90,190,130) blended 30/70 over bgC (8,9,22) -> (33,63,54).
+    // BACON_1.5_EQ8_SPECTRUM_BLUE (U2.60, feedback #12): the analyzer is
+    // now BLUE at the same 30% opacity -- (60,120,220) blended 30/70 over
+    // bgC -> (24,42,81); the 1-px peak outline is a bright blue.
     // The opaque grid/axis/curve drawn afterwards stay fully readable.
     // BACON_1.5_ANALYZER_SCALE (U2.52.9, feedback #6): with the analyzer
     // fed in DAC counts (see SpectrumAnalyzer::FeedMix), fp2fl() now yields
     // the true -1..1 audio: the bins reflect the REAL dynamics of the mix
     // (a kick lights the lows, a hat the highs) and a 0 dBFS sine peaks at
     // ~0.25 (Hann window) -> the x4 below maps it to a full bar.
-    // BACON_1.5_EQ8_SPECTRUM_BARS (U2.52.9, feedback #6): the 24 log bins
+    // BACON_1.5_EQ8_SPECTRUM_BARS (U2.52.9, feedback #6): the log bins
     // render as thin 3-px bars with gaps plus a 1-px outline on top of each
     // bar, so the spectrum reads as a filled line tracing the wave shape
     // (FabFilter Pro-Q style) instead of chunky blocks.
+    // BACON_1.5_ANALYZER_96BARS (U2.59, feedback #12 "aumentar la cantidad
+    // de barras al triple o cuádruple, como analizadores VST"): 96 bars
+    // over the 308 px canvas -> 3 px per bar, contiguous (a solid
+    // spectrum line, exactly the VST Spectrum Analyzer look).
     {
-        const unsigned short specBlend = tf565(33, 63, 54);
-        const unsigned short specTop = tf565(63, 132, 92);
+        const unsigned short specBlend = tf565(24, 42, 81);
+        const unsigned short specTop = tf565(90, 170, 255);
         SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
-        sp.Compute();
+        // BACON_1.5_ANALYZER_96BARS (U2.59): a 4096-point FFT every frame
+        // is ~4x the old cost, so the compute is throttled to every 5
+        // frames (~12 fps at 60 fps UI) -- the analyzer stays live, the UI
+        // thread stays light.
+        static int fftThrottle = 0;
+        if ((++fftThrottle % 5) == 0) sp.Compute();
         const fixed *bb = sp.Bins();
         const int n = sp.BinCount();
         int bw = (cX1 - cX0) / n;
@@ -412,12 +451,26 @@ void InstrumentEqView::PostFlushDraw() {
             // BACON_1.5_ANALYZER_DB (U2.53, feedback #7): the bars used to
             // be LINEAR (fp2fl(bb)*4 over the canvas), so a +1 dB EQ boost
             // on loud low content moved the low bars by ~12% of the canvas
-            // ("+1 dB sube demasiado las barras").  The height is now the
-            // mixVULevel dB mapping (-24..+3 dB over the canvas, the same
-            // scale as the mixer bars), so bar height moves with perceived
-            // loudness and the EQ curve stays the reference.
-            int h = (int)(mixVULevel(fp2fl(bb[i]) * 4.0f) *
-                          (float)(cY1 - cY0));
+            // ("+1 dB sube demasiado las barras").  The height is now a dB
+            // mapping, so bar height moves with perceived loudness and the
+            // EQ curve stays the reference.
+            // BACON_1.5_EQ8_SPECTRUM_36DB (U2.58, feedback #11 "los picos
+            // agudos siguen ahogandose, en un hihat no se ve ninguna de las
+            // barras moviendose"): hat_probe measured the real kit hi-hat
+            // through the analyzer: its body peaks at ~-16 dB (bars 20..280
+            // Hz) but the 6..18 kHz region sits at -25..-29 dB, BELOW the
+            // -24 dB floor of the mixer mapping, so every high bar stuck at
+            // the 2-px minimum -- the highs looked dead.  The spectrum bars
+            // now map -36..+4 dB over the canvas (floor -36 dB, 0 dBFS at
+            // 90% of the canvas, +4 dB clipped at the top): the same hat
+            // highs now read 10..57 px and move with every hit, while the
+            // mixer bars keep their own -24..0 dBFS scale.
+            float p = fp2fl(bb[i]) * 4.0f;
+            float db = (p > 0.0f) ? 20.0f * log10f(p) : -80.0f;
+            float frac = (db + 36.0f) / 40.0f;
+            if (frac < 0.0f) frac = 0.0f;
+            if (frac > 1.0f) frac = 1.0f;
+            int h = (int)(frac * (float)(cY1 - cY0));
             if (h < 2) h = 2;
             if (h > cY1 - cY0) h = cY1 - cY0;
             int bx = cX0 + i * bw + (bw - barW) / 2;
@@ -442,7 +495,8 @@ void InstrumentEqView::PostFlushDraw() {
         tfFill(cX0, yy, cX1 - cX0 + 1, 1, gridC);
     }
 
-    // dB labels (left margin, inside the canvas top)
+    // dB labels (left margin x=0, fullscreen -- BACON_1.5_EQ8_NO_FRAME
+    // U2.57b: no left border column, the labels sit on the screen edge)
     tfTinyText(0, cY0 + 1, "+24", lblC);
     tfTinyText(0, cMid - 4, "0", lblC);
     tfTinyText(0, cY1 - 6, "-24", lblC);
@@ -460,8 +514,11 @@ void InstrumentEqView::PostFlushDraw() {
         for (int b = 0; b < 8; b++) {
             if (!bandOn_[b]) continue;
             int gx = freqToX(freqHz_[b]);
+            // BACON_1.5_EQ8_HEADER_CLEAR (U2.59): clamp the handle INSIDE the
+            // canvas (gyy >= cY0+4 so the 9-px crosshair spans y>=cY0 and
+            // can never overlap the 3 header rows above the canvas).
             int gyy = cMid - (int)(gainDb_[b] * pxPerDb);
-            if (gyy < cY0) gyy = cY0;
+            if (gyy < cY0 + 4) gyy = cY0 + 4;
             if (gyy > cY1) gyy = cY1;
             unsigned short col = (b == selected_) ? selC : bandC;
             // faint vertical guide from the top of the canvas to the handle
@@ -471,12 +528,6 @@ void InstrumentEqView::PostFlushDraw() {
             tfFill(gx - 2, gyy + 3, 5, 2, col);
             tfFill(gx - 2, gyy - 4, 2, 9, col);
             tfFill(gx + 1, gyy - 4, 2, 9, col);
-            // band number just above the handle, always INSIDE the canvas
-            // (a +24 dB handle would otherwise push it onto the char header)
-            char num[2] = {(char)('1' + b), 0};
-            int ny = gyy - 16;
-            if (ny < cY0 + 1) ny = cY0 + 1;
-            tfTinyText(gx - 1, ny, num, col);
         }
 
         // Composite response curve, evaluated from the view coefficients.
@@ -511,18 +562,38 @@ void InstrumentEqView::PostFlushDraw() {
             if (yy < cY0) yy = cY0;
             if (yy > cY1) yy = cY1;
             if (db >= 0.0) {
-                tfFill(x, yy, 3, cMid - yy + 1, bandC);
+                tfFill(x, yy, 3, cMid - yy + 1, waveC);
             } else {
-                tfFill(x, cMid, 3, yy - cMid + 1, bandC);
+                tfFill(x, cMid, 3, yy - cMid + 1, waveC);
             }
-            tfFill(x + 1, yy, 1, 1, selC);
+            tfFill(x + 1, yy, 1, 1, waveTop);
+        }
+
+        // Band numbers, drawn AFTER the curve so the response fill can never
+        // cover them (BACON_1.5_EQ8_HEADER_CLEAR, U2.59 -- the numbers must
+        // stay "claramente identificables, no superpuestas").  Each number
+        // gets a small canvas-color clear behind it so the curve/grid below
+        // it never bleeds through the glyph.
+        for (int b = 0; b < 8; b++) {
+            if (!bandOn_[b]) continue;
+            int gx = freqToX(freqHz_[b]);
+            int gyy = cMid - (int)(gainDb_[b] * pxPerDb);
+            if (gyy < cY0 + 4) gyy = cY0 + 4;
+            if (gyy > cY1) gyy = cY1;
+            unsigned short col = (b == selected_) ? selC : bandC;
+            char num[2] = {(char)('1' + b), 0};
+            int ny = gyy - 16;
+            if (ny < cY0 + 1) ny = cY0 + 1;
+            tfFill(gx - 2, ny, 7, 6, bgC);
+            tfTinyText(gx - 1, ny, num, col);
         }
     }
 
     // Frequency axis labels under the canvas.  BACON_1.5_EQ8_AXIS_LABELS
     // (U2.52.9, feedback #6): 11 labels over the 20 Hz..20 kHz log axis
     // (40 80 120 200 500 1k 2k 5k 10k 15k 20k), each centered on its
-    // frequency, at the 8 px that remain below the canvas (y 235..239).
+    // frequency, at the 8 px that remain between the canvas bottom (y=232)
+    // and the screen edge (y 235..239, fullscreen -- U2.57b).
     {
         static const char *kAxisLabels[11] = {
             "40", "80", "120", "200", "500",

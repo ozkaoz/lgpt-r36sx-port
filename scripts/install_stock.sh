@@ -13,7 +13,15 @@ install -m 0755 "$CORE" "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so"
 install -m 0755 "$DAEMON" "$SD/lgpt/otg/bin/r36s_u241_usb_audio_io"
 cp -f "$ROOT/deployment/start.lgpt" "$SD/roms/lgpt/start.lgpt"
 cp -f "$ROOT/deployment/config.stock.xml" "$SD/lgpt/config.xml"
-cp -f "$ROOT/recovery/u2_38au8_sync_uac2/usb_f_uac2.ko" "$SD/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/usb_f_uac2.ko"
+# U2.56.1 ALSA_STACK: the UAC2 gadget needs the port's ALSA core modules
+# (soundcore/snd/snd-timer/snd-pcm) next to usb_f_uac2.ko - otg_u241_common.sh
+# probes every module under modules/4.4.186-release and falls back to the
+# host_usb_audio copies, which are built for a different kernel and fail with
+# "unknown symbol". Without this stack the gadget is never created and the PC
+# does not detect the console (U2517 setup: snd.ko unknown symbols).
+for m in soundcore.ko snd.ko snd-timer.ko snd-pcm.ko usb_f_uac2.ko; do
+  install -m 0644 "$ROOT/recovery/u2_38au8_sync_uac2/$m" "$SD/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/$m"
+done
 for f in otg_u241_common.sh otg_u241_setup_once.sh otg_u241_apply_profile_once.sh otg_u241_shutdown.sh; do install -m 0755 "$ROOT/device/$f" "$SD/lgpt/otg/bin/$f"; done
 : > "$SD/lgpt/otg/enable_lgpt_uac2_bridge"
 printf 'STEREO_48K\n' > "$SD/lgpt/otg/audio_usb_profile"

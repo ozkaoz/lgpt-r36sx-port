@@ -10,7 +10,7 @@ SpectrumAnalyzer &SpectrumAnalyzer::Get() {
 }
 
 SpectrumAnalyzer::SpectrumAnalyzer()
-    : ringPos_(0), armed_(false), generation_(0),
+    : ringPos_(0), armed_(false), targetInstr_(0), generation_(0),
       lastSeenGeneration_(0) {
     memset(ring_, 0, sizeof(ring_));
     memset(wre_, 0, sizeof(wre_));
@@ -23,6 +23,9 @@ SpectrumAnalyzer::SpectrumAnalyzer()
     // bottom nine bars all collapsed onto a single FFT bin and any sample
     // lit them all through spectral leakage ("las barras no miden
     // 20 Hz-20 kHz").
+    // BACON_1.5_ANALYZER_96BARS (U2.59, feedback #12): 4096 points
+    // (11.7 Hz/bin) so the 96 log bars each still cover 2+ real bins at
+    // every frequency (the top 20 kHz bar covers bins ~1549..2171).
     static const float fLo = 20.0f;
     static const float fHi = 20000.0f;
     const float step = logf(fHi / fLo) / (kLogBins - 1);
@@ -55,6 +58,27 @@ void SpectrumAnalyzer::SetArmed(bool armed) { armed_ = armed; }
 // reflejan la dinamica real", bars 100% full for any signal).
 void SpectrumAnalyzer::FeedMix(const fixed *stereo, int frames) {
     if (!armed_) return;                     // zero cost
+    // BACON_1.5_ANALYZER_INSTRUMENT (U2.59): while the EQ8 view targets an
+    // instrument, the master tap is ignored -- the ring belongs to the
+    // instrument being edited (see SetInstrumentTarget).
+    if (targetInstr_) return;
+    if (!stereo || frames <= 0) return;
+    for (int i = 0; i < frames; i++) {
+        fixed l = stereo[i * 2];
+        fixed r = stereo[i * 2 + 1];
+        ring_[ringPos_] = (l >> 16) + (r >> 16);
+        if (++ringPos_ >= kRingFrames) ringPos_ = 0;
+    }
+    generation_++;
+}
+
+// BACON_1.5_ANALYZER_INSTRUMENT (U2.59, feedback #12): same ring contract
+// as FeedMix, fed from inside the instrument Render right after its EQ8
+// (post-EQ dry output, pre track gain/FX sends -- the exact signal the
+// drawn EQ curve describes).  Same count<<15 scale and (l>>16)+(r>>16)
+// mono average, so the bins read exactly like the master tap.
+void SpectrumAnalyzer::FeedInstrument(const fixed *stereo, int frames) {
+    if (!armed_) return;                     // zero cost
     if (!stereo || frames <= 0) return;
     for (int i = 0; i < frames; i++) {
         fixed l = stereo[i * 2];
@@ -66,11 +90,32 @@ void SpectrumAnalyzer::FeedMix(const fixed *stereo, int frames) {
 }
 
 void SpectrumAnalyzer::runFft() {
-    // Copy newest 256 samples of the ring into the float window.
+    // BACON_1.5_ANALYZER_DCBLOCK (U2.57, feedback #10): the window mean is
+    // subtracted BEFORE the FFT.  Percussive attacks carry a DC transient:
+    // the kit's "HI HAT 01.wav" swings -4000..+9000 counts (up to ~13% of
+    // full scale) during the first 20 ms of the hit (measured window means,
+    // dc_attack.py), because the struck membrane starts displaced to one
+    // side.  The Hann FFT maps that step onto bins 1-3, so bars 20..120 Hz
+    // pinned at full on EVERY percussive hit even though the sustained body
+    // of a hi-hat is 500 Hz..10 kHz.  The ear hears the AC content (the
+    // click), not the DC step; subtracting the window mean removes exactly
+    // that step (it is ~flat inside a 21.3 ms window).
+    // U2.57b: a LINEAR detrend (mean + slope) was tried and REJECTED: it
+    // cancels part of a 1-cycle tone (a 46.875 Hz sine at bin 1 read 0.136
+    // instead of 0.25, i.e. -5.3 dB of a real kick body).  The residual
+    // sub-bin ramp of the attack keeps ~3.5% of a bar on the low bars --
+    // accepted, it is below perception.
+    double mean = 0.0;
     for (int i = 0; i < kFftSize; i++) {
         int idx = ringPos_ - kFftSize + i;
         if (idx < 0) idx += kRingFrames;
-        float s = fp2fl(ring_[idx]);
+        mean += fp2fl(ring_[idx]);
+    }
+    mean /= (double)kFftSize;
+    for (int i = 0; i < kFftSize; i++) {
+        int idx = ringPos_ - kFftSize + i;
+        if (idx < 0) idx += kRingFrames;
+        float s = fp2fl(ring_[idx]) - (float)mean;
         // Hann window
         float w = 0.5f - 0.5f * cosf(2.0f * 3.14159265f * i / (float)(kFftSize - 1));
         wre_[i] = s * w;
@@ -126,6 +171,17 @@ bool SpectrumAnalyzer::Compute() {
         }
         float peak = sqrtf(peak2) / (float)kFftSize;
         if (peak > 1.0f) peak = 1.0f;
+        // BACON_1.5_ANALYZER_INSTANT_PEAK (U2.57b, feedback #10): the bins
+        // are the INSTANTANEOUS per-window peak, no temporal smoothing.
+        // The U2.57 exponential smoothing (0.86/0.14 per frame, ~150 ms)
+        // was too slow for the high end: a hi-hat's wash decays in
+        // 200-500 ms, so its bars never reached a visible level while the
+        // sustained kick body (50-100 Hz) filled its bars -- "las barras
+        // no se dibujan en sonidos altos; en los graves (kick) si se
+        // dibujan".  The detrend above already kills the fake DC transient
+        // in the low bars; the highs now react frame-exact like the mixer
+        // VU peak.  The view scales peak 0.25 (0 dBFS sine, Hann) x4 to a
+        // full bar, so a clean transient lights its real spectral region.
         bins_[i] = fl2fp(peak);
     }
     return true;

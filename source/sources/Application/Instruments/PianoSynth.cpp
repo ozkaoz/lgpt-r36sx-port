@@ -6,6 +6,7 @@
 #include "Application/Instruments/SynthMath.h"
 #include "Services/Audio/Audio.h"
 #include "System/System/System.h"
+#include "Application/Audio/SpectrumAnalyzer.h" // BACON_1.5_ANALYZER_INSTRUMENT (U2.59)
 
 #include <math.h>
 #include <string.h>
@@ -267,9 +268,14 @@ bool PianoSynth::Start(int channel, unsigned char note, bool retrigger) {
     float vel = (float)velocity_[channel] / 127.0f;
     if (vel < 0.02f) vel = 0.02f;
     float velFactor = powf(vel, 1.3f);
+    // BACON_1.5_SYNTH_VOLUME_SCALE (U2.57, feedback #10): instrument volume
+    // 100 now equals the old 10 (-20 dB, factor 0.1) -- the synth engine
+    // used to drive full-scale partials at volume 100, way louder than the
+    // sample engine ("100 de volumen de instrumento debe ser el equivalente
+    // a 10 actual").  The accent still boosts above the base.
     float vol = (float)volume_->GetInt() / 100.0f;
     float accent = (float)accent_->GetInt() / 100.0f;
-    pv->peak_ = vol * velFactor * (1.0f + accent * 0.5f);
+    pv->peak_ = vol * 0.1f * velFactor * (1.0f + accent * 0.5f);
 
     pv->ampEnv_ = 0.0f;
     pv->ampStage_ = SES_ATTACK;
@@ -492,6 +498,10 @@ bool PianoSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
         else if (v < -(i2fp(1) - 1)) v = -(i2fp(1) - 1);
         buffer[i] = v << FIXED_SHIFT;
     }
+    // BACON_1.5_ANALYZER_INSTRUMENT (U2.59): post-EQ dry output in master
+    // scale, same contract as SampleInstrument::Render -- see there.
+    if (SpectrumAnalyzer::Get().WantsInstrument(this))
+        SpectrumAnalyzer::Get().FeedInstrument(buffer, size);
 
     return true;
 }

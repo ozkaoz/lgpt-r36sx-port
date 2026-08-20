@@ -8,7 +8,7 @@ build actual:
    navegacion, storage, audio), estructura, deuda, riesgos, pruebas,
    recomendaciones multitrack.
 2. Los SHA del build actual coinciden con los golden documentados
-   (core fcc02d6b, daemon f7140072, sp404 968dfa61, midi 3f0ea7a2).
+   (core 4f0183e1, daemon f7140072, sp404 968dfa61, midi 3f0ea7a2).
 3. El audit.sh registra los 24+ runners host y los baselines F4/F5/F8/F9.
 4. La verificacion en SD es parte del protocolo documentado (SD == build).
 5. Los puntos de verificacion del usuario estan presentes en el informe.
@@ -24,7 +24,7 @@ AUDIT = ROOT / "scripts/audit.sh"
 BUILD = Path("/mnt/d/R36S/PORT LPTRACKER/BUILD/U2523")
 
 GOLDENS = {
-    "lgpt_r36sx_u2523.so": "c73685b4a05cddbcee269024be8ad3a2aecacff6f6d134b99c18a28de1c8758f",
+    "lgpt_r36sx_u2523.so": "2541cbe598298c1a59cdafd0dec222f5bafbdb99783c92def7816357e9d66431",
     "r36s_u2523_usb_audio_io": "f7140072f9b83573e03caf904d17de6227374823c3719757c7d11a438bb1417d",
     "r36s_sp404_host_audio_io": "968dfa61e561d348fd4ec8006e39b23b4dd56a49f1912f885c2731f118983b83",
     "r36s_midi_host_io": "3f0ea7a23db7390f1fb3b73cbda97f66316c6568d0c7574b838579a014baee80",

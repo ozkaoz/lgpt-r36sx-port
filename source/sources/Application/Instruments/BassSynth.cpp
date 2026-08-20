@@ -6,6 +6,7 @@
 #include "Application/Instruments/SynthMath.h"
 #include "Services/Audio/Audio.h"
 #include "System/System/System.h"
+#include "Application/Audio/SpectrumAnalyzer.h" // BACON_1.5_ANALYZER_INSTRUMENT (U2.59)
 
 #include <math.h>
 #include <string.h>
@@ -240,9 +241,14 @@ bool BassSynth::Start(int channel, unsigned char note, bool retrigger) {
     }
 
     // Envelopes: attack to peak, decay to sustain.
+    // BACON_1.5_SYNTH_VOLUME_SCALE (U2.57, feedback #10): instrument volume
+    // 100 now equals the old 10 (-20 dB, factor 0.1) -- the synth engine
+    // used to drive full-scale oscillators at volume 100, way louder than
+    // the sample engine ("100 de volumen de instrumento debe ser el
+    // equivalente a 10 actual").  The accent still boosts above the base.
     float vol = (float)volume_->GetInt() / 100.0f;
     float accent = (float)accent_->GetInt() / 100.0f;
-    v.peak_ = vol * (1.0f + accent * 0.5f);
+    v.peak_ = vol * 0.1f * (1.0f + accent * 0.5f);
 
     v.ampEnv_ = 0.0f;
     v.ampStage_ = SES_ATTACK;
@@ -544,20 +550,25 @@ bool BassSynth::Render(int channel, fixed *buffer, int size, bool updateTick) {
     // the master scale at the exit, AFTER the Q15 FV2/EQ kernels, clamped to
     // +-i2fp(1)-1 so the DAC's short(fp2i()) never wraps: a peak-1.0 synth is
     // full scale, like a peak sample.
-    // BACON_1.5_VOL_SYNTHS_UNITY (U2.55, feedback #8): the U2.52.9 -20 dB
-    // pad is reverted.  The kit comparison that motivated it compared the
-    // sample instrument volume 100 on a 0..255 scale (39%, -8 dB) against
-    // the synth's 0..100 scale (100%, 0 dBFS) -- the "19 dB louder" was a
-    // scale mismatch.  With the sample path at FL-style unity (instrument
-    // volume 128 = 1.0, U2.55), a full-scale sample at 128 and a synth at
-    // 100 are both 0 dBFS peak, so a synth at 100 reads 0 dBFS on the VU
-    // bars exactly like the kit.
+    // BACON_1.5_SYNTH_BAR_LEVEL (U2.60, feedback #12): the synth engine was
+    // -20 dB below the samples (U2.57, "100 de volumen = el equivalente a
+    // 10") so its mixer bar read ~21% at volume 100 while the drums read
+    // ~99% at the same setting -- "el bajo solo llena una parte pequena de
+    // las barras".  The bars map PEAK on a dB scale, so a sustained saw
+    // (peak 0.113) can never reach the top like the transient samples.
+    // Raise the post-EQ level x8 so the peak at volume 100 lands at ~0.9
+    // (90% bar, like the drums at the same volume); the instrument volume
+    // then scales the bar down linearly, matching the perceived level.
     for (int i = 0; i < size * 2; i++) {
-        fixed v = buffer[i];
+        int v = (int)buffer[i] * 8;
         if (v > i2fp(1) - 1) v = i2fp(1) - 1;
         else if (v < -(i2fp(1) - 1)) v = -(i2fp(1) - 1);
-        buffer[i] = v << FIXED_SHIFT;
+        buffer[i] = (fixed)(v << FIXED_SHIFT);
     }
+    // BACON_1.5_ANALYZER_INSTRUMENT (U2.59): post-EQ dry output in master
+    // scale, same contract as SampleInstrument::Render -- see there.
+    if (SpectrumAnalyzer::Get().WantsInstrument(this))
+        SpectrumAnalyzer::Get().FeedInstrument(buffer, size);
 
     return true;
 }

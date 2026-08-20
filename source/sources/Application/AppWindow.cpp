@@ -134,6 +134,15 @@ GUIColor AppWindow::borderColor_(0x3F, 0x5F, 0xBF);
 GUIColor AppWindow::songviewfeColor_(0x2A, 0x3E, 0x8F);
 GUIColor AppWindow::songview00Color_(0x1E, 0x2B, 0x66);
 GUIColor AppWindow::highlightColor_(0x5B, 0x8C, 0xFF);
+// BACON_1.5_THEME_BACK_TO_14 (U2.58, feedback #11 "sigue viendose rosado"):
+// the U2.57b accent change (0x6B8CFF / 0x7D8CFF) was reverted: the real
+// cause of the pink was NOT this palette but the SD's lgpt/config.xml,
+// whose <BORDER FF008C / HICOLOR2 DB33DB / ROWCOLOR2 FF00FF> magenta values
+// override these statics via defineColor() (lines 224-252).  Bacon-1.4's
+// shipped config.xml carries the classic blue-violet theme (this exact
+// palette); install.sh now restores that config.xml and always installs
+// config.stock.xml as the launcher's fallback.  This file matches the
+// Bacon-1.4 (golden-bacon-1.4) palette byte for byte.
 GUIColor AppWindow::highlight2Color_(0x9D, 0x5B, 0xFF);
 GUIColor AppWindow::consoleColor_(0x40, 0xC8, 0x78);
 GUIColor AppWindow::cursorColor_(0x7F, 0xB8, 0xFF);

@@ -13,6 +13,12 @@ echo "TREEFROG_AUDIO_DEBUG=$AUDIO_DEBUG_VALUE"
 
 cd "$ROOT/projects"
 
+# BACON_1.5_BLUE_FOCUS (U2.57, feedback #10): the focus/selection accent
+# is BLUE (0x9dbf, RGB565 152,216,248), the code default -- it was
+# 0xd99b (216,152,216, pink) here, which made every selection read
+# rosado on the console ("los colores se ven rosados, deben ser
+# azules-morados").  NOTE: keep comments ABOVE the make command -- a
+# comment inside a backslash-continued command line breaks the chain.
 rm -rf buildTREEFROG
 rm -f lgpt_libretro.so ../lgpt_libretro.so
 find . -type f \( -name '*.o' -o -name '*.d' -o -name '*.so' \) -delete 2>/dev/null || true
@@ -29,11 +35,11 @@ make PLATFORM=TREEFROG \
   TREEFROG_DISABLE_PHRASE_AUDITION=0 \
   TREEFROG_HIGH_CONTRAST_SELECTION=1 \
   TREEFROG_PURPLE_FOCUS_SELECTION=1 \
-  TREEFROG_PURPLE_FOCUS_RGB565=0xd99b \
+  TREEFROG_PURPLE_FOCUS_RGB565=0x9dbf \
   TREEFROG_VIDEO_MODE=0 \
   TREEFROG_VIDEO_PROBE=0 \
   TREEFROG_PORT_VERSION_BADGE=0 \
-  TREEFROG_PORT_VERSION_BADGE_COLOR=0xd99b \
+  TREEFROG_PORT_VERSION_BADGE_COLOR=0x9dbf \
   TREEFROG_INPUT_DEBUG="$INPUT_DEBUG_VALUE" \
   TREEFROG_EVENT_DEBUG_ALL="$EVENT_DEBUG_VALUE" \
   TREEFROG_RETRO_LIFECYCLE_DEBUG=0 \

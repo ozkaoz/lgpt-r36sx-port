@@ -323,12 +323,13 @@ int main() {
     rmsS100 = bufferRms(buffer, 512 * 2);
     // sustain 100 must be clearly louder than sustain 60 (>= 1.3x).
     check(rmsS100 > rmsS60 * 1.3f, "sustain 100 >= 1.3x louder than 60");
-    // ... and sit at the FL-style unity level: BACON_1.5_VOL_SYNTHS_UNITY
-    // (U2.55, feedback #8) removed the U2.52.9 -20 dB pad: the full-scale
-    // saw sustains at peak ~1.0 / rms ~0.577, the same 0 dBFS peak class as
-    // a full-scale kit sample at instrument volume 128.  A dead signal
-    // measures < 0.001, so the unity saw stays far above the floor.
-    check(rmsS100 > 0.03, "sustained note at FL-style unity level");
+    // ... and sit at the new U2.57 level: BACON_1.5_SYNTH_VOLUME_SCALE
+    // (U2.57, feedback #10) re-padded the synth engine -20 dB (volume 100
+    // = the old 10, "100 de volumen debe ser el equivalente a 10 actual"),
+    // so the full-scale saw sustains at peak ~0.1 / rms ~0.0577 -- audible
+    // and far above the dead-signal floor (< 0.001), but no longer the
+    // loudest thing in the mix.
+    check(rmsS100 > 0.03, "sustained note at the -20 dB synth level");
     // The device edit flow: X+UP (gain +1) on every band, rendered each
     // time -- the sound must never collapse after ANY single edit.
     for (int b = 0; b < 8; b++) {

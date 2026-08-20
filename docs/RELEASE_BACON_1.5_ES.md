@@ -1,7 +1,7 @@
 Pre-release Bacon 1.5 - Sinths and EQ8 (build U2.52.3, 2026-08-18)
 
 Build:
-- lgpt_r36sx_u2523.so - SHA256 c73685b4a05cddbcee269024be8ad3a2aecacff6f6d134b99c18a28de1c8758f
+- lgpt_r36sx_u2523.so - SHA256 2541cbe598298c1a59cdafd0dec222f5bafbdb99783c92def7816357e9d66431
 - r36s_u2523_usb_audio_io (daemon USB UAC2) - f7140072... (byte-identico al anterior)
 - r36s_sp404_host_audio_io - 968dfa61...
 - r36s_midi_host_io - 3f0ea7a2...
@@ -418,3 +418,103 @@ git diff --check limpio, DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS,
 BUILD_U2523_OK, SD_MOUNT=/mnt/g install/verify OK (BACKUP en
 /mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260819_110135).
 Core c73685b4 instalado en SD.
+
+Novedades U2.57 (feedback de la prueba en R36SX #10 - "se ve en tonos
+rosados" + "recuadro demasiado ancho" + "las barras del EQ8 no se dibujan
+en sonidos altos"):
+
+46. Volumen de los sinths corregido (feedback #10, CONFIRMADO por el
+    usuario): los sinths vol 100 suenan a la par de las samples; ver 47/48.
+    BACON_1.5_SYNTH_LEVEL_X (factor x0.1 en BassSynth/PianoSynth sobre el
+    peak Q15, verificado: saw vol 100 peak 3692 ~0.113 = -19 dB, el mismo
+    nivel que un sample media-fuerte).
+47. DC-block del analizador (feedback #10): el ataque de los golpes
+    percusivos lleva un transitorio DC (el "HI HAT 01.wav" del kit oscila
+    -4000..+9000 cuentas en los primeros 20 ms, medido con dc_attack.py)
+    que la FFT de 1024 mapeaba a los bins 1-3: las barras 20..120 Hz se
+    clavaban llenas en CADA golpe aunque el cuerpo sostenido del hi-hat es
+    500 Hz..10 kHz. Restar la media de la ventana elimina ese paso (los
+    graves vuelven a leerse como el contenido AC real del sample).
+48. (U2.57, luego corregido en U2.57b) smoothing temporal del analyzer
+    ~150 ms: ver punto 49.
+49. (U2.57) Mixer y EQ8 con estilo chopper (top bar + marco CD_BORDER):
+    RETIRADO en U2.57b por feedback #10 ("el recuadro es demasiado ancho y
+    de un color no correcto; quitemos el recuadro, mantengamos el aspecto
+    full screen"): ver punto 50.
+50. (U2.57b) Mixer/EQ8 full screen SIN marco: el recuadro chopper se
+    retira de MixerView (DrawView vuelve al título simple; strips 4..26,
+    FX RETURNS fila 1, transporte (35,0)) y de InstrumentEqView (canvas
+    x6..314 / y24..232, etiquetas dB a la izquierda x0, eje de frecuencias
+    en y235..239). Se MANTIENEN las mejoras del feedback #10: sin
+    drawNotes()/drawMap() (los recuadros de notas y el mapa SCPI PG M TT
+    siguen fuera) y los 9 medidores a pantalla completa.
+51. (U2.57b) Analizador de pico instantáneo (feedback #10, "las barras no
+    se dibujan en sonidos altos"): el smoothing exponencial 0.86/0.14
+    (~150 ms) ahogaba los agudos — el wash del hi-hat decae en 200-500 ms
+    y sus barras nunca llegaban a nivel visible, mientras el kick
+    sostenido (50-100 Hz) sí llenaba las suyas. Ahora las barras son el
+    pico instantáneo por ventana (como el VU del mixer): los agudos
+    reaccionan en el frame, el DC-block mantiene limpios los graves, y un
+    transitorio de 1 ms ya no clava ninguna barra (pico < 0.06 vs 0.25 de
+    un tono sostenido). Se probó un detrend lineal (media + pendiente) y
+    se RECHAZÓ: costaba -5.3 dB en un tono de 46.875 Hz (1 ciclo), i.e.
+    cuerpos de kick reales.
+52. (U2.57b) Tema azul-morado (feedback #10, "se ve en tonos rosados, no
+    azules"): el define TREEFROG_PURPLE_FOCUS_RGB565 (0xd99b -> 0x9dbf)
+    era una macro MUERTA (definida pero nunca usada en el port); el rosado
+    real venía de la paleta del tema en AppWindow.cpp (CD_HILITE2
+    (157,91,255) y ROW2 (168,107,255) violetas). Los acentos se desplazan
+    al azul-morado: HILITE2 (selecciones, títulos, strips activos) ->
+    (107,140,255) y ROW2 (filas alternas) -> (125,140,255).
+    NOTA U2.58: este cambio se REVIRTIÓ (paleta de nuevo byte a byte
+    idéntica a golden-bacon-1.4) al descubrirse que el rosado real NO
+    venía de esta paleta sino del lgpt/config.xml de la SD (punto 53).
+
+53. (U2.58, feedback #11 "sigue viendose rosado... compare la interfaz y
+    colores de Bacon-1.4") Tema de colores restaurado a Bacon-1.4: la
+    causa del rosado era el lgpt/config.xml de la SD, que cargaba la
+    paleta STOCK magenta (BORDER FF008C, HICOLOR2 DB33DB, ROWCOLOR2
+    FF00FF, SONGVIEW_FE A55B8F...) y sobreescribía el tema del código vía
+    defineColor() en AppWindow.  La comparación contra el tag
+    golden-bacon-1.4 (el commit exacto del core publicado e4fbbdc8)
+    demostró que paleta del código, defines de build (0xd99b) y overlay
+    del chopper (PITCH/ENV fullscreen incluido) eran IDÉNTICOS a
+    Bacon-1.4 -- el "cuadro rosado" del graphical chopper era el marco
+    azul clásico renderizado con BORDER=FF008C del config rosa.  Fix:
+    (a) install.sh SIEMPRE instala lgpt/config.stock.xml (plantilla de
+    respaldo del launcher, que falla con código 21 si faltan ambos
+    configs) y repara el config.xml rosa (firma FF008C) copiando el
+    config azul oficial de sd_root/lgpt/config.xml (backup previo en
+    BACKUP/config.xml.pink.previous); (b) verify.sh exige BORDER 3F5FBF y
+    ausencia de FF008C en el config vivo + presencia de config.stock.xml;
+    (c) la paleta del código vuelve a la de golden-bacon-1.4 (CD_HILITE2
+    (157,91,255), ROW2 (168,107,255)) para que el tema por defecto
+    coincida con la configuración de colores de la release.
+
+54. (U2.58, feedback #11 "los picos agudos siguen ahogandose, en un hihat
+    por ejmplo no se ve ninguna de las barras moviendose") Analizador EQ8
+    con piso de -36 dB: la medición empírica (tests/host/hat_probe.cpp,
+    muestra REAL "HI HAT 01.wav" del kit de la SD a través del
+    SpectrumAnalyzer) mostró que el cuerpo del hi-hat pica en ~-16 dB
+    (barras 20..280 Hz -> 56 px) pero la región 6..18 kHz queda en
+    -25..-29 dB, POR DEBAJO del piso -24 dB del mapeo mixVULevel: cada
+    barra alta se pegaba al mínimo de 2 px y parecía muerta.  Las barras
+    del espectro ahora se mapean a -36..+4 dB sobre el canvas (0 dBFS =
+    90%, +4 dB recortado arriba); el mismo hi-hat lee 49..73 px en las
+    bandas 390 Hz..17.8 kHz y se mueve con cada golpe.  El mixer mantiene
+    su propia escala -24..+3 dB (BACON_1.5_EQ8_SPECTRUM_36DB).
+
+Regresión U2.58: AUDIT_CLEAN_MAIN_U2523_OK (gate completo), host
+EQ8_SPECTRUM_VERIFY 16 + analyzer_mix 60 + eq8_struct 77 + MIXER_VU_CHAIN
+52 + bass 72 + piano 46 checks OK (ASAN/UBSAN limpio),
+test_ui_centered_layout (secciones 1-13 OK, sin marco, strips 4..26, sin
+notas/mapa), test_f10_baseline OK (golden actualizado a 150dbe24),
+bash -n de scripts/ y device/ OK, git diff --check limpio,
+DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK (0 errors/0
+warnings), SD_MOUNT=/mnt/g install/verify OK (ERRORS=0, config.xml azul
+BORDER 3F5FBF + config.stock.xml presentes), daemons byte-idénticos
+(f7140072, 968dfa61, 3f0ea7a2).  Core 2541cbe5 instalado en SD.
+NOTA (feedback #10): NO hace falta recompilar kernel/.ko — todos los
+cambios de esta ronda viven en el core .so (lgpt_r36sx_u2523.so, la
+aplicación); el kernel y los módulos del stack de audio ya instalados no
+intervienen en colores, layout ni analizador.

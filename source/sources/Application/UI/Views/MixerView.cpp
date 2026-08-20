@@ -917,14 +917,15 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// each row is a single cell (one-column meter) so the 9 meters of the
 	// MIX page fit the centered bank; totalCells == height.
 	// BACON_1.5_VU_DB_SCALE (U2.52.9, feedback #6):
-	// The bar fill = mixVULevel(peak) on the dB scale ((20*log10(p)+24)/27
-	// over -24..+3 dBFS, see FxPages.h; the scanned peak already includes
+	// The bar fill = mixVULevel(peak) on the dB scale ((20*log10(p)+24)/24
+	// over -24..0 dBFS, see FxPages.h; the scanned peak already includes
 	// the track volume, so no extra volume factor).  A track at volume 20
-	// on a full-scale instrument reads ~37% of the bar, and 0 dBFS reads
-	// 24/27 with the +3 zone as headroom.  The bar turns red (CD_ERROR)
-	// only when the fill reaches the 0 dBFS ceiling (the top +3 cell of the
-	// CUE scale), i.e. a real pre-clip level at/over 0 dBFS -- the
-	// condition that produces the clipped sound.
+	// on a full-scale instrument reads ~42% of the bar, and 0 dBFS reads
+	// the FULL bar.  BACON_1.5_VU_TOP0DB (U2.59): the bar turns red
+	// (CD_ERROR) only when the fill reaches the 0 dBFS ceiling (the top
+	// cell), i.e. a real pre-clip level at/over 0 dBFS -- the condition
+	// that produces the clipped sound, and the same 0 dB reference the
+	// other consoles/DAWs use.
 	// The 4-cell pitch separates
 	// the 3-digit volume numbers ("100 100" instead of "100100").
 	// TREEFROG_MIXER_STEREO_METERS_V1 (Bacon 1.1.1) + TREEFROG_MIXER_HALF_CELL_BARS_V2:
@@ -935,7 +936,8 @@ void MixerView::drawVolumeBar(int channel,int x,int y,int height) {
 	// columna anterior").  Each side shows its own post-pan peak, so the pan
 	// is visible in the bars themselves: center = both equal, hard left =
 	// left full / right empty.  Each side turns red on its own when it
-	// passes 0 dB into the +3 zone.  With the 0..127 volume scale (127 =
+	// passes 0 dB (BACON_1.5_VU_TOP0DB: 0 dBFS = the top of the bar).  With
+	// the 0..127 volume scale (127 =
 	// +2.1 dB) the fill can push past 0 dB and reach the red zone.  Side 0
 	// records L and paints the cell track; side 1 records R at the same x;
 	// the pixels are drawn by PostFlushDraw() after the char flush.
@@ -991,15 +993,15 @@ void MixerView::drawMasterBar(int x,int y,int height) {
 
 	// BACON_1.5_VU_DB_SCALE (U2.52.9, feedback #6):
 	// Master bars = mixVULevel(master peak) on the dB scale
-	// ((20*log10(p)+24)/27 over -24..+3 dBFS, see FxPages.h).  The peak
+	// ((20*log10(p)+24)/24 over -24..0 dBFS, see FxPages.h).  The peak
 	// already includes the master fader (applied pre-scan on the master
 	// bus, MixerService::SetMasterVolume), so the bar shows the real
 	// loudness: one track at volume 20 on a full-scale instrument reads
-	// ~37%, 0 dBFS reads 24/27.  It turns red (CD_ERROR) only when the
-	// fill reaches the 0 dBFS ceiling (the top +3 cell of the CUE
-	// scale), i.e. the pre-clip mix sum is really at/over 0 dBFS
-	// (MixerService::GetMasterPeak, true pre-clip mix sum, can exceed 1.0,
-	// which maps past the +3 dBFS top row).
+	// ~42%, 0 dBFS reads the full bar.  BACON_1.5_VU_TOP0DB (U2.59): it
+	// turns red (CD_ERROR) only when the fill reaches the 0 dBFS ceiling
+	// (the top cell, the clip lamp), i.e. the pre-clip mix sum is really
+	// at/over 0 dBFS (MixerService::GetMasterPeak, true pre-clip mix sum,
+	// can exceed 1.0, which reads as the full red top cell).
 	// Two bars are drawn (L at x, R at x+2, one-cell gap) so
 	// the stereo balance of the mix is visible live.
 	MixerService *ms=MixerService::GetInstance() ;
@@ -1076,9 +1078,11 @@ void MixerView::drawMeterBar(int x,int y,int height,float peak,int volume,
 // every frame: left bar px 0..2, dark seam px 3..4, right bar px 5..7.
 // TREEFROG_MIXER_COMPACT_BARS_V1 (Bacon 1.1.1 V13): M8-style compact meters:
 // each level is 3 px tall (2 px fill + 1 px gap), so a 12-cell bar renders
-// 32 fine steps instead of 12 chunky 8-px blocks.  The top 12.5% of the bar
-// is the 0 dB+ zone: it fills solid red when the level reaches it (instead
-// of the whole bar turning red at full scale).
+// 32 fine steps instead of 12 chunky 8-px blocks.  BACON_1.5_VU_TOP0DB
+// (U2.59): the TOP CELL of the bar is the 0 dBFS zone: it fills solid red
+// when the level reaches the full bar (a real pre-clip level at/over
+// 0 dBFS), the clip lamp -- 0 dBFS is now the top of the bar like other
+// consoles/DAWs.
 void MixerView::PostFlushDraw() {
 #if defined(PLATFORM_TREEFROG)
 	AppWindow *app=(AppWindow *)&w_ ;
@@ -1698,18 +1702,20 @@ void MixerView::drawFxPages() {
 	GUITextProperties props ;
 	SetColor(CD_NORMAL) ;
 	props.invert_=false ;
-	if (navigator_.Page()==FX_PAGE_MIX) {
+if (navigator_.Page()==FX_PAGE_MIX) {
 		// RC6 (compact single-cell meters) + TREEFROG_MIXER_ZERO_DB_CLIP_V5
 		// (Bacon 1.1.1): the MIX page lays out 10 columns: the static CUE
-		// scale (+3/0/-6/-12/-24/-36 dB, compact, right-aligned to the
-		// master), the MST live bar, the 8 channel bars one cell each 4
-		// columns apart.  The bank spans the CUE scale at x=0..1 .. the
-		// last channel at x=36.
+		// scale (0/-6/-12/-24 dB, compact, right-aligned to the master),
+		// the MST live bar, the 8 channel bars one cell each 4 columns
+		// apart.  The bank spans the CUE scale at x=0..1 .. the last
+		// channel at x=36.
 		// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): fullscreen DAW
 		// channel-strip layout.  Rows 0-3 keep the title/transport block
 		// (title + Song/Live at x=0/21, RET/FX RETURNS at row 1, and the
-		// clip/%/batt/time overlay at x=35..39); rows 27-29 keep the played
-		// notes + view map (drawNotes/drawMap, shared base-class overlays).
+		// clip/%/batt/time overlay at x=35..39); the played-notes boxes and
+		// the view map are REMOVED (feedback #10: "quitar los recuadros de
+		// notas y las letras SCPI PG M TT" -- drawNotes/drawMap calls are
+		// gone), so the strips extend to the bottom of the screen.
 		// The channel strips read top-down like a DAW: hex label at
 		// row 4, the 18-cell live bar at rows 7..24, the volume number
 		// BELOW the bar (row 25) and the pan/mute marker under it (row
@@ -1724,26 +1730,26 @@ void MixerView::drawFxPages() {
 		const int barY=labelY+2 ;   // bars start on the row below the labels
 		const int barHeight=18 ;    // bar cells = barY+1 .. barY+barHeight
 		const int retY=1 ;
-// BACON_1.5_VU_DB_SCALE (U2.52.9, feedback #6):
+// BACON_1.5_VU_TOP0DB (U2.59, feedback #12): 0 dBFS is the TOP of the bar
+// (the +3 dB headroom zone is REMOVED -- "si es necesario quitar +3DB se
+// quita"), so the meter reads 0 dB exactly when the level reaches 0 dBFS,
+// like the meters of other consoles/DAWs (SP404MKII, FL Studio): a
+// full-scale sample at volume 128 pins the bar at 0 dB.
 	// Static CUE scale drawn to the LEFT of the master, right-aligned to
 	// the master column so the marks sit as close to the bars as possible
 	// (compact 2-3 cell labels).  The bars are dB now (mixVULevel maps the
-	// true peak onto its dB position over -24..+3 dBFS, 1 dB per 1/27 of
+	// true peak onto its dB position over -24..0 dBFS, 1 dB per 1/24 of
 	// the bar, see FxPages.h), so each mark sits on its REAL dB row of the
-	// bar: "+3" is the top cell (the red zone = the CUE+3 lamp), "0" is
-	// the 0 dBFS reference, and -6/-12/-24 dB sit at their log positions
-	// (the linear fill with dB labels made the -6..0 zone look like a huge
-	// empty gap: 6 dB were 17% of the bar while the marks assumed the log
-	// scale).  The scale never moves with the volume; the bars move
-	// against this fixed reference.
+	// bar: "0" is the top cell (0 dBFS = full bar, red clip lamp), and
+	// -6/-12/-24 dB sit at their log positions.  The scale never moves
+	// with the volume; the bars move against this fixed reference.
 	SetColor(CD_NORMAL) ;
 	DrawString(masterX-3,labelY,"C",props) ;
 	SetColor(CD_ERROR) ;
-	DrawString(masterX-3,barY+1+0,"+3",props) ;
+	DrawString(masterX-3,barY+1+0,"0",props) ;
 	SetColor(CD_HILITE2) ;
-	DrawString(masterX-3,barY+1+2,"0",props) ;
+	DrawString(masterX-3,barY+1+4,"-6",props) ;
 	SetColor(CD_HILITE1) ;
-	DrawString(masterX-3,barY+1+6,"-6",props) ;
 	DrawString(masterX-4,barY+1+9,"-12",props) ;
 	DrawString(masterX-4,barY+1+17,"-24",props) ;
 		drawMasterBar(masterX,barY,barHeight) ;
@@ -1754,8 +1760,6 @@ void MixerView::drawFxPages() {
 	} else {
 		drawFxParamPage(navigator_.Page()) ;
 	}
-	drawNotes() ;
-	drawMap() ;
 }
 
 void MixerView::DrawView() {
@@ -1767,11 +1771,15 @@ void MixerView::DrawView() {
 	GUIPoint anchor=GetAnchor() ;
 
 	SetColor(CD_NORMAL) ;
-	// RC4 P3: "R+UP Song" navigation hint retired from the title row;
-	// documented in HelpRegistry (MIXER section, SELECT+R1).
-	DrawString(pos._x,pos._y,"Mixer",props) ;
-
+	// BACON_1.5_MIXER_NO_FRAME (U2.57b, feedback #10): the chopper frame is
+	// REMOVED -- the fullscreen strips keep the DAW look without the thick
+	// border ("el recuadro es demasiado ancho y de un color no correcto,
+	// quitemos el recuadro pero mantengamos el aspecto full screen").  The
+	// played-notes boxes (drawNotes) and the P G/SCPI/M TT map (drawMap)
+	// stay removed (feedback #10): the strips own rows 4..26 of the whole
+	// width.
 	Player *player=Player::GetInstance() ;
+	DrawString(pos._x,pos._y,"Mixer",props) ;
 	DrawString(21,pos._y,(player->GetSequencerMode()==SM_SONG)?"Song":"Live",props) ;
 
 	drawFxPages() ;
@@ -1797,9 +1805,9 @@ void MixerView::OnPlayerUpdate(PlayerEventType ,unsigned int tick) {
 	GUITextProperties props ;
 	SetColor(CD_NORMAL) ;
 	// BACON_1.5_MIXER_FULLSCREEN (U2.53, feedback #7): the transport readout
-	// (clip / % / batt / time) moves to the far right edge (x=35..39, rows
-	// 0..3) so it no longer collides with the RET line (row 1) and the
-	// channel strips (labels at rows 4-5).
+	// (clip / % / batt / time) sits on the far right edge (x=35..39, rows
+	// 0..3) so it never collides with the RET line (row 1) or the channel
+	// strips (labels at rows 4-5).
 	GUIPoint pos(35,0) ;
 	
 	if (player->Clipped()) {
@@ -1836,8 +1844,6 @@ void MixerView::OnPlayerUpdate(PlayerEventType ,unsigned int tick) {
 	sprintf(strbuffer,"%2.2d:%2.2d",mi,se) ; 
 	pos._y+=1 ;	
 	DrawString(pos._x,pos._y,strbuffer,props) ;
-
-    drawNotes() ;
 
 } ;
 

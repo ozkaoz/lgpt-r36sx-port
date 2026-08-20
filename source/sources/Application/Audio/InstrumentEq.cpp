@@ -5,13 +5,38 @@
 
 static const float kMinGainDb = -24.0f;
 static const float kMaxGainDb = 24.0f;
-// BACON_1.5_EQ8_BLOCKLIMIT (U2.53, feedback #7): per-block soft limiter
-// ceiling = 2.0 linear (65535 Q15 = just under i2fp(2)).  65535 is the max
-// value that survives the sample path's <<15 restore into the int16<<15
-// buffer (65535<<15 = 2147450880 < INT32_MAX, 65536<<15 would overflow).
-// The int32 sample pipeline wraps at +/-2.0 (see AudioMixer::Render), so
-// 2.0 is the absolute headroom of the chain.
-static const int kBlockLimit = (1 << 15) * 2 - 1;
+// BACON_1.5_EQ8_SOFTKNEE (U2.59, feedback #12): per-sample soft knee that
+// mirrors the master safety limiter (AudioMixer::Render, BACON_1.5_MASTER_
+// SAFETY U2.56) but caps at UNITY instead of 1.0-at-the-master:
+//   - |x| <= 0.85          -> passes untouched (the master's transparent
+//     region, so a normal edit changes nothing);
+//   - 0.85 < |x| <= 1.7    -> mapped onto (0.85 .. 1.0];
+//   - |x| > 1.7            -> clamped to 1.0 (i2fp(1)-1, the same ceiling
+//     the synths clamp to, and a full-scale sample's exact level).
+// The old per-block limiter (BACON_1.5_EQ8_BLOCKLIMIT U2.53) scaled a hot
+// block down to 2.0, so ONE instrument could still push the master bus
+// past its 1.7 flat ceiling -- the saved lgpt_KAOZ kick (BELL +11 dB @
+// 2500 Hz, Q 1.0) did exactly that and the whole mix crushed to a square
+// wave ("aplicar esa EQ en el kick genera distorsion").  With the knee
+// capped at unity an instrument can never exceed full scale on its own,
+// so the master stays in its transparent region no matter what the EQ
+// does; the 64-bit map handles the full int32 input range (+-2.0).
+// BACON_1.5_EQ8_SOFTKNEE_C1 (U2.60, feedback #12): the first soft knee was
+// piecewise-LINEAR and its slope JUMPED at 0.85 (1.0 -> 0.176): every
+// crest riding the knee got a kink that created "solapa"/click harmonics
+// (a boosted kick, or the bass now boosted to ~0.9, both ride it).  The
+// map is now a C1 RATIONAL: it joins the transparent region with slope 1
+// at 0.85, climbs monotonically, and lands on the unity ceiling with
+// slope 0 at 1.7 -- no slope discontinuity anywhere, so a loud crest is
+// compressed smoothly and creates no new high-frequency content.
+//   f(u) = (u + A*u^2) / (1 + B*u),  u = |x| - 0.85
+//   f(0) = 0, f'(0) = 1 (C1 at the knee), f(T) = C, f'(T) = 0 (smooth
+//   landing on unity), T = 1.7-0.85, C = 1.0-0.85.
+static const int kKneeQ15 = (int)(0.85f * 32768.0f);  // 27852
+static const int kTopQ15 = (int)(1.7f * 32768.0f);    // 55705
+static const int kUnityQ15 = (1 << 15) - 1;           // 32767
+static const int kKneeAQ32 = -27212171;               // A in Q32
+static const int kKneeBQ32 = 565359;                  // B in Q32
 // BACON_1.5_EQ8_STRUCTURAL: exponential coefficient smoothing step.
 // cur += (tgt - cur) >> kSmoothShift per frame -> -3 dB point after
 // kSmoothShift frames (~1.3 ms @ 48 kHz with shift 6), within 1 LSB after
@@ -230,22 +255,21 @@ void InstrumentEq::recomputeBand(int band) {
     }
 }
 
-// BACON_1.5_EQ8_BLOCKLIMIT (U2.53, feedback #7): see the kBlockLimit
-// comment above; the old per-sample saturate at +/-1.0 was removed.
-// Process() applies the limiter inline at the end of the block.
-
+// BACON_1.5_EQ8_SOFTKNEE (U2.59, feedback #12): see the constants above;
+// the old per-block scale-to-2.0 limiter is gone.  The knee runs inline
+// per sample (64-bit), after the band loop.
 void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
     if (frames <= 0 || !buffer) { rtViolations_++; return; }
     if (flat_) return;  // zero cost
     if (channel < 0 || channel >= kMaxChannels) { rtViolations_++; return; }
 
-    // BACON_1.5_EQ8_BLOCKLIMIT (U2.53, feedback #7): the per-block soft
-    // limiter ceiling.  The int32 sample pipeline wraps at +/-2.0 when two
-    // full-scale signals meet (the master sum now accumulates in 64 bits,
-    // AudioMixer::Render), so 2.0 is the absolute headroom of the chain and
-    // this limiter is the last line of defense for the instrument EQ path.
+    // BACON_1.5_EQ8_SOFTKNEE (U2.59, feedback #12): the old block limiter
+    // note is gone.  The int32 sample pipeline wraps at +/-2.0 when two
+    // full-scale signals meet (the master sum accumulates in 64 bits,
+    // AudioMixer::Render), but this knee caps the instrument at UNITY
+    // before it ever reaches the bus, so the master safety never engages
+    // on account of one instrument's EQ.
     int idx = 0;
-    int maxAbs = 0;
     for (int i = 0; i < frames; i++) {
         // BACON_1.5_EQ8_STRUCTURAL: per-frame exponential coefficient blend
         // (only while a band is converging).
@@ -302,29 +326,53 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
             xL = tL;
             xR = tR;
         }
+        // BACON_1.5_EQ8_SOFTKNEE_C1: per-sample soft knee (linked L/R is
+        // unnecessary: each channel maps independently, same curve).  The
+        // map is monotonic, C1-smooth and 64-bit; boosts can push x past
+        // +/-2^30 and the master-scale restore <<15 must never see a value
+        // over i2fp(1)-1 (32767 Q15), which this guarantees.
+        // f(u) = (u + A*u^2) / (1 + B*u) with A in Q32, B in Q32:
+        //   n = u - ((Aq32*u^2) >> 32),  d = (1<<32) + Bq32*u,
+        //   f = (n << 32) / d.
+        {
+            int aL = (xL < 0) ? -xL : xL;
+            int aR = (xR < 0) ? -xR : xR;
+            if (aL > kKneeQ15) {
+                int v;
+                if (aL >= kTopQ15) {
+                    v = kUnityQ15;
+                } else {
+                    int u = aL - kKneeQ15;
+                    long long u2 = (long long)u * u;
+                    long long n = u - ((kKneeAQ32 * u2) >> 32);
+                    long long d = (1LL << 32) + (long long)kKneeBQ32 * u;
+                    long long f = (n << 32) / d;
+                    v = kKneeQ15 + (int)f;
+                    if (v > kUnityQ15) v = kUnityQ15;
+                    if (v < kKneeQ15) v = kKneeQ15;
+                }
+                xL = (xL < 0) ? -v : v;
+            }
+            if (aR > kKneeQ15) {
+                int v;
+                if (aR >= kTopQ15) {
+                    v = kUnityQ15;
+                } else {
+                    int u = aR - kKneeQ15;
+                    long long u2 = (long long)u * u;
+                    long long n = u - ((kKneeAQ32 * u2) >> 32);
+                    long long d = (1LL << 32) + (long long)kKneeBQ32 * u;
+                    long long f = (n << 32) / d;
+                    v = kKneeQ15 + (int)f;
+                    if (v > kUnityQ15) v = kUnityQ15;
+                    if (v < kKneeQ15) v = kKneeQ15;
+                }
+                xR = (xR < 0) ? -v : v;
+            }
+        }
         buffer[idx] = xL;
         buffer[idx + 1] = xR;
-        int aL = (xL < 0) ? -xL : xL;
-        int aR = (xR < 0) ? -xR : xR;
-        if (aL > maxAbs) maxAbs = aL;
-        if (aR > maxAbs) maxAbs = aR;
         idx += 2;
-    }
-
-    if (maxAbs > kBlockLimit) {
-        // BACON_1.5_EQ8_BLOCKLIMIT (U2.53, feedback #7): hot block -> scale
-        // the WHOLE block down so its peak lands exactly on 2.0 (65535 Q15).
-        // Linked L/R keeps the stereo balance; the wave shape is preserved
-        // (no flat-topping).  Only runs while the block is over the ceiling,
-        // and the 64-bit division handles the full int32 input range.
-        idx = 0;
-        for (int i = 0; i < frames; i++) {
-            fixed vL = buffer[idx];
-            fixed vR = buffer[idx + 1];
-            buffer[idx] = (fixed)(((long long)vL * kBlockLimit) / maxAbs);
-            buffer[idx + 1] = (fixed)(((long long)vR * kBlockLimit) / maxAbs);
-            idx += 2;
-        }
     }
 }
 

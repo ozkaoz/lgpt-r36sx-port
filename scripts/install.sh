@@ -69,6 +69,21 @@ printf 'STEREO_48K\n' > "$SD/lgpt/otg/audio_usb_profile"
 : > "$SD/lgpt/otg/enable_lgpt_uac2_bridge"
 printf 'LOCAL_CONSOLE\n' > "$SD/lgpt/otg/audio_driver_mode"
 rm -f "$SD/lgpt/otg/lowlat_240" "$SD/lgpt/otg/disable_mute_local" "$SD/lgpt/otg/mute_local_during_otg"
+# BACON_1.5_CONFIG_THEME (U2.58, feedback #11 "sigue viendose rosado"): the
+# SD carried lgpt/config.xml with the STOCK magenta palette (BORDER FF008C,
+# HICOLOR2 DB33DB, ROWCOLOR2 FF00FF) which overrides the in-code theme via
+# defineColor() -- the whole port rendered pink.  The release config.xml
+# (sd_root/lgpt/config.xml) is the classic blue-violet theme of Bacon-1.4;
+# config.stock.xml stays installed as the launcher's fallback template
+# (lgpt_launcher_u241.sh fails with code 21 when BOTH are missing).
+install -m 0644 "$ROOT/sd_root/lgpt/config.stock.xml" "$SD/lgpt/config.stock.xml"
+if [[ ! -f "$SD/lgpt/config.xml" ]]; then
+  install -m 0644 "$ROOT/sd_root/lgpt/config.xml" "$SD/lgpt/config.xml"
+elif grep -q 'FF008C' "$SD/lgpt/config.xml"; then
+  cp -f "$SD/lgpt/config.xml" "$BACKUP/config.xml.pink.previous"
+  install -m 0644 "$ROOT/sd_root/lgpt/config.xml" "$SD/lgpt/config.xml"
+  echo "CONFIG_PINK_REPAIRED"
+fi
 cat > "$SD/LGPT_OTG_LOGS/INSTALL_STATE_U2523.txt" <<EOF
 Installed: $(date -Is)
 Version: U2.52.3

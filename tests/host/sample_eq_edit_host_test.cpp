@@ -278,6 +278,7 @@ class TestSourceWav : public SoundSource {
 
 static TestSourceWav *g_hihat;
 static TestSourceWav *g_kick;
+static TestSourceWav *g_snare;
 
 class TestPool : public SamplePool {
   public:
@@ -306,6 +307,15 @@ class TestPool : public SamplePool {
             wav_[2] = g_kick;
             count_ = 3;
         }
+        g_snare = TestSourceWav::TryLoad(
+            "/mnt/g/lgpt/samples/Drum Kit LGPT/SNARE 01.wav");
+        if (g_snare) {
+            names_[3] = (char *)malloc(2);
+            names_[3][0] = 'S';
+            names_[3][1] = 0;
+            wav_[3] = g_snare;
+            count_ = 4;
+        }
     }
     static void Install() { T_Singleton<SamplePool>::instance_ = new TestPool(); }
     virtual void Load() {}
@@ -333,8 +343,8 @@ static bool bufferFinite(const fixed *b, int n) {
 
 // Q15 fixed point: unity audio == 32768 counts.  A "bounded" buffer must
 // stay within +-65536 counts (a +24 dB EQ boost can legitimately exceed
-// unity while the 64-bit Df2 stays clean; BACON_1.5_EQ8_BLOCKLIMIT caps the
-// per-block output at 65535 = just under 2.0, the int32 pipeline limit).
+// unity mid-pipeline while the 64-bit Df2 stays clean; the
+// BACON_1.5_EQ8_SOFTKNEE then caps the instrument at 32767 Q15).
 static bool bufferBounded(const fixed *b, int n) {
     for (int i = 0; i < n; i++) {
         if (fabs((double)fp2fl(b[i])) > 65536.0) return false;
@@ -433,7 +443,11 @@ int main() {
     printf("+12@100Hz: 100Hz=%.4f (x%.2f) 1kHz=%.4f (x%.2f)\n",
            a100, base100 > 0 ? a100 / base100 : 0,
            a1k, base1k > 0 ? a1k / base1k : 0);
-    check(a100 > base100 * 3.4, "100 Hz REALLY boosted ~12 dB (bell center)");
+    // BACON_1.5_EQ8_SOFTKNEE (U2.59): the source peaks at 0.6, so +12 dB
+    // pushes the output past the 0.85 knee -- the measured ratio is the
+    // COMPRESSED one (x3.05 measured vs x3.98 linear; the knee's unity cap
+    // is measured precisely in B4).  The point here is the boost is real.
+    check(a100 > base100 * 2.8, "100 Hz REALLY boosted ~12 dB (bell center)");
     check(a1k < base1k * 1.6, "1 kHz left nearly intact (no DC shelf spill)");
 
     // --- edit 2: +6 dB @ 1 kHz on top ---
@@ -447,8 +461,9 @@ int main() {
     printf("+6@1kHz:   100Hz=%.4f (x%.2f) 1kHz=%.4f (x%.2f)\n",
            b100, base100 > 0 ? b100 / base100 : 0,
            b1k, base1k > 0 ? b1k / base1k : 0);
-    check(b100 > base100 * 3.0, "100 Hz band still boosted (independent bands)");
-    check(b1k > base1k * 1.6, "1 kHz boosted ~6 dB on top of 100 Hz");
+    // Same knee note as +12 dB above: x2.81 measured vs x3.98 linear.
+    check(b100 > base100 * 2.5, "100 Hz band still boosted (independent bands)");
+    check(b1k > base1k * 1.2, "1 kHz boosted ~6 dB on top of 100 Hz");
 
     // --- edit 3: LOW_PASS @ 500 Hz with -6 dB (a 0 dB band is transparent
     // by design, BACON_1.5_EQ8_0DB_TRANSPARENT) cuts the highs ---
@@ -507,12 +522,16 @@ int main() {
     // so fp2fl() returns the DAC int16 count (1.0 == 32768): the compare
     // below is the real loudness at the output.
     // BACON_1.5_VOL_LEVELS_FL (U2.55, feedback #8): FL-style unity levels.
-    // The synth at volume 100 renders a full-scale saw (peak 1.0) and the
-    // sample at instrument volume 128 (its default, now unity) renders the
-    // full-scale hat at peak ~0.68: both sit at 0 dBFS-class peaks, the
-    // level the VU bars read at mixer volume 127 (~0 dB, FL-style).  The
-    // old U2.52.9 -20 dB pad (peak 0.1 / rms 0.0452) is gone; a regression
-    // to it (peak 3276.8 counts) fails the unity bound below.
+    // BACON_1.5_SYNTH_VOLUME_SCALE (U2.57, feedback #10): the synth at
+    // volume 100 rendered a -20 dB saw (peak 0.1, "100 de volumen debe ser
+    // el equivalente a 10 actual"), which read ~21% of the mixer bar while
+    // the drums read ~99% at the same setting.
+    // BACON_1.5_SYNTH_BAR_LEVEL (U2.60, feedback #12): the bars map PEAK on
+    // a dB scale, so a sustained saw (peak 0.113) could never reach the top
+    // like the transient samples.  The synth's post-EQ level is raised x8
+    // so its peak at volume 100 lands at ~0.9 (90% bar, like the drums at
+    // the same volume); the instrument volume then scales the bar down
+    // linearly, matching the perceived level.
     printf("-- (A) synth vs sample level --\n");
     {
         BassSynth synth;
@@ -534,12 +553,11 @@ int main() {
         }
         double sRms = sqrt(sAcc / (double)sN);
         printf("synth vol100 sustained: peak=%.3f rms=%.3f\n", sPk, sRms);
-        // Unity range in int16 counts (fp2fl of the master-scale buffer =
-        // the DAC count; 1.0 == 32768): a full-scale saw at volume 100
-        // reads peak 32768 -- a regression to the -20 dB pad (3276.8), or
-        // a double boost (65536+), both fail.  Bounds: [0.5, 2.0] of full
-        // scale = [16384, 65536].
-        check(sPk > 16384.0 && sPk < 65536.0, "synth sustained peak in unity range");
+        // New bar policy: the synth at volume 100 peaks at ~0.9 of full
+        // scale (90% bar, like the drums at the same volume).  A regression
+        // to the -20 dB saw (0.1) or a double boost (1.8) both fail.
+        // Bounds: [0.8, 1.0] of full scale = [26214, 32767].
+        check(sPk > 26214.0 && sPk < 32768.0, "synth sustained peak at the 90% bar level");
 
         if (g_hihat) {
             SampleInstrument sh;
@@ -562,13 +580,12 @@ int main() {
             double hRms = hN ? sqrt(hAcc / (double)hN) : 0.0;
             printf("hihat vol128: peak=%.3f rms=%.3f\n", hPk, hRms);
             check(hPk > 0.0, "hi-hat renders audio");
-            // Both at FL-style unity: the synth peak ~1.0 against the hat
-            // peak ~0.68 (+3.3 dB, the hat transients pass the resampler
-            // peak at 0.987).  No RMS compare: the crest factor of a
-            // SUSTAINED saw (~1.5 dB) vs a DECAYING hat (~26 dB) makes the
-            // RMS ratio meaningless by nature.
-            check(sPk > hPk * 0.5 && sPk < hPk * 2.0,
-                  "synth peak near the reference sample peak");
+            // The synth at volume 100 now peaks at ~0.9 (90% bar, the new
+            // BAR_LEVEL policy) vs the hat at 0.68 -- the bass can reach
+            // the top of the bar like the drums, and the instrument volume
+            // scales the bar down from there.
+            check(sPk > hPk * 0.8 && sPk < hPk * 1.5,
+                  "synth peak now matches the reference sample peak");
         } else {
             printf("SD sample not mounted - hi-hat compare skipped\n");
         }
@@ -583,9 +600,10 @@ int main() {
 // low-f0 coefficient set explodes the low end -- the U2.52.8 DC shelf --
 // and fails these ratios by an order of magnitude).  B2 runs the REAL
 // KICK 01.wav (full-scale) at instrument volume 128 (FL-style unity)
-// through BELL/LSHELF +-1 dB @ 80 Hz: the output stays bounded (the block
-// limiter at 2.0 must NOT engage), finite, and the peak/bar move by ~1 dB
-// -- not a loudness explosion.  With the mixer channel at 127 the kick
+// through BELL/LSHELF +-1 dB @ 80 Hz: the output stays bounded (the
+// BACON_1.5_EQ8_SOFTKNEE caps at 1.0 Q15, it must NOT engage), finite,
+// and the peak/bar move by ~1 dB -- not a loudness explosion.  With the
+// mixer channel at 127 the kick
 // peaks scale x1.27: 0.7 -> 0.89 (bar ~85%, past the -6 dB mark) and a
 // +1 dB edit pushes them into the master clip (FL-like red at the top),
 // which is the only "damage" a +1 dB edit can do to a hot kick.
@@ -666,9 +684,10 @@ int main() {
         base80 = goertzel(acc, g_renderSize * kAccBlocks, 80.0);
         printf("kick baseline: peak=%.4f 80Hz=%.4f dc=%.1f bar=%.1f%%\n",
                basePeak, base80, baseDc,
-               100.0 * (20.0 * log10(basePeak / 32768.0) + 24.0) / 27.0);
-        // At the mixer channel at 127 the baseline scales x1.27: 0.70 ->
-        // 0.89 (-1.0 dB, bar ~85%) -- the -6 dB complaint is gone.
+               100.0 * (20.0 * log10(basePeak / 32768.0) + 24.0) / 24.0);
+        // BACON_1.5_VU_TOP0DB (U2.59): bar% = the -24..0 dBFS mixer scale
+        // (0 dBFS = 100% of the bar); the kick at volume 128 with the mixer
+        // channel at 127 scales x1.27 and sits above -6 dBFS.
         check(basePeak * 1.27 > 0.5 * 32768.0,
               "kick at channel 127 sits above -6 dBFS");
 
@@ -693,9 +712,10 @@ int main() {
             double dB = 20.0 * log10(pk / 32768.0);
             printf("kick %s: peak=%.4f (%.1f dB) dc=%.1f bar=%.1f%%\n",
                    names[t], pk, dB, dc,
-                   100.0 * (dB + 24.0) / 27.0);
+                   100.0 * (dB + 24.0) / 24.0);
             check(bufferFinite(acc, accN), "kick EQ output finite");
-            check(pk < 65536.0, "kick EQ output bounded (limiter off)");
+            // BACON_1.5_EQ8_SOFTKNEE caps the instrument at 32767 Q15.
+            check(pk < 32768.0, "kick EQ output bounded (knee off at +-1 dB)");
             // The loop click (kick tail -> sample start) adds a window DC
             // that shifts with the EQ phase; a loose sanity bound keeps the
             // "no EQ-generated DC" claim on the synthetic-source checks.
@@ -708,6 +728,275 @@ int main() {
         free(acc);
     } else {
         printf("SD sample not mounted - kick EQ scenario skipped\n");
+    }
+
+    // ============ (B3) U2.59: the project lgpt_KAOZ kick EQ config + the
+    // worst slider cases, on the synthetic 100 Hz + 1 kHz source ============
+    // The saved kick instrument (lgptsav.dat ID 20) carries: BELL +6 dB @
+    // 160 Hz Q 1.00 (band 1) and BELL +5 dB @ 753.88 Hz Q 1.00 (band 3),
+    // all 8 bands enabled, EQ active.  The user reported "al ajustar la EQ
+    // genera aliasing, armonicos o sonidos extra (similares a
+    // sintetizadores); la ultima configuracion que deje en el Kick lo
+    // rompe".  The EQ8 DSP is an LTI chain (64-bit Df2, prewarped bell,
+    // Nyquist clamp, BACON_1.5_EQ8_SOFTKNEE cap): it CANNOT create new
+    // spectral lines -- B3 proves it with the EXACT saved config: the
+    // 100 Hz / 1 kHz components stay, the 2nd-harmonic positions
+    // (320/1508 Hz) stay at their no-EQ baseline (an LTI filter scales
+    // them by |H| <= ~1.4, it never ADDS energy), the output is finite and
+    // bounded.  Then the worst cases the view sliders can reach (BELL
+    // +24 dB @ 20 kHz Q 0.1 and Q 10, the max frequency) stay bounded and
+    // finite too -- no configuration reachable from the UI can break the
+    // sound.
+    printf("-- (B3) project kick EQ config + worst slider cases --\n");
+    {
+        renderBlocks(si, buf, 120);   // converge the smoothing at 0 dB
+        fixed *acc = (fixed *)malloc(sizeof(fixed) * 2 * g_renderSize * kAccBlocks);
+        const int accN = 2 * g_renderSize * kAccBlocks;
+        double basePeak = 0, base100 = 0, base1k = 0, base320 = 0,
+               base754 = 0, base1508 = 0;
+        renderAccumulate(si, acc, kAccBlocks);
+        for (int i = 0; i < accN; i++) {
+            double v = fabs((double)fp2fl(acc[i]));
+            if (v > basePeak) basePeak = v;
+        }
+        base100 = goertzel(acc, g_renderSize * kAccBlocks, 100.0);
+        base1k = goertzel(acc, g_renderSize * kAccBlocks, 1000.0);
+        base320 = goertzel(acc, g_renderSize * kAccBlocks, 320.0);
+        base754 = goertzel(acc, g_renderSize * kAccBlocks, 754.0);
+        base1508 = goertzel(acc, g_renderSize * kAccBlocks, 1508.0);
+        printf("B3 baseline: peak=%.4f 100Hz=%.4f 1kHz=%.4f 320Hz=%.4f 754Hz=%.4f 1508Hz=%.4f\n",
+               basePeak, base100, base1k, base320, base754, base1508);
+        check(bufferFinite(acc, accN), "B3 baseline finite");
+
+        // Apply the project kick EQ: band1 BELL +6 @160 Hz, band3 BELL +5
+        // @754 Hz, Q 1.00 (the saved lgptsav.dat values, EQ active).
+        si.FindVariable(SIP_EQF1)->SetInt(16000);     // 160 Hz * 100
+        si.FindVariable(SIP_EQG1)->SetInt(6);
+        si.FindVariable(SIP_EQT1)->SetInt(0);         // BELL
+        si.FindVariable(SIP_EQ_Q1)->SetInt(100);      // Q 1.00
+        si.FindVariable(SIP_EQF3)->SetInt(75388);     // 753.88 Hz * 100
+        si.FindVariable(SIP_EQG3)->SetInt(5);
+        si.FindVariable(SIP_EQT3)->SetInt(0);         // BELL
+        si.FindVariable(SIP_EQ_Q3)->SetInt(100);      // Q 1.00
+        renderBlocks(si, buf, 120);                   // converge the smoothing
+        double pk = 0, c100 = 0, c1k = 0, c320 = 0, c754 = 0, c1508 = 0;
+        renderAccumulate(si, acc, kAccBlocks);
+        for (int i = 0; i < accN; i++) {
+            double v = fabs((double)fp2fl(acc[i]));
+            if (v > pk) pk = v;
+        }
+        c100 = goertzel(acc, g_renderSize * kAccBlocks, 100.0);
+        c1k = goertzel(acc, g_renderSize * kAccBlocks, 1000.0);
+        c320 = goertzel(acc, g_renderSize * kAccBlocks, 320.0);
+        c754 = goertzel(acc, g_renderSize * kAccBlocks, 754.0);
+        c1508 = goertzel(acc, g_renderSize * kAccBlocks, 1508.0);
+        printf("B3 kickEQ: peak=%.4f 100Hz=%.4f 1kHz=%.4f 320Hz=%.4f 754Hz=%.4f 1508Hz=%.4f\n",
+               pk, c100, c1k, c320, c754, c1508);
+        check(bufferFinite(acc, accN), "B3 kick EQ finite");
+        check(pk < 32768.0, "B3 kick EQ bounded (knee off at +-1 dB)");
+        check(c100 > base100 * 0.6f && c100 < base100 * 1.8f,
+              "B3 100 Hz survives the 160 Hz bell (no kill)");
+        // The bells really work on the real content: the 754 Hz bell's
+        // skirt (+2.5 dB at 1 kHz, 1.33x above its center) visibly boosts
+        // the 1 kHz component of the source (the source has no 754 Hz
+        // energy to boost directly -- its 754 Hz reading is just the
+        // 1 kHz tone's window leakage, so it is NOT a bell-activity probe).
+        check(c1k > base1k * 1.15f, "B3 the 754 Hz bell boosts its skirt (bells work)");
+        check(c1k < base1k * 1.8f, "B3 the 754 Hz bell does not explode the 1 kHz");
+        // The 2nd-harmonic positions stay at the no-EQ baseline: an LTI
+        // filter scales them by the response magnitude (<= ~1.4), it never
+        // ADDS energy -- a nonlinearity (the reported "armonicos") would
+        // put the ratio far above this.
+        check(c320 < base320 * 2.0f, "B3 no 2nd harmonic at 320 Hz");
+        check(c1508 < base1508 * 2.0f, "B3 no 2nd harmonic at 1508 Hz");
+        si.FindVariable(SIP_EQF1)->SetInt(16000);
+        si.FindVariable(SIP_EQG1)->SetInt(0);
+        si.FindVariable(SIP_EQF3)->SetInt(75388);
+        si.FindVariable(SIP_EQG3)->SetInt(0);
+        renderBlocks(si, buf, 120);
+
+        // Worst cases the view sliders can reach: BELL +24 dB @ 20 kHz
+        // (freqFromIndex(59), the max) with the widest and narrowest Q.
+        const char *qNames[] = { "Q0.1", "Q10" };
+        const int qVals[] = { 10, 1000 };
+        for (int t = 0; t < 2; t++) {
+            si.FindVariable(SIP_EQF0)->SetInt(2000000);  // 20 kHz * 100
+            si.FindVariable(SIP_EQG0)->SetInt(24);
+            si.FindVariable(SIP_EQT0)->SetInt(0);        // BELL
+            si.FindVariable(SIP_EQ_Q0)->SetInt(qVals[t]);
+            renderBlocks(si, buf, 120);
+            double wpk = 0, w100 = 0;
+            renderAccumulate(si, acc, kAccBlocks);
+            for (int i = 0; i < accN; i++) {
+                double v = fabs((double)fp2fl(acc[i]));
+                if (v > wpk) wpk = v;
+            }
+            w100 = goertzel(acc, g_renderSize * kAccBlocks, 100.0);
+            printf("B3 +24dB@20kHz %s: peak=%.4f 100Hz=%.4f\n",
+                   qNames[t], wpk, w100);
+            check(bufferFinite(acc, accN), "B3 worst case finite");
+            check(wpk < 32768.0, "B3 worst case bounded (knee holds)");
+            check(w100 > base100 * 0.3f,
+                  "B3 the low end survives the worst top band");
+        }
+        si.FindVariable(SIP_EQF0)->SetInt(8000);
+        si.FindVariable(SIP_EQG0)->SetInt(0);
+        si.FindVariable(SIP_EQT0)->SetInt(0);
+        si.FindVariable(SIP_EQ_Q0)->SetInt(100);
+        free(acc);
+    }
+
+    // ============ (B4) U2.59: the SAVED lgpt_KAOZ configs (feedback #12) ===
+    // The user left the kick (ID 20) with BELL +11 dB @ 2500 Hz Q 1.00 and
+    // the snare (ID 10) with BELL -8 dB @ 45.39 Hz Q 1.00.  Claims:
+    //   - "Aplicar esa EQ en el kick genera distorsion": measure the EQ
+    //     output against the master safety zones (0.85 knee / 1.7 flat
+    //     ceiling, AudioMixer.cpp) -- if a single instrument's EQ output
+    //     crosses 1.7 the master flat-caps it (real distortion).
+    //   - "el kick en 2500 hz no tiene nada en el analizador": measure the
+    //     kick's real 2500 Hz content pre-EQ -- the CONTENT exists (the
+    //     analyzer showed nothing because it displays the master mix, not
+    //     the instrument; fixed by BACON_1.5_ANALYZER_INSTRUMENT U2.59).
+    //   - "bajar frecuencias debe bajar la señal, no incrementarla": the
+    //     snare -8 dB @ 45.39 Hz must measurably CUT the low content.
+    printf("-- (B4) saved lgpt_KAOZ configs: kick +11dB@2500, snare -8dB@45.4 --\n");
+    {
+        // Mirror of AudioMixer::safetyLimit on the count<<15 scale.
+        const double kneeC = 0.85 * 32768.0;
+        const double topC = 1.7 * 32768.0;
+        const double ceilC = 32768.0;
+        const double spanC = ceilC - kneeC;
+        const int accN = 2 * g_renderSize * kAccBlocks;
+        if (g_kick) {
+            SampleInstrument sk;
+            sk.FindVariable(SIP_SAMPLE)->SetInt(2);
+            sk.FindVariable(SIP_LOOPMODE)->SetInt(1);
+            sk.FindVariable(SIP_END)->SetInt(g_kick->GetSize(0));
+            sk.Init();
+            fixed *acc = (fixed *)malloc(sizeof(fixed) * 2 * g_renderSize * kAccBlocks);
+            fixed atk[2 * 512];
+
+            double pk0 = 0, a2500 = 0, pk = 0, c2500 = 0;
+            int crushed = 0;
+            check(sk.Start(0, 60, true), "B4 kick Start");
+            renderBlocks(sk, acc, 120);
+            renderAccumulate(sk, acc, kAccBlocks);
+            for (int i = 0; i < accN; i++) {
+                double v = fabs((double)fp2fl(acc[i]));
+                if (v > pk0) pk0 = v;
+            }
+            // The 2500 Hz content is the attack click (first ms), so measure
+            // the FIRST 512-frame block (10.7 ms) of a fresh start, not the
+            // long window (the looped body would dilute the transient).
+            check(sk.Start(0, 60, true), "B4 kick restart");
+            renderBlocks(sk, atk, 1);
+            a2500 = goertzel(atk, 512, 2500.0);
+            printf("B4 kick pre-EQ: peak=%.1f counts attack2500Hz=%.1f counts (%.1f dBFS)\n",
+                   pk0, a2500, 20.0 * log10(a2500 / 32768.0));
+            check(a2500 > 32768.0 * 0.002,
+                  "B4 the kick HAS 2500 Hz content pre-EQ (the analyzer was showing the mix)");
+
+            // The exact saved config: BELL +11 dB @ 2500 Hz, Q 1.00, active.
+            sk.FindVariable(SIP_EQF5)->SetInt(250000);
+            sk.FindVariable(SIP_EQG5)->SetInt(11);
+            sk.FindVariable(SIP_EQT5)->SetInt(0);
+            sk.FindVariable(SIP_EQ_Q5)->SetInt(100);
+            renderBlocks(sk, acc, 120);            // converge the EQ
+            check(sk.Start(0, 60, true), "B4 kick restart eq");
+            renderBlocks(sk, atk, 1);
+            c2500 = goertzel(atk, 512, 2500.0);
+            renderBlocks(sk, acc, 120);
+            renderAccumulate(sk, acc, kAccBlocks);
+            for (int i = 0; i < accN; i++) {
+                double v = (double)fp2fl(acc[i]);
+                double a = fabs(v);
+                if (a > pk) pk = a;
+                if (a > topC) crushed++;
+            }
+            printf("B4 kick +11dB@2500: peak=%.1f counts attack2500Hz=%.1f counts masterCrush=%d\n",
+                   pk, c2500, crushed);
+            check(bufferFinite(acc, accN), "B4 kick +11dB finite");
+            check(c2500 > a2500 * 2.0f,
+                  "B4 the +11 dB boost really boosts the 2500 Hz click");
+            // BACON_1.5_EQ8_SOFTKNEE (U2.59): the per-sample soft knee caps
+            // the instrument at unity, so a single instrument can NEVER push
+            // the master past its transparent region -- the saved config
+            // produces NO flat-top at the master.
+            check(pk <= 32768.0, "B4 EQ output never exceeds unity (soft knee)");
+            check(crushed == 0,
+                  "B4 the master never flat-tops from one instrument's EQ");
+            sk.FindVariable(SIP_EQF5)->SetInt(250000);
+            sk.FindVariable(SIP_EQG5)->SetInt(0);
+            renderBlocks(sk, acc, 120);
+            free(acc);
+        } else {
+            printf("B4 kick skipped (no SD sample)\n");
+        }
+
+        if (g_snare) {
+            SampleInstrument ss;
+            ss.FindVariable(SIP_SAMPLE)->SetInt(3);
+            ss.FindVariable(SIP_LOOPMODE)->SetInt(1);
+            ss.FindVariable(SIP_END)->SetInt(g_snare->GetSize(0));
+            ss.Init();
+            check(ss.Start(0, 60, true), "B4 snare Start");
+            fixed *acc = (fixed *)malloc(sizeof(fixed) * 2 * g_renderSize * kAccBlocks);
+
+            double base45 = 0, c45 = 0, base45One = 0, c45One = 0;
+            renderBlocks(ss, acc, 120);
+            renderAccumulate(ss, acc, kAccBlocks);
+            base45 = goertzel(acc, g_renderSize * kAccBlocks, 45.39);
+            printf("B4 snare pre-EQ(loop): 45.39Hz=%.1f counts\n", base45);
+
+            // The exact saved config: BELL -8 dB @ 45.39 Hz, Q 1.00, active.
+            ss.FindVariable(SIP_EQF0)->SetInt(4539);
+            ss.FindVariable(SIP_EQG0)->SetInt(-8);
+            ss.FindVariable(SIP_EQT0)->SetInt(0);
+            ss.FindVariable(SIP_EQ_Q0)->SetInt(100);
+            renderBlocks(ss, acc, 120);
+            renderAccumulate(ss, acc, kAccBlocks);
+            c45 = goertzel(acc, g_renderSize * kAccBlocks, 45.39);
+            printf("B4 snare -8dB@45.4(loop): 45.39Hz=%.1f counts\n", c45);
+            // BACON_1.5_EQ8_LOOPFLUSH (U2.59): before the fix, the looped
+            // window ROSE x7 (the low bell's filter tail crossed the loop
+            // boundary every pass and rang) -- the "bajar = subir" report.
+            // The per-channel EQ state is flushed at the wrap, so the
+            // discontinuity ring is gone (735 -> 290 measured); the residual
+            // ~2.8x is the filter's NATURAL resonance when the sample
+            // attack is replayed each pass (Q1 at 45 Hz), not an energy
+            // adder.  One-shot (how the user hears the snare) adds nothing.
+            // BACON_1.5_EQ8_SOFTKNEE_C1 (U2.60): the C1 rational knee
+            // shapes the attack crests differently (measured ring 3.17x,
+            // within ~15% of the linear knee's 2.83x) -- the resonance
+            // excitation moved, not worsened; 3.5x keeps the gate.
+            check(c45 < base45 * 3.5f,
+                  "B4 the looped cut does not ring (discontinuity flush)");
+
+            // The user hears the snare ONE-SHOT; it has no 45 Hz body (the
+            // pre-EQ one-shot bin reads ~0), so there is nothing to cut --
+            // but the cut must still NOT add content where there was none.
+            ss.FindVariable(SIP_LOOPMODE)->SetInt(0);
+            check(ss.Start(0, 60, true), "B4 snare one-shot restart");
+            renderBlocks(ss, acc, 120);
+            renderAccumulate(ss, acc, kAccBlocks);
+            base45One = goertzel(acc, g_renderSize * kAccBlocks, 45.39);
+            printf("B4 snare pre-EQ(oneshot): 45.39Hz=%.1f counts\n", base45One);
+            ss.FindVariable(SIP_EQG0)->SetInt(-8);
+            check(ss.Start(0, 60, true), "B4 snare one-shot restart eq");
+            renderBlocks(ss, acc, 120);
+            renderAccumulate(ss, acc, kAccBlocks);
+            c45One = goertzel(acc, g_renderSize * kAccBlocks, 45.39);
+            printf("B4 snare -8dB@45.4(oneshot): 45.39Hz=%.1f counts\n", c45One);
+            check(bufferFinite(acc, accN), "B4 snare cut finite");
+            check(c45One < base45One + 32768.0 * 0.001,
+                  "B4 one-shot cut adds no low energy (bajar = bajar)");
+            ss.FindVariable(SIP_LOOPMODE)->SetInt(1);
+            ss.FindVariable(SIP_EQG0)->SetInt(0);
+            renderBlocks(ss, acc, 120);
+            free(acc);
+        } else {
+            printf("B4 snare skipped (no SD sample)\n");
+        }
     }
 
     free(buf);

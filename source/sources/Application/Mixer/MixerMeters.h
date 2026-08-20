@@ -27,7 +27,11 @@ public:
 	// "0 dB" CUE mark at row 7 with the +3 zone (2 cells) above it.  The
 	// bar fill reaching the top cell means a real pre-clip sum at/over
 	// +3 dBFS (the CUE+3 lamp), and a 0 dBFS sum tops the "0" mark.
-	static float ZeroDbLevel() { return 24.0f / 27.0f ; }
+	// BACON_1.5_VU_TOP0DB (U2.59, feedback #12): the +3 zone is REMOVED:
+	// 0 dBFS = the top of the bar (the full bar), like the meters of other
+	// consoles/DAWs.  The red top cell lights only at a real pre-clip level
+	// at/over 0 dBFS (the clip lamp).
+	static float ZeroDbLevel() { return 1.0f ; }
 
 	MixerMeters() {
 		for (int i = 0 ; i < kChannels ; i++) {
@@ -68,8 +72,9 @@ public:
 
 	// BACON_1.5_VU_DB_SCALE (U2.52.9): normalized level of one side, rendered
 	// by drawMeterBar and PostFlushDraw.  The level is the TRUE peak mapped
-	// onto its dB position (mixVULevel, see FxPages.h: (20*log10(p)+24)/27
-	// over -24..+3 dBFS).  The volume parameter is kept for API stability
+	// onto its dB position (mixVULevel, see FxPages.h: (20*log10(p)+24)/24
+	// over -24..0 dBFS, 0 dBFS = the top of the bar -- BACON_1.5_VU_TOP0DB,
+	// U2.59).  The volume parameter is kept for API stability
 	// but IGNORED: the scanned peaks already include their fader (the
 	// channel scan runs on the post-volume buffer in PlayerChannel::Render,
 	// and the master damp is applied pre-scan on the master bus in
@@ -109,9 +114,11 @@ public:
 			return g ;
 		}
 		// BACON_1.5_VU_DB_SCALE (U2.52.9): 0 dB+ zone: the top cells above
-		// the 0 dBFS row (see ZeroDbLevel = 24/27, the +3 zone), rendered
-		// solid red.  On the dB scale it lights when the fill reaches the
-		// 0 dBFS row (a real pre-clip level at/over ~0 dBFS).
+		// the 0 dBFS row, rendered solid red.
+		// BACON_1.5_VU_TOP0DB (U2.59): 0 dBFS is the top of the bar, so the
+		// red band is the TOP CELL ONLY (the min-1 clamp): it lights as a
+		// clip lamp when the fill reaches 0 dBFS (a real pre-clip level
+		// at/over 0 dBFS).
 		g.redBandLevels = g.totalLevels - (int)(ZeroDbLevel() * (float)g.totalLevels + 0.5f) ;
 		if (g.redBandLevels < 1) g.redBandLevels = 1 ;
 		g.redBandPx = g.redBandLevels * kLevelHeight ;

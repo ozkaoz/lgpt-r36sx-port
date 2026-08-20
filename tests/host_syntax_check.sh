@@ -11,7 +11,7 @@ BASE=(
   -DTREEFROG_FACE_TAP_MODE=0 -DTREEFROG_MODIFIER_RETRIGGER=0
   -DTREEFROG_EVENT_DEBUG_ALL=1 -DTREEFROG_DISABLE_PHRASE_AUDITION=0
   -DTREEFROG_HIGH_CONTRAST_SELECTION=1 -DTREEFROG_PURPLE_FOCUS_SELECTION=1
-  -DTREEFROG_PURPLE_FOCUS_RGB565=0xd99b -DTREEFROG_VIDEO_MODE=0
+  -DTREEFROG_PURPLE_FOCUS_RGB565=0x9dbf -DTREEFROG_VIDEO_MODE=0
   -DTREEFROG_VIDEO_PROBE=0 -DTREEFROG_PORT_VERSION_BADGE=0
   -DTREEFROG_AUDIO_DEBUG=0 -DTREEFROG_RETRO_LIFECYCLE_DEBUG=0
   -DCPP_MEMORY -DHAVE_STDINT_H -D_NDEBUG -D_NO_JACK_ -DDUMMYMIDI
@@ -40,6 +40,12 @@ FILES=(
 for file_path in "${FILES[@]}"; do
   g++ "${BASE[@]}" -DTREEFROG_ENABLE_START=1 -DTREEFROG_ENABLE_SELECT=1 -fsyntax-only "$file_path"
 done
+
+# SampleInstrument.cpp: the MIPS target is 32-bit, where the legacy
+# (unsigned int) pointer cast in the downsampling path is valid; the x86-64
+# host check needs -fpermissive to accept it (same file, same defines).
+g++ "${BASE[@]}" -DTREEFROG_ENABLE_START=1 -DTREEFROG_ENABLE_SELECT=1 \
+  -fpermissive -fsyntax-only "$SOURCE/Application/Instruments/SampleInstrument.cpp"
 
 # Diagnostic branches must also remain compilable, but the production build uses 0.
 for file_path in \
