@@ -766,10 +766,9 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
     // sound's energy is CENTERED instead of where it was the instant the
     // buttons were pressed ("el pico mas alto historico, donde esta el
     // peso del sonido").  The marker NEVER moves the EQ: L2+R2+X snaps the
-    // selected band to it.  L2+X+L/R steps the marker 1 Hz at a time (SIP
-    // units are 0.01 Hz, so 1 Hz = 100 units); L2+X+UP/DN toggles the
-    // selected band's slope (12/24 dB/oct).  All handled BEFORE the plain
-    // X+arrows so the chords are unambiguous.
+    // selected band to it.  R2+X+UP/DN toggles the selected band's slope
+    // (12/24/36/48 dB/oct).  L2+X+L/R steps the SELECTED BAND (1..8).
+    // All handled BEFORE the plain X+arrows so the chords are unambiguous.
     bool l2 = (mask & EPBM_L2) != 0;
     bool r2 = (mask & EPBM_R2) != 0;
     if (l2 && r2 && x && !(left || right || up || down)) {
@@ -808,24 +807,19 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
         return;
     }
     if (l2 && x && (left || right)) {
-        if (!peakMarkerOn_) {
-            peakMarkerOn_ = true;
-            peakManual_ = true;
-            if (peakHz_ <= 0.0f) peakHz_ = freqHz_[selected_];
-        }
-        peakManual_ = true;
-        if (left) peakHz_ -= 1.0f;
-        if (right) peakHz_ += 1.0f;
-        if (peakHz_ < 20.0f) peakHz_ = 20.0f;
-        if (peakHz_ > 20000.0f) peakHz_ = 20000.0f;
+        // L2+X+L/R: step the SELECTED BAND (1..8), independent of peak marker
+        selected_ = (selected_ + (left ? 7 : 1)) % 8;
         char buf[88];
-        sprintf(buf, "PEAK %5.0fHz  (1 Hz steps)", peakHz_);
+        sprintf(buf, "BAND %1d  %5.0fHz  %+d dB  Q%.2f  %s",
+                selected_ + 1, freqHz_[selected_], (int)gainDb_[selected_],
+                q_[selected_], bandOn_[selected_] ? "ON" : "OFF");
         setStatus(buf);
         refreshDraw();
         return;
     }
-    if (l2 && x && (up || down)) {
-        slope_[selected_] = (slope_[selected_] == 2) ? 1 : 2;
+    if (r2 && x && (up || down)) {
+        // R2+X+UP/DN: toggle slope (1..4 = 12/24/36/48 dB/oct)
+        slope_[selected_] = (slope_[selected_] == 4) ? 1 : slope_[selected_] + 1;
         char buf[88];
         sprintf(buf, "B%1d SLOPE %d dB/oct", selected_ + 1,
                 slope_[selected_] * 12);

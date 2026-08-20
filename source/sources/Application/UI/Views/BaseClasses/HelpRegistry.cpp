@@ -183,12 +183,13 @@ static const HelpLine kEq8Lines_[] = {
     // PEAKHIST (U2.62, feedback #14): L2+R2 marks the HISTORICAL peak of
     // the instrument's post-EQ spectrum (the loudest peak since the marker
     // was armed -- where the sound's energy is centered) and toggles off;
-    // L2+R2+X moves the selected band to the marker; L2+X+L/R steps the
-    // marker 1 Hz; L2+X+UP/DN toggles the band slope (12/24 dB/oct).
+    // L2+R2+X moves the selected band to the marker.
+    // L2+X+L/R steps the SELECTED BAND (1..8).
+    // R2+X+UP/DN toggles the band slope (12/24/36/48 dB/oct).
     {"L2+R2", "peak marker (hist)"},
     {"L2+R2+X", "band -> peak"},
-    {"L2+X L/R", "peak +-1 Hz"},
-    {"L2+X UP/DN", "slope 12/24"},
+    {"L2+X L/R", "band select"},
+    {"R2+X UP/DN", "slope 12/24/36/48"},
     {"Y+L/R", "Q wider/narrower"},
     {"Y+UP/DN", "intensity all"},
     {"A", "band on/off"},

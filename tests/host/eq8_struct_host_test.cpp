@@ -700,8 +700,8 @@ int main() {
         CHECK(eq.GetBandSlope(0) == 1);
         eq.SetBandSlope(0, 2);
         CHECK(eq.GetBandSlope(0) == 2);
-        eq.SetBandSlope(0, 7);       // clamps to 2
-        CHECK(eq.GetBandSlope(0) == 2);
+        eq.SetBandSlope(0, 7);       // clamps to 4 (new max)
+        CHECK(eq.GetBandSlope(0) == 4);
         eq.SetBandSlope(0, 0);       // clamps to 1
         CHECK(eq.GetBandSlope(0) == 1);
 

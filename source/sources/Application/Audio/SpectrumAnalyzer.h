@@ -132,6 +132,12 @@ private:
     // (see the accessors above).  Written only by Compute() (UI thread).
     float peakHzHist_;
     float peakMag2Hist_;
+
+    // BACON_1.5_ANALYZER_HIGH_FREQ (U2.63): log bin parameters for
+    // Compute() high-frequency boost and variable bin fraction.
+    float fLo_;
+    float fHi_;
+    float step_;
 };
 
 #endif

@@ -176,7 +176,7 @@ private:
     // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): stage [1] is the SECOND
     // pass of a 24 dB/oct cascade (only used while a band's slope == 2 and
     // its type is not a bell; single-pass bands never touch it).
-    ChanState state_[kMaxChannels][kNumBands][2];
+    ChanState state_[kMaxChannels][kNumBands][4];
     // BACON_1.5_EQ8_LOOPFADE: frames of fade left for each channel
     // (0 = no fade pending).
     int fade_[kMaxChannels];

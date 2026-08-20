@@ -110,7 +110,7 @@ void InstrumentEq::Reset() {
 void InstrumentEq::ResetChannelState() {
     for (int c = 0; c < kMaxChannels; c++) {
         for (int b = 0; b < kNumBands; b++) {
-            for (int s = 0; s < 2; s++) {
+            for (int s = 0; s < 4; s++) {
                 ChanState &st = state_[c][b][s];
                 st.s1L = 0; st.s2L = 0;
                 st.s1R = 0; st.s2R = 0;
@@ -164,7 +164,7 @@ void InstrumentEq::ConfigureBand(int band, BandType type, fixed hz, fixed db,
     q = fl2fp(qf);
 
     if (slope < 1) slope = 1;
-    if (slope > 2) slope = 2;
+    if (slope > 4) slope = 4;
 
     bool paramsChanged = (bg.type != type || bg.hz != hz || bg.db != db ||
                           bg.q != q || bg.slope != slope);
@@ -425,7 +425,7 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
         if (fade > 0) {
             fixed r = kFadeRampQ15[kFadeFrames - (fade--)];
             for (int b = 0; b < kNumBands; b++) {
-                for (int s = 0; s < 2; s++) {
+                for (int s = 0; s < 4; s++) {
                     ChanState &st = state_[channel][b][s];
                     // 64-bit: the states are 2^24-scale (see ChanState).
                     st.s1L = (st.s1L * (long long)r) >> 15;
@@ -469,7 +469,7 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
             if (bg.tB0 == kIdentityB0 && bg.tB1 == 0 && bg.tB2 == 0 &&
                 bg.tA1 == 0 && bg.tA2 == 0) {
                 for (int c = 0; c < kMaxChannels; c++) {
-                    for (int s = 0; s < 2; s++) {
+                    for (int s = 0; s < 4; s++) {
                         ChanState &st = state_[c][b][s];
                         // 64-bit: the states are 2^24-scale (see ChanState).
                         st.s1L = (st.s1L * (long long)kCloseFadeQ15) >> 15;
@@ -540,36 +540,42 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
                          st.s2R;
                 st.s2R = (((long long)bg.b2 * (long long)xR + 16384) >> 15) -
                          (((long long)bg.a2 * (long long)yR + (1 << 23)) >> 24);
-                // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): a band with
-                // slope 2 (24 dB/oct) cascades the same biquad through stage
-                // [1].  Only non-bell types can use it (a bell's shape is
-                // its Q), so a BELL band always runs the single stage.
-                if (bg.slope == 2 && bg.type != TYPE_BELL) {
-                    ChanState &st2 = state_[channel][b][1];
-                    long long yL2 =
-                        (((long long)bg.b0 * (long long)tL + 16384) >> 15) +
-                        st2.s1L;
-                    fixed tL2 = (fixed)((yL2 + 256) >> 9);
-                    st2.s1L =
-                        (((long long)bg.b1 * (long long)tL + 16384) >> 15) -
-                        (((long long)bg.a1 * (long long)yL2 + (1 << 23)) >> 24) +
-                        st2.s2L;
-                    st2.s2L =
-                        (((long long)bg.b2 * (long long)tL + 16384) >> 15) -
-                        (((long long)bg.a2 * (long long)yL2 + (1 << 23)) >> 24);
-                    long long yR2 =
-                        (((long long)bg.b0 * (long long)tR + 16384) >> 15) +
-                        st2.s1R;
-                    fixed tR2 = (fixed)((yR2 + 256) >> 9);
-                    st2.s1R =
-                        (((long long)bg.b1 * (long long)tR + 16384) >> 15) -
-                        (((long long)bg.a1 * (long long)yR2 + (1 << 23)) >> 24) +
-                        st2.s2R;
-                    st2.s2R =
-                        (((long long)bg.b2 * (long long)tR + 16384) >> 15) -
-                        (((long long)bg.a2 * (long long)yR2 + (1 << 23)) >> 24);
-                    tL = tL2;
-                    tR = tR2;
+                // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): a band with slope > 1
+                // cascades the same biquad `slope` times (12 dB/oct per stage).
+                // Only non-bell types can use it (a bell's shape is its Q),
+                // so a BELL band always runs the single stage.
+                if (bg.slope > 1 && bg.type != TYPE_BELL) {
+                    fixed tL_cascade = tL;
+                    fixed tR_cascade = tR;
+                    for (int stage = 1; stage < bg.slope; stage++) {
+                        ChanState &st2 = state_[channel][b][stage];
+                        long long yL2 =
+                            (((long long)bg.b0 * (long long)tL_cascade + 16384) >> 15) +
+                            st2.s1L;
+                        fixed tL2 = (fixed)((yL2 + 256) >> 9);
+                        st2.s1L =
+                            (((long long)bg.b1 * (long long)tL_cascade + 16384) >> 15) -
+                            (((long long)bg.a1 * (long long)yL2 + (1 << 23)) >> 24) +
+                            st2.s2L;
+                        st2.s2L =
+                            (((long long)bg.b2 * (long long)tL_cascade + 16384) >> 15) -
+                            (((long long)bg.a2 * (long long)yL2 + (1 << 23)) >> 24);
+                        long long yR2 =
+                            (((long long)bg.b0 * (long long)tR_cascade + 16384) >> 15) +
+                            st2.s1R;
+                        fixed tR2 = (fixed)((yR2 + 256) >> 9);
+                        st2.s1R =
+                            (((long long)bg.b1 * (long long)tR_cascade + 16384) >> 15) -
+                            (((long long)bg.a1 * (long long)yR2 + (1 << 23)) >> 24) +
+                            st2.s2R;
+                        st2.s2R =
+                            (((long long)bg.b2 * (long long)tR_cascade + 16384) >> 15) -
+                            (((long long)bg.a2 * (long long)yR2 + (1 << 23)) >> 24);
+                        tL_cascade = tL2;
+                        tR_cascade = tR2;
+                    }
+                    tL = tL_cascade;
+                    tR = tR_cascade;
                 }
                 xL = tL;
                 xR = tR;

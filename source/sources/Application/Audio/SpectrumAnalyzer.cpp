@@ -29,15 +29,25 @@ SpectrumAnalyzer::SpectrumAnalyzer()
     // log bars each cover 4+ real bins at every frequency (the 20 kHz top
     // bar covers bins ~5965..8355) and the FFT bin grid is fine enough for
     // the sub-Hz peak interpolation of the EQ view's marker.
-    static const float fLo = 20.0f;
-    static const float fHi = 20000.0f;
-    const float step = logf(fHi / fLo) / (kLogBins - 1);
+    fLo_ = 20.0f;
+    fHi_ = 20000.0f;
+    step_ = logf(fHi_ / fLo_) / (kLogBins - 1);
     const float hzPerBin = (float)kRate / (float)kFftSize;
     for (int i = 0; i < kLogBins; i++) {
-        float fc = fLo * expf(step * i);
+        float fc = fLo_ * expf(step_ * i);
         float b = fc / hzPerBin;
-        binLo_[i] = (int)(b - b * 0.30f);
-        binHi_[i] = (int)(b + b * 0.30f);
+        // BACON_1.5_ANALYZER_HIGH_FREQ (U2.63): narrower bin fraction at high
+        // frequencies to preserve peak resolution.  Below 1 kHz use 0.30;
+        // above, taper to 0.10 at 20 kHz so each log bin covers fewer FFT
+        // bins and peaks don't get smeared.
+        float frac = 0.30f;
+        if (fc > 1000.0f) {
+            float t = (fc - 1000.0f) / 19000.0f;  // 0..1 from 1k to 20k
+            if (t > 1.0f) t = 1.0f;
+            frac = 0.30f - 0.20f * t;  // 0.30 -> 0.10
+        }
+        binLo_[i] = (int)(b - b * frac);
+        binHi_[i] = (int)(b + b * frac);
         if (binLo_[i] < 1) binLo_[i] = 1;
         if (binHi_[i] >= kFftSize / 2) binHi_[i] = kFftSize / 2 - 1;
         if (binHi_[i] < binLo_[i]) binHi_[i] = binLo_[i];
@@ -210,6 +220,19 @@ bool SpectrumAnalyzer::Compute() {
             if (mag2 > peak2) peak2 = mag2;
         }
         float peak = sqrtf(peak2) / (float)kFftSize;
+        if (peak > 1.0f) peak = 1.0f;
+        // BACON_1.5_ANALYZER_HIGH_FREQ (U2.63): visual gain boost for high
+        // frequencies so snare/hi-hat transients show clearly after a HPF.
+        // The analyzer input is flat, but the log bins at high freq cover
+        // more Hz/Hz, so energy spreads.  A gentle +6 dB/oct above 2 kHz
+        // compensates the perceptual and display roll-off.
+        float fc = fLo_ * expf(step_ * i);
+        float visGain = 1.0f;
+        if (fc > 2000.0f) {
+            visGain = powf(fc / 2000.0f, 0.5f);  // +6 dB/oct slope
+            if (visGain > 4.0f) visGain = 4.0f;   // cap at +12 dB
+        }
+        peak *= visGain;
         if (peak > 1.0f) peak = 1.0f;
         // BACON_1.5_ANALYZER_INSTANT_PEAK (U2.57b, feedback #10): the bins
         // are the INSTANTANEOUS per-window peak, no temporal smoothing.
