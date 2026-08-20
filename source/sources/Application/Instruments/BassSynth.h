@@ -155,8 +155,11 @@ private:
     Variable *eqGain_[8] ;
     Variable *eqType_[8] ;
     Variable *eqQ_[8] ;
+    // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): per-band slope
+    // (1 = 12 dB/oct, 2 = 24 dB/oct), persisted as SIP_EQS0..7.
+    Variable *eqSlope_[8] ;
     FxEngine::InstrumentEq eqDsp_ ;
-    int eqCache_[34] ;
+    int eqCache_[42] ;
     int eqRateCache_ ;
 
     Variable *table_ ;

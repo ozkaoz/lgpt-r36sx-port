@@ -29,6 +29,8 @@ static const FourCC kTypeIDs[8] = {SIP_EQT0, SIP_EQT1, SIP_EQT2, SIP_EQT3,
                                    SIP_EQT4, SIP_EQT5, SIP_EQT6, SIP_EQT7};
 static const FourCC kQIDs[8]    = {SIP_EQ_Q0, SIP_EQ_Q1, SIP_EQ_Q2, SIP_EQ_Q3,
                                    SIP_EQ_Q4, SIP_EQ_Q5, SIP_EQ_Q6, SIP_EQ_Q7};
+static const FourCC kSlopeIDs[8] = {SIP_EQS0, SIP_EQS1, SIP_EQS2, SIP_EQS3,
+                                    SIP_EQS4, SIP_EQS5, SIP_EQS6, SIP_EQS7};
 
 static const float kDefaultFreq8[8] = {
     80.f, 160.f, 320.f, 640.f, 1250.f, 2500.f, 5000.f, 10000.f,
@@ -147,7 +149,7 @@ static double xToFreq(int x) {
 
 InstrumentEqView::InstrumentEqView(GUIWindow &w, ViewData *data)
     : View(w, data), instr_(0), selected_(0), bypass_(false),
-      peakMarkerOn_(false), peakHz_(0.0f) {
+      peakMarkerOn_(false), peakHz_(0.0f), peakManual_(false) {
     status_[0] = 0;
     for (int i = 0; i < 8; i++) {
         freqHz_[i] = kDefaultFreq8[i];
@@ -155,6 +157,7 @@ InstrumentEqView::InstrumentEqView(GUIWindow &w, ViewData *data)
         q_[i] = 1.0f;
         type_[i] = 0;
         bandOn_[i] = true;
+        slope_[i] = 1;
     }
 }
 
@@ -197,10 +200,14 @@ void InstrumentEqView::loadFromInstrument() {
         Variable *vg = instr_->FindVariable(kGainIDs[i]);
         Variable *vt = instr_->FindVariable(kTypeIDs[i]);
         Variable *vq = instr_->FindVariable(kQIDs[i]);
+        Variable *vs = instr_->FindVariable(kSlopeIDs[i]);
         if (vf) freqHz_[i] = (float)vf->GetInt() / 100.0f;
         if (vg) gainDb_[i] = (float)vg->GetInt();
         if (vt) type_[i] = vt->GetInt();
         if (vq) q_[i] = (float)vq->GetInt() / 100.0f;
+        if (vs) slope_[i] = vs->GetInt();
+        if (slope_[i] < 1) slope_[i] = 1;
+        if (slope_[i] > 2) slope_[i] = 2;
         bandOn_[i] = ((mask >> i) & 1) != 0;
     }
 }
@@ -218,10 +225,12 @@ void InstrumentEqView::writeToInstrument() {
         Variable *vg = instr_->FindVariable(kGainIDs[i]);
         Variable *vt = instr_->FindVariable(kTypeIDs[i]);
         Variable *vq = instr_->FindVariable(kQIDs[i]);
+        Variable *vs = instr_->FindVariable(kSlopeIDs[i]);
         if (vf) vf->SetInt((int)(freqHz_[i] * 100.0f + 0.5f));
         if (vg) vg->SetInt((int)gainDb_[i]);
         if (vt) vt->SetInt(type_[i]);
         if (vq) vq->SetInt((int)(q_[i] * 100.0f + 0.5f));
+        if (vs) vs->SetInt(slope_[i]);
     }
 }
 
@@ -234,9 +243,9 @@ void InstrumentEqView::setStatus(const char *msg) {
 void InstrumentEqView::cycleBandType() {
     type_[selected_] = (type_[selected_] + 1) % 7;
     char buf[88];
-    sprintf(buf, "BAND%1d %s %5.0fHz %+3ddB Q%.2f %s",
+    sprintf(buf, "BAND%1d %s %5.0fHz %+3ddB Q%.2f S%d %s",
             selected_ + 1, kEqTypeNames[type_[selected_]], freqHz_[selected_],
-            (int)gainDb_[selected_], q_[selected_],
+            (int)gainDb_[selected_], q_[selected_], slope_[selected_],
             bandOn_[selected_] ? "ON" : "OFF");
     setStatus(buf);
     refreshDraw();
@@ -258,6 +267,10 @@ void InstrumentEqView::OnFocus() {
     // click finally shows, the snare's low cut finally drops the low bars).
     SpectrumAnalyzer::Get().SetArmed(true);
     SpectrumAnalyzer::Get().SetInstrumentTarget(instr_);
+    // BACON_1.5_ANALYZER_PEAKHIST (U2.62): start the historical peak
+    // tracking from this focus, so L2+R2 marks the peak of the CURRENT
+    // listening session.
+    SpectrumAnalyzer::Get().PeakTrackReset();
     setStatus(0);
     isDirty_ = true;
 }
@@ -311,9 +324,10 @@ void InstrumentEqView::buildHeader(char *title, size_t titleSz, char *line,
     // mask (the full index fits the 16-col title).
     snprintf(title, titleSz, "EQ8 %s INS-%02X", name,
              viewData_->currentInstrument_);
-    snprintf(line, lineSz, "B%1d %s %4.0fHz %+3.1fdB Q%.2f %s",
+    snprintf(line, lineSz, "B%1d %s %4.0fHz %+3.1fdB Q%.2f S%d %s",
              selected_ + 1, kEqTypeNames[type_[selected_]],
              freqHz_[selected_], gainDb_[selected_], q_[selected_],
+             slope_[selected_],
              bandOn_[selected_] ? "ON" : "OFF");
     if (status_[0]) {
         snprintf(status, statusSz, "%s", status_);
@@ -321,7 +335,7 @@ void InstrumentEqView::buildHeader(char *title, size_t titleSz, char *line,
         snprintf(status, statusSz, "EQ BYPASSED");
     } else {
         snprintf(status, statusSz,
-                 "L/R band  X f/g  Y Q  A on/off  B type  SEL bypass");
+                 "L/R band  X f/g  Y Q  L2+R2 peak  L2+X U/D slope");
     }
 }
 
@@ -430,77 +444,14 @@ void InstrumentEqView::PostFlushDraw() {
     tfFill(cX0 - 2, cY0 - 2, cX1 - cX0 + 5, cY1 - cY0 + 5, bgC);
 
     // BACON_1.5_EQ8_SPECTRUM_BACKDROP (U2.52.8, feedback (F)): the live
-    // spectrum is drawn INSIDE the canvas as a 30% opacity backdrop (the
-    // bars live BEHIND the EQ curve, not in a separate strip below it).
-    // specC (90,190,130) blended 30/70 over bgC (8,9,22) -> (33,63,54).
-    // BACON_1.5_EQ8_SPECTRUM_BLUE (U2.60, feedback #12): the analyzer is
-    // now BLUE at the same 30% opacity -- (60,120,220) blended 30/70 over
-    // bgC -> (24,42,81); the 1-px peak outline is a bright blue.
-    // The opaque grid/axis/curve drawn afterwards stay fully readable.
-    // BACON_1.5_ANALYZER_SCALE (U2.52.9, feedback #6): with the analyzer
-    // fed in DAC counts (see SpectrumAnalyzer::FeedMix), fp2fl() now yields
-    // the true -1..1 audio: the bins reflect the REAL dynamics of the mix
-    // (a kick lights the lows, a hat the highs) and a 0 dBFS sine peaks at
-    // ~0.25 (Hann window) -> the x4 below maps it to a full bar.
-    // BACON_1.5_EQ8_SPECTRUM_BARS (U2.52.9, feedback #6): the log bins
-    // render as thin 3-px bars with gaps plus a 1-px outline on top of each
-    // bar, so the spectrum reads as a filled line tracing the wave shape
-    // (FabFilter Pro-Q style) instead of chunky blocks.
-    // BACON_1.5_ANALYZER_96BARS (U2.59, feedback #12 "aumentar la cantidad
-    // de barras al triple o cuádruple, como analizadores VST"): 96 bars
-    // over the 308 px canvas -> 3 px per bar, contiguous (a solid
-    // spectrum line, exactly the VST Spectrum Analyzer look).
-    // BACON_1.5_ANALYZER_FINE (U2.61, feedback #13 "analizador mas
-    // detallado, milimetrico"): 154 bars at 2 px each, filling the canvas
-    // edge to edge (308/154 = 2) -- a continuous spectrum line where the
-    // hipass cuts and click harmonics read as real spectral shape.
-    {
-        const unsigned short specBlend = tf565(24, 42, 81);
-        const unsigned short specTop = tf565(90, 170, 255);
-        SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
-        // BACON_1.5_ANALYZER_FINE (U2.61): an 8192-point FFT every 5
-        // frames (~12 fps at 60 fps UI) is still ~2x the 4096 cost -- the
-        // analyzer stays live, the UI thread stays light.
-        static int fftThrottle = 0;
-        if ((++fftThrottle % 5) == 0) sp.Compute();
-        const fixed *bb = sp.Bins();
-        const int n = sp.BinCount();
-        int bw = (cX1 - cX0) / n;
-        int barW = 2;
-        for (int i = 0; i < n; i++) {
-            // BACON_1.5_ANALYZER_20HZ: a 0 dBFS sine peaks around 0.25 in
-            // the normalized FFT bins (Hann window), so scale x4 to make a
-            // full bar mean 0 dBFS.
-            // BACON_1.5_ANALYZER_DB (U2.53, feedback #7): the bars used to
-            // be LINEAR (fp2fl(bb)*4 over the canvas), so a +1 dB EQ boost
-            // on loud low content moved the low bars by ~12% of the canvas
-            // ("+1 dB sube demasiado las barras").  The height is now a dB
-            // mapping, so bar height moves with perceived loudness and the
-            // EQ curve stays the reference.
-            // BACON_1.5_EQ8_SPECTRUM_36DB (U2.58, feedback #11 "los picos
-            // agudos siguen ahogandose, en un hihat no se ve ninguna de las
-            // barras moviendose"): hat_probe measured the real kit hi-hat
-            // through the analyzer: its body peaks at ~-16 dB (bars 20..280
-            // Hz) but the 6..18 kHz region sits at -25..-29 dB, BELOW the
-            // -24 dB floor of the mixer mapping, so every high bar stuck at
-            // the 2-px minimum -- the highs looked dead.  The spectrum bars
-            // now map -36..+4 dB over the canvas (floor -36 dB, 0 dBFS at
-            // 90% of the canvas, +4 dB clipped at the top): the same hat
-            // highs now read 10..57 px and move with every hit, while the
-            // mixer bars keep their own -24..0 dBFS scale.
-            float p = fp2fl(bb[i]) * 4.0f;
-            float db = (p > 0.0f) ? 20.0f * log10f(p) : -80.0f;
-            float frac = (db + 36.0f) / 40.0f;
-            if (frac < 0.0f) frac = 0.0f;
-            if (frac > 1.0f) frac = 1.0f;
-            int h = (int)(frac * (float)(cY1 - cY0));
-            if (h < 2) h = 2;
-            if (h > cY1 - cY0) h = cY1 - cY0;
-            int bx = cX0 + i * bw + (bw - barW) / 2;
-            tfFill(bx, cY1 - h, barW, h, specBlend);
-            tfFill(bx, cY1 - h, barW, 1, specTop);
-        }
-    }
+    // spectrum is drawn INSIDE the canvas as a backdrop (the bars live
+    // BEHIND the EQ curve, not in a separate strip below it).
+    // BACON_1.5_EQ8_PURPLE_ORDER (U2.62, feedback #14): the bars are drawn
+    // AFTER the purple curve wash (and before the 1-px curve edge), so the
+    // blue spectrum stays visible THROUGH the purple ("las barras azules
+    // deben verse atraves del morado") -- the wash is a backdrop, the bars
+    // are the foreground layer, and the curve edge stays the top line.
+    // The bar code moved below, between the curve fill and the curve edge.
 
     // BACON_1.5_EQ8_PIXEL_HEADER (U2.53, feedback #7): the top border moves
     // from cY0-2 (which clipped the last 2 px of the header strip) to the
@@ -555,6 +506,10 @@ void InstrumentEqView::PostFlushDraw() {
 
         // Composite response curve, evaluated from the view coefficients.
         // Bypassed EQ draws a flat 0 dB line.
+        // BACON_1.5_EQ8_PURPLE_ORDER (U2.62, feedback #14): the curve is
+        // split in TWO passes: the purple WASH (below) comes first, then
+        // the spectrum bars, then the 1-px purple edge -- so the blue bars
+        // show through the wash and the curve line stays the top layer.
         const double rateD = (double)rate;
         for (int x = cX0; x <= cX1; x += 3) {
             double f = xToFreq(x);
@@ -576,8 +531,14 @@ void InstrumentEqView::PostFlushDraw() {
                 double imN = b1 * swv + b2 * sin(2 * w);
                 double reD = 1.0 + a1 * cwv + a2 * cos(2 * w);
                 double imD = a1 * swv + a2 * sin(2 * w);
-                db += 10.0 * log10((reN * reN + imN * imN + 1e-12) /
-                                   (reD * reD + imD * imD + 1e-12));
+                double bandDb = 10.0 * log10((reN * reN + imN * imN + 1e-12) /
+                                             (reD * reD + imD * imD + 1e-12));
+                // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): a slope-2 band
+                // cascades the same biquad twice in the DSP, so its drawn
+                // response is exactly 2x the single-stage dB at every
+                // frequency.  A BELL keeps its Q shape (slope 1 only).
+                db += (slope_[b] == 2 && type_[b] != 0) ? 2.0 * bandDb
+                                                        : bandDb;
             }
             if (db > 24.0) db = 24.0;
             if (db < -24.0) db = -24.0;
@@ -589,6 +550,87 @@ void InstrumentEqView::PostFlushDraw() {
             } else {
                 tfFill(x, cMid, 3, yy - cMid + 1, waveC);
             }
+        }
+
+        // BACON_1.5_EQ8_SPECTRUM_BLUE (U2.60, feedback #12): the analyzer is
+        // BLUE -- (60,120,220) blended 30/70 over the canvas bg -> (24,42,81)
+        // with a bright-blue 1-px peak outline; the opaque grid/axis drawn
+        // before stay fully readable.
+        // BACON_1.5_ANALYZER_SCALE (U2.52.9, feedback #6): with the analyzer
+        // fed in DAC counts (see SpectrumAnalyzer::FeedMix), fp2fl() now
+        // yields the true -1..1 audio: the bins reflect the REAL dynamics of
+        // the mix and a 0 dBFS sine peaks at ~0.25 (Hann window) -> the x4
+        // below maps it to a full bar.
+        // BACON_1.5_ANALYZER_FINE (U2.61, feedback #13) -> BACON_1.5_ANALYZER_
+        // FINER (U2.62, feedback #14): 154 bars at 2 px -> 308 bars at 1 px,
+        // edge to edge (308/308 = 1) -- a continuous 1 px spectrum line where
+        // the hipass cuts and click harmonics read as real spectral shape.
+        // BACON_1.5_EQ8_PURPLE_ORDER (U2.62): the bars draw OVER the curve
+        // wash and UNDER the curve edge (see the curve comment above).
+        {
+            const unsigned short specBlend = tf565(24, 42, 81);
+            const unsigned short specTop = tf565(90, 170, 255);
+            SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
+            // BACON_1.5_ANALYZER_FINE (U2.61) -> FINER (U2.62): a 16384-point
+            // FFT every 5 frames (~12 fps at 60 fps UI) costs ~2x the 8192
+            // one -- the analyzer stays live, the UI thread stays light.
+            static int fftThrottle = 0;
+            if ((++fftThrottle % 5) == 0) sp.Compute();
+            const fixed *bb = sp.Bins();
+            const int n = sp.BinCount();
+            int bw = (cX1 - cX0) / n;
+            int barW = 1;
+            for (int i = 0; i < n; i++) {
+                // BACON_1.5_ANALYZER_DB (U2.53, feedback #7): the bars are
+                // dB-mapped so height moves with perceived loudness and the
+                // EQ curve stays the reference ("+1 dB sube demasiado las
+                // barras" on the old linear map).
+                // BACON_1.5_EQ8_SPECTRUM_36DB (U2.58, feedback #11): the
+                // bars map -36..+4 dB over the canvas (floor -36 dB, 0 dBFS
+                // at 90% of the canvas, +4 dB clipped at the top) so the
+                // hi-hat highs (real kit: -25..-29 dB) read and move.
+                float p = fp2fl(bb[i]) * 4.0f;
+                float db = (p > 0.0f) ? 20.0f * log10f(p) : -80.0f;
+                float frac = (db + 36.0f) / 40.0f;
+                if (frac < 0.0f) frac = 0.0f;
+                if (frac > 1.0f) frac = 1.0f;
+                int h = (int)(frac * (float)(cY1 - cY0));
+                if (h < 2) h = 2;
+                if (h > cY1 - cY0) h = cY1 - cY0;
+                int bx = cX0 + i * bw + (bw - barW) / 2;
+                tfFill(bx, cY1 - h, barW, h, specBlend);
+                tfFill(bx, cY1 - h, barW, 1, specTop);
+            }
+        }
+
+        // 1-px purple edge on top of the bars (the curve line).
+        for (int x = cX0; x <= cX1; x += 3) {
+            double f = xToFreq(x);
+            double db = 0.0;
+            for (int b = 0; b < 8; b++) {
+                if (!bandOn_[b] || gainDb_[b] == 0.0f) continue;
+                fixed f0, f1, f2, fA1, fA2;
+                FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
+                                         gainDb_[b], q_[b], f0, f1, f2,
+                                         fA1, fA2);
+                double b0 = fp2fl(f0), b1 = fp2fl(f1), b2 = fp2fl(f2);
+                double a1 = fp2fl(fA1), a2 = fp2fl(fA2);
+                double w = 2.0 * 3.14159265358979323846 * f / rateD;
+                double cwv = cos(w), swv = sin(w);
+                double reN = b0 + b1 * cwv + b2 * cos(2 * w);
+                double imN = b1 * swv + b2 * sin(2 * w);
+                double reD = 1.0 + a1 * cwv + a2 * cos(2 * w);
+                double imD = a1 * swv + a2 * sin(2 * w);
+                double bandDb = 10.0 * log10((reN * reN + imN * imN + 1e-12) /
+                                             (reD * reD + imD * imD + 1e-12));
+                db += (slope_[b] == 2 && type_[b] != 0) ? 2.0 * bandDb
+                                                        : bandDb;
+            }
+            if (db > 24.0) db = 24.0;
+            if (db < -24.0) db = -24.0;
+            int yy = cMid - (int)(db * pxPerDb);
+            if (yy < cY0) yy = cY0;
+            if (yy > cY1) yy = cY1;
             tfFill(x + 1, yy, 1, 1, waveTop);
         }
 
@@ -597,6 +639,9 @@ void InstrumentEqView::PostFlushDraw() {
         // stay "claramente identificables, no superpuestas").  Each number
         // gets a small canvas-color clear behind it so the curve/grid below
         // it never bleeds through the glyph.
+        // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): a slope-2 band shows a
+        // "2" right under its crosshair (24 dB/oct), so the extra-steep
+        // filters are identifiable at a glance.
         for (int b = 0; b < 8; b++) {
             if (!bandOn_[b]) continue;
             int gx = freqToX(freqHz_[b]);
@@ -609,16 +654,31 @@ void InstrumentEqView::PostFlushDraw() {
             if (ny < cY0 + 1) ny = cY0 + 1;
             tfFill(gx - 2, ny, 7, 6, bgC);
             tfTinyText(gx - 1, ny, num, col);
+            if (slope_[b] == 2 && type_[b] != 0) {
+                int sy = gyy + 6;
+                if (sy + 6 > cY1 + 1) sy = gyy - 12;
+                if (sy < cY0 + 1) sy = cY0 + 1;
+                tfFill(gx - 2, sy, 7, 6, bgC);
+                tfTinyText(gx - 1, sy, "2", col);
+            }
         }
     }
 
-    // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): the L2+R2 peak marker
-    // -- a yellow 1-px line at the marked frequency with a bright cap and
-    // a Hz label, drawn AFTER the curve so the tuned frequency is always
-    // on top.  The selected band follows the marker (freqHz_[selected_]),
-    // so the marker IS the frequency being EQ'd.  Drawn also while
-    // bypassed: it only marks the spectrum, it does not edit anything.
+    // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13) -> BACON_1.5_ANALYZER_
+    // PEAKHIST (U2.62, feedback #14): the L2+R2 peak marker -- a yellow
+    // 1-px line at the marked frequency with a bright cap and a Hz label,
+    // drawn AFTER the curve so the tuned frequency is always on top.  The
+    // marker follows the HISTORICAL peak (the loudest spectrum peak since
+    // it was armed), refreshed every frame -- the user watches it settle on
+    // where the sound's energy is centered.  It NEVER edits the EQ on its
+    // own; L2+R2+X moves the selected band to it.  Drawn also while
+    // bypassed: it only marks the spectrum.  While the user steps the
+    // marker manually (L2+X+L/R) the auto-follow stops (peakManual_).
     if (peakMarkerOn_) {
+        if (!peakManual_) {
+            float h = SpectrumAnalyzer::Get().PeakFrequencyHistory();
+            if (h > 0.0f) peakHz_ = h;
+        }
         const unsigned short peakC = tf565(255, 244, 120);
         int px = freqToX(peakHz_);
         if (px < cX0) px = cX0;
@@ -700,30 +760,48 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
 
     if (!instr_) return;
 
-    // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): L2+R2 marks the peak
-    // frequency of the instrument's post-EQ spectrum (the targeted analyzer
-    // tap) and snaps the selected band to it -- the same combo toggles the
-    // marker off.  L2+X+arrows steps the marker 1 Hz at a time (SIP_EQF
-    // units are 0.01 Hz, so 1 Hz = 100 units) for precise EQ tuning.
-    // Handled BEFORE the plain X+arrows so the chord is unambiguous.
+    // BACON_1.5_ANALYZER_PEAKHIST (U2.62, feedback #14): L2+R2 marks the
+    // HISTORICAL peak of the instrument's post-EQ spectrum -- the loudest
+    // spectrum peak since the marker was armed, so it shows where the
+    // sound's energy is CENTERED instead of where it was the instant the
+    // buttons were pressed ("el pico mas alto historico, donde esta el
+    // peso del sonido").  The marker NEVER moves the EQ: L2+R2+X snaps the
+    // selected band to it.  L2+X+L/R steps the marker 1 Hz at a time (SIP
+    // units are 0.01 Hz, so 1 Hz = 100 units); L2+X+UP/DN toggles the
+    // selected band's slope (12/24 dB/oct).  All handled BEFORE the plain
+    // X+arrows so the chords are unambiguous.
     bool l2 = (mask & EPBM_L2) != 0;
     bool r2 = (mask & EPBM_R2) != 0;
+    if (l2 && r2 && x && !(left || right || up || down)) {
+        if (peakMarkerOn_ && peakHz_ > 0.0f) {
+            freqHz_[selected_] = peakHz_;
+            bandOn_[selected_] = true;
+            char buf[88];
+            sprintf(buf, "B%1d -> PEAK %5.0fHz", selected_ + 1, peakHz_);
+            setStatus(buf);
+        } else {
+            setStatus("PEAK: mark first (L2+R2)");
+        }
+        refreshDraw();
+        return;
+    }
     if (l2 && r2) {
         if (peakMarkerOn_) {
             peakMarkerOn_ = false;
+            peakManual_ = false;
+            SpectrumAnalyzer::Get().PeakTrackReset();
             setStatus("PEAK OFF");
         } else {
-            float p = SpectrumAnalyzer::Get().PeakFrequency();
-            if (p > 0.0f) {
-                peakMarkerOn_ = true;
-                peakHz_ = p;
-                freqHz_[selected_] = p;
-                bandOn_[selected_] = true;
+            peakManual_ = false;
+            SpectrumAnalyzer::Get().PeakTrackReset();
+            peakMarkerOn_ = true;
+            if (SpectrumAnalyzer::Get().PeakHasHistory()) {
+                peakHz_ = SpectrumAnalyzer::Get().PeakFrequencyHistory();
                 char buf[88];
-                sprintf(buf, "PEAK %5.0fHz  B%1d synced", p, selected_ + 1);
+                sprintf(buf, "PEAK %5.0fHz (hist)", peakHz_);
                 setStatus(buf);
             } else {
-                setStatus("PEAK: no signal yet (play the instrument)");
+                setStatus("PEAK: listening...");
             }
         }
         refreshDraw();
@@ -732,16 +810,25 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
     if (l2 && x && (left || right)) {
         if (!peakMarkerOn_) {
             peakMarkerOn_ = true;
-            peakHz_ = freqHz_[selected_];
+            peakManual_ = true;
+            if (peakHz_ <= 0.0f) peakHz_ = freqHz_[selected_];
         }
+        peakManual_ = true;
         if (left) peakHz_ -= 1.0f;
         if (right) peakHz_ += 1.0f;
         if (peakHz_ < 20.0f) peakHz_ = 20.0f;
         if (peakHz_ > 20000.0f) peakHz_ = 20000.0f;
-        freqHz_[selected_] = peakHz_;
-        bandOn_[selected_] = true;
         char buf[88];
         sprintf(buf, "PEAK %5.0fHz  (1 Hz steps)", peakHz_);
+        setStatus(buf);
+        refreshDraw();
+        return;
+    }
+    if (l2 && x && (up || down)) {
+        slope_[selected_] = (slope_[selected_] == 2) ? 1 : 2;
+        char buf[88];
+        sprintf(buf, "B%1d SLOPE %d dB/oct", selected_ + 1,
+                slope_[selected_] * 12);
         setStatus(buf);
         refreshDraw();
         return;

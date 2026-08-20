@@ -139,7 +139,10 @@ private:
        Variable *eqFreq_[8] ;
        Variable *eqType_[8] ;
        Variable *eqQ_[8] ;
-       int eqCache_[34] ;
+       // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): per-band slope
+       // (1 = 12 dB/oct, 2 = 24 dB/oct), persisted as SIP_EQS0..7.
+       Variable *eqSlope_[8] ;
+       int eqCache_[42] ;
        // FXP_INSTRUMENT_EQ_RATE (bacon-1.5, item 2): the audio driver sample
        // rate cached at the last syncInstrumentEq so InstrumentEq is rebuilt
        // at the real rate (48 kHz) instead of the ctor default 44100.

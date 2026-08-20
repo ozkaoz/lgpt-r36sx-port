@@ -4,8 +4,8 @@
 //
 // The analyzer (SpectrumAnalyzer.cpp) is fed the final master buffer in DAC
 // counts <<15; FeedMix stores the mono average as (l>>16)+(r>>16), which for
-// two identical full-scale channels is ~1.0 after fp2fl().  An 8192-point
-// Hann-windowed FFT (BACON_1.5_ANALYZER_FINE, U2.61 -- 5.86 Hz/bin) then
+// two identical full-scale channels is ~1.0 after fp2fl().  A 16384-point
+// Hann-windowed FFT (BACON_1.5_ANALYZER_FINER, U2.62 -- 2.93 Hz/bin) then
 // maps a 0 dBFS sine at an exact FFT bin to a peak of N*A/4 / N = 0.25;
 // the EQ8 view scales x4 to a full bar (0 dBFS = full).
 //
@@ -21,27 +21,27 @@
 //   - INSTANT_PEAK: bins are the instantaneous per-window peak, NO temporal
 //     smoothing.
 //
-// U2.61 grid: 154 log bars over 20 Hz..20 kHz, FFT 8192 (5.86 Hz/bin at
-// 48 kHz).  The window covers the newest 8192 of an 8192-frame ring, so a
+// U2.62 grid: 308 log bars over 20 Hz..20 kHz, FFT 16384 (2.93 Hz/bin at
+// 48 kHz).  The window covers the newest 16384 of a 16384-frame ring, so a
 // full feed fills the window exactly.  Reference bar indices (log grid
-// 20*1000^(i/153)):
-//   - 46.875 Hz (bin 8)   -> bar 19 (fc ~47.9 Hz)
-//   - 100 Hz (bin 17)     -> bar 36 (fc ~100 Hz)
-//   - 984.375 Hz (bin 168)-> bar 86 (fc ~1015 Hz)
-//   - 16 kHz (bin 2731)   -> bar 148 (fc ~16.1 kHz)
+// 20*1000^(i/307)):
+//   - 46.875 Hz (bin 16)  -> bar 38 (fc ~48.0 Hz)
+//   - 100 Hz (bin 34)     -> bar 72 (fc ~100 Hz)
+//   - 984.375 Hz (bin 336)-> bar 173 (fc ~1017 Hz)
+//   - 16 kHz (bin 5461)   -> bar 297 (fc ~16.1 kHz)
 //
 // Scenarios:
 //   1. silence -> every bin is 0.
-//   2. 0 dBFS sine at bin 84 (984.375 Hz): the peak lands on bar 54 at
-//      ~0.25, the +-30% log overlap lights bars 51..55 at the same height,
+//   2. 0 dBFS sine at bin 336 (984.375 Hz): the peak lands on bar 173 at
+//      ~0.25, the +-30% log overlap lights bars 162..189 at the same height,
 //      and the far bars stay ~0.
-//   3. same sine at -12 dBFS (amp 0.25): bar 54 at ~0.0625, exactly 4x less
+//   3. same sine at -12 dBFS (amp 0.25): bar 173 at ~0.0625, exactly 4x less
 //      -- the bars reflect the real dynamics.
-//   4. low-bass resolution: a sine exactly at bin 4 (46.875 Hz) lights
-//      bar 12 at ~0.25; a 20 Hz sine falls below bin 2 and reads the lobe
+//   4. low-bass resolution: a sine exactly at bin 16 (46.875 Hz) lights
+//      bar 38 at ~0.25; a 20 Hz sine falls below bin 2 and reads the lobe
 //      minus the window DC (documented 20..70 Hz floor); a 100 Hz sine
-//      lights bar 22 WITHOUT reaching the 1 kHz bars.
-//   5. 16 kHz sine lands on bar 92, not the mid bars.
+//      lights bar 72 WITHOUT reaching the 1 kHz bars.
+//   5. 16 kHz sine lands on bar 297, not the mid bars.
 //   6. full-scale DC (the hi-hat DC transient, ~4300 counts): the DCBLOCK
 //      removes it -- all bars ~0.
 //   7. a full-scale 1 ms pulse (broadband, like a kick transient): it must
@@ -122,10 +122,10 @@ int main() {
     }
     check(allZero, "silence: all bins 0");
 
-    // 2. 0 dBFS sine at bin 84 (984.375 Hz) -> bar 54 (fc ~1015 Hz) ~0.25.
+    // 2. 0 dBFS sine at bin 336 (984.375 Hz) -> bar 173 (fc ~1017 Hz) ~0.25.
     //    Design finding: the bands are +/-30% LOG bands, so the +-30%
-    //    ranges of bars 51..55 all contain bin 84 -- a pure tone lights
-    //    ~5 contiguous bars at the same height (soft overlap, not
+    //    ranges of bars 162..189 all contain bin 336 -- a pure tone lights
+    //    ~28 contiguous bars at the same height (soft overlap, not
     //    leakage).  What must NOT happen: the tone reaching the far ends.
     oneShot(984.375f, 32767);
     {
@@ -134,41 +134,41 @@ int main() {
         printf("1kHz 0dBFS: bar%d=%.4f bar%d=%.4f\n", bar, peakBar, bar + 1,
                fp2fl(sp.Bins()[bar + 1]));
         check(peakBar > 0.22f && peakBar < 0.28f,
-              "1 kHz 0 dBFS: bar 54 ~0.25 (Hann N/4)");
+              "1 kHz 0 dBFS: bar 173 ~0.25 (Hann N/4)");
         check(fp2fl(sp.Bins()[bar + 1]) > 0.15f,
-              "overlap design: bar 55 shares bin 84");
+              "overlap design: bar 174 shares bin 336");
         float bar0 = fp2fl(sp.Bins()[0]);
-        float bar92 = fp2fl(sp.Bins()[logBarIndex(16000.0)]);
-        printf("1kHz 0dBFS: bar0=%.4f bar92=%.4f\n", bar0, bar92);
-        check(bar0 < 0.02f && bar92 < 0.02f, "1 kHz stays out of the far bars");
+        float barTop = fp2fl(sp.Bins()[logBarIndex(16000.0)]);
+        printf("1kHz 0dBFS: bar0=%.4f bar297=%.4f\n", bar0, barTop);
+        check(bar0 < 0.02f && barTop < 0.02f, "1 kHz stays out of the far bars");
     }
 
     // 3. same sine at -12 dBFS: exactly 4x less (instantaneous peak)
     oneShot(984.375f, 8192);
     {
         float peakBar = fp2fl(sp.Bins()[logBarIndex(984.375)]);
-        printf("1kHz -12dBFS: bar54=%.4f\n", peakBar);
+        printf("1kHz -12dBFS: bar173=%.4f\n", peakBar);
         check(peakBar > 0.055f && peakBar < 0.075f,
               "-12 dBFS is 4x below 0 dBFS (0.0625)");
     }
 
-    // 4. low-bass floor: bin 4 (46.875 Hz) lights bar 12 at ~0.25.  A
-    //    20 Hz sine (bin 1.7) falls BELOW bin 2 -- its Hann main lobe
-    //    lands on bins 1-2, so bar 0 still reads part of it (documented
-    //    20..70 Hz floor).  A 100 Hz sine (bin 8.5) must light the low
+    // 4. low-bass floor: bin 16 (46.875 Hz) lights bar 38 at ~0.25.  A
+    //    20 Hz sine (bin 6.8) falls below bin 8 -- its Hann main lobe
+    //    lands on bins 6-7, so bar 0 still reads part of it (documented
+    //    20..70 Hz floor).  A 100 Hz sine (bin 34) must light the low
     //    bars WITHOUT reaching the 1 kHz bars.
     oneShot(46.875f, 32767);
     {
         int bar = logBarIndex(46.875);
         float b = fp2fl(sp.Bins()[bar]);
         printf("46.875Hz 0dBFS: bar%d=%.4f\n", bar, b);
-        check(b > 0.22f && b < 0.28f, "46.875 Hz (bin 4) lights bar 12 at ~0.25");
+        check(b > 0.22f && b < 0.28f, "46.875 Hz (bin 16) lights bar 38 at ~0.25");
     }
     oneShot(20.0f, 32767);
     {
         float bar0 = fp2fl(sp.Bins()[0]);
         printf("20Hz 0dBFS: bar0=%.4f (lobe minus window DC)\n", bar0);
-        // The window covers 1.7 cycles of a 20 Hz tone, so the DC-block
+        // The window covers 6.8 cycles of a 20 Hz tone, so the DC-block
         // removes only a small fraction of the tone (vs the 0.43 cycles of
         // the old 1024 window) and bar 0 reads most of the lobe.
         check(bar0 > 0.12f && bar0 < 0.30f,
@@ -178,18 +178,18 @@ int main() {
     {
         float barLow = fp2fl(sp.Bins()[logBarIndex(100.0)]);
         float barHigh = fp2fl(sp.Bins()[logBarIndex(1000.0)]);
-        printf("100Hz 0dBFS: bar22=%.4f bar54=%.4f\n", barLow, barHigh);
+        printf("100Hz 0dBFS: bar72=%.4f bar173=%.4f\n", barLow, barHigh);
         check(barLow > 0.05f, "100 Hz lights the low bars");
         check(barHigh < 0.05f, "100 Hz stays out of the 1 kHz bar");
     }
 
-    // 5. 16 kHz sine -> bar 92 (fc ~16.1 kHz)
+    // 5. 16 kHz sine -> bar 297 (fc ~16.1 kHz)
     oneShot(16000.0f, 32767);
     {
         int bar = logBarIndex(16000.0);
         float b = fp2fl(sp.Bins()[bar]);
         printf("16kHz 0dBFS: bar%d=%.4f\n", bar, b);
-        check(b > 0.10f, "16 kHz lands on the top bar 92");
+        check(b > 0.10f, "16 kHz lands on the top bar 297");
         float mid = fp2fl(sp.Bins()[logBarIndex(1000.0)]);
         check(mid < 0.05f, "16 kHz stays out of the mid bars");
     }
@@ -212,15 +212,15 @@ int main() {
     // 7. INSTANT_PEAK: a full-scale 1 ms pulse (48 samples, like a kick
     //    transient) at the FFT window center must NOT pin any bar to full:
     //    the detrended per-bar peak stays < 0.06 while a real sustained
-    //    tone reads 0.25.  The ring holds the NEWEST 4096 frames (ringPos_
+    //    tone reads 0.25.  The ring holds the NEWEST 16384 frames (ringPos_
     //    wraps to 0 after the feed, so the window is the whole feed; its
-    //    center is 2048).
+    //    center is 8192).
     {
         const int kFrames = SpectrumAnalyzer::kRingFrames;
         fixed buf[2 * kFrames];
         memset(buf, 0, sizeof(buf));
         fixed s = ((fixed)32767) << 15;
-        for (int i = 2024; i < 2072; i++) {
+        for (int i = 8168; i < 8216; i++) {
             buf[i * 2] = s;
             buf[i * 2 + 1] = s;
         }

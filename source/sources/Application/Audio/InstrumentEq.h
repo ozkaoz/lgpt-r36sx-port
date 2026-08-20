@@ -30,6 +30,9 @@
  *     per-frame path blends the active coefficients toward the new target
  *     with a fixed-point exponential (no clicks, no zipper noise).  The
  *     smoothing runs only while a band is converging.
+ *   - BACON_1.5_EQ8_SLOPE (U2.62): per-band slope 1..2 (12/24 dB/oct).
+ *     Slope 2 cascades the same biquad twice (only LP/HP/BP/NOTCH/shelves;
+ *     a bell's shape is its Q), doubling the dB response exactly.
  */
 
 namespace FxEngine {
@@ -70,17 +73,18 @@ public:
     void SetSampleRate(int rate);
 
     // BACON_1.5_EQ8_STRUCTURAL: single atomic entry point for every edit.
-    // Recomputes the band's RBJ coefficients only when (type, hz, db, q)
-    // changed since the last call; toggling `enabled` never touches the
-    // float math.
+    // Recomputes the band's RBJ coefficients only when (type, hz, db, q,
+    // slope) changed since the last call; toggling `enabled` never touches
+    // the float math unless the band must close/reopen (see below).
     void ConfigureBand(int band, BandType type, fixed hz, fixed db, fixed q,
-                       bool enabled);
+                       int slope, bool enabled);
     void SetBypass(bool on);
     void SetBandEnabled(int band, bool on);
     void SetBandType(int band, BandType type);
     void SetBandFreq(int band, fixed hz);    // 20..20000
     void SetBandGainDb(int band, fixed db);  // -24..+24
     void SetBandQ(int band, fixed q);        // 0.1..10
+    void SetBandSlope(int band, int slope);  // 1 = 12 dB/oct, 2 = 24 dB/oct
     void SetAllFlat();
 
     // Interleaved stereo in-place processing (channel 0..kMaxChannels-1).
@@ -94,21 +98,35 @@ public:
     fixed GetBandFreq(int band) const { return bandCfg_[band].hz; }
     fixed GetBandGainDb(int band) const { return bandCfg_[band].db; }
     fixed GetBandQ(int band) const { return bandCfg_[band].q; }
+    int GetBandSlope(int band) const { return bandCfg_[band].slope; }
     int GetSampleRate() const { return rate_; }
 
     // BACON_1.5_EQ8_STRUCTURAL: returns the CURRENT (smoothed) coefficients
     // the Process() path is actually applying to the signal.  The UI curve
     // is drawn from these exact values, so the picture always matches the
     // sound (no duplicated RBJ math in the view).
+    // BACON_1.5_EQ8_SLOPE_PRECISION (U2.62): b0..b2 are stored in Q24 (so a
+    // 80 Hz LP numerator keeps its exact ~1e-5 values); the readback scales
+    // them down to the Q15 the curve expects, truncating toward zero so the
+    // values are bit-identical to a direct Q15 emission (Q24 = 2^9 * Q15).
+    // BACON_1.5_EQ8_DEN24 (U2.62): a1/a2 are Q24 too (see EqBiquad.h), same
+    // >>9 readback.
     void GetBandCoeffs(int band, fixed *b0, fixed *b1, fixed *b2, fixed *a1,
                        fixed *a2) const {
         if (band < 0 || band >= kNumBands) {
             *b0 = i2fp(1); *b1 = 0; *b2 = 0; *a1 = 0; *a2 = 0;
             return;
         }
-        *b0 = bandCfg_[band].b0; *b1 = bandCfg_[band].b1;
-        *b2 = bandCfg_[band].b2; *a1 = bandCfg_[band].a1;
-        *a2 = bandCfg_[band].a2;
+        fixed v0 = bandCfg_[band].b0;
+        fixed v1 = bandCfg_[band].b1;
+        fixed v2 = bandCfg_[band].b2;
+        fixed va1 = bandCfg_[band].a1;
+        fixed va2 = bandCfg_[band].a2;
+        *b0 = v0 >= 0 ? (fixed)(v0 >> 9) : (fixed)(-((-(long long)v0) >> 9));
+        *b1 = v1 >= 0 ? (fixed)(v1 >> 9) : (fixed)(-((-(long long)v1) >> 9));
+        *b2 = v2 >= 0 ? (fixed)(v2 >> 9) : (fixed)(-((-(long long)v2) >> 9));
+        *a1 = va1 >= 0 ? (fixed)(va1 >> 9) : (fixed)(-((-(long long)va1) >> 9));
+        *a2 = va2 >= 0 ? (fixed)(va2 >> 9) : (fixed)(-((-(long long)va2) >> 9));
     }
 
     bool WasEdited() const { return edited_; }
@@ -117,6 +135,18 @@ public:
 private:
     void refreshFlat();
     void recomputeBand(int band);
+    // BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): ramp one band's
+    // coefficients to the IDENTITY filter (b0=1, rest 0) instead of the old
+    // instant snap/flush.  Used when a band goes to 0 dB (recomputeBand),
+    // gets disabled (ConfigureBand) or the EQ bypasses (SetBypass): with a
+    // HIPASS below 80 Hz the state holds large low-frequency cancellation
+    // values, so removing the filter instantly jumped the output by the
+    // whole removed signal ("el clipeo al final al editar").  The band keeps
+    // RUNNING while the coefficients blend toward identity, so the output
+    // morphs filtered->raw over ~1.3 ms (inaudible); the identity filter
+    // then drains the state in 2 samples, so no stale state is left behind
+    // when the band comes back (no click on re-activation either).
+    void smoothToIdentity(int band);
 
     struct BandCfg {
         // Active (smoothed) coefficients used by Process().
@@ -125,18 +155,28 @@ private:
         fixed tB0, tB1, tB2, tA1, tA2;
         bool smoothing;             // cur != tgt, blend each frame
         fixed hz, db, q;
+        int slope;                  // 1 = 12 dB/oct, 2 = 24 dB/oct cascade
         bool enabled;
         BandType type;
     };
 
     struct ChanState {
-        fixed s1L, s2L, s1R, s2R;
+        // BACON_1.5_EQ8_SLOPE_PRECISION (U2.62): the states run at 2^24
+        // (extended precision, 9 fractional bits below the signal scale) so
+        // a LP/HP corner below ~500 Hz keeps its exact ~1e-5 numerator:
+        // with Q15 states the b0..b2 products truncated to (0,1,0) and the
+        // filter became a resonator (any low LP/HP corner "rang"; the slope
+        // 2 cascade BOOSTED instead of squaring the cut).
+        long long s1L, s2L, s1R, s2R;
     };
 
     BandCfg bandCfg_[kNumBands];
     // BACON_1.5_EQ8_STRUCTURAL: one INDEPENDENT biquad state per channel AND
-    // per band (state_[channel][band]).
-    ChanState state_[kMaxChannels][kNumBands];
+    // per band (state_[channel][band][0]).
+    // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): stage [1] is the SECOND
+    // pass of a 24 dB/oct cascade (only used while a band's slope == 2 and
+    // its type is not a bell; single-pass bands never touch it).
+    ChanState state_[kMaxChannels][kNumBands][2];
     // BACON_1.5_EQ8_LOOPFADE: frames of fade left for each channel
     // (0 = no fade pending).
     int fade_[kMaxChannels];

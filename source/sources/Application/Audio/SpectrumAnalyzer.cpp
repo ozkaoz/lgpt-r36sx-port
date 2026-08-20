@@ -11,7 +11,7 @@ SpectrumAnalyzer &SpectrumAnalyzer::Get() {
 
 SpectrumAnalyzer::SpectrumAnalyzer()
     : ringPos_(0), armed_(false), targetInstr_(0), generation_(0),
-      lastSeenGeneration_(0) {
+      lastSeenGeneration_(0), peakHzHist_(0.0f), peakMag2Hist_(0.0f) {
     memset(ring_, 0, sizeof(ring_));
     memset(wre_, 0, sizeof(wre_));
     memset(wim_, 0, sizeof(wim_));
@@ -24,10 +24,11 @@ SpectrumAnalyzer::SpectrumAnalyzer()
     // lit them all through spectral leakage ("las barras no miden
     // 20 Hz-20 kHz").
     // BACON_1.5_ANALYZER_96BARS (U2.59, feedback #12) -> BACON_1.5_ANALYZER_
-    // FINE (U2.61, feedback #13): 8192 points (5.86 Hz/bin, 170 ms window)
-    // so the 154 log bars each cover 2+ real bins at every frequency (the
-    // 20 kHz top bar covers bins ~2982..4178) and the FFT bin grid is fine
-    // enough for the ~1 Hz peak interpolation of the EQ view's marker.
+    // FINE (U2.61, feedback #13) -> BACON_1.5_ANALYZER_FINER (U2.62,
+    // feedback #14): 16384 points (2.93 Hz/bin, 341 ms window) so the 308
+    // log bars each cover 4+ real bins at every frequency (the 20 kHz top
+    // bar covers bins ~5965..8355) and the FFT bin grid is fine enough for
+    // the sub-Hz peak interpolation of the EQ view's marker.
     static const float fLo = 20.0f;
     static const float fHi = 20000.0f;
     const float step = logf(fHi / fLo) / (kLogBins - 1);
@@ -165,6 +166,43 @@ bool SpectrumAnalyzer::Compute() {
 
     runFft();
 
+    // BACON_1.5_ANALYZER_PEAKHIST (U2.62, feedback #14): update the
+    // historical peak from THIS window before the bars (same scan range as
+    // PeakFrequency, so the marker and the history always agree).  The
+    // history only grows while tracking is armed; PeakTrackReset() (called
+    // when the view opens the marker) starts a fresh window.
+    {
+        int lo = binLo_[0];
+        int hi = binHi_[kLogBins - 1];
+        if (hi >= kFftSize / 2) hi = kFftSize / 2 - 1;
+        float best2 = 0.0f;
+        int best = lo;
+        for (int b = lo; b <= hi; b++) {
+            float m = wre_[b] * wre_[b] + wim_[b] * wim_[b];
+            if (m > best2) { best2 = m; best = b; }
+        }
+        if (best2 > peakMag2Hist_ && best2 > 0.0f) {
+            peakMag2Hist_ = best2;
+            float a = (best > lo)
+                          ? wre_[best - 1] * wre_[best - 1] + wim_[best - 1] * wim_[best - 1]
+                          : 0.0f;
+            float c = (best < hi)
+                          ? wre_[best + 1] * wre_[best + 1] + wim_[best + 1] * wim_[best + 1]
+                          : 0.0f;
+            float den = a - 2.0f * best2 + c;
+            float delta = 0.0f;
+            if (den != 0.0f) {
+                delta = 0.5f * (a - c) / den;
+                if (delta < -1.0f) delta = -1.0f;
+                if (delta > 1.0f) delta = 1.0f;
+            }
+            float hz = (best + delta) * (float)kRate / (float)kFftSize;
+            if (hz < 20.0f) hz = 20.0f;
+            if (hz > 20000.0f) hz = 20000.0f;
+            peakHzHist_ = hz;
+        }
+    }
+
     for (int i = 0; i < kLogBins; i++) {
         float peak2 = 0.0f;
         for (int b = binLo_[i]; b <= binHi_[i]; b++) {
@@ -189,11 +227,20 @@ bool SpectrumAnalyzer::Compute() {
     return true;
 }
 
+// BACON_1.5_ANALYZER_PEAKHIST (U2.62, feedback #14): see the header.  Called
+// on the UI thread when the EQ view arms the peak marker (L2+R2 ON) or
+// refocuses, so the history always starts from the moment the user began
+// listening for the peak.
+void SpectrumAnalyzer::PeakTrackReset() {
+    peakHzHist_ = 0.0f;
+    peakMag2Hist_ = 0.0f;
+}
+
 // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): strongest FFT bin in the
 // audible range with parabolic interpolation.  The bins_ grid is LOG-spaced
 // (spacing 1.4% at 85 Hz -> +-6 Hz at best), so the marker would be coarse
-// if it came from the bars; the raw 8192-bin spectrum gives 5.86 Hz spacing
-// and the parabola between the two neighbouring bins lands within ~1 Hz.
+// if it came from the bars; the raw 16384-bin spectrum gives 2.93 Hz spacing
+// and the parabola between the two neighbouring bins lands within ~0.5 Hz.
 float SpectrumAnalyzer::PeakFrequency() const {
     int lo = binLo_[0];
     int hi = binHi_[kLogBins - 1];

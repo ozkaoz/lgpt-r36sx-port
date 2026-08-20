@@ -116,6 +116,9 @@ PianoSynth::PianoSynth() {
         static const FourCC qIDs[8] = {
             SIP_EQ_Q0, SIP_EQ_Q1, SIP_EQ_Q2, SIP_EQ_Q3,
             SIP_EQ_Q4, SIP_EQ_Q5, SIP_EQ_Q6, SIP_EQ_Q7 };
+        static const FourCC slopeIDs[8] = {
+            SIP_EQS0, SIP_EQS1, SIP_EQS2, SIP_EQS3,
+            SIP_EQS4, SIP_EQS5, SIP_EQS6, SIP_EQS7 };
         eqEnable_ = new Variable("eq bypass", SIP_EQEN, 1);
         Insert(eqEnable_);
         eqMask_ = new Variable("eq bands", SIP_EQMASK, 255);
@@ -135,6 +138,11 @@ PianoSynth::PianoSynth() {
             sprintf(n, "eqq%d", i);
             eqQ_[i] = new Variable(n, qIDs[i], 100);
             Insert(eqQ_[i]);
+            // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): per-band slope
+            // (1 = 12 dB/oct, 2 = 24 dB/oct).
+            sprintf(n, "eqs%d", i);
+            eqSlope_[i] = new Variable(n, slopeIDs[i], 1);
+            Insert(eqSlope_[i]);
         }
     }
     memset(eqCache_, 0xFF, sizeof(eqCache_));
@@ -296,6 +304,13 @@ bool PianoSynth::Start(int channel, unsigned char note, bool retrigger) {
 
     pv->active_ = true;
     lastNote_[channel] = note;
+
+    // BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): every note start fades
+    // this channel's EQ biquad states to zero (see SampleInstrument::Start
+    // for the rationale - stale HIPASS cancellation residue clicks on the
+    // first samples of the new note).
+    eqDsp_.FadeChannelState(channel);
+
     return true;
 }
 
@@ -520,14 +535,15 @@ void PianoSynth::syncInstrumentEq() {
         eqDsp_.SetSampleRate(rate);
     }
 
-    int vals[34];
+    int vals[42];
     vals[0] = eqEnable_->GetInt();
     vals[1] = eqMask_->GetInt();
     for (int i = 0; i < 8; i++) {
-        vals[2 + 4 * i] = eqFreq_[i]->GetInt();
-        vals[3 + 4 * i] = eqGain_[i]->GetInt();
-        vals[4 + 4 * i] = eqType_[i]->GetInt();
-        vals[5 + 4 * i] = eqQ_[i]->GetInt();
+        vals[2 + 5 * i] = eqFreq_[i]->GetInt();
+        vals[3 + 5 * i] = eqGain_[i]->GetInt();
+        vals[4 + 5 * i] = eqType_[i]->GetInt();
+        vals[5 + 5 * i] = eqQ_[i]->GetInt();
+        vals[6 + 5 * i] = eqSlope_[i]->GetInt();
     }
     if (memcmp(vals, eqCache_, sizeof(eqCache_)) == 0) return;
     memcpy(eqCache_, vals, sizeof(eqCache_));
@@ -535,20 +551,24 @@ void PianoSynth::syncInstrumentEq() {
     eqDsp_.SetBypass(vals[0] ? false : true);
     int mask = vals[1];
     for (int band = 0; band < 8; band++) {
-        float hz = (float)vals[2 + 4 * band] / 100.0f;
+        float hz = (float)vals[2 + 5 * band] / 100.0f;
         if (hz < 20.0f) hz = 20.0f;
         if (hz > 20000.0f) hz = 20000.0f;
-        float db = (float)vals[3 + 4 * band];
-        float q = (float)vals[5 + 4 * band] / 100.0f;
+        float db = (float)vals[3 + 5 * band];
+        float q = (float)vals[5 + 5 * band] / 100.0f;
         if (q < 0.1f) q = 0.1f;
         if (q > 10.0f) q = 10.0f;
-        int type = vals[4 + 4 * band];
+        int type = vals[4 + 5 * band];
         if (type < 0) type = 0;
         if (type >= (int)FxEngine::InstrumentEq::kTypeCount) type = 0;
+        int slope = vals[6 + 5 * band];
+        if (slope < 1) slope = 1;
+        if (slope > 2) slope = 2;
         eqDsp_.SetBandFreq(band, fl2fp(hz));
         eqDsp_.SetBandGainDb(band, fl2fp(db));
         eqDsp_.SetBandType(band, (FxEngine::InstrumentEq::BandType)type);
         eqDsp_.SetBandQ(band, fl2fp(q));
+        eqDsp_.SetBandSlope(band, slope);
         eqDsp_.SetBandEnabled(band, ((mask >> band) & 1) != 0);
     }
 }

@@ -69,19 +69,30 @@ private:
 	I_Instrument *instr_ ;
 	int selected_ ;
 	bool bypass_ ;
-	// BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): L2+R2 toggles a peak
-	// marker at the strongest frequency of the targeted analyzer tap (the
-	// instrument being edited, post-EQ); L2+X+arrows steps it 1 Hz at a
-	// time and moves the selected band to it ("marcar el pico de frecuencia
-	// del sample y ajustar de 1 en 1 los hz a ecualizar").
-	bool peakMarkerOn_ ;
-	float peakHz_ ;
-	bool bandOn_[8] ;
-	int type_[8] ;
-	float freqHz_[8] ;
-	float gainDb_[8] ;
-	float q_[8] ;
-	char status_[96] ;
+// BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13) -> BACON_1.5_ANALYZER_
+    // PEAKHIST (U2.62, feedback #14): L2+R2 toggles a marker at the
+    // HISTORICAL peak of the targeted analyzer tap (the loudest spectrum
+    // peak since the marker was armed -- where the sound's energy is
+    // centered, not where it was the instant the buttons were pressed).
+    // The marker does NOT move the EQ: L2+R2+X snaps the selected band to
+    // the marker, L2+X+L/R steps it 1 Hz at a time (peakManual_ freezes the
+    // auto-follow while stepping), L2+X+UP/DN toggles the selected band's
+    // slope (12/24 dB/oct).
+    bool peakMarkerOn_ ;
+    float peakHz_ ;
+    // BACON_1.5_ANALYZER_PEAKHIST (U2.62): true while the user is stepping
+    // the marker manually (L2+X+L/R), so the per-frame history follow does
+    // not fight the stepper.
+    bool peakManual_ ;
+    bool bandOn_[8] ;
+    int type_[8] ;
+    float freqHz_[8] ;
+    float gainDb_[8] ;
+    float q_[8] ;
+    // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): per-band slope from the
+    // instrument (1 = 12 dB/oct, 2 = 24 dB/oct; non-bell types).
+    int slope_[8] ;
+    char status_[96] ;
 } ;
 
 #endif

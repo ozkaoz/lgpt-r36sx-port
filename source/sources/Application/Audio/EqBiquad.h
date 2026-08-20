@@ -43,9 +43,21 @@ enum EqBiquadType {
 //   f0   : center frequency in Hz
 //   lvl  : band gain in dB
 //   qv   : Q (0.1 .. 10)
-inline void eqBiquadCoeffs(int type, int rate, float f0, float lvl, float qv,
-                           fixed &b0, fixed &b1, fixed &b2,
-                           fixed &a1, fixed &a2) {
+//   bShift : fixed-point scale of the emitted b0..b2 (15 = Q15, 24 = Q24).
+//   BACON_1.5_EQ8_SLOPE_PRECISION (U2.62): the a1/a2 denominators are always
+//   emitted in Q15 (they are O(1)); the b0..b2 numerators can be emitted at a
+//   higher scale.  For a LOW_PASS/HIGH_PASS corner below ~500 Hz the RBJ
+//   numerator terms are ~1e-5 (e.g. 2.7e-5 at 80 Hz), BELOW one Q15 LSB
+//   (3.05e-5): truncation turned the filter into a resonator (b0=0, b1=1,
+//   b2=0) -- any instrument EQ'd with a low LP/HP corner resonated, and the
+//   24 dB/oct cascade of two "identical" stages measured a BOOST instead of
+//   the squared cut.  InstrumentEq uses bShift=24: covers the full numerator
+//   range (2.7e-5 up to ~16 for a +24 dB 20 kHz shelf) with ~0.1% precision
+//   at low corners and exact Q15 readback (>>9); ParametricEQ keeps 15 for
+//   its legacy kernel.
+inline void eqBiquadCoeffsShift(int type, int rate, float f0, float lvl,
+                                float qv, fixed &b0, fixed &b1, fixed &b2,
+                                fixed &a1, fixed &a2, int bShift) {
     float w0 = 2.0f * 3.14159265f * f0 / (float)rate;
     if (w0 > 3.14159265f * 0.9f) w0 = 3.14159265f * 0.9f;
     if (w0 < 1e-6f) w0 = 1e-6f;
@@ -160,14 +172,29 @@ inline void eqBiquadCoeffs(int type, int rate, float f0, float lvl, float qv,
     }
     }
     if (fa0 != 0.0f) {
-        b0 = fl2fp(fb0 / fa0);
-        b1 = fl2fp(fb1 / fa0);
-        b2 = fl2fp(fb2 / fa0);
-        a1 = fl2fp(fa1 / fa0);
-        a2 = fl2fp(fa2 / fa0);
+        const double scale = (double)((int64_t)1 << bShift);
+        b0 = (fixed)((double)(fb0 / fa0) * scale);
+        b1 = (fixed)((double)(fb1 / fa0) * scale);
+        b2 = (fixed)((double)(fb2 / fa0) * scale);
+        // BACON_1.5_EQ8_DEN24 (U2.62): the a1/a2 denominators also use the
+        // caller's bShift (Q24 for InstrumentEq).  In Q15 a low-frequency
+        // band's 1+a1+a2 at DC is ~1e-4 against a Q15 quantum of 3e-5, so
+        // the center gain wandered (e.g. +24 dB bell @ 100 Hz read 13.6
+        // instead of 15.8) and the DC pole was ill-conditioned enough to
+        // turn the loop's rounding into a slow ~8 Hz mode on the slope-2
+        // cascade.  The legacy Q15 emission (eqBiquadCoeffs) is unchanged.
+        a1 = (fixed)((double)(fa1 / fa0) * scale);
+        a2 = (fixed)((double)(fa2 / fa0) * scale);
     } else {
-        b0 = i2fp(1); b1 = 0; b2 = 0; a1 = 0; a2 = 0;
+        b0 = (fixed)((int64_t)1 << bShift); b1 = 0; b2 = 0; a1 = 0; a2 = 0;
     }
+}
+
+// Legacy Q15 emission (the ParametricEQ kernel scale).
+inline void eqBiquadCoeffs(int type, int rate, float f0, float lvl, float qv,
+                           fixed &b0, fixed &b1, fixed &b2,
+                           fixed &a1, fixed &a2) {
+    eqBiquadCoeffsShift(type, rate, f0, lvl, qv, b0, b1, b2, a1, a2, 15);
 }
 
 } // namespace FxEngine

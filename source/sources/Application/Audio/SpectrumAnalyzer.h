@@ -51,16 +51,17 @@ class I_Instrument;
 
 class SpectrumAnalyzer {
 public:
-    // BACON_1.5_ANALYZER_FINE (U2.61, feedback #13): 8192 points (5.86 Hz/bin
-    // at 48 kHz, 170 ms window) so the log bars each resolve 2+ real bins
-    // even at 20 Hz (bar 0 covers bins 2..5) and the PEAK marker can be
-    // interpolated to ~1 Hz precision.  154 log bars at 2 px each fill the
-    // 308 px EQ canvas with a contiguous spectrum line -- the hipass/boost
-    // cuts and the click harmonics show as real spectral shape, not
-    // staircase ("analizador mas fino, milimetrico").
-    static const int kRingFrames = 8192;
-    static const int kFftSize = 8192;
-    static const int kLogBins = 154;
+    // BACON_1.5_ANALYZER_FINE (U2.61, feedback #13) -> BACON_1.5_ANALYZER_
+    // FINER (U2.62, feedback #14): 16384 points (2.93 Hz/bin at 48 kHz,
+    // 341 ms window) so the log bars each resolve 4+ real bins even at
+    // 20 Hz (bar 0 covers bins 4..10) and the PEAK marker interpolates to
+    // ~0.5 Hz precision ("analizador mas preciso" on top of U2.61's fine
+    // grid).  308 log bars at 1 px each draw the full 308 px EQ canvas as a
+    // contiguous 1 px spectrum line.  The 16384-point FFT costs ~2x the
+    // 8192 one (still UI-thread, throttled to ~12 fps).
+    static const int kRingFrames = 16384;
+    static const int kFftSize = 16384;
+    static const int kLogBins = 308;
     static const int kRate = 48000;
 
     static SpectrumAnalyzer &Get();
@@ -95,10 +96,20 @@ public:
 
     // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13): frequency in Hz of the
     // strongest FFT bin within 20 Hz..20 kHz from the LAST Compute(), with
-    // parabolic interpolation between the two neighbours -- ~1 Hz precision
-    // at the 5.86 Hz/bin grid.  Returns 0 when no window has run yet.  The
+    // parabolic interpolation between the two neighbours -- sub-Hz precision
+    // at the 2.93 Hz/bin grid.  Returns 0 when no window has run yet.  The
     // EQ8 view uses it to place the L2+R2 peak marker.
     float PeakFrequency() const;
+
+    // BACON_1.5_ANALYZER_PEAKHIST (U2.62, feedback #14): the marker is now
+    // the HISTORICAL peak: Compute() keeps the loudest (frequency, magnitude)
+    // pair seen since the last PeakTrackReset(), so L2+R2 marks where the
+    // sound's energy is CENTERED over the whole listening window, not where
+    // it happened to be the moment the buttons were pressed.  The values are
+    // read on the UI thread after Compute() (the only writer), so no locking.
+    void PeakTrackReset();
+    float PeakFrequencyHistory() const { return peakHzHist_; }
+    bool PeakHasHistory() const { return peakMag2Hist_ > 0.0f; }
 
 private:
     SpectrumAnalyzer();
@@ -116,6 +127,11 @@ private:
     fixed bins_[kLogBins];
     int binLo_[kLogBins];
     int binHi_[kLogBins];
+
+    // BACON_1.5_ANALYZER_PEAKHIST (U2.62): historical peak tracking state
+    // (see the accessors above).  Written only by Compute() (UI thread).
+    float peakHzHist_;
+    float peakMag2Hist_;
 };
 
 #endif

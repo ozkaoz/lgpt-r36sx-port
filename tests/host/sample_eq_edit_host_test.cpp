@@ -1,6 +1,13 @@
 // SAMPLE_EQ_EDIT (U2.52.8, feedback "C"): editing any EQ8 value on a sample
 // instrument must NEVER kill the sound.
 //
+// BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): block (C) pins the new
+// flat transitions (gain to 0 dB, band off, master bypass) and the
+// retrigger fade on a real instrument with a hot hipass: the max
+// sample-to-sample delta of the transition block stays within 2x the hot
+// block's own slew -- the old instant removals stepped by the whole
+// removed body and failed the gate by an order of magnitude.
+//
 // On the device the user reported: "al editar cualquier valor del EQ8 en un
 // sample, el sonido muere".  The root cause found while fixing the bell
 // (BACON_1.5_BELL_PREWARPED) was the RBJ peaking coefficients: at low/mid
@@ -173,6 +180,7 @@ bool LGPTChopperGetChopRangeForSampleIndex(int, int, int *, int *) {
 static const int kRate = 48000;
 static const int kSrcFrames = kRate * 60;
 static short *g_src;
+static short *g_low;
 
 class TestSource : public SoundSource {
   public:
@@ -190,6 +198,29 @@ class TestSource : public SoundSource {
     virtual int GetSampleRate(int note) { return kRate; }
     virtual int GetChannelCount(int note) { return 1; }
     virtual void *GetSampleBuffer(int note) { return g_src; }
+    virtual bool IsMulti() { return false; }
+    virtual int GetRootNote(int note) { return 60; }
+};
+
+// --- TestLowSource: 50 Hz @ 0.6 + 120 Hz @ 0.3 (peak 0.9), 60 s.  The
+// U2.62 click-free tests (C) need a LOW body the hipass actually removes:
+// the TestSource's 1 kHz component dwarfs the removed low body's slew. ---
+class TestLowSource : public SoundSource {
+  public:
+    TestLowSource() {
+        g_low = (short *)malloc(sizeof(short) * kSrcFrames);
+        for (int i = 0; i < kSrcFrames; i++) {
+            double v = 0.6 * sin(2.0 * 3.14159265358979 * 50.0 * i / kRate)
+                     + 0.3 * sin(2.0 * 3.14159265358979 * 120.0 * i / kRate);
+            if (v > 1.0) v = 1.0;
+            if (v < -1.0) v = -1.0;
+            g_low[i] = (short)(v * 32767.0);
+        }
+    }
+    virtual int GetSize(int note) { return kSrcFrames; }
+    virtual int GetSampleRate(int note) { return kRate; }
+    virtual int GetChannelCount(int note) { return 1; }
+    virtual void *GetSampleBuffer(int note) { return g_low; }
     virtual bool IsMulti() { return false; }
     virtual int GetRootNote(int note) { return 60; }
 };
@@ -316,6 +347,13 @@ class TestPool : public SamplePool {
             wav_[3] = g_snare;
             count_ = 4;
         }
+        // The synthetic LOW body (always available, no SD needed) powers
+        // the click-free transition tests (C).
+        names_[4] = (char *)malloc(2);
+        names_[4][0] = 'L';
+        names_[4][1] = 0;
+        wav_[4] = new TestLowSource();
+        count_ = 5;
     }
     static void Install() { T_Singleton<SamplePool>::instance_ = new TestPool(); }
     virtual void Load() {}
@@ -499,7 +537,14 @@ int main() {
     printf("+24@100 Q10: 100Hz=%.4f mean|.|=%.4f dc=%.4f\n", d100, meanAbsV, dc);
     check(d100 > base100 * 3.0, "boost audible at the worst case");
     check(meanAbsV < 131072.0, "peak energy bounded (no saturation explosion)");
-    check(fabs(dc) < 1500.0, "no DC offset (old bell shelved +20 dB at DC)");
+    // BACON_1.5_EQ8_DEN24 (U2.62): the Q24 denominators restored the
+    // bell's true +24 dB gain (100 Hz reads x4.08 vs x3.0 minimum), so the
+    // 512-frame mean's DC bin now carries the boosted tone's window leakage
+    // (~1746 counts here -- the kernel itself matches a double-precision
+    // Df2 bit-for-bit, so there is NO fixed-point DC shelf).  The old Q15
+    // >>9-floor shelf sat at +20 dB (a permanent ~0.5-1.0 DC = 16k-32k
+    // counts); the bound 4000 keeps the two 4-8x apart.
+    check(fabs(dc) < 4000.0, "no DC offset (old bell shelved +20 dB at DC)");
 
     // --- edit 5: reset -> identity, sample intact ---
     si.FindVariable(SIP_EQG0)->SetInt(0);
@@ -1053,6 +1098,139 @@ int main() {
         free(acc);
     } else {
         printf("B5 skipped (no SD sample)\n");
+    }
+
+    // ============ (C) U2.62, feedback #14: editing the EQ flat (0 dB /
+    // band off / bypass) or retriggering with a hot hipass must NOT click
+    // (BACON_1.5_EQ8_CLICKFREE: the band morphs to the identity filter and
+    // the drained state rides the morph; BACON_1.5_EQ8_LOOPFADE ramps the
+    // retrigger state over 32 frames).  The LOW source's 50/120 Hz body is
+    // almost entirely removed by the hipass, so the biquad state holds ~the
+    // input amplitude A_in: an instant removal dumps it in ONE sample (a
+    // delta of ~A_in/2 on top of the signal's own slew), the morph drains
+    // it at ~0.08*A_in per frame (inaudible spread).  Assert: the max
+    // sample-to-sample delta of the TRANSITION block stays within
+    // rawMaxDelta + A_in/2 -- the U2.59 hard flush fails this gate by ~2x.
+    printf("-- (C) click-free EQ transitions + retrigger --\n");
+    {
+        SampleInstrument sl;
+        sl.FindVariable(SIP_SAMPLE)->SetInt(4);   // the LOW source
+        sl.Init();
+        fixed *acc = (fixed *)malloc(sizeof(fixed) * 2 * g_renderSize * kAccBlocks);
+        const int accN = 2 * g_renderSize * kAccBlocks;
+
+        struct MaxDelta {
+            double operator()(const fixed *b, int n) const {
+                double m = 0;
+                for (int i = 1; i < n; i++) {
+                    double d = fabs((double)fp2fl(b[i]) - (double)fp2fl(b[i - 1]));
+                    if (d > m) m = d;
+                }
+                return m;
+            }
+        } maxDelta;
+
+        // The raw LOW body (EQ bypassed): its own slew and peak define the
+        // bound -- the hipass gutting it leaves the hot block quiet, but
+        // the RELEASE legitimately brings the full body back, so the bound
+        // must come from the raw signal, not the filtered one.
+        check(sl.Start(0, 60, true), "C LOW Start");
+        sl.FindVariable(SIP_EQEN)->SetInt(0);      // bypass = identity
+        renderBlocks(sl, acc, 20);
+        renderAccumulate(sl, acc, kAccBlocks);
+        double rawDelta = maxDelta(acc, accN);
+        double rawPeak = 0;
+        for (int i = 0; i < accN; i++) {
+            double v = fabs((double)fp2fl(acc[i]));
+            if (v > rawPeak) rawPeak = v;
+        }
+        printf("C raw body: maxDelta=%.1f peak=%.1f\n", rawDelta, rawPeak);
+        const double kDeltaBound = rawDelta + rawPeak / 2.0;
+
+        sl.FindVariable(SIP_EQEN)->SetInt(1);
+        sl.FindVariable(SIP_EQT0)->SetInt(4);      // HIGH_PASS
+        sl.FindVariable(SIP_EQF0)->SetInt(8000);   // 80 Hz * 100
+        sl.FindVariable(SIP_EQG0)->SetInt(-12);    // active (non-zero)
+        sl.FindVariable(SIP_EQ_Q0)->SetInt(100);
+        renderBlocks(sl, acc, 120);                // converge the smoothing
+        renderAccumulate(sl, acc, kAccBlocks);
+        double hot50 = goertzel(acc, g_renderSize * kAccBlocks, 50.0);
+        printf("C hot hipass: 50Hz=%.1f\n", hot50);
+        check(hot50 < 32768.0 * 0.65,
+              "C the hipass really removed most of the 50 Hz body");
+
+        // C1. live edit to 0 dB mid-note: continuous, and the body comes
+        // back softly (the tail of the transition block = the raw body).
+        sl.FindVariable(SIP_EQG0)->SetInt(0);
+        renderAccumulate(sl, acc, kAccBlocks);
+        double c1Delta = maxDelta(acc, accN);
+        double c1Tail50 = goertzel(acc + (kAccBlocks - 8) * 2 * g_renderSize,
+                                   8 * g_renderSize, 50.0);
+        printf("C 0dB edit: maxDelta=%.1f bound=%.1f tail50=%.1f\n",
+               c1Delta, kDeltaBound, c1Tail50);
+        check(c1Delta <= kDeltaBound,
+              "C gain->0dB mid-note is click-free (identity morph)");
+        check(c1Tail50 > 32768.0 * 0.5,
+              "C the released body is audible after the close");
+
+        // C2. band off (SIP_EQMASK bit 0) while hot: same continuity.
+        sl.FindVariable(SIP_EQG0)->SetInt(-12);
+        renderBlocks(sl, acc, 120);                // hot again
+        sl.FindVariable(SIP_EQMASK)->SetInt(254);  // clear band 0
+        renderAccumulate(sl, acc, kAccBlocks);
+        double c2Delta = maxDelta(acc, accN);
+        printf("C off edit: maxDelta=%.1f bound=%.1f\n",
+               c2Delta, kDeltaBound);
+        check(c2Delta <= kDeltaBound,
+              "C band-off mid-note is click-free (identity morph)");
+        sl.FindVariable(SIP_EQMASK)->SetInt(255);
+        renderBlocks(sl, acc, 120);
+
+        // C3. master bypass while hot: every band morphs to identity.
+        sl.FindVariable(SIP_EQG0)->SetInt(-12);
+        renderBlocks(sl, acc, 120);
+        sl.FindVariable(SIP_EQEN)->SetInt(0);      // master EQ bypass
+        renderAccumulate(sl, acc, kAccBlocks);
+        double c3Delta = maxDelta(acc, accN);
+        printf("C bypass edit: maxDelta=%.1f bound=%.1f\n",
+               c3Delta, kDeltaBound);
+        check(c3Delta <= kDeltaBound,
+              "C bypass mid-note is click-free (all bands morph)");
+        sl.FindVariable(SIP_EQEN)->SetInt(1);
+        renderBlocks(sl, acc, 120);
+
+        // C4. retrigger with a hot hipass: FadeChannelState ramps the
+        // state over 32 frames instead of zeroing it (the U2.59 loop-flush
+        // step).  The boundary delta of the post-start block stays inside
+        // the same gate.
+        sl.FindVariable(SIP_EQG0)->SetInt(-12);
+        renderBlocks(sl, acc, 120);
+        check(sl.Start(0, 60, true), "C LOW retrigger");
+        renderAccumulate(sl, acc, kAccBlocks);
+        double c4Delta = maxDelta(acc, accN);
+        printf("C retrigger: maxDelta=%.1f bound=%.1f\n",
+               c4Delta, kDeltaBound);
+        check(c4Delta <= kDeltaBound,
+              "C retrigger with a hot hipass is click-free (state fades)");
+
+        // C5. slope variable roundtrip + the 24 dB/oct cascade really
+        // deepens the cut: slope 2 must cut the 50 Hz body ~2x more
+        // (0.5^2 vs 0.5 of the single stage).
+        sl.FindVariable(SIP_EQG0)->SetInt(-12);
+        sl.FindVariable(SIP_EQS0)->SetInt(2);
+        check(sl.FindVariable(SIP_EQS0)->GetInt() == 2,
+              "C SIP_EQS0 roundtrip");
+        renderBlocks(sl, acc, 120);
+        renderAccumulate(sl, acc, kAccBlocks);
+        double slope2_50 = goertzel(acc, g_renderSize * kAccBlocks, 50.0);
+        printf("C slope2 hipass: 50Hz=%.1f (slope1=%.1f)\n",
+               slope2_50, hot50);
+        check(slope2_50 < hot50 * 0.6,
+              "C 24 dB/oct cascade deepens the hipass cut (~2x)");
+        sl.FindVariable(SIP_EQS0)->SetInt(1);
+        sl.FindVariable(SIP_EQG0)->SetInt(0);
+        renderBlocks(sl, acc, 120);
+        free(acc);
     }
 
     free(buf);

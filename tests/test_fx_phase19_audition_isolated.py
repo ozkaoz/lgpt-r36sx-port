@@ -154,18 +154,22 @@ def check_eq_curve_dsp():
     assert "pxPerDb" in IEQ_VIEW
     assert "/ 48.0" in IEQ_VIEW
     # Per-frame exponential smoothing + exact snap at the last 2^-6 step.
+    # U2.62 (BACON_1.5_EQ8_DEN24): the deltas run as long long so the Q24
+    # a1/a2 denominators blend at full width; the per-frame step is still
+    # the signed >>kSmoothShift with the exact snap.
     assert "kSmoothShift" in IEQ_CPP
-    assert "bg.b0 += d0 >> kSmoothShift;" in IEQ_CPP
+    assert "bg.b0 += (fixed)(d0 >> kSmoothShift);" in IEQ_CPP
     assert "(d0 >> kSmoothShift) == 0) bg.b0 = bg.tB0;" in IEQ_CPP
     assert "bg.smoothing = false;" in IEQ_CPP
-    # Per-band-per-channel states (no shared cascade state).
+    # Per-band-per-channel-per-stage states (no shared cascade state).
     assert "state_[channel][b]" in IEQ_CPP
-    assert "ChanState &st = state_[channel][b];" in IEQ_CPP
+    assert "ChanState &st = state_[channel][b][0];" in IEQ_CPP
     # U2.52.5 (BACON_1.5_EQ8_DF2_64BIT): the transposed Df2 state update
     # runs in 64 bits (a 32-bit sum overflows with full-scale input + boosts;
-    # on the device any EQ edit "killed" the sound).
+    # on the device any EQ edit "killed" the sound).  U2.62: the products
+    # are explicit (long long)bg.b1 * (long long)xL Q24/Q15 multiplies.
     assert "BACON_1.5_EQ8_DF2_64BIT" in IEQ_CPP
-    assert "(long long)fp_mul(bg.b1, xL)" in IEQ_CPP
+    assert "(long long)bg.b1 * (long long)xL" in IEQ_CPP
     print("6. InstrumentEq: view-state curve (shared eqBiquadCoeffs), +/-24 dB, exact snap, Df2 64-bit OK")
 
 

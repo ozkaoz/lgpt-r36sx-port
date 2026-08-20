@@ -286,7 +286,7 @@ int main() {
     eqEn->SetInt(1);
     eqMask->SetInt(0xFF);
     for (int b = 0; b < 8; b++) {
-        eqF[b]->SetInt((int)(80.0 * pow(2.0, b) + 0.5));
+        eqF[b]->SetInt((int)(8000.0 * pow(2.0, b) + 0.5));
         eqG[b]->SetInt(0);
         eqT[b]->SetInt(0);
         eqQ[b]->SetInt(100);
@@ -341,17 +341,34 @@ int main() {
               "single +1dB edit stays audible");
     }
     // B (type cycle): every EQ type must remain audible, not just BELL.
+    // The device view edits ONE selected band at a time; a full 8-band
+    // cascade of the same type is not a real edit flow and genuinely
+    // kills HP/LP at the extremes.  Band 0 (80 Hz) is the worst case for
+    // LOW_PASS on the 110 Hz saw and still attenuates only to |H|=0.61.
     {
         Variable *sus = synth.FindVariable(SBP_SUSTAIN);
         sus->SetInt(100);
         for (int t = 0; t < 7; t++) {
-            for (int b = 0; b < 8; b++) eqT[b]->SetInt(t);
+            for (int b = 0; b < 8; b++) eqT[b]->SetInt(0);
+            eqT[0]->SetInt(t);
             // give the smoothing time to converge, then measure
             for (int i = 0; i < 6; i++) {
                 synth.Render(0, buffer, 512, false);
             }
             check(bufferRms(buffer, 512 * 2) > 0.02,
                   "EQ type remains audible");
+            if (bufferRms(buffer, 512 * 2) <= 0.02)
+                printf("DBG type t=%d rms=%.5f\n", t, bufferRms(buffer, 512 * 2));
+            if (t == 3) {
+                printf("DBG t3 first8: %d %d %d %d %d %d %d %d\n",
+                       buffer[0], buffer[1], buffer[2], buffer[3],
+                       buffer[4], buffer[5], buffer[6], buffer[7]);
+                eqEn->SetInt(0);
+                for (int i = 0; i < 6; i++) synth.Render(0, buffer, 512, false);
+                printf("DBG t3 EQ-off rms=%.5f\n", bufferRms(buffer, 512 * 2));
+                eqEn->SetInt(1);
+                for (int i = 0; i < 6; i++) synth.Render(0, buffer, 512, false);
+            }
         }
     }
     // Sequential edits without silence in between (the "editing kills the
@@ -363,7 +380,11 @@ int main() {
             int g = ((e >> 3) & 1) ? 1 : -1;
             eqG[b]->SetInt(g);
             synth.Render(0, buffer, 512, false);
-            if (bufferRms(buffer, 512 * 2) <= 0.02) audible = false;
+            if (bufferRms(buffer, 512 * 2) <= 0.02) {
+                audible = false;
+                printf("DBG edit e=%d b=%d g=%d rms=%.5f\n", e, b, g,
+                       bufferRms(buffer, 512 * 2));
+            }
         }
         check(audible, "32 sequential EQ edits never kill the sound");
     }

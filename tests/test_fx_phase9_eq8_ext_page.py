@@ -106,9 +106,9 @@ def check_instrument_eq():
     # BAND_PASS appended before kTypeCount (persisted values unchanged).
     assert "TYPE_BAND_PASS" in IEQ_H
     assert "kTypeCount" in IEQ_H
-    # DSP via the shared primitive.
+    # DSP via the shared primitive (U2.62: the Q24 shift variant).
     assert "EqBiquad.h" in IEQ_CPP
-    assert "eqBiquadCoeffs(" in IEQ_CPP
+    assert "eqBiquadCoeffsShift(" in IEQ_CPP
     assert "mapBandType" in IEQ_CPP
     # Fullscreen view shows the 7th type and cycles 0..6.
     assert '"BANDP"' in IEQ_VIEW

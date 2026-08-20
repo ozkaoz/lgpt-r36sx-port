@@ -1,6 +1,7 @@
 #include "InstrumentEq.h"
 
 #include <math.h>
+#include <stdio.h>
 #include "EqBiquad.h"
 
 static const float kMinGainDb = -24.0f;
@@ -42,6 +43,14 @@ static const int kKneeBQ32 = 565359;                  // B in Q32
 // kSmoothShift frames (~1.3 ms @ 48 kHz with shift 6), within 1 LSB after
 // ~7*kSmoothShift frames (~9 ms).  Inaudible, click-free edits.
 static const int kSmoothShift = 6;
+// BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): the identity target used
+// when a band closes (0 dB / disabled / bypass).  The band keeps running
+// while its coefficients blend toward these values, so the output morphs
+// filtered -> raw without a step, and the identity dynamics drain the
+// biquad state in 2 samples (no stale state to click on re-activation).
+// BACON_1.5_EQ8_SLOPE_PRECISION (U2.62): the b0..b2 numerators are Q24 (see
+// EqBiquad.h), so the identity b0 is 1.0 in Q24, not i2fp(1).
+static const fixed kIdentityB0 = (fixed)(1 << 24);  // 1.0 in Q24
 
 namespace FxEngine {
 
@@ -77,7 +86,7 @@ void InstrumentEq::Reset() {
     bypass_ = false;
     for (int b = 0; b < kNumBands; b++) {
         BandCfg &bg = bandCfg_[b];
-        bg.b0 = i2fp(1);
+        bg.b0 = kIdentityB0;
         bg.b1 = 0;
         bg.b2 = 0;
         bg.a1 = 0;
@@ -91,6 +100,7 @@ void InstrumentEq::Reset() {
         bg.hz = fl2fp(DefaultBandHz(b));
         bg.db = 0;
         bg.q = fl2fp(1.0f);
+        bg.slope = 1;
         bg.enabled = false;
         bg.type = TYPE_BELL;
     }
@@ -100,9 +110,11 @@ void InstrumentEq::Reset() {
 void InstrumentEq::ResetChannelState() {
     for (int c = 0; c < kMaxChannels; c++) {
         for (int b = 0; b < kNumBands; b++) {
-            ChanState &s = state_[c][b];
-            s.s1L = 0; s.s2L = 0;
-            s.s1R = 0; s.s2R = 0;
+            for (int s = 0; s < 2; s++) {
+                ChanState &st = state_[c][b][s];
+                st.s1L = 0; st.s2L = 0;
+                st.s1R = 0; st.s2R = 0;
+            }
         }
     }
 }
@@ -127,10 +139,10 @@ void InstrumentEq::SetSampleRate(int rate) {
 }
 
 // BACON_1.5_EQ8_STRUCTURAL: atomic edit entry point.  The fingerprint
-// (type, hz, db, q, rate) gates the float RBJ recompute; the enabled flag
-// is a free toggle that never touches the coefficient math.
+// (type, hz, db, q, slope, rate) gates the float RBJ recompute; the enabled
+// flag is a free toggle that only drives the close/reopen morph.
 void InstrumentEq::ConfigureBand(int band, BandType type, fixed hz, fixed db,
-                                 fixed q, bool enabled) {
+                                 fixed q, int slope, bool enabled) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
     if (type < 0 || type >= (BandType)kTypeCount) { rtViolations_++; return; }
 
@@ -151,67 +163,136 @@ void InstrumentEq::ConfigureBand(int band, BandType type, fixed hz, fixed db,
     if (qf > 10.0f) qf = 10.0f;
     q = fl2fp(qf);
 
+    if (slope < 1) slope = 1;
+    if (slope > 2) slope = 2;
+
     bool paramsChanged = (bg.type != type || bg.hz != hz || bg.db != db ||
-                          bg.q != q);
+                          bg.q != q || bg.slope != slope);
+    bool enabledChanged = (bg.enabled != enabled);
     bg.type = type;
     bg.hz = hz;
     bg.db = db;
     bg.q = q;
+    bg.slope = slope;
     bg.enabled = enabled;
     edited_ = true;
 
+    // BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): the close/reopen of a
+    // band always morphs (RBJ <-> identity), never snaps.  `enabledChanged`
+    // re-opens a band whose coefficients were left at identity by the
+    // previous close, so the filter has to be rebuilt.
     if (paramsChanged) {
-        recomputeBand(band);
+        if (enabled) {
+            recomputeBand(band);
+        } else {
+            smoothToIdentity(band);
+        }
+    } else if (enabledChanged) {
+        if (enabled) {
+            recomputeBand(band);
+        } else {
+            smoothToIdentity(band);
+        }
     }
     refreshFlat();
 }
 
-void InstrumentEq::SetBypass(bool on) { bypass_ = on; edited_ = true; refreshFlat(); }
+void InstrumentEq::SetBypass(bool on) {
+    if (on == bypass_) return;
+    bypass_ = on;
+    edited_ = true;
+    // BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): bypassing morphs every
+    // band to the identity filter (they keep running while the coefficients
+    // blend), and re-enabling rebuilds every band's coefficients the same
+    // way.  The old instant "flat path + state flush" step is gone.
+    for (int b = 0; b < kNumBands; b++) {
+        if (on) {
+            smoothToIdentity(b);
+        } else {
+            recomputeBand(b);
+        }
+    }
+    refreshFlat();
+}
 
 void InstrumentEq::SetBandEnabled(int band, bool on) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
-    bandCfg_[band].enabled = on; edited_ = true; refreshFlat();
+    ConfigureBand(band, bandCfg_[band].type, bandCfg_[band].hz,
+                  bandCfg_[band].db, bandCfg_[band].q,
+                  bandCfg_[band].slope, on);
 }
 
 void InstrumentEq::SetBandType(int band, BandType t) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
     ConfigureBand(band, t, bandCfg_[band].hz, bandCfg_[band].db,
-                  bandCfg_[band].q, bandCfg_[band].enabled);
+                  bandCfg_[band].q, bandCfg_[band].slope,
+                  bandCfg_[band].enabled);
 }
 
 void InstrumentEq::SetBandFreq(int band, fixed hz) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
     ConfigureBand(band, bandCfg_[band].type, hz, bandCfg_[band].db,
-                  bandCfg_[band].q, bandCfg_[band].enabled);
+                  bandCfg_[band].q, bandCfg_[band].slope,
+                  bandCfg_[band].enabled);
 }
 
 void InstrumentEq::SetBandGainDb(int band, fixed db) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
     ConfigureBand(band, bandCfg_[band].type, bandCfg_[band].hz, db,
-                  bandCfg_[band].q, bandCfg_[band].enabled);
+                  bandCfg_[band].q, bandCfg_[band].slope,
+                  bandCfg_[band].enabled);
 }
 
 void InstrumentEq::SetBandQ(int band, fixed q) {
     if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
     ConfigureBand(band, bandCfg_[band].type, bandCfg_[band].hz,
-                  bandCfg_[band].db, q, bandCfg_[band].enabled);
+                  bandCfg_[band].db, q, bandCfg_[band].slope,
+                  bandCfg_[band].enabled);
+}
+
+void InstrumentEq::SetBandSlope(int band, int slope) {
+    if (band < 0 || band >= kNumBands) { rtViolations_++; return; }
+    ConfigureBand(band, bandCfg_[band].type, bandCfg_[band].hz,
+                  bandCfg_[band].db, bandCfg_[band].q, slope,
+                  bandCfg_[band].enabled);
 }
 
 void InstrumentEq::SetAllFlat() {
     for (int b = 0; b < kNumBands; b++) {
-        bandCfg_[b].enabled = false;
-        bandCfg_[b].type = TYPE_BELL;
-        bandCfg_[b].db = 0;
-        bandCfg_[b].q = fl2fp(1.0f);
+        BandCfg &bg = bandCfg_[b];
+        bool wasActive = bg.enabled && bg.db != 0;
+        bg.enabled = false;
+        bg.type = TYPE_BELL;
+        bg.db = 0;
+        bg.q = fl2fp(1.0f);
+        bg.slope = 1;
+        if (wasActive) {
+            // BACON_1.5_EQ8_CLICKFREE (U2.62): resetting the EQ while audio
+            // plays morphs every hot band to identity instead of the old
+            // instant flush (see refreshFlat()).
+            smoothToIdentity(b);
+        }
     }
     edited_ = true;
     refreshFlat();
 }
 
+// BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): pure flag computation, no
+// audio-side effects.  The EQ bounces (flat_) only when NOTHING is running:
+// no band is hot AND no band is converging (a converging band keeps the
+// path alive until its coefficients land exactly, so the identity target is
+// reached with the state already drained).
 void InstrumentEq::refreshFlat() {
-    if (bypass_) {
-        flat_ = true;
-        ResetChannelState();
+    if (bypass_ || !edited_) {
+        // Pristine/initial EQ or explicit bypass: the bands either already
+        // hold identity coefficients or are converging to them (SetBypass
+        // morphs every band), so the path must keep running while any band
+        // is still converging.
+        bool converging = false;
+        for (int b = 0; b < kNumBands; b++) {
+            if (bandCfg_[b].smoothing) { converging = true; break; }
+        }
+        flat_ = !converging;
         return;
     }
     // BACON_1.5_EQ8_0DB_TRANSPARENT (U2.52.6, feedback): a band at 0 dB is
@@ -220,17 +301,13 @@ void InstrumentEq::refreshFlat() {
     // 80 Hz band cut everything above 80 Hz -> "the EQ kills the sound").
     // The band only enters the DSP once the user moves the gain off 0.
     bool any = false;
+    bool converging = false;
     for (int b = 0; b < kNumBands; b++) {
+        if (bandCfg_[b].smoothing) { converging = true; }
         if (!bandCfg_[b].enabled) continue;
-        if (bandCfg_[b].db != 0) { any = true; break; }
+        if (bandCfg_[b].db != 0) { any = true; }
     }
-    flat_ = !any;
-    if (flat_) {
-        // BACON_1.5_EQ8_STRUCTURAL: entering the flat path leaves stale
-        // filter states behind; reset them so the next edit starts clean
-        // (no transient from the old filter when the band comes back).
-        ResetChannelState();
-    }
+    flat_ = !any && !converging;
 }
 
 // FXP_INSTRUMENT_EQ_BP (bacon-1.5, item 2): the coefficient math lives in the
@@ -249,24 +326,49 @@ static int mapBandType(int t) {
     }
 }
 
+// BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): ramp one band's
+// coefficients to the identity filter (b0=1, rest 0) instead of the old
+// instant snap.  The band KEEPS RUNNING while the coefficients blend toward
+// identity, so the output morphs filtered->raw over ~9 ms (the old refresh
+// flat-path flush removed the filter in one step: with a HIPASS below 80 Hz
+// the state holds large low-frequency cancellation values, and dumping them
+// at once jumped the output by the whole removed signal - the click heard
+// "al final al editar").  The per-frame loop also drains the state during
+// the close (see Process), so nothing is left to pop when the coefficients
+// land exactly on identity.
+void InstrumentEq::smoothToIdentity(int band) {
+    BandCfg &bg = bandCfg_[band];
+    bg.tB0 = kIdentityB0;
+    bg.tB1 = 0;
+    bg.tB2 = 0;
+    bg.tA1 = 0;
+    bg.tA2 = 0;
+    if (bg.b0 != bg.tB0 || bg.b1 != bg.tB1 || bg.b2 != bg.tB2 ||
+        bg.a1 != bg.tA1 || bg.a2 != bg.tA2) {
+        bg.smoothing = true;
+    } else {
+        bg.smoothing = false;
+    }
+}
+
 void InstrumentEq::recomputeBand(int band) {
     BandCfg &bg = bandCfg_[band];
     // BACON_1.5_EQ8_0DB_TRANSPARENT: a 0 dB band is the identity filter for
-    // EVERY type.  Snap the coefficients immediately (no smoothing, no
-    // stale LP/HP/NOTCH state left behind while the band is transparent).
+    // EVERY type.  The band morphs to it smoothly (see smoothToIdentity);
+    // the state drain in Process() removes the old LP/HP/NOTCH residue so
+    // the band comes back clean.
     if (bg.db == 0) {
-        bg.tB0 = bg.b0 = i2fp(1);
-        bg.tB1 = bg.b1 = 0;
-        bg.tB2 = bg.b2 = 0;
-        bg.tA1 = bg.a1 = 0;
-        bg.tA2 = bg.a2 = 0;
-        bg.smoothing = false;
+        smoothToIdentity(band);
         return;
     }
     if (rate_ <= 0) return;
     fixed b0, b1, b2, a1, a2;
-    eqBiquadCoeffs(mapBandType((int)bg.type), rate_, fp2fl(bg.hz),
-                   fp2fl(bg.db), fp2fl(bg.q), b0, b1, b2, a1, a2);
+    // BACON_1.5_EQ8_SLOPE_PRECISION (U2.62): numerators at Q24 so LP/HP
+    // corners below ~500 Hz keep their exact ~1e-5 RBJ values (a Q15 b1 of
+    // 1.79 truncates to 1, turning the LP into a resonator; the 24 dB/oct
+    // cascade of the broken stage then BOOSTED instead of squaring the cut).
+    eqBiquadCoeffsShift(mapBandType((int)bg.type), rate_, fp2fl(bg.hz),
+                        fp2fl(bg.db), fp2fl(bg.q), b0, b1, b2, a1, a2, 24);
     // Set the target coefficients; the per-frame loop smooths cur -> tgt.
     bg.tB0 = b0; bg.tB1 = b1; bg.tB2 = b2; bg.tA1 = a1; bg.tA2 = a2;
     if (bg.b0 != bg.tB0 || bg.b1 != bg.tB1 || bg.b2 != bg.tB2 ||
@@ -280,10 +382,30 @@ void InstrumentEq::recomputeBand(int band) {
 // BACON_1.5_EQ8_SOFTKNEE (U2.59, feedback #12): see the constants above;
 // the old per-block scale-to-2.0 limiter is gone.  The knee runs inline
 // per sample (64-bit), after the band loop.
+// BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): per-frame state drain used
+// while a band closes (targets == identity).  The coefficient morph alone
+// would leave the biquad's memory frozen (the near-identity recurrence
+// stops driving it), and the exact-identity dynamics would then dump that
+// residue over 2 samples - a pop of the removed signal's amplitude.  The
+// drain scales the state by (1/32)^(1/42) each frame, so after the ~42
+// frames of the morph the residue is ~A/32 (a 2-sample discharge ~40 dB
+// below the removed component - inaudible) and the output path is
+// continuous throughout (the released energy spreads over the whole morph,
+// no step anywhere).
+static const fixed kCloseFadeQ15 = 30172;  // (1/32)^(1/42) * 2^15
+
 void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
     if (frames <= 0 || !buffer) { rtViolations_++; return; }
     if (flat_) return;  // zero cost
     if (channel < 0 || channel >= kMaxChannels) { rtViolations_++; return; }
+    static int dbgPass = 0;
+    dbgPass++;
+    if (dbgPass % 2 == 0) {
+        const BandCfg &bg = bandCfg_[0];
+        printf("DBG active b0=%d b1=%d b2=%d a1=%d a2=%d smoothing=%d\n",
+                    (int)bg.b0, (int)bg.b1, (int)bg.b2, (int)bg.a1, (int)bg.a2,
+                    (int)bg.smoothing);
+    }
 
     // BACON_1.5_EQ8_SOFTKNEE (U2.59, feedback #12): the old block limiter
     // note is gone.  The int32 sample pipeline wraps at +/-2.0 when two
@@ -303,28 +425,32 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
         if (fade > 0) {
             fixed r = kFadeRampQ15[kFadeFrames - (fade--)];
             for (int b = 0; b < kNumBands; b++) {
-                ChanState &st = state_[channel][b];
-                st.s1L = fp_mul(st.s1L, r);
-                st.s2L = fp_mul(st.s2L, r);
-                st.s1R = fp_mul(st.s1R, r);
-                st.s2R = fp_mul(st.s2R, r);
+                for (int s = 0; s < 2; s++) {
+                    ChanState &st = state_[channel][b][s];
+                    // 64-bit: the states are 2^24-scale (see ChanState).
+                    st.s1L = (st.s1L * (long long)r) >> 15;
+                    st.s2L = (st.s2L * (long long)r) >> 15;
+                    st.s1R = (st.s1R * (long long)r) >> 15;
+                    st.s2R = (st.s2R * (long long)r) >> 15;
+                }
             }
         }
         // BACON_1.5_EQ8_STRUCTURAL: per-frame exponential coefficient blend
-        // (only while a band is converging).
+        // (only while a band is converging).  The diffs are 64-bit: the Q24
+        // identity b0 (1<<24) minus a target can span the whole int32 range.
         for (int b = 0; b < kNumBands; b++) {
             BandCfg &bg = bandCfg_[b];
             if (!bg.smoothing) continue;
-            fixed d0 = bg.tB0 - bg.b0;
-            fixed d1 = bg.tB1 - bg.b1;
-            fixed d2 = bg.tB2 - bg.b2;
-            fixed dA1 = bg.tA1 - bg.a1;
-            fixed dA2 = bg.tA2 - bg.a2;
-            bg.b0 += d0 >> kSmoothShift;
-            bg.b1 += d1 >> kSmoothShift;
-            bg.b2 += d2 >> kSmoothShift;
-            bg.a1 += dA1 >> kSmoothShift;
-            bg.a2 += dA2 >> kSmoothShift;
+            long long d0 = (long long)bg.tB0 - (long long)bg.b0;
+            long long d1 = (long long)bg.tB1 - (long long)bg.b1;
+            long long d2 = (long long)bg.tB2 - (long long)bg.b2;
+            long long dA1 = (long long)bg.tA1 - (long long)bg.a1;
+            long long dA2 = (long long)bg.tA2 - (long long)bg.a2;
+            bg.b0 += (fixed)(d0 >> kSmoothShift);
+            bg.b1 += (fixed)(d1 >> kSmoothShift);
+            bg.b2 += (fixed)(d2 >> kSmoothShift);
+            bg.a1 += (fixed)(dA1 >> kSmoothShift);
+            bg.a2 += (fixed)(dA2 >> kSmoothShift);
             // Snap the last sub-2^-6 residual so convergence is EXACT
             // (the (tgt-cur)>>6 step lands on zero while still apart).
             if (bg.b0 != bg.tB0 && (d0 >> kSmoothShift) == 0) bg.b0 = bg.tB0;
@@ -336,6 +462,23 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
                 bg.a1 == bg.tA1 && bg.a2 == bg.tA2) {
                 bg.smoothing = false;
             }
+            // BACON_1.5_EQ8_CLICKFREE (U2.62): while a band is closing
+            // (targets == identity) drain its state on ALL channels and
+            // stages, so no residue is left for the identity dynamics to
+            // dump (see the constant above).
+            if (bg.tB0 == kIdentityB0 && bg.tB1 == 0 && bg.tB2 == 0 &&
+                bg.tA1 == 0 && bg.tA2 == 0) {
+                for (int c = 0; c < kMaxChannels; c++) {
+                    for (int s = 0; s < 2; s++) {
+                        ChanState &st = state_[c][b][s];
+                        // 64-bit: the states are 2^24-scale (see ChanState).
+                        st.s1L = (st.s1L * (long long)kCloseFadeQ15) >> 15;
+                        st.s2L = (st.s2L * (long long)kCloseFadeQ15) >> 15;
+                        st.s1R = (st.s1R * (long long)kCloseFadeQ15) >> 15;
+                        st.s2R = (st.s2R * (long long)kCloseFadeQ15) >> 15;
+                    }
+                }
+            }
         }
 
         fixed xL = buffer[idx];
@@ -343,27 +486,94 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
         for (int b = 0; b < kNumBands; b++) {
             const BandCfg &bg = bandCfg_[b];
             // BACON_1.5_EQ8_0DB_TRANSPARENT: same rule as refreshFlat() --
-            // a 0 dB band (any type) never touches the audio.
-            if (!bg.enabled || bg.db == 0) continue;
-            ChanState &st = state_[channel][b];
-            // BACON_1.5_EQ8_DF2_64BIT: compute the transposed Df2 state update
-            // in 64 bits.  With full-scale input and EQ boosts the per-term
-            // Q15 values (b1*x, a1*t, s2...) can each approach +/-2^31, so a
-            // 32-bit sum overflows (verified under UBSAN; on the device any
-            // edit "killed" the sample sound: U2.52.5).  The final value fits
-            // in 32 bits, so the truncation is exact.
-            fixed tL = (fixed)((long long)fp_mul(bg.b0, xL) + st.s1L);
-            st.s1L = (fixed)((long long)fp_mul(bg.b1, xL) -
-                             (long long)fp_mul(bg.a1, tL) + st.s2L);
-            st.s2L = (fixed)((long long)fp_mul(bg.b2, xL) -
-                             (long long)fp_mul(bg.a2, tL));
-            fixed tR = (fixed)((long long)fp_mul(bg.b0, xR) + st.s1R);
-            st.s1R = (fixed)((long long)fp_mul(bg.b1, xR) -
-                             (long long)fp_mul(bg.a1, tR) + st.s2R);
-            st.s2R = (fixed)((long long)fp_mul(bg.b2, xR) -
-                             (long long)fp_mul(bg.a2, tR));
-            xL = tL;
-            xR = tR;
+            // a 0 dB band (any type) never touches the audio.  A band that
+            // is still converging (closing to identity or opening to its
+            // filter) must keep running.
+            if ((!bg.enabled || bg.db == 0) && !bg.smoothing) continue;
+            ChanState &st = state_[channel][b][0];
+            // BACON_1.5_EQ8_DF2_64BIT: transposed Df2 state update in 64 bits.
+            // With full-scale input and EQ boosts the per-term values can
+            // each approach +/-2^31, so a 32-bit sum overflows (verified
+            // under UBSAN; on the device any edit "killed" the sample sound:
+            // U2.52.5).  The final value fits in 32 bits, so the truncation
+            // is exact.
+            // BACON_1.5_EQ8_SLOPE_PRECISION (U2.62): the b0..b2 numerators
+            // AND the a1..a2 denominators are Q24 (see EqBiquad.h).  The
+            // STATES run at 2^24 (9 fractional bits below the signal): the
+            // numerator products (b0..b2, 2^24 * 2^15 = 2^39, >>15 to 2^24)
+            // and the denominator products (a1..a2, 2^24 * 2^24 = 2^48,
+            // >>24 to 2^24) accumulate in the extended states, truncated to
+            // the signal scale ONLY at the output.  In the old Q15 layout
+            // the 80 Hz LP numerator terms (b1 = 1.79 Q15) truncated to
+            // (0,1,0) and the filter became a resonator (see EqBiquad.h).
+            // BACON_1.5_EQ8_SLOPE_ROUND (U2.62): every shift ROUNDS (+half)
+            // instead of flooring.  With floor, the >>9 at the output biases
+            // the loop by ~0.5 Q15/sample; the quantized Q15 denominator is
+            // ~9.2e-5 at DC (ill-conditioned), so the bias lands as a ~0.17
+            // DC offset (|H(200)| measured 0.51 instead of 0.167).  Rounding
+            // makes the bias zero-mean.
+            // BACON_1.5_EQ8_DF2_FULL24 (U2.62): the state feedback uses the
+            // FULL 2^24 sum `y`, NOT the >>9 output t.  Feeding back t
+            // dropped 9 bits of state resolution every sample; with the
+            // ill-conditioned DC denominator (1+a1+a2 ~ 1.8e-4 for a 100 Hz
+            // bell, tau ~5500 frames) that loss excited a slow ~8 Hz mode
+            // that grew to +/-0.06 on a slope-2 cascade.  With y at 2^24 the
+            // a-terms shift >>24 (a1*2^24 * y*2^24 = 2^48), the loop is
+            // closed at full precision and the >>9 happens only at the
+            // output readback.
+            {
+                long long yL =
+                    (((long long)bg.b0 * (long long)xL + 16384) >> 15) +
+                    st.s1L;
+                fixed tL = (fixed)((yL + 256) >> 9);
+                st.s1L = (((long long)bg.b1 * (long long)xL + 16384) >> 15) -
+                         (((long long)bg.a1 * (long long)yL + (1 << 23)) >> 24) +
+                         st.s2L;
+                st.s2L = (((long long)bg.b2 * (long long)xL + 16384) >> 15) -
+                         (((long long)bg.a2 * (long long)yL + (1 << 23)) >> 24);
+                long long yR =
+                    (((long long)bg.b0 * (long long)xR + 16384) >> 15) +
+                    st.s1R;
+                fixed tR = (fixed)((yR + 256) >> 9);
+                st.s1R = (((long long)bg.b1 * (long long)xR + 16384) >> 15) -
+                         (((long long)bg.a1 * (long long)yR + (1 << 23)) >> 24) +
+                         st.s2R;
+                st.s2R = (((long long)bg.b2 * (long long)xR + 16384) >> 15) -
+                         (((long long)bg.a2 * (long long)yR + (1 << 23)) >> 24);
+                // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): a band with
+                // slope 2 (24 dB/oct) cascades the same biquad through stage
+                // [1].  Only non-bell types can use it (a bell's shape is
+                // its Q), so a BELL band always runs the single stage.
+                if (bg.slope == 2 && bg.type != TYPE_BELL) {
+                    ChanState &st2 = state_[channel][b][1];
+                    long long yL2 =
+                        (((long long)bg.b0 * (long long)tL + 16384) >> 15) +
+                        st2.s1L;
+                    fixed tL2 = (fixed)((yL2 + 256) >> 9);
+                    st2.s1L =
+                        (((long long)bg.b1 * (long long)tL + 16384) >> 15) -
+                        (((long long)bg.a1 * (long long)yL2 + (1 << 23)) >> 24) +
+                        st2.s2L;
+                    st2.s2L =
+                        (((long long)bg.b2 * (long long)tL + 16384) >> 15) -
+                        (((long long)bg.a2 * (long long)yL2 + (1 << 23)) >> 24);
+                    long long yR2 =
+                        (((long long)bg.b0 * (long long)tR + 16384) >> 15) +
+                        st2.s1R;
+                    fixed tR2 = (fixed)((yR2 + 256) >> 9);
+                    st2.s1R =
+                        (((long long)bg.b1 * (long long)tR + 16384) >> 15) -
+                        (((long long)bg.a1 * (long long)yR2 + (1 << 23)) >> 24) +
+                        st2.s2R;
+                    st2.s2R =
+                        (((long long)bg.b2 * (long long)tR + 16384) >> 15) -
+                        (((long long)bg.a2 * (long long)yR2 + (1 << 23)) >> 24);
+                    tL = tL2;
+                    tR = tR2;
+                }
+                xL = tL;
+                xR = tR;
+            }
         }
         // BACON_1.5_EQ8_SOFTKNEE_C1: per-sample soft knee (linked L/R is
         // unnecessary: each channel maps independently, same curve).  The
@@ -414,6 +624,13 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
         idx += 2;
     }
     fade_[channel] = fade;
+    // BACON_1.5_EQ8_CLICKFREE (U2.62, feedback #14): a close-transition can
+    // converge in the middle of playback; re-evaluate the flat flag so the
+    // very next Process() call bounces instead of looping through a fully
+    // transparent band set.  refreshFlat() is pure (no audio effects), and
+    // the per-band skip above keeps the remaining frames of THIS buffer
+    // transparent anyway.
+    if (!flat_) refreshFlat();
 }
 
 } // namespace FxEngine
