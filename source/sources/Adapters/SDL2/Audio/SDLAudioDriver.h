@@ -5,6 +5,9 @@
 #include <SDL2/SDL.h>
 #include "System/Process/Process.h"
 
+// BUG2 FIX (Bacon 1.5 FX): SDL2 AudioDevice API
+static const int kSDL2FixMarker = 1;
+
 class SDLAudioDriver ;
 
 class SDLAudioDriverThread: public SysThread {
@@ -37,6 +40,7 @@ public:
 	void OnChunkDone(Uint8 *stream,int len) ;
 
 private:
+  SDL_AudioDeviceID devId_; // BUG2 FIX: SDL2 device
   int fragSize_ ;  // Actual fragsize used by the driver
   char *unalignedMain_ ;
   char *mainBuffer_ ;

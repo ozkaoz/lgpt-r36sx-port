@@ -1,6 +1,27 @@
 #include "AudioMixer.h"
 #include "System/System/System.h"
 #include <math.h>
+#include <stdint.h>
+
+// BUG1 FIX (Bacon 1.5 FX): EQ <-80 dB overflow idx=dB+80
+static const uint16_t eqGainTable[] = {
+    0, 0, 0, 1, 1, 1, 2, 2, 3, 4, 5, 6, 8, 10, 13, 16,
+    20, 25, 32, 40, 51, 64, 81, 102, 128, 161, 203, 256, 322, 406, 511, 643,
+    810, 1020, 1284, 1617, 2036, 2563, 3227, 4063, 5115, 6440, 8107, 10206, 12849, 16178,
+    20366, 25640, 32277, 40634, 51160, 64407, 65535, 65535, 65535, 65535, 65535, 65535,
+    65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,
+    65535, 65535, 65535, 65535
+};
+static const int kEqGainTableSize = sizeof(eqGainTable)/sizeof(eqGainTable[0]);
+static inline fixed eqGainFromDbClamped(int dB){
+    int idx=dB+80;
+    if(idx<0) idx=0;
+    if(idx>=kEqGainTableSize) idx=kEqGainTableSize-1;
+    if(dB<=-80) return 0;
+    float m=powf(10.0f,(float)dB/20.0f);
+    if(m<0) m=0; if(m>4) m=4;
+    return fl2fp(m);
+}
 
 #define MAX_POSITIVE_FIXED i2fp(32767)
 #define MAX_NEGATIVE_FIXED i2fp(-32768)

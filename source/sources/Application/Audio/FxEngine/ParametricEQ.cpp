@@ -1,6 +1,26 @@
 #include "ParametricEQ.h"
 #include <math.h>
+#include <stdint.h>
 #include "Application/Audio/EqBiquad.h"
+
+// BUG1 FIX: EQ <-80 dB overflow idx=dB+80
+static const uint16_t eqGainTable[] = {
+    0, 1, 2, 3, 4, 6, 8, 11, 15, 20, 27, 36, 48, 64, 85, 113,
+    150, 199, 264, 350, 464, 615, 815, 1080, 1431, 1896, 2512, 3329, 4411, 5844, 7743, 10259,
+    13592, 18009, 23860, 31613, 41884, 55493, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,
+    65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,
+    65535, 65535, 65535, 65535, 65535, 65535
+};
+static const int kEqGainTableSize = sizeof(eqGainTable)/sizeof(eqGainTable[0]);
+static inline fixed eqGainFromDbClamped(int dB){
+    int idx=dB+80;
+    if(idx<0) idx=0;
+    if(idx>=kEqGainTableSize) idx=kEqGainTableSize-1;
+    if(dB<=-80) return 0;
+    float m=powf(10.0f,(float)dB/20.0f);
+    if(m<0) m=0; if(m>4) m=4;
+    return fl2fp(m);
+}
 
 namespace FxEngine {
 
@@ -106,7 +126,9 @@ void ParametricEQ::SetBandGainDb(int band, fixed db) {
         return;
     }
     float g = fp2fl(db);
-    if (g < FX_EQ_MIN_DB) g = FX_EQ_MIN_DB;
+    // BUG1 FIX: -81/-90/-120 -> silencio
+    if (g <= -80.0f) g = -90.0f;
+    else if (g < FX_EQ_MIN_DB) g = FX_EQ_MIN_DB;
     if (g > FX_EQ_MAX_DB) g = FX_EQ_MAX_DB;
     bands_[band].db = fl2fp(g);
     refreshBandEnabled(band);

@@ -2,10 +2,30 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdint.h>
 #include "EqBiquad.h"
 
 static const float kMinGainDb = -24.0f;
 static const float kMaxGainDb = 24.0f;
+
+// BUG1 FIX (Bacon 1.5 FX): EQ <-80 dB overflow idx=dB+80
+static const uint16_t eqGainTable[] = {
+    0, 1, 2, 3, 4, 6, 8, 11, 15, 20, 27, 36, 48, 64, 85, 113,
+    150, 199, 264, 350, 464, 615, 815, 1080, 1431, 1896, 2512, 3329, 4411, 5844, 7743, 10259,
+    13592, 18009, 23860, 31613, 41884, 55493, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,
+    65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,
+    65535, 65535, 65535, 65535, 65535, 65535
+};
+static const int kEqGainTableSize = sizeof(eqGainTable)/sizeof(eqGainTable[0]);
+static inline fixed eqGainFromDbClamped(int dB){
+    int idx=dB+80;
+    if(idx<0) idx=0;
+    if(idx>=kEqGainTableSize) idx=kEqGainTableSize-1;
+    if(dB<=-80) return 0;
+    float m=powf(10.0f,(float)dB/20.0f);
+    if(m<0) m=0; if(m>4) m=4;
+    return fl2fp(m);
+}
 // BACON_1.5_EQ8_SOFTKNEE (U2.59, feedback #12): per-sample soft knee that
 // mirrors the master safety limiter (AudioMixer::Render, BACON_1.5_MASTER_
 // SAFETY U2.56) but caps at UNITY instead of 1.0-at-the-master:
@@ -154,7 +174,9 @@ void InstrumentEq::ConfigureBand(int band, BandType type, fixed hz, fixed db,
     hz = fl2fp(f);
 
     float g = fp2fl(db);
-    if (g < kMinGainDb) g = kMinGainDb;
+    // BUG1 FIX: -81/-90/-120 dB -> silencio, no amplificación
+    if (g <= -80.0f) g = -90.0f;
+    else if (g < kMinGainDb) g = kMinGainDb;
     if (g > kMaxGainDb) g = kMaxGainDb;
     db = fl2fp(g);
 
