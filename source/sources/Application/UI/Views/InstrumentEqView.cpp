@@ -159,6 +159,7 @@ InstrumentEqView::InstrumentEqView(GUIWindow &w, ViewData *data)
         bandOn_[i] = true;
         slope_[i] = 1;
     }
+    for (int i = 0; i < 308; i++) heldH_[i] = 0.0f;
 }
 
 InstrumentEqView::~InstrumentEqView() {
@@ -272,6 +273,7 @@ void InstrumentEqView::OnFocus() {
     // tracking from this focus, so L2+R2 marks the peak of the CURRENT
     // listening session.
     SpectrumAnalyzer::Get().PeakTrackReset();
+    for (int i = 0; i < 308; i++) heldH_[i] = 0.0f;
     setStatus(0);
     isDirty_ = true;
 }
@@ -279,6 +281,7 @@ void InstrumentEqView::OnFocus() {
 void InstrumentEqView::LooseFocus() {
     SpectrumAnalyzer::Get().SetArmed(false);
     SpectrumAnalyzer::Get().SetInstrumentTarget(0);
+    for (int i = 0; i < 308; i++) heldH_[i] = 0.0f;
     View::LooseFocus();
 }
 
@@ -607,8 +610,8 @@ void InstrumentEqView::PostFlushDraw() {
             if ((++fftThrottle % 5) == 0) sp.Compute();
             const fixed *bb = sp.Bins();
             const int n = sp.BinCount();
-            int bw = (cX1 - cX0) / n;
-            int barW = 1;
+            int canvasW = cX1 - cX0 + 1;
+            // bar width inclusive to cover 6..314 without gap
             // BACON_1.5_ANALYZER_EQUAL (U2.65): peak hold para que todas
             // las barras (graves, medios, agudos) se vean iguales como
             // los graves ("todas las barras deben ser iguales").  Los
@@ -616,7 +619,6 @@ void InstrumentEqView::PostFlushDraw() {
             // hold el snare desaparece en 1 frame y parece distinto.
             // Hold con decay 0.92 por frame de UI (~60 fps, vida media
             // ~500 ms) mantiene el pico visible igual que el kick.
-            static float heldH[308] = {0};
             for (int i = 0; i < n; i++) {
                 // BACON_1.5_ANALYZER_DB (U2.53, feedback #7): the bars are
                 // dB-mapped so height moves with perceived loudness and the
@@ -626,7 +628,7 @@ void InstrumentEqView::PostFlushDraw() {
                 // bars map -36..+4 dB over the canvas (floor -36 dB, 0 dBFS
                 // at 90% of the canvas, +4 dB clipped at the top) so the
                 // hi-hat highs (real kit: -25..-29 dB) read and move.
-                float p = fp2fl(bb[i]) * 4.0f;
+                float p = fp2fl(bb[i]);
                 float db = (p > 0.0f) ? 20.0f * log10f(p) : -80.0f;
                 float frac = (db + 36.0f) / 40.0f;
                 if (frac < 0.0f) frac = 0.0f;
@@ -634,22 +636,21 @@ void InstrumentEqView::PostFlushDraw() {
                 int h = (int)(frac * (float)(cY1 - cY0));
                 if (h < 2) h = 2;
                 if (h > cY1 - cY0) h = cY1 - cY0;
-                // hold solo >140 Hz para que hihat sin bajos no encienda graves;
-                // graves (<140 Hz) sin hold para que sean instantáneos y no se queden pegados
-                float fcHold = 20.0f * powf(1000.0f, (float)i / (float)(n - 1));
+                float fcHold = sp.BinFrequency(i);
                 int hh = h;
                 if (fcHold > 140.0f) {
-                    if ((float)h > heldH[i]) heldH[i] = (float)h;
-                    else heldH[i] *= 0.92f;
-                    hh = (int)(heldH[i] + 0.5f);
+                    if ((float)h > heldH_[i]) heldH_[i] = (float)h;
+                    else heldH_[i] *= 0.92f;
+                    hh = (int)(heldH_[i] + 0.5f);
                     if (hh < 2) hh = 2;
                     if (hh > cY1 - cY0) hh = cY1 - cY0;
                 } else {
-                    heldH[i] = (float)h; // sin hold en graves
+                    heldH_[i] = (float)h;
                 }
-                int bx = cX0 + i * bw + (bw - barW) / 2;
+                int bx = cX0 + (i * canvasW) / n;
+                int nextBx = cX0 + ((i + 1) * canvasW) / n;
+                int barW = nextBx - bx;
                 tfFill(bx, cY1 - hh, barW, hh, specBlend);
-                // top con diagonal a ambos lados (pico dinámico)
                 tfFill(bx, cY1 - hh, barW, 1, specTop);
                 if (bx > cX0) tfFill(bx - 1, cY1 - hh + 1, 1, 1, specTop);
                 if (bx + barW < cX1) tfFill(bx + barW, cY1 - hh + 1, 1, 1, specTop);

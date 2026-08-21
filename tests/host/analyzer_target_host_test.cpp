@@ -221,5 +221,81 @@ int main() {
     }
 
     printf("analyzer_mix_host_test: ALL OK (%d checks)\n", checks);
+    // --- 7. Instrument target switching clears capture (new spec) ---
+    {
+        SpectrumAnalyzer &sp2 = SpectrumAnalyzer::Get();
+        sp2.SetArmed(true);
+        // Use fake instrument pointers (only pointer identity matters)
+        const I_Instrument *fakeA = (const I_Instrument*)0x1001;
+        const I_Instrument *fakeB = (const I_Instrument*)0x1002;
+        sp2.SetInstrumentTarget(fakeA);
+        // Feed via instrument A
+        {
+            fixed buf[2*SpectrumAnalyzer::kRingFrames];
+            for(int i=0;i<SpectrumAnalyzer::kRingFrames;i++){ int c=(int)(10000*sin(2*3.14159265*1000*i/48000.0)); fixed s=i2fp(c); buf[i*2]=s; buf[i*2+1]=s; }
+            sp2.FeedInstrument(buf, SpectrumAnalyzer::kRingFrames);
+        }
+        CHECK(sp2.Compute());
+        bool anyA=false; for(int i=0;i<sp2.BinCount();i++) if(fp2fl(sp2.Bins()[i])>0.01f) anyA=true;
+        CHECK(anyA);
+        float peakA = sp2.PeakFrequency();
+        CHECK(peakA>0);
+        sp2.PeakTrackReset();
+        // feed again to create history
+        {
+            fixed buf[2*SpectrumAnalyzer::kRingFrames];
+            for(int i=0;i<SpectrumAnalyzer::kRingFrames;i++){ int c=(int)(20000*sin(2*3.14159265*1000*i/48000.0)); fixed s=i2fp(c); buf[i*2]=s; buf[i*2+1]=s; }
+            sp2.FeedInstrument(buf, SpectrumAnalyzer::kRingFrames);
+        }
+        sp2.Compute();
+        CHECK(sp2.PeakHasHistory());
+        // Switch to B should clear immediately
+        sp2.SetInstrumentTarget(fakeB);
+        for(int i=0;i<sp2.BinCount();i++) CHECK(sp2.Bins()[i]==0);
+        CHECK(!sp2.PeakHasHistory());
+        CHECK(sp2.PeakFrequency()==0);
+        // Feed silent via B should not inherit
+        {
+            fixed buf[2*SpectrumAnalyzer::kRingFrames];
+            memset(buf,0,sizeof(buf));
+            sp2.FeedInstrument(buf, SpectrumAnalyzer::kRingFrames);
+        }
+        sp2.Compute();
+        bool anyB=false; for(int i=0;i<sp2.BinCount();i++) if(fp2fl(sp2.Bins()[i])>0.01f) anyB=true;
+        CHECK(!anyB);
+        // Idempotent: setting same target again should not clear
+        // Save a lit state first
+        {
+            fixed buf[2*SpectrumAnalyzer::kRingFrames];
+            for(int i=0;i<SpectrumAnalyzer::kRingFrames;i++){ int c=(int)(10000*sin(2*3.14159265*1000*i/48000.0)); fixed s=i2fp(c); buf[i*2]=s; buf[i*2+1]=s; }
+            sp2.FeedInstrument(buf, SpectrumAnalyzer::kRingFrames);
+        }
+        sp2.Compute();
+        float before = fp2fl(sp2.Bins()[100]);
+        sp2.SetInstrumentTarget(fakeB);
+        CHECK(fp2fl(sp2.Bins()[100])==before);
+        sp2.SetArmed(true);
+        CHECK(fp2fl(sp2.Bins()[100])==before);
+        // Changing armed should clear
+        sp2.SetArmed(false);
+        for(int i=0;i<sp2.BinCount();i++) CHECK(sp2.Bins()[i]==0);
+        sp2.SetArmed(true);
+        // Master fallback when target is null
+        sp2.SetInstrumentTarget(0);
+        {
+            fixed buf[2*SpectrumAnalyzer::kRingFrames];
+            for(int i=0;i<SpectrumAnalyzer::kRingFrames;i++){ int c=(int)(10000*sin(2*3.14159265*500*i/48000.0)); fixed s=i2fp(c); buf[i*2]=s; buf[i*2+1]=s; }
+            sp2.FeedMix(buf, SpectrumAnalyzer::kRingFrames);
+        }
+        CHECK(sp2.Compute());
+        { bool any=false; for(int i=0;i<sp2.BinCount();i++) if(fp2fl(sp2.Bins()[i])>0.01f) any=true; CHECK(any); }
+        // WantsInstrument
+        sp2.SetInstrumentTarget(fakeA);
+        CHECK(sp2.WantsInstrument(fakeA));
+        CHECK(!sp2.WantsInstrument(fakeB));
+        CHECK(!sp2.WantsInstrument(0));
+        sp2.SetArmed(false);
+    }
+    printf("analyzer_target_extended: %d checks\n", checks);
     return 0;
 }

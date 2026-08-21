@@ -35,6 +35,8 @@ FILES=(
   "$SOURCE/Application/UI/Views/ModalDialogs/SampleChopperModal.cpp"
   "$SOURCE/Application/UI/Views/MixerView.cpp"
   "$SOURCE/Application/Audio/AudioFileStreamer.cpp"
+  "$SOURCE/Application/Audio/SpectrumAnalyzer.cpp"
+  "$SOURCE/Application/UI/Views/InstrumentEqView.cpp"
   "$SOURCE/Adapters/TREEFROG/Audio/TreeFrogUac2Bridge.cpp"
 )
 for file_path in "${FILES[@]}"; do

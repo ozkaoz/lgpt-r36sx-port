@@ -302,4 +302,25 @@
 **Relacionado:** `EqBiquad.h`, `InstrumentEq.cpp/h`, `InstrumentEqView.cpp`, `tests/host/eq_sub80_host_test.cpp`, `tests/host/sample_eq_edit_host_test.cpp:1173`
 ---
 
+
+## DEC-2026-08-21-31 — Analyzer fix: correct Hz mapping, Blackman 2/sum, clearCapture, hold/barW
+
+**Decisión:** Reemplazar mapeo solapado ±30%→±10% y `visGain` por intervalos exclusivos con bordes `sqrt(f[i]*f[i+1])`, `lo=ceil(edgeLow/hzPerBin)` `hi=ceil(edgeHigh/hzPerBin)-1`, interpolación de potencia si `hi<lo` (pixel < bin), exponer `BinFrequency(i)`, pico solo `7..6826` con parábola una vez por `Compute()` (`peakHz_`), escala Blackman `amplitudeScale=2/sum` (0 dBFS→1.0, -12dBFS 0.25→0.25, clamp 1.0, sin `visGain` ni `*4`), ventana lazy (68kB), `runFft` optimizado (copia ring+media, luego `(wre-mean)*window`), `clearCapture()` y `SetArmed`/`SetInstrumentTarget` no-inline idempotentes (resetean `ringPos_`, `ring_`, `bins_`, `lastSeenGeneration_`, picos), `InstrumentEqView` `heldH_[308]` miembro limpio en ctor/`OnFocus`/`LooseFocus`, `BinFrequency` para hold>140Hz, `fp2fl` sin `*4`, `canvasW=309` `bx=cX0+(i*canvasW)/n` cubre 6..314.
+
+**Motivo:** Ventanas solapadas hacían tono 1kHz iluminar 770-1430Hz y máximo a 1.43k; `visGain` inclinaba agudos; compensaciones Hann→Blackman descalibradas; ring heredaba espectro al cambiar instrumento; hold estático sobrevivía foco.
+
+**Evidencia:**
+- `spectrum_analyzer_host_test` 50 checks PASS (984Hz 0.9999 width1, sweep 30-19000 ±1px Peak<3Hz, -6dBFS 0.35-0.55, DC 0.0000, pulse 0.0139)
+- `analyzer_target` 1781 checks PASS (master fallback, WantsInstrument, clearCapture)
+- `hat_probe` 308 bins sin overflow, `eq8_struct` 109 PASS, `eq_sub80` 22 PASS
+- Build `c43006ae1a62feb3e5891d9e4494c852905f887b7e97e916680b7925c2d9a73a` 1.4M, `host_syntax_check` PASS (SpectrumAnalyzer+InstrumentEqView), `audit` PASS (salvo F10 golden desfasado y WAVs ausentes documentados)
+- SD `c43006a` local==SD, R36SX PASS 2026-08-21 14:45 tonos 40-16k posición correcta, sin diagonal visGain, cambio instrumento limpia espectro
+
+**Consecuencias:** Sustituye `visGain` y ventanas de DEC-04/07, conserva Blackman y `hold>140Hz` de DEC-04/07.
+
+**Relacionado:** `SpectrumAnalyzer.cpp/h`, `InstrumentEqView.cpp/h`, `tests/host/spectrum_analyzer_host_test.cpp`, `tests/host/analyzer_target_host_test.cpp`, `tests/host/hat_probe.cpp`
+
+**Follow-ups (fuera de alcance):** cancelación antiphase L/R por downmix, concatenación multi-canal mismo instrumento, sync para adapters concurrentes.
+
+---
 *Fin de DECISIONS.md*

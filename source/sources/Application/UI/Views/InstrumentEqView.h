@@ -92,6 +92,7 @@ private:
     // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): per-band slope from the
     // instrument (1 = 12 dB/oct, 2 = 24 dB/oct; non-bell types).
     int slope_[8] ;
+    float heldH_[308] ;
     char status_[96] ;
 } ;
 

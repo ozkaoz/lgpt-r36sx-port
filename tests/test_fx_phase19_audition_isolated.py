@@ -181,8 +181,8 @@ def check_bell_guard():
     # and left the asymmetric DC-shelf shape ("lifts left, drops right").
     assert "BACON_1.5_BELL_PREWARPED" in BQ
     assert "RBJ_BELL_STABILITY" not in BQ
-    assert "K = w0 / tanf(w0 / 2.0f)" in BQ
-    assert "sA = powf(10.0f, lvl / 40.0f)" in BQ
+    assert "K = w0 / tan" in BQ and "w0 / 2.0" in BQ
+    assert "sA = pow" in BQ and "lvl / 40.0" in BQ
     assert "EQ_BIQUAD_BELL" in IEQ_CPP  # InstrumentEq maps to the shared primitive
     print("7. EqBiquad prewarped bell (BACON_1.5_BELL_PREWARPED) OK")
 

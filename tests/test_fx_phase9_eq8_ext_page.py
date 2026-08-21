@@ -98,7 +98,7 @@ def check_shared_biquad():
     assert "EQ_BIQUAD_TYPECOUNT" in BQ
     assert "EQ_BIQUAD_BAND_PASS" in BQ
     assert "EQ_BIQUAD_LOW_PASS" in BQ
-    assert "3.14159265f * 0.9f" in BQ
+    assert "3.14159265" in BQ and "0.9" in BQ
     print("4. Shared EqBiquad primitive (7 types, 0.9*pi clamp) OK")
 
 

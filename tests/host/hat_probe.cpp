@@ -91,10 +91,10 @@ int main(int argc, char **argv) {
     sp.SetArmed(true);
 
     // Peak per bar over the whole file + per-block px mapping (EQ8 view:
-    // h = mixVULevel(fp2fl(bin)*4) * 208, min 2 px).
-    float barPeak[32] = {0};
-    int maxPxOld[32] = {0};
-    int maxPxNew[32] = {0};
+    // h = mixVULevel(fp2fl(bin)) * 208, min 2 px).
+    float barPeak[308] = {0};
+    int maxPxOld[308] = {0};
+    int maxPxNew[308] = {0};
     int blocks = 0;
     fixed *buf = (fixed *)malloc(sizeof(fixed) * 2 * kFrames);
     for (int off = 0; off < outFrames; off += kFrames) {
@@ -115,10 +115,10 @@ int main(int argc, char **argv) {
         for (int i = 0; i < sp.BinCount(); i++) {
             float v = fp2fl(bb[i]);
             if (v > barPeak[i]) barPeak[i] = v;
-            int pxOld = (int)(mixVULevel(v * 4.0f) * 208.0f);
+            int pxOld = (int)(mixVULevel(v) * 208.0f);
             if (pxOld < 2) pxOld = 2;
             if (pxOld > maxPxOld[i]) maxPxOld[i] = pxOld;
-            int pxNew = (int)(eq8Frac(v * 4.0f) * 208.0f);
+            int pxNew = (int)(eq8Frac(v) * 208.0f);
             if (pxNew < 2) pxNew = 2;
             if (pxNew > maxPxNew[i]) maxPxNew[i] = pxNew;
         }

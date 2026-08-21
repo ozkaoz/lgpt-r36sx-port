@@ -1,245 +1,125 @@
-// EQ8_SPECTRUM_VERIFY (U2.57b, feedback #10 + U2.59, feedback #12): objective
-// host check that the SpectrumAnalyzer bins ARE a faithful representation of
-// the audio fed from the master mix.
-//
-// The analyzer (SpectrumAnalyzer.cpp) is fed the final master buffer in DAC
-// counts <<15; FeedMix stores the mono average as (l>>16)+(r>>16), which for
-// two identical full-scale channels is ~1.0 after fp2fl().  A 16384-point
-// Hann-windowed FFT (BACON_1.5_ANALYZER_FINER, U2.62 -- 2.93 Hz/bin) then
-// maps a 0 dBFS sine at an exact FFT bin to a peak of N*A/4 / N = 0.25;
-// the EQ8 view scales x4 to a full bar (0 dBFS = full).
-//
-// U2.57b perceptual model (feedback #10: "las barras no se dibujan en
-// sonidos altos; en los graves (kick) si se dibujan"):
-//   - DCBLOCK: the window mean is subtracted before the FFT.  Percussive
-//     attacks carry a DC transient (the kit's hi-hat swings -4000..+9000
-//     counts during the first 20 ms, dc_attack.py); the Hann FFT mapped it
-//     onto bins 1-3, so bars 20..120 Hz pinned at full on EVERY percussive
-//     hit.  The ear hears the AC content, not the DC step.  (A linear
-//     detrend was tried in U2.57b and REJECTED: it cost -5.3 dB on a
-//     46.875 Hz 1-cycle tone, i.e. real kick bodies.)
-//   - INSTANT_PEAK: bins are the instantaneous per-window peak, NO temporal
-//     smoothing.
-//
-// U2.62 grid: 308 log bars over 20 Hz..20 kHz, FFT 16384 (2.93 Hz/bin at
-// 48 kHz).  The window covers the newest 16384 of a 16384-frame ring, so a
-// full feed fills the window exactly.  Reference bar indices (log grid
-// 20*1000^(i/307)):
-//   - 46.875 Hz (bin 16)  -> bar 38 (fc ~48.0 Hz)
-//   - 100 Hz (bin 34)     -> bar 72 (fc ~100 Hz)
-//   - 984.375 Hz (bin 336)-> bar 173 (fc ~1017 Hz)
-//   - 16 kHz (bin 5461)   -> bar 297 (fc ~16.1 kHz)
-//
-// Scenarios:
-//   1. silence -> every bin is 0.
-//   2. 0 dBFS sine at bin 336 (984.375 Hz): the peak lands on bar 173 at
-//      ~0.25, the +-30% log overlap lights bars 162..189 at the same height,
-//      and the far bars stay ~0.
-//   3. same sine at -12 dBFS (amp 0.25): bar 173 at ~0.0625, exactly 4x less
-//      -- the bars reflect the real dynamics.
-//   4. low-bass resolution: a sine exactly at bin 16 (46.875 Hz) lights
-//      bar 38 at ~0.25; a 20 Hz sine falls below bin 2 and reads the lobe
-//      minus the window DC (documented 20..70 Hz floor); a 100 Hz sine
-//      lights bar 72 WITHOUT reaching the 1 kHz bars.
-//   5. 16 kHz sine lands on bar 297, not the mid bars.
-//   6. full-scale DC (the hi-hat DC transient, ~4300 counts): the DCBLOCK
-//      removes it -- all bars ~0.
-//   7. a full-scale 1 ms pulse (broadband, like a kick transient): it must
-//      NOT pin any bar to full -- the per-bar peak stays < 0.06.
+// SpectrumAnalyzer host test - new spec (exclusive log intervals, Blackman 2/sum, no visGain, no x4)
 #include "Application/Audio/SpectrumAnalyzer.h"
 #include "Application/Utils/fixed.h"
-
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 
 static int checks = 0;
 static int failures = 0;
-
 static void check(bool cond, const char *what) {
     checks++;
-    if (!cond) {
-        failures++;
-        printf("FAIL: %s\n", what);
-    }
+    if (!cond) { failures++; printf("FAIL: %s\n", what); }
 }
-
 static int logBarIndex(double hz) {
-    double r = log(hz / 20.0) / log(20000.0 / 20.0);
-    return (int)(r * (SpectrumAnalyzer::kLogBins - 1) + 0.5);
+    double r = log(hz / 20.0) / log(20000.0 / 20.0) * (SpectrumAnalyzer::kLogBins - 1);
+    return (int)(r + 0.5);
 }
-
-// The master mix arrives in DAC counts << 15 (AudioOutDriver scale):
-// a count of 32767 (0 dBFS) is the fixed value 32767 << 15.  FeedMix
-// downsamples with (l>>16)+(r>>16), so the feeder must use that scale.
-static void feedSine(float ampHz, int ampCounts) {
-    const int kFrames = SpectrumAnalyzer::kRingFrames;
-    fixed buf[2 * kFrames];
-    for (int i = 0; i < kFrames; i++) {
-        float v = (float)ampCounts *
-                  sinf(2.0f * 3.14159265f * ampHz * i / 48000.0f);
+static void feedSine(float hz, int ampCounts) {
+    const int kF = SpectrumAnalyzer::kRingFrames;
+    fixed buf[2*kF];
+    for (int i=0;i<kF;i++) {
+        float v = (float)ampCounts * sinf(2.0f*3.14159265f*hz*i/48000.0f);
         fixed s = ((fixed)(long long)v) << 15;
-        buf[i * 2] = s;
-        buf[i * 2 + 1] = s;
+        buf[i*2]=s; buf[i*2+1]=s;
     }
-    SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
-    sp.SetArmed(true);
-    sp.FeedMix(buf, kFrames);
+    SpectrumAnalyzer::Get().SetArmed(true);
+    SpectrumAnalyzer::Get().FeedMix(buf,kF);
 }
-
 static void feedDC(int ampCounts) {
-    const int kFrames = SpectrumAnalyzer::kRingFrames;
-    fixed buf[2 * kFrames];
+    const int kF = SpectrumAnalyzer::kRingFrames;
+    fixed buf[2*kF];
     fixed s = ((fixed)ampCounts) << 15;
-    for (int i = 0; i < kFrames; i++) {
-        buf[i * 2] = s;
-        buf[i * 2 + 1] = s;
-    }
-    SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
-    sp.SetArmed(true);
-    sp.FeedMix(buf, kFrames);
+    for(int i=0;i<kF;i++){ buf[i*2]=s; buf[i*2+1]=s; }
+    SpectrumAnalyzer::Get().SetArmed(true);
+    SpectrumAnalyzer::Get().FeedMix(buf,kF);
 }
+static void oneShot(float hz,int amp){ feedSine(hz,amp); SpectrumAnalyzer::Get().Compute(); }
 
-// One feed + compute: with INSTANT_PEAK (U2.57b) a sustained tone reaches
-// its steady-state value in a single frame (the ring holds the full window).
-static void oneShot(float ampHz, int ampCounts) {
-    feedSine(ampHz, ampCounts);
-    SpectrumAnalyzer::Get().Compute();
-}
-
-int main() {
+int main(){
     SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
-
     // 1. silence
     sp.SetArmed(true);
-    static fixed silence[SpectrumAnalyzer::kRingFrames * 2];
-    memset(silence, 0, sizeof(silence));
+    static fixed silence[SpectrumAnalyzer::kRingFrames*2];
+    memset(silence,0,sizeof(silence));
     sp.FeedMix(silence, SpectrumAnalyzer::kRingFrames);
-    check(sp.Compute(), "compute on silence");
-    bool allZero = true;
-    for (int i = 0; i < sp.BinCount(); i++) {
-        if (fp2fl(sp.Bins()[i]) > 0.001f) allZero = false;
-    }
-    check(allZero, "silence: all bins 0");
-
-    // 2. 0 dBFS sine at bin 336 (984.375 Hz) -> bar 173 (fc ~1017 Hz) ~0.25.
-    //    Design finding: the bands are +/-30% LOG bands, so the +-30%
-    //    ranges of bars 162..189 all contain bin 336 -- a pure tone lights
-    //    ~28 contiguous bars at the same height (soft overlap, not
-    //    leakage).  What must NOT happen: the tone reaching the far ends.
-    oneShot(984.375f, 32767);
+    check(sp.Compute(),"compute silence");
+    bool allZero=true;
+    for(int i=0;i<sp.BinCount();i++) if(fp2fl(sp.Bins()[i])>0.001f) allZero=false;
+    check(allZero,"silence all bins 0");
+    // 2. 984.375 Hz exact bin (bin 336) 0 dBFS
+    oneShot(984.375f,32767);
     {
         int bar = logBarIndex(984.375);
-        float peakBar = fp2fl(sp.Bins()[bar]);
-        printf("1kHz 0dBFS: bar%d=%.4f bar%d=%.4f\n", bar, peakBar, bar + 1,
-               fp2fl(sp.Bins()[bar + 1]));
-        check(peakBar > 0.22f && peakBar < 0.28f,
-              "1 kHz 0 dBFS: bar 173 ~0.25 (Hann N/4)");
-        check(fp2fl(sp.Bins()[bar + 1]) > 0.15f,
-              "overlap design: bar 174 shares bin 336");
-        float bar0 = fp2fl(sp.Bins()[0]);
-        float barTop = fp2fl(sp.Bins()[logBarIndex(16000.0)]);
-        printf("1kHz 0dBFS: bar0=%.4f bar297=%.4f\n", bar0, barTop);
-        check(bar0 < 0.02f && barTop < 0.02f, "1 kHz stays out of the far bars");
+        // Find max bar
+        int peakBar=0; float peakVal=0;
+        for(int i=0;i<sp.BinCount();i++){ float v=fp2fl(sp.Bins()[i]); if(v>peakVal){peakVal=v; peakBar=i;} }
+        printf("984Hz 0dB: peakBar=%d expect=%d val=%.4f\n",peakBar,bar,peakVal);
+        check(abs(peakBar - bar) <= 1,"984Hz max visual in real bin log");
+        check(peakVal > 0.95f && peakVal < 1.05f,"984Hz 0dB amplitude 0.95-1.0");
+        // width above -6dB (0.5 * peak) max 3 pixels
+        int width=0;
+        for(int i=0;i<sp.BinCount();i++){ if(fp2fl(sp.Bins()[i]) > peakVal*0.5f) width++; }
+        printf("984Hz width -6dB = %d\n",width);
+        check(width <= 3,"984Hz width above -6dB max 3 pixels");
+        // no plateau of 28 bars: check that bar+14 is low
+        float plateau = fp2fl(sp.Bins()[bar+14 < sp.BinCount() ? bar+14 : bar]);
+        check(plateau < 0.1f, "no 28-bar plateau");
+        // far bars low
+        check(fp2fl(sp.Bins()[0]) < 0.02f && fp2fl(sp.Bins()[logBarIndex(16000)]) < 0.02f,"984Hz far bars low");
+        // PeakFrequency
+        float pf = sp.PeakFrequency();
+        printf("PeakFrequency %.2f\n",pf);
+        check(fabsf(pf - 984.375f) < 3.0f,"PeakFrequency <3Hz");
     }
-
-    // 3. same sine at -12 dBFS: exactly 4x less (instantaneous peak)
-    oneShot(984.375f, 8192);
+    // 3. same tone amp 0.25 (8192)
+    oneShot(984.375f,8192);
     {
-        float peakBar = fp2fl(sp.Bins()[logBarIndex(984.375)]);
-        printf("1kHz -12dBFS: bar173=%.4f\n", peakBar);
-        check(peakBar > 0.055f && peakBar < 0.075f,
-              "-12 dBFS is 4x below 0 dBFS (0.0625)");
+        float v = fp2fl(sp.Bins()[logBarIndex(984.375)]);
+        printf("984Hz 0.25 amp bar=%.4f\n",v);
+        check(v > 0.24f && v < 0.26f,"984Hz amp 0.25 reading 0.24-0.26");
     }
-
-    // 4. low-bass floor: bin 16 (46.875 Hz) lights bar 38 at ~0.25.  A
-    //    20 Hz sine (bin 6.8) falls below bin 8 -- its Hann main lobe
-    //    lands on bins 6-7, so bar 0 still reads part of it (documented
-    //    20..70 Hz floor).  A 100 Hz sine (bin 34) must light the low
-    //    bars WITHOUT reaching the 1 kHz bars.
-    oneShot(46.875f, 32767);
-    {
-        int bar = logBarIndex(46.875);
-        float b = fp2fl(sp.Bins()[bar]);
-        printf("46.875Hz 0dBFS: bar%d=%.4f\n", bar, b);
-        // U2.65: visGain uniforme +3dB/oct desde 20 Hz, 1 kHz normalizado a 1.0
-        // hace que 46 Hz quede ~0.17 (0.7x) pero igual visible como graves
-        check(b > 0.12f && b < 0.30f, "46.875 Hz (bin 16) lights bar 38");
+    // 4. sweep
+    double freqs[]={30,40,60,80,100,200,440,1000,2500,5000,10000,16000,19000};
+    for(int f=0;f<13;f++){
+        double hz=freqs[f];
+        oneShot((float)hz,32767);
+        int expect = logBarIndex(hz);
+        int peakBar=0; float peakVal=0;
+        for(int i=0;i<sp.BinCount();i++){ float v=fp2fl(sp.Bins()[i]); if(v>peakVal){peakVal=v; peakBar=i;}}
+        printf("sweep %.0f expect %d peak %d val %.3f pf %.1f\n",hz,expect,peakBar,peakVal,sp.PeakFrequency());
+        check(abs(peakBar - expect) <= 1,"sweep max visual +-1 pixel");
+        check(fabsf(sp.PeakFrequency() - (float)hz) < 3.0f,"sweep PeakFrequency <3Hz");
+        // -6dBFS amp 0.5 should be 0.35-0.55? Actually -6dBFS is 0.5 amp -> 0.5*1.0 =0.5, but with Blackman maybe 0.35-0.55
+        // We'll test amplitude 0.5 counts 16384
+        feedSine((float)hz,16384);
+        sp.Compute();
+        float v6 = fp2fl(sp.Bins()[peakBar]);
+        // For 0.5 amp, expect ~0.5
+        check(v6 > 0.35f && v6 < 0.55f,"sweep -6dBFS 0.35-0.55");
     }
-    oneShot(20.0f, 32767);
-    {
-        float bar0 = fp2fl(sp.Bins()[0]);
-        printf("20Hz 0dBFS: bar0=%.4f (lobe minus window DC)\n", bar0);
-        // The window covers 6.8 cycles of a 20 Hz tone, so the DC-block
-        // removes only a small fraction of the tone (vs the 0.43 cycles of
-        // the old 1024 window) and bar 0 reads most of the lobe.
-        check(bar0 > 0.12f && bar0 < 0.30f,
-              "20 Hz: bar 0 reads the lobe minus the window DC (documented floor)");
-    }
-    oneShot(100.0f, 32767);
-    {
-        float barLow = fp2fl(sp.Bins()[logBarIndex(100.0)]);
-        float barHigh = fp2fl(sp.Bins()[logBarIndex(1000.0)]);
-        printf("100Hz 0dBFS: bar72=%.4f bar173=%.4f\n", barLow, barHigh);
-        check(barLow > 0.05f, "100 Hz lights the low bars");
-        check(barHigh < 0.05f, "100 Hz stays out of the 1 kHz bar");
-    }
-
-    // 5. 16 kHz sine -> bar 297 (fc ~16.1 kHz)
-    oneShot(16000.0f, 32767);
-    {
-        int bar = logBarIndex(16000.0);
-        float b = fp2fl(sp.Bins()[bar]);
-        printf("16kHz 0dBFS: bar%d=%.4f\n", bar, b);
-        check(b > 0.10f, "16 kHz lands on the top bar 297");
-        float mid = fp2fl(sp.Bins()[logBarIndex(1000.0)]);
-        check(mid < 0.05f, "16 kHz stays out of the mid bars");
-    }
-
-    // 6. DCBLOCK: a sustained DC of 4300 counts (the measured hi-hat DC
-    //    transient swing) must read ~0 everywhere -- the mean subtraction
-    //    removes it before the FFT.
+    // 5. DC
     feedDC(4300);
-    check(sp.Compute(), "compute on DC 4300");
+    sp.Compute();
     {
-        float worst = 0.0f;
-        for (int i = 0; i < sp.BinCount(); i++) {
-            float v = fp2fl(sp.Bins()[i]);
-            if (v > worst) worst = v;
-        }
-        printf("DC 4300: worst bar=%.4f\n", worst);
-        check(worst < 0.01f, "DC transient is blocked (bars ~0)");
+        float worst=0; for(int i=0;i<sp.BinCount();i++){ float v=fp2fl(sp.Bins()[i]); if(v>worst) worst=v; }
+        printf("DC worst %.4f\n",worst);
+        check(worst < 0.01f,"DC bins ~0");
     }
-
-    // 7. INSTANT_PEAK: a full-scale 1 ms pulse (48 samples, like a kick
-    //    transient) at the FFT window center must NOT pin any bar to full:
-    //    the detrended per-bar peak stays < 0.06 while a real sustained
-    //    tone reads 0.25.  The ring holds the NEWEST 16384 frames (ringPos_
-    //    wraps to 0 after the feed, so the window is the whole feed; its
-    //    center is 8192).
+    // 6. 1ms pulse
     {
-        const int kFrames = SpectrumAnalyzer::kRingFrames;
-        fixed buf[2 * kFrames];
-        memset(buf, 0, sizeof(buf));
-        fixed s = ((fixed)32767) << 15;
-        for (int i = 8168; i < 8216; i++) {
-            buf[i * 2] = s;
-            buf[i * 2 + 1] = s;
-        }
+        const int kF = SpectrumAnalyzer::kRingFrames;
+        fixed buf[2*kF];
+        memset(buf,0,sizeof(buf));
+        fixed s = ((fixed)32767)<<15;
+        for(int i=8168;i<8216;i++){ buf[i*2]=s; buf[i*2+1]=s; }
         sp.SetArmed(true);
-        sp.FeedMix(buf, kFrames);
+        sp.FeedMix(buf,kF);
+        sp.Compute();
+        float worst=0; for(int i=0;i<sp.BinCount();i++){ float v=fp2fl(sp.Bins()[i]); if(v>worst) worst=v; }
+        printf("1ms pulse worst %.4f\n",worst);
+        check(worst < 0.2f,"1ms pulse not full scale");
     }
-    check(sp.Compute(), "compute on 1 ms pulse");
-    {
-        float worst = 0.0f;
-        for (int i = 0; i < sp.BinCount(); i++) {
-            float v = fp2fl(sp.Bins()[i]);
-            if (v > worst) worst = v;
-        }
-        printf("1ms pulse: worst bar=%.4f\n", worst);
-        check(worst < 0.06f, "a 1 ms transient never pins a bar (sustained tones read 0.25)");
-    }
-
-    printf("EQ8_SPECTRUM_VERIFY: %d checks, %d failures\n", checks, failures);
-    return failures ? 1 : 0;
+    printf("spectrum_analyzer: %d checks, %d failures\n",checks,failures);
+    return failures?1:0;
 }

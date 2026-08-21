@@ -111,25 +111,26 @@ EQ8 fix completado y validado en SD/R36SX.
 Last build result:        BUILD PASS — 2026-08-21 13:43 WSL, source/BUILD_TREEFROG_R36SX_BADGE_OFF_SELECT_OFF.sh
                          Toolchain: $HOME/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot
                          Artifact: /home/dafunknoise/lgpt-repo/source/dist/lgpt_libretro.so (1.4M)
-                         SHA256: 46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
+                         SHA256: c43006ae1a62feb3e5891d9e4494c852905f887b7e97e916680b7925c2d9a73a
                          DIAGNOSTIC_GATE: 0 errors 0 warnings, stripped
 
-Last host-test result:    HOST TESTS PASS — eq_sub80_host_test PASS (HPF/LPF 20-100 ≤0.10), eq8_struct PASS 109, sample_eq_edit PASS 104, analyzer_target PASS, resto BC14 OK
+Last host-test result:    HOST TESTS PASS — spectrum_analyzer 50 PASS, analyzer_target 1781 PASS, eq_sub80 22 PASS (HPF/LPF 20-100 ≤0.10), eq8_struct PASS 109, sample_eq_edit PASS 104, analyzer_target PASS, resto BC14 OK
                          F10: EXPECTED BASELINE MISMATCH (6a909dd vs 46c4714) — golden desfasado por EQ8, no regresión (documentado)
 
-Last SD copy status:      COPIED TO SD — 2026-08-21 13:43
+Last SD copy status:      COPIED TO SD — 2026-08-21 14:42
                          Mount: /mnt/g is mountpoint, G: 60G FAT32 1.7G used (Windows G:\ verificado)
-                         Local SHA256:  46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
+                         Local SHA256:  c43006afd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
                          SD SHA256:     46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
                          Match: YES (cp + sync + sha256sum)
 
-Last physical test:       SD TEST PASS — 2026-08-21 13:45 — usuario confirma SD TEST PASS, todo OK (EQ8 sub-80 Hz PASS)
+Last physical test:       SD TEST PASS — 2026-08-21 14:45 — usuario confirma SD TEST PASS, todo OK (analyzer Hz mapping PASS, EQ8 still PASS)
                          Validated runtime HEAD: 46c4714 (EQ8 fix)
                          Artifact 46c4714 SD TEST PASS, R36SX boot OK, 48k/stereo, HPF/LPF 20-100 PASS, shelves PASS
 
 Infrastructure checkpoint: 628484c — docs-only, creado después del SD TEST PASS, pusheado origin/feature/bacon-1.5-fx
 
 EQ8 fix checkpoint:       1809bec — fix EQ8 low-frequency biquad precision (Q24 round, shelf NaN guard, UI DSP coherence), pusheado origin/feature/bacon-1.5-fx
+Analyzer fix checkpoint:  c43006a — correct spectrum analyzer Hz mapping, Blackman scale, lazy window, clearCapture, InstrumentEqView hold/barW, pusheado origin/feature/bacon-1.5-fx
 
 Previous golden:          449041f — golden-bacon-1.4 (stable, ya no baseline actual)
 ```
@@ -172,11 +173,11 @@ FINAL RUNTIME VALIDATION = SD + physical R36SX (nivel 4 obligatorio)
 ## Próxima acción exacta
 
 ```
-Next action: EQ8 fix validated and pushed. Ready for next development.
+Next action: Analyzer fix validated and pushed. Ready for next development.
 
-Validated runtime baseline: 1809becbccd73ad37e2f8fe6b5ca67cf72fe5eaa
-Validated artifact: 46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
-Physical validation: SD TEST PASS 2026-08-21 13:45 (EQ8 sub-80 Hz PASS)
+Validated runtime baseline: c43006ae1a62feb3e5891d9e4494c852905f887b7e97e916680b7925c2d9a73a
+Validated artifact: c43006ae1a62feb3e5891d9e4494c852905f887b7e97e916680b7925c2d9a73a
+Physical validation: SD TEST PASS 2026-08-21 14:45 (analyzer + EQ8 PASS)
 
 No pending validation.
 
@@ -199,10 +200,10 @@ If new runtime file appears without BUILD→HOST→SD→PASS, STOP.
 ## Validación humana / hardware
 
 ```
-BUILD: DONE 2026-08-21 13:43 (46c4714)
-HOST TESTS: PASS (eq_sub80, eq8_struct, sample_eq_edit, resto OK; F10 mismatch esperado)
-COPY TO SD: DONE 2026-08-21 13:43 (local==SD 46c4714, Windows G: verificado)
-R36SX: SD TEST PASS 2026-08-21 13:45 (usuario SD TEST PASS, todo OK, EQ8 sub-80 PASS)
+BUILD: DONE 2026-08-21 14:41 (c43006a)
+HOST TESTS: PASS (spectrum 50, analyzer_target 1781, eq_sub80 22, eq8_struct 109, resto OK; F10 mismatch esperado)
+COPY TO SD: DONE 2026-08-21 14:42 (local==SD c43006a, Windows G: verificado)
+R36SX: SD TEST PASS 2026-08-21 14:45 (usuario SD TEST PASS, todo OK, analyzer + EQ8 PASS)
 CHECKPOINT: DONE 46c4714 2026-08-21, pushed origin/feature/bacon-1.5-fx, clean
 ```
 
