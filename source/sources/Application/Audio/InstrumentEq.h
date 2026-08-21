@@ -130,11 +130,11 @@ public:
         fixed v2 = bandCfg_[band].b2;
         fixed va1 = bandCfg_[band].a1;
         fixed va2 = bandCfg_[band].a2;
-        *b0 = v0 >= 0 ? (fixed)(v0 >> 9) : (fixed)(-((-(long long)v0) >> 9));
-        *b1 = v1 >= 0 ? (fixed)(v1 >> 9) : (fixed)(-((-(long long)v1) >> 9));
-        *b2 = v2 >= 0 ? (fixed)(v2 >> 9) : (fixed)(-((-(long long)v2) >> 9));
-        *a1 = va1 >= 0 ? (fixed)(va1 >> 9) : (fixed)(-((-(long long)va1) >> 9));
-        *a2 = va2 >= 0 ? (fixed)(va2 >> 9) : (fixed)(-((-(long long)va2) >> 9));
+        *b0 = v0 >= 0 ? (fixed)((v0 + 256) >> 9) : (fixed)(-((-(long long)v0 + 256) >> 9));
+        *b1 = v1 >= 0 ? (fixed)((v1 + 256) >> 9) : (fixed)(-((-(long long)v1 + 256) >> 9));
+        *b2 = v2 >= 0 ? (fixed)((v2 + 256) >> 9) : (fixed)(-((-(long long)v2 + 256) >> 9));
+        *a1 = va1 >= 0 ? (fixed)((va1 + 256) >> 9) : (fixed)(-((-(long long)va1 + 256) >> 9));
+        *a2 = va2 >= 0 ? (fixed)((va2 + 256) >> 9) : (fixed)(-((-(long long)va2 + 256) >> 9));
     }
 
     bool WasEdited() const { return edited_; }

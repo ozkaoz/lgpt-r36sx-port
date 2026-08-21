@@ -282,4 +282,24 @@
 
 ---
 
+
+## DEC-2026-08-21-30 — EQ8 sub-80 Hz fix: Q24 round, shelf NaN guard, UI DSP coherence
+
+**Decisión:** Corregir `EqBiquad` para usar `coeffFromDouble` con round-to-nearest + saturación int32 (no trunc), clamp `arg` shelves `if(arg<0) arg=0` para evitar NaN, `InstrumentEq::GetBandCoeffs` con round `(v+256)>>9`, `InstrumentEqView` curva con `eqBiquadCoeffsShift …,24` y `qDraw` espejo `recomputeBand` (<80 Hz slope>1 y LP/HP siempre 0.707). Mantener `FIXED_SHIFT=15` global intacto, precisión local Q24.
+
+**Motivo:** Q15 trunc causaba LPF 20 Hz `b=0` (-96 dB), HPF 20 `err -1.8`/`+12` boost espurio, `LPF20 err -0.136>0.10`; shelf `sqrt(neg)` → NaN para HSH 20 +24 S=2; UI Q15 vs DSP Q24 divergencia 6 dB.
+
+**Alternativas:** Q23/Q25/Q26 evaluados (ver `eq_study4.py`): Q23 fail HPF20 0.15>0.10 y overflow HSH, Q24 pass 0.076 y Q25 pass 0.038 pero Q24 más margen (8.2G vs 16G vs 33G). Elegido Q24 por ser mínimo que pasa ≤0.10 con mayor margen que Q25/26.
+
+**Evidencia:**
+- `eq_sub80_host_test` antes FAIL `LPF20 err -0.136`, después PASS `HPF20 -3.086 err -0.076`, `LPF20 -2.993 err 0.017` (Q24 round)
+- `eq8_struct` 109 checks PASS, `sample_eq_edit` 104 checks PASS (umbral ajustado 0.5→0.2 para HPF 0dB active)
+- `EqBiquad.h:61` `coeffFromDouble` + `arg` clamp, `InstrumentEq.h:133` round, `InstrumentEqView.cpp:555` Q24
+- Build `46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3` 1.4M, `sha256sum` local==SD `/mnt/g/cubegm/cores/lgpt_r36sx_port_libretro.so`, SD TEST PASS 2026-08-21 13:45
+
+**Consecuencias:** HPF/LPF 20-100 Hz Butterworth `-3.01±0.10`, shelves sin NaN, UI=DSP ±0.2 dB, sin overflow int32 (saturación) ni int64, sin float hot path, 48kHz Stereo preservado.
+
+**Relacionado:** `EqBiquad.h`, `InstrumentEq.cpp/h`, `InstrumentEqView.cpp`, `tests/host/eq_sub80_host_test.cpp`, `tests/host/sample_eq_edit_host_test.cpp:1173`
+---
+
 *Fin de DECISIONS.md*

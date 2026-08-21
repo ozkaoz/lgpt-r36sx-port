@@ -55,6 +55,23 @@ enum EqBiquadType {
 //   range (2.7e-5 up to ~16 for a +24 dB 20 kHz shelf) with ~0.1% precision
 //   at low corners and exact Q15 readback (>>9); ParametricEQ keeps 15 for
 //   its legacy kernel.
+
+// Helper: convert double coefficient to fixed with round-to-nearest and saturation.
+// double is acceptable at control rate (recompute), not in audio loop.
+inline fixed coeffFromDouble(double v, int shift) {
+    double scale = (double)((int64_t)1 << shift);
+    double s = v * scale;
+    long long q;
+    if (s >= 0) {
+        q = (long long)floor(s + 0.5);
+    } else {
+        q = (long long)ceil(s - 0.5);
+    }
+    if (q > 2147483647LL) q = 2147483647LL;
+    if (q < -2147483648LL) q = -2147483648LL;
+    return (fixed)q;
+}
+
 inline void eqBiquadCoeffsShift(int type, int rate, float f0, float lvl,
                                 float qv, fixed &b0, fixed &b1, fixed &b2,
                                 fixed &a1, fixed &a2, int bShift) {
@@ -75,7 +92,9 @@ inline void eqBiquadCoeffsShift(int type, int rate, float f0, float lvl,
     case EQ_BIQUAD_LOW_SHELF: {
         double S = (double)qv; if (S < 0.5) S = 0.5; if (S > 2.0) S = 2.0;
         double sqA = sqrt(A);
-        double ac = (sw / 2.0) * sqrt((A + 1.0 / A) * (1.0 / S - 1.0) + 2.0);
+        double arg = (A + 1.0 / A) * (1.0 / S - 1.0) + 2.0;
+        if (arg < 0.0) arg = 0.0;
+        double ac = (sw / 2.0) * sqrt(arg);
         fb0 = A * ((A + 1.0) - (A - 1.0) * cw + 2.0 * sqA * ac);
         fb1 = 2.0 * A * ((A - 1.0) - (A + 1.0) * cw);
         fb2 = A * ((A + 1.0) - (A - 1.0) * cw - 2.0 * sqA * ac);
@@ -87,7 +106,9 @@ inline void eqBiquadCoeffsShift(int type, int rate, float f0, float lvl,
     case EQ_BIQUAD_HIGH_SHELF: {
         double S = (double)qv; if (S < 0.5) S = 0.5; if (S > 2.0) S = 2.0;
         double sqA = sqrt(A);
-        double as = (sw / 2.0) * sqrt((A + 1.0 / A) * (1.0 / S - 1.0) + 2.0);
+        double arg = (A + 1.0 / A) * (1.0 / S - 1.0) + 2.0;
+        if (arg < 0.0) arg = 0.0;
+        double as = (sw / 2.0) * sqrt(arg);
         fb0 = A * ((A + 1.0) + (A - 1.0) * cw + 2.0 * sqA * as);
         fb1 = -2.0 * A * ((A - 1.0) + (A + 1.0) * cw);
         fb2 = A * ((A + 1.0) + (A - 1.0) * cw - 2.0 * sqA * as);
@@ -173,11 +194,10 @@ inline void eqBiquadCoeffsShift(int type, int rate, float f0, float lvl,
         break;
     }
     }
-    if (fa0 != 0.0) {
-        const double scale = (double)((int64_t)1 << bShift);
-        b0 = (fixed)((double)(fb0 / fa0) * scale);
-        b1 = (fixed)((double)(fb1 / fa0) * scale);
-        b2 = (fixed)((double)(fb2 / fa0) * scale);
+    if (fa0 != 0.0 && isfinite(fa0) && isfinite(fb0)) {
+        b0 = coeffFromDouble(fb0 / fa0, bShift);
+        b1 = coeffFromDouble(fb1 / fa0, bShift);
+        b2 = coeffFromDouble(fb2 / fa0, bShift);
         // BACON_1.5_EQ8_DEN24 (U2.62): the a1/a2 denominators also use the
         // caller's bShift (Q24 for InstrumentEq).  In Q15 a low-frequency
         // band's 1+a1+a2 at DC is ~1e-4 against a Q15 quantum of 3e-5, so
@@ -185,8 +205,8 @@ inline void eqBiquadCoeffsShift(int type, int rate, float f0, float lvl,
         // instead of 15.8) and the DC pole was ill-conditioned enough to
         // turn the loop's rounding into a slow ~8 Hz mode on the slope-2
         // cascade.  The legacy Q15 emission (eqBiquadCoeffs) is unchanged.
-        a1 = (fixed)((double)(fa1 / fa0) * scale);
-        a2 = (fixed)((double)(fa2 / fa0) * scale);
+        a1 = coeffFromDouble(fa1 / fa0, bShift);
+        a2 = coeffFromDouble(fa2 / fa0, bShift);
     } else {
         b0 = (fixed)((int64_t)1 << bShift); b1 = 0; b2 = 0; a1 = 0; a2 = 0;
     }

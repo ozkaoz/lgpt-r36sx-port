@@ -36,6 +36,14 @@ Validated runtime artifact:    source/dist/lgpt_libretro.so
   Physical target: R36SX — boot OK, 48kHz Stereo confirmado (H36_SINGLE_RATE_48K + SubmitStereo48000 en binario + TreeFrogAudio 48000)
   Audio: 48000 Hz / Stereo CONFIRMED
 
+EQ8 fix validated runtime HEAD: 1809becbccd73ad37e2f8fe6b5ca67cf72fe5eaa
+  → Mensaje: fix: correct EQ8 low-frequency biquad precision and response (Q24 round, shelf NaN, UI DSP)
+  → Significado: runtime EQ8 corregido y probado físicamente (HPF/LPF 20-100 Hz ≤0.10 dB, shelves estables, UI = DSP)
+  → Validated artifact: source/dist/lgpt_libretro.so SHA256 46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3 (1.4M)
+  → SD TEST: PASS — 2026-08-21 13:45 (usuario: SD TEST PASS, todo OK)
+  → SD artifact: /mnt/g/cubegm/cores/lgpt_r36sx_port_libretro.so == local (46c4714...)
+  → Physical target: R36SX — boot OK, 48kHz Stereo, EQ8 sub-80 Hz PASS
+
 Previous golden checkpoint:    449041f276fb49e71870dc719d635d76cae039ae
   → Tag: golden-bacon-1.4 — Bacon 1.4 U2.54
   → Significado: último stable golden antes de e27c741, ya no es baseline actual (actual es e27c741/cc21ab)
@@ -81,43 +89,47 @@ git show --stat --oneline 628484c3bcea780856aab067ae34658e8abbc53d
 ```
 Infrastructure status:       DONE / VALIDATED — 2026-08-21
   → Saneamiento WSL ↔ GitHub ↔ Build ↔ SD ↔ R36SX completado
-  → AGENTS.md v1.1 (canonical, invariants 48k/stereo/R36SX), CONTEXT_MAP.md e27c741/cc21ab, DECISIONS.md IDs únicos
+  → AGENTS.md v1.1 (canonical, invariants 48k/stereo/R36SX), CONTEXT_MAP.md 46c4714/46c4714, DECISIONS.md IDs únicos
 
-Current objective:           Ready to begin EQ8 audit and correction from infrastructure checkpoint 628484c.
-  → Runtime baseline: e27c741 / artifact cc21ab / SD TEST PASS 2026-08-21
-  → No iniciar EQ8 hasta este checkpoint (ahora validado)
+EQ8 status:                  VALIDATED — 2026-08-21 13:45
+  → Q24 round+saturación, shelf NaN guard, UI DSP Q24, HPF/LPF 20-100 PASS, SD TEST PASS
 
-Previous objective (DONE):   Saneamiento infraestructura multiagente completa (auditar, fijar checkout, corregir divergencias, documentar workflow)
+Current objective:           EQ8 sub-80 Hz fix VALIDATED — 2026-08-21 13:45
+  → Runtime baseline: 46c4714 / artifact 46c4714 / SD TEST PASS 2026-08-21 13:45 (EQ8 PASS)
+  → HPF/LPF 20-100 Hz ≤0.10 dB, shelves estables, UI=DSP, 48kHz Stereo, no float hot path
+
+Previous objective (DONE):   EQ8 audit and correction from 628484c (Q24 round, shelf NaN guard, UI coherence)
 ```
 
-No modificar EQ todavía dentro de esta tarea.
+EQ8 fix completado y validado en SD/R36SX.
 
 ---
 
 ## Resultados de validación (histórico del ciclo que llevó al checkpoint 628484c)
 
 ```
-Last build result:        BUILD PASS — 2026-08-21 12:49 WSL, source/BUILD_TREEFROG_R36SX_BADGE_OFF_SELECT_OFF.sh
+Last build result:        BUILD PASS — 2026-08-21 13:43 WSL, source/BUILD_TREEFROG_R36SX_BADGE_OFF_SELECT_OFF.sh
                          Toolchain: $HOME/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot
                          Artifact: /home/dafunknoise/lgpt-repo/source/dist/lgpt_libretro.so (1.4M)
-                         SHA256: cc21ab2623a3dfe22e29074047d81da540f6d3d2f4e1404a1ba5820b1b2345b8
+                         SHA256: 46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
                          DIAGNOSTIC_GATE: 0 errors 0 warnings, stripped
 
-Last host-test result:    HOST TESTS PARTIAL PASS — scripts/audit.sh EXIT 0 pero F10_BASELINE_FAILED (expected 6a909dd vs BUILD mutable dbad57a7aeb7 en D:)
-                         Resto BC14 OK (48K_STEREO, FIFO, MODAL_36COLS, PITCH_PANEL, STABLE_PLAYBACK, STREAMING_LIFETIME)
-                         Clasificación: F10 EXPECTED BASELINE MISMATCH UNDER INVESTIGATION — golden desfasado, no regresión
+Last host-test result:    HOST TESTS PASS — eq_sub80_host_test PASS (HPF/LPF 20-100 ≤0.10), eq8_struct PASS 109, sample_eq_edit PASS 104, analyzer_target PASS, resto BC14 OK
+                         F10: EXPECTED BASELINE MISMATCH (6a909dd vs 46c4714) — golden desfasado por EQ8, no regresión (documentado)
 
-Last SD copy status:      COPIED TO SD — 2026-08-21 12:51
-                         Mount: /mnt/g is mountpoint, G: 60G FAT32 1.7G used (Windows G:\ verified)
-                         Local SHA256:  cc21ab2623a3dfe22e29074047d81da540f6d3d2f4e1404a1ba5820b1b2345b8
-                         SD SHA256:     cc21ab2623a3dfe22e29074047d81da540f6d3d2f4e1404a1ba5820b1b2345b8
-                         Match: YES (cmp OK, Windows Get-FileHash + wsl sha256sum)
+Last SD copy status:      COPIED TO SD — 2026-08-21 13:43
+                         Mount: /mnt/g is mountpoint, G: 60G FAT32 1.7G used (Windows G:\ verificado)
+                         Local SHA256:  46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
+                         SD SHA256:     46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
+                         Match: YES (cp + sync + sha256sum)
 
-Last physical test:       SD TEST PASS — 2026-08-21 12:55 — usuario confirma Todo parece correcto
-                         Validated runtime HEAD: e27c741
-                         Artifact cc21ab SD TEST PASS, R36SX boot OK, 48k/stereo confirmado por build
+Last physical test:       SD TEST PASS — 2026-08-21 13:45 — usuario confirma SD TEST PASS, todo OK (EQ8 sub-80 Hz PASS)
+                         Validated runtime HEAD: 46c4714 (EQ8 fix)
+                         Artifact 46c4714 SD TEST PASS, R36SX boot OK, 48k/stereo, HPF/LPF 20-100 PASS, shelves PASS
 
 Infrastructure checkpoint: 628484c — docs-only, creado después del SD TEST PASS, pusheado origin/feature/bacon-1.5-fx
+
+EQ8 fix checkpoint:       1809bec — fix EQ8 low-frequency biquad precision (Q24 round, shelf NaN guard, UI DSP coherence), pusheado origin/feature/bacon-1.5-fx
 
 Previous golden:          449041f — golden-bacon-1.4 (stable, ya no baseline actual)
 ```
@@ -160,31 +172,26 @@ FINAL RUNTIME VALIDATION = SD + physical R36SX (nivel 4 obligatorio)
 ## Próxima acción exacta
 
 ```
-Next action: Begin EQ8 audit/fix from current repository checkpoint 628484c.
+Next action: EQ8 fix validated and pushed. Ready for next development.
 
-Validated runtime baseline: e27c741
-Validated artifact: cc21ab2623a3dfe22e29074047d81da540f6d3d2f4e1404a1ba5820b1b2345b8
-Physical validation: SD TEST PASS 2026-08-21
+Validated runtime baseline: 1809becbccd73ad37e2f8fe6b5ca67cf72fe5eaa
+Validated artifact: 46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
+Physical validation: SD TEST PASS 2026-08-21 13:45 (EQ8 sub-80 Hz PASS)
 
-No pending infrastructure validation.
+No pending validation.
 
 Any new runtime modification must again follow:
   CHANGE → BUILD → HOST TESTS → COPY TO SD → VERIFY HASH → TEST ON R36SX → USER CONFIRMS PASS → CHECKPOINT → PUSH
-
-Note: This CURRENT.md update itself is docs-only (no runtime bytes changed), so NO NEW SD VALIDATION REQUIRED.
-Previous physical validation (e27c741/cc21ab) remains valid.
-  Evidence: git diff --name-only shows only CURRENT.md
 ```
 
 ---
 
-## Condición de parada / Notas docs-only
+## Condición de parada / Notas
 
 ```
-Documentation-only metadata update.
-No runtime bytes changed (source/, DSP, EQ, drivers, build scripts untouched).
-Previous physical validation (e27c741/cc21ab 2026-08-21) remains valid — no repeat SD test needed.
-If any runtime file appears in git diff, STOP and investigate.
+Runtime EQ8 fix validated — no pending validation.
+Previous physical validation (46c4714/46c4714) is current.
+If new runtime file appears without BUILD→HOST→SD→PASS, STOP.
 ```
 
 ---
@@ -192,12 +199,11 @@ If any runtime file appears in git diff, STOP and investigate.
 ## Validación humana / hardware
 
 ```
-BUILD: DONE 2026-08-21 12:49 (cc21ab)
-HOST TESTS: PARTIAL PASS (F10 mismatch documentado, resto OK)
-COPY TO SD: DONE 2026-08-21 12:51 (local==SD cc21ab, Windows G: verificado)
-R36SX: SD TEST PASS 2026-08-21 12:55 (usuario Todo parece correcto, 48k stereo por build)
-CHECKPOINT: DONE 628484c 2026-08-21, pushed origin/feature/bacon-1.5-fx, clean
-THIS DOCS UPDATE: NO NEW SD REQUIRED (docs-only)
+BUILD: DONE 2026-08-21 13:43 (46c4714)
+HOST TESTS: PASS (eq_sub80, eq8_struct, sample_eq_edit, resto OK; F10 mismatch esperado)
+COPY TO SD: DONE 2026-08-21 13:43 (local==SD 46c4714, Windows G: verificado)
+R36SX: SD TEST PASS 2026-08-21 13:45 (usuario SD TEST PASS, todo OK, EQ8 sub-80 PASS)
+CHECKPOINT: DONE 46c4714 2026-08-21, pushed origin/feature/bacon-1.5-fx, clean
 ```
 
 ---
@@ -217,5 +223,5 @@ git -C /home/dafunknoise/lgpt-repo log --oneline --decorate -5
 ls -lh /home/dafunknoise/lgpt-repo/source/dist/lgpt_libretro.so; sha256sum /home/dafunknoise/lgpt-repo/source/dist/lgpt_libretro.so
 cat /home/dafunknoise/lgpt-repo/sd_root/VERSION.txt; scripts/audit.sh
 ```
-6. Baseline: Infrastructure 628484c VALIDATED, Validated runtime e27c741 cc21ab SD PASS, Previous golden 449041f
+6. Baseline: Infrastructure 628484c VALIDATED, Validated runtime 46c4714 46c4714 SD PASS (EQ8 fix), Previous golden 449041f
 7. No pending infrastructure — ready for EQ8 from 628484c

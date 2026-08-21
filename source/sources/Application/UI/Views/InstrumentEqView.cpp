@@ -546,13 +546,17 @@ void InstrumentEqView::PostFlushDraw() {
                 if (!bandOn_[b] || (!isFilter && gainDb_[b] == 0.0f)) continue;
                 fixed f0, f1, f2, fA1, fA2;
                 // BACON_1.5_EQ8_WALL (U2.65): LOWPA/HIPAS siempre Butterworth
+                // Also mirror InstrumentEq::recomputeBand Q clamping for <80Hz
                 float qDraw = q_[b];
-                if (type_[b] == 3 || type_[b] == 4) qDraw = 0.70710678f;
-                FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
+                if (freqHz_[b] < 80.0f && slope_[b] > 1) qDraw = 0.70710678f;
+                else if (type_[b] == 3 || type_[b] == 4 ||
+                         (type_[b] == 0 && freqHz_[b] < 80.0f && slope_[b] > 4) ||
+                         ((type_[b] == 1 || type_[b] == 2) && freqHz_[b] < 80.0f && slope_[b] > 4)) qDraw = 0.70710678f;
+                FxEngine::eqBiquadCoeffsShift(type_[b], rate, freqHz_[b],
                                          gainDb_[b], qDraw, f0, f1, f2,
-                                         fA1, fA2);
-                double b0 = fp2fl(f0), b1 = fp2fl(f1), b2 = fp2fl(f2);
-                double a1 = fp2fl(fA1), a2 = fp2fl(fA2);
+                                         fA1, fA2, 24);
+                double b0 = (double)f0 / (1<<24), b1 = (double)f1 / (1<<24), b2 = (double)f2 / (1<<24);
+                double a1 = (double)fA1 / (1<<24), a2 = (double)fA2 / (1<<24);
                 double w = 2.0 * 3.14159265358979323846 * f / rateD;
                 double cwv = cos(w), swv = sin(w);
                 double reN = b0 + b1 * cwv + b2 * cos(2 * w);
@@ -661,12 +665,15 @@ void InstrumentEqView::PostFlushDraw() {
                 if (!bandOn_[b] || (!isFilter2 && gainDb_[b] == 0.0f)) continue;
                 fixed f0, f1, f2, fA1, fA2;
                 float qDraw2 = q_[b];
-                if (type_[b] == 3 || type_[b] == 4) qDraw2 = 0.70710678f;
-                FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
+                if (freqHz_[b] < 80.0f && slope_[b] > 1) qDraw2 = 0.70710678f;
+                else if (type_[b] == 3 || type_[b] == 4 ||
+                         (type_[b] == 0 && freqHz_[b] < 80.0f && slope_[b] > 4) ||
+                         ((type_[b] == 1 || type_[b] == 2) && freqHz_[b] < 80.0f && slope_[b] > 4)) qDraw2 = 0.70710678f;
+                FxEngine::eqBiquadCoeffsShift(type_[b], rate, freqHz_[b],
                                          gainDb_[b], qDraw2, f0, f1, f2,
-                                         fA1, fA2);
-                double b0 = fp2fl(f0), b1 = fp2fl(f1), b2 = fp2fl(f2);
-                double a1 = fp2fl(fA1), a2 = fp2fl(fA2);
+                                         fA1, fA2, 24);
+                double b0 = (double)f0 / (1<<24), b1 = (double)f1 / (1<<24), b2 = (double)f2 / (1<<24);
+                double a1 = (double)fA1 / (1<<24), a2 = (double)fA2 / (1<<24);
                 double w = 2.0 * 3.14159265358979323846 * f / rateD;
                 double cwv = cos(w), swv = sin(w);
                 double reN = b0 + b1 * cwv + b2 * cos(2 * w);

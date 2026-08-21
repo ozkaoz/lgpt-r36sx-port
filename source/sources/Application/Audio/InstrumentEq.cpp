@@ -455,14 +455,6 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
     if (frames <= 0 || !buffer) { rtViolations_++; return; }
     if (flat_) return;  // zero cost
     if (channel < 0 || channel >= kMaxChannels) { rtViolations_++; return; }
-    static int dbgPass = 0;
-    dbgPass++;
-    if (dbgPass % 2 == 0) {
-        const BandCfg &bg = bandCfg_[0];
-        printf("DBG active b0=%d b1=%d b2=%d a1=%d a2=%d smoothing=%d\n",
-                    (int)bg.b0, (int)bg.b1, (int)bg.b2, (int)bg.a1, (int)bg.a2,
-                    (int)bg.smoothing);
-    }
 
     // BACON_1.5_EQ8_SOFTKNEE (U2.59, feedback #12): the old block limiter
     // note is gone.  The int32 sample pipeline wraps at +/-2.0 when two

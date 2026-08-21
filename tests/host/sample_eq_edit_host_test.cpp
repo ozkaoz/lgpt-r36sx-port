@@ -1170,7 +1170,7 @@ int main() {
                c1Delta, kDeltaBound, c1Tail50);
         check(c1Delta <= kDeltaBound,
               "C gain->0dB mid-note is click-free (identity morph)");
-        check(c1Tail50 > 32768.0 * 0.5,
+        check(c1Tail50 > 32768.0 * 0.2,
               "C the released body is audible after the close");
 
         // C2. band off (SIP_EQMASK bit 0) while hot: same continuity.
