@@ -93,6 +93,7 @@ private:
     // instrument (1 = 12 dB/oct, 2 = 24 dB/oct; non-bell types).
     int slope_[8] ;
     float heldH_[308] ;
+    unsigned long lastUpdateMs_ ;
     char status_[96] ;
 } ;
 

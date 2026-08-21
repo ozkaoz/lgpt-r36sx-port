@@ -51,6 +51,21 @@ install -m 0755 "$ROOT/device/lgpt_launcher_u241.sh" "$SD/cubegm/lgpt"
 for f in otg_u241_common.sh otg_u241_setup_once.sh otg_u241_apply_profile_once.sh otg_u241_shutdown.sh otg_h37_apply_driver_mode.sh otg_h37_android_runtime_supervisor.sh otg_h37_host_runtime_supervisor.sh otg_h37_host_device_detect.sh; do
   install -m 0755 "$ROOT/device/$f" "$SD/lgpt/otg/bin/$f"
 done
+# Android AOA payload (H36) - required for Android audio driver
+install -m 0755 "$ROOT/sd_root/lgpt/otg/bin/r36s_aoa_bulk_audio_io_h36" "$SD/lgpt/otg/bin/r36s_aoa_bulk_audio_io_h36"
+install -m 0755 "$ROOT/sd_root/lgpt/otg/bin/r36s_aoa_bulk_receiver_h36" "$SD/lgpt/otg/bin/r36s_aoa_bulk_receiver_h36"
+mkdir -p "$SD/ANDROID"
+install -m 0644 "$ROOT/sd_root/ANDROID/LGPTUsbAudioBridge-H36-debug.apk" "$SD/ANDROID/LGPTUsbAudioBridge-H36-debug.apk"
+install -m 0644 "$ROOT/sd_root/ANDROID/LGPTUsbAudioBridge-H38-debug.apk" "$SD/ANDROID/LGPTUsbAudioBridge-H38-debug.apk"
+# TreeFrogUI: ensure LGPT stock entry uses port core automatically (second copy)
+# Stock LGPT core filename expected by TreeFrogUI is lgpt_libretro.so (fallback)
+if [ -f "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so" ]; then
+  cp -f "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so" "$SD/cubegm/cores/lgpt_libretro.so" 2>/dev/null || true
+  # Also ensure the port core is available under stock name for auto-selection
+  if [ ! -f "$SD/cubegm/cores/lgpt_libretro.so" ]; then
+    install -m 0755 "$ROOT/sd_root/cubegm/cores/lgpt_r36sx_port_libretro.so" "$SD/cubegm/cores/lgpt_libretro.so"
+  fi
+fi
 if [[ "$HOST_BACKENDS" -eq 1 ]]; then
   install -m 0755 "$SP404_DAEMON" "$ACTIVE_SP404_DAEMON"
   install -m 0755 "$MIDI_DAEMON" "$ACTIVE_MIDI_DAEMON"

@@ -54,6 +54,8 @@ public:
     float BinFrequency(int index) const;
 
     float PeakFrequency() const { return peakHz_; }
+    float RawPeakFrequency() const { return peakHz_; }
+    float DisplayPeakFrequency() const;
 
     void PeakTrackReset();
     float PeakFrequencyHistory() const { return peakHzHist_; }
@@ -64,7 +66,8 @@ private:
     void runFft();
     void clearCapture();
 
-    fixed ring_[kRingFrames];
+    fixed ringL_[kRingFrames];
+    fixed ringR_[kRingFrames];
     int ringPos_;
     volatile bool armed_;
     volatile const I_Instrument *targetInstr_;

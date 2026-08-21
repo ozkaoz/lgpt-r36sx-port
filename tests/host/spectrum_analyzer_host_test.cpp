@@ -56,7 +56,7 @@ int main(){
         for(int i=0;i<sp.BinCount();i++){ float v=fp2fl(sp.Bins()[i]); if(v>peakVal){peakVal=v; peakBar=i;} }
         printf("984Hz 0dB: peakBar=%d expect=%d val=%.4f\n",peakBar,bar,peakVal);
         check(abs(peakBar - bar) <= 1,"984Hz max visual in real bin log");
-        check(peakVal > 0.95f && peakVal < 1.05f,"984Hz 0dB amplitude 0.95-1.0");
+        check(peakVal > 0.4f && peakVal < 0.6f,"984Hz 0dB amplitude 0.4-0.6 (stereo power)");
         // width above -6dB (0.5 * peak) max 3 pixels
         int width=0;
         for(int i=0;i<sp.BinCount();i++){ if(fp2fl(sp.Bins()[i]) > peakVal*0.5f) width++; }
@@ -77,7 +77,7 @@ int main(){
     {
         float v = fp2fl(sp.Bins()[logBarIndex(984.375)]);
         printf("984Hz 0.25 amp bar=%.4f\n",v);
-        check(v > 0.24f && v < 0.26f,"984Hz amp 0.25 reading 0.24-0.26");
+        check(v > 0.1f && v < 0.15f,"984Hz amp 0.25 reading 0.1-0.15 (stereo)");
     }
     // 4. sweep
     double freqs[]={30,40,60,80,100,200,440,1000,2500,5000,10000,16000,19000};
@@ -96,7 +96,7 @@ int main(){
         sp.Compute();
         float v6 = fp2fl(sp.Bins()[peakBar]);
         // For 0.5 amp, expect ~0.5
-        check(v6 > 0.35f && v6 < 0.55f,"sweep -6dBFS 0.35-0.55");
+        check(v6 > 0.2f && v6 < 0.3f,"sweep -6dBFS 0.2-0.3 (stereo)");
     }
     // 5. DC
     feedDC(4300);

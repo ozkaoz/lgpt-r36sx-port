@@ -51,6 +51,17 @@ fi
 grep -aFq 'value="3F5FBF"' "$SD/lgpt/config.xml" || ERRORS=$((ERRORS+1))
 grep -aFq 'FF008C' "$SD/lgpt/config.xml" && ERRORS=$((ERRORS+1))
 [[ -s "$SD/lgpt/config.stock.xml" ]] || ERRORS=$((ERRORS+1))
+# Android AOA payload (H36) - required for Android audio driver
+[[ -s "$SD/lgpt/otg/bin/r36s_aoa_bulk_audio_io_h36" ]] || ERRORS=$((ERRORS+1))
+[[ -x "$SD/lgpt/otg/bin/r36s_aoa_bulk_audio_io_h36" ]] || ERRORS=$((ERRORS+1))
+[[ -s "$SD/lgpt/otg/bin/r36s_aoa_bulk_receiver_h36" ]] || ERRORS=$((ERRORS+1))
+[[ -x "$SD/lgpt/otg/bin/r36s_aoa_bulk_receiver_h36" ]] || ERRORS=$((ERRORS+1))
+[[ -s "$SD/ANDROID/LGPTUsbAudioBridge-H36-debug.apk" ]] || ERRORS=$((ERRORS+1))
+[[ -s "$SD/ANDROID/LGPTUsbAudioBridge-H38-debug.apk" ]] || ERRORS=$((ERRORS+1))
+# TreeFrogUI: port core must be available as lgpt_libretro.so for auto-selection
+[[ -s "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so" ]] || ERRORS=$((ERRORS+1))
+[[ -s "$SD/cubegm/cores/lgpt_libretro.so" ]] || ERRORS=$((ERRORS+1))
+[[ "$(sha256sum "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so" | awk '{print $1}')" == "$(sha256sum "$SD/cubegm/cores/lgpt_libretro.so" | awk '{print $1}')" ]] || ERRORS=$((ERRORS+1))
 echo "ERRORS=$ERRORS"
 [[ "$ERRORS" -eq 0 ]]
 echo VERIFY_U2523_OK

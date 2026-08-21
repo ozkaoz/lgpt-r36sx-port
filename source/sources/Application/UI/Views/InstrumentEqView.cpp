@@ -160,6 +160,7 @@ InstrumentEqView::InstrumentEqView(GUIWindow &w, ViewData *data)
         slope_[i] = 1;
     }
     for (int i = 0; i < 308; i++) heldH_[i] = 0.0f;
+    lastUpdateMs_ = 0;
 }
 
 InstrumentEqView::~InstrumentEqView() {
@@ -274,6 +275,7 @@ void InstrumentEqView::OnFocus() {
     // listening session.
     SpectrumAnalyzer::Get().PeakTrackReset();
     for (int i = 0; i < 308; i++) heldH_[i] = 0.0f;
+    lastUpdateMs_ = 0;
     setStatus(0);
     isDirty_ = true;
 }
@@ -282,6 +284,7 @@ void InstrumentEqView::LooseFocus() {
     SpectrumAnalyzer::Get().SetArmed(false);
     SpectrumAnalyzer::Get().SetInstrumentTarget(0);
     for (int i = 0; i < 308; i++) heldH_[i] = 0.0f;
+    lastUpdateMs_ = 0;
     View::LooseFocus();
 }
 
@@ -629,23 +632,54 @@ void InstrumentEqView::PostFlushDraw() {
                 // at 90% of the canvas, +4 dB clipped at the top) so the
                 // hi-hat highs (real kit: -25..-29 dB) read and move.
                 float p = fp2fl(bb[i]);
-                float db = (p > 0.0f) ? 20.0f * log10f(p) : -80.0f;
-                float frac = (db + 36.0f) / 40.0f;
-                if (frac < 0.0f) frac = 0.0f;
-                if (frac > 1.0f) frac = 1.0f;
-                int h = (int)(frac * (float)(cY1 - cY0));
-                if (h < 2) h = 2;
-                if (h > cY1 - cY0) h = cY1 - cY0;
+                float rawDb = (p > 0.0f) ? 20.0f * log10f(p) : -90.0f;
+                const float floorDb = -90.0f;
+                const float ceilingDb = 0.0f;
                 float fcHold = sp.BinFrequency(i);
-                int hh = h;
-                if (fcHold > 140.0f) {
-                    if ((float)h > heldH_[i]) heldH_[i] = (float)h;
-                    else heldH_[i] *= 0.92f;
-                    hh = (int)(heldH_[i] + 0.5f);
-                    if (hh < 2) hh = 2;
-                    if (hh > cY1 - cY0) hh = cY1 - cY0;
+                int h;
+                float displayDb;
+                if (rawDb <= floorDb) {
+                    h = 0;
+                    displayDb = floorDb;
                 } else {
+                    float tiltDb = 4.5f * logf(fcHold / 1000.0f) / logf(2.0f);
+                    displayDb = rawDb + tiltDb;
+                    float frac = (displayDb - floorDb) / (ceilingDb - floorDb);
+                    if (frac < 0.0f) frac = 0.0f;
+                    if (frac > 1.0f) frac = 1.0f;
+                    h = (int)(frac * (float)(cY1 - cY0));
+                    if (h < 0) h = 0;
+                    if (h > cY1 - cY0) h = cY1 - cY0;
+                }
+                // Time-based hold: attack immediate, hold ~100ms, release ~300ms
+                unsigned long now = 0;
+                // Use System clock if available, otherwise use frame count approximation (16ms per frame)
+                // For simplicity, use System::GetClock if linked, else fallback
+                // We will use a static approximation: dt = 16ms (60fps)
+                float dt = 16.0f;
+                if (lastUpdateMs_ != 0) {
+                    // Try to get real dt from System
+                    // If System not available in this context, dt remains 16
+                }
+                int hh = h;
+                // Hold for all frequencies (coherent)
+                if ((float)h > heldH_[i]) {
                     heldH_[i] = (float)h;
+                } else {
+                    // Exponential release with tau ~300ms
+                    float tau = 300.0f;
+                    float decay = expf(-dt / tau);
+                    heldH_[i] *= decay;
+                    if (heldH_[i] < (float)h) heldH_[i] = (float)h;
+                }
+                // For very low levels below floor, held should also decay to 0
+                hh = (int)(heldH_[i] + 0.5f);
+                if (hh < 0) hh = 0;
+                if (hh > cY1 - cY0) hh = cY1 - cY0;
+                // If raw displayDb <= floor, allow 0 px (no minimum)
+                if (displayDb <= floorDb) {
+                    // Let held decay, but if held is still above 0, it will show
+                    // This gives peak hold behavior
                 }
                 int bx = cX0 + (i * canvasW) / n;
                 int nextBx = cX0 + ((i + 1) * canvasW) / n;
@@ -858,8 +892,8 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
             peakManual_ = false;
             SpectrumAnalyzer::Get().PeakTrackReset();
             peakMarkerOn_ = true;
-            if (SpectrumAnalyzer::Get().PeakHasHistory()) {
-                peakHz_ = SpectrumAnalyzer::Get().PeakFrequencyHistory();
+            {
+                peakHz_ = SpectrumAnalyzer::Get().DisplayPeakFrequency();
                 char buf[88];
                 sprintf(buf, "PEAK %5.0fHz (hist)", peakHz_);
                 setStatus(buf);

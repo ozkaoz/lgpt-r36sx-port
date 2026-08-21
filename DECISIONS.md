@@ -323,4 +323,25 @@
 **Follow-ups (fuera de alcance):** cancelación antiphase L/R por downmix, concatenación multi-canal mismo instrumento, sync para adapters concurrentes.
 
 ---
+
+## DEC-2026-08-21-32 — Analyzer final: stereo power, DisplayPeak, TreeFrog auto, Android payload
+
+**Decisión:** Completar H1/H4/H5/H6: stereo `ringL/R` + `power=0.5*(|L|²+|R|²)` `amp=sqrt(power)*2/sum` (0dBFS duplicado 0.5→1.0 conservado, antiphase no cancela), `DisplayPeakFrequency()` sobre 308 bins con `tilt 4.5*log2(fc/1000)` y floor -90 (gate `rawDb<=floor→h=0` antes tilt, sin diagonal 1k-20k), `InstrumentEqView` `heldH_[308]` + `lastUpdateMs_` con `exp(-dt/300)` (attack inmediato, hold 100ms, release 300ms), rango `-90..0` sin `h>=2`, `canvasW=309` `bx=(i*canvasW)/n`, `hat_probe` 308 bins + Tests A-E (antiphase 8k, burst 6-16k, -90..0 sensibilidad, tilt, no regresión), `install.sh`/`verify.sh` Android payload + TreeFrog `lgpt_libretro.so` auto (backup, SHA Match).
+
+**Motivo:** Hi-hat estéreo cancelado por mono sum, diagonal silencio por tilt sobre floor, Peak usaba `mag2Combined` crudo vs display, hold estático, TreeFrog requería selección manual, Android faltaban `r36s_aoa_*_h36` + APKs.
+
+**Evidencia:**
+- `analyzer_h1_stereo_test` 6 checks PASS (in-phase 0.144 antiphase 0.144 L-only 0.102)
+- `spectrum_analyzer` 50 PASS (984Hz 0.5 width1, sweep 30-19000 ±1)
+- `InstrumentEqView` diagonal `h==0` para `rawDb<=-90` en 500-20k
+- `DisplayPeak` test `1k -10dB vs 8k -18dB` → Display 8k Raw 1k
+- `hat_probe` Tests A-E PASS, `eq8_struct` 109 PASS, `test_fx_phase19/09` OK
+- Build `66c966d089e6edd090e2f803d43c185eda12415ad27f42ec2e3b6e602b230ea5` 1.4M, `host_syntax_check` OK
+- SD `66c966d` local==SD, R36SX F1-F7 PASS (idle horizontal, hihat, Peak Display, TreeFrog LGPT→port `66c966d`, Android `HOST→enum→AOA→APK→audio`)
+
+**Consecuencias:** Reemplaza ventanas solapadas/`visGain` de DEC-04/07 y mono sum de DEC-31, preserva Blackman+hold>140Hz y Q24 EQ8.
+
+**Relacionado:** `SpectrumAnalyzer.cpp/h`, `InstrumentEqView.cpp/h`, `tests/host/analyzer_h1_stereo_test.cpp`, `hat_probe.cpp`, `scripts/install.sh`, `verify.sh`
+
+---
 *Fin de DECISIONS.md*

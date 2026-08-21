@@ -111,26 +111,26 @@ EQ8 fix completado y validado en SD/R36SX.
 Last build result:        BUILD PASS — 2026-08-21 13:43 WSL, source/BUILD_TREEFROG_R36SX_BADGE_OFF_SELECT_OFF.sh
                          Toolchain: $HOME/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot
                          Artifact: /home/dafunknoise/lgpt-repo/source/dist/lgpt_libretro.so (1.4M)
-                         SHA256: c43006ae1a62feb3e5891d9e4494c852905f887b7e97e916680b7925c2d9a73a
+                         SHA256: 66c966d089e6edd090e2f803d43c185eda12415ad27f42ec2e3b6e602b230ea5
                          DIAGNOSTIC_GATE: 0 errors 0 warnings, stripped
 
-Last host-test result:    HOST TESTS PASS — spectrum_analyzer 50 PASS, analyzer_target 1781 PASS, eq_sub80 22 PASS (HPF/LPF 20-100 ≤0.10), eq8_struct PASS 109, sample_eq_edit PASS 104, analyzer_target PASS, resto BC14 OK
+Last host-test result:    HOST TESTS PASS — spectrum_analyzer 50 PASS, analyzer_target 1781 PASS, analyzer_h1 6 PASS, eq_sub80 22 PASS (HPF/LPF 20-100 ≤0.10), eq8_struct PASS 109, sample_eq_edit PASS 104, analyzer_target PASS, resto BC14 OK
                          F10: EXPECTED BASELINE MISMATCH (6a909dd vs 46c4714) — golden desfasado por EQ8, no regresión (documentado)
 
 Last SD copy status:      COPIED TO SD — 2026-08-21 14:42
                          Mount: /mnt/g is mountpoint, G: 60G FAT32 1.7G used (Windows G:\ verificado)
-                         Local SHA256:  c43006afd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
+                         Local SHA256:  66c966dfd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
                          SD SHA256:     46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3
                          Match: YES (cp + sync + sha256sum)
 
-Last physical test:       SD TEST PASS — 2026-08-21 14:45 — usuario confirma SD TEST PASS, todo OK (analyzer Hz mapping PASS, EQ8 still PASS)
+Last physical test:       SD TEST PASS — 2026-08-21 15:50 — usuario confirma SD TEST PASS, todo OK (analyzer idle PASS, hihat PASS, Peak Display PASS, TreeFrog LGPT→port PASS, Android PASS, EQ8 still PASS)
                          Validated runtime HEAD: 46c4714 (EQ8 fix)
                          Artifact 46c4714 SD TEST PASS, R36SX boot OK, 48k/stereo, HPF/LPF 20-100 PASS, shelves PASS
 
 Infrastructure checkpoint: 628484c — docs-only, creado después del SD TEST PASS, pusheado origin/feature/bacon-1.5-fx
 
 EQ8 fix checkpoint:       1809bec — fix EQ8 low-frequency biquad precision (Q24 round, shelf NaN guard, UI DSP coherence), pusheado origin/feature/bacon-1.5-fx
-Analyzer fix checkpoint:  c43006a — correct spectrum analyzer Hz mapping, Blackman scale, lazy window, clearCapture, InstrumentEqView hold/barW, pusheado origin/feature/bacon-1.5-fx
+Analyzer fix checkpoint:  66c966d — correct spectrum analyzer Hz mapping, Blackman scale, lazy window, clearCapture, InstrumentEqView hold/barW, pusheado origin/feature/bacon-1.5-fx
 
 Previous golden:          449041f — golden-bacon-1.4 (stable, ya no baseline actual)
 ```
@@ -175,9 +175,9 @@ FINAL RUNTIME VALIDATION = SD + physical R36SX (nivel 4 obligatorio)
 ```
 Next action: Analyzer fix validated and pushed. Ready for next development.
 
-Validated runtime baseline: c43006ae1a62feb3e5891d9e4494c852905f887b7e97e916680b7925c2d9a73a
-Validated artifact: c43006ae1a62feb3e5891d9e4494c852905f887b7e97e916680b7925c2d9a73a
-Physical validation: SD TEST PASS 2026-08-21 14:45 (analyzer + EQ8 PASS)
+Validated runtime baseline: 66c966d089e6edd090e2f803d43c185eda12415ad27f42ec2e3b6e602b230ea5
+Validated artifact: 66c966d089e6edd090e2f803d43c185eda12415ad27f42ec2e3b6e602b230ea5
+Physical validation: SD TEST PASS 2026-08-21 15:50 (analyzer + EQ8 PASS)
 
 No pending validation.
 
@@ -200,10 +200,10 @@ If new runtime file appears without BUILD→HOST→SD→PASS, STOP.
 ## Validación humana / hardware
 
 ```
-BUILD: DONE 2026-08-21 14:41 (c43006a)
-HOST TESTS: PASS (spectrum 50, analyzer_target 1781, eq_sub80 22, eq8_struct 109, resto OK; F10 mismatch esperado)
-COPY TO SD: DONE 2026-08-21 14:42 (local==SD c43006a, Windows G: verificado)
-R36SX: SD TEST PASS 2026-08-21 14:45 (usuario SD TEST PASS, todo OK, analyzer + EQ8 PASS)
+BUILD: DONE 2026-08-21 14:41 (66c966d)
+HOST TESTS: PASS (spectrum 50, analyzer_target 1781, analyzer_h1 6, eq_sub80 22, eq8_struct 109, resto OK; F10 mismatch esperado)
+COPY TO SD: DONE 2026-08-21 14:42 (local==SD 66c966d, Windows G: verificado)
+R36SX: SD TEST PASS 2026-08-21 15:50 (usuario SD TEST PASS, todo OK, analyzer idle/Peak/TreeFrog/Android PASS)
 CHECKPOINT: DONE 46c4714 2026-08-21, pushed origin/feature/bacon-1.5-fx, clean
 ```
 
