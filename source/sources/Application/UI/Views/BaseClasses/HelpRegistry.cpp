@@ -170,31 +170,28 @@ static const HelpLine kChopperPitchLines_[] = {
 // BACON_1.5_EQ8_HELP (U2.52.8, feedback (E)): the EQ8 editor is a fullscreen
 // view of its own (VT_INSTRUMENT_EQ) with dedicated combos; SELECT+R1 on the
 // EQ screen must explain them instead of opening with an empty section.
+// U2.65: L2+X 1 Hz lineal, R2+X slope 12..96, B+arrows ordenado, Y Q, etc.
 static const HelpLine kEq8Lines_[] = {
-    {"L/R", "band"},
-    {"X+L/R", "frequency"},
+    {"L/R", "band 1-8 select"},
+    {"X+L/R", "freq log +-1 step"},
     {"X+UP/DN", "gain +-1 dB"},
     // BACON_1.5_EQ8_FAST_COARSE (U2.52.9, feedback #6): L1+X+arrows = fast
     // displacement (~1 octave per step, 10 dB per step) like the rest of
     // the port; no conflict with the L1+X global undo (no arrows).
     {"L1+X L/R", "freq ~1 oct"},
     {"L1+X UP/DN", "gain +-10 dB"},
-    // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13) -> BACON_1.5_ANALYZER_
-    // PEAKHIST (U2.62, feedback #14): L2+R2 marks the HISTORICAL peak of
-    // the instrument's post-EQ spectrum (the loudest peak since the marker
-    // was armed -- where the sound's energy is centered) and toggles off;
-    // L2+R2+X moves the selected band to the marker.
-    // L2+X+L/R steps the SELECTED BAND (1..8).
-    // R2+X+UP/DN toggles the band slope (12/24/36/48 dB/oct).
+    {"L2+X L/R", "freq +-1 Hz"},
+    // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13) -> PEAKHIST (U2.62)
+    // L2+R2 historical peak, L2+R2+X band->peak, R2+X slope 12..96
     {"L2+R2", "peak marker (hist)"},
     {"L2+R2+X", "band -> peak"},
-    {"L2+X L/R", "band select"},
-    {"R2+X UP/DN", "slope 12/24/36/48"},
+    {"R2+X UP/DN", "slope 12..96 dB/oct"},
+    {"B", "next filter type"},
+    {"B+L/R B+UP/DN", "prev/next type order"},
     {"Y+L/R", "Q wider/narrower"},
-    {"Y+UP/DN", "intensity all"},
+    {"Y+UP/DN", "intensity all bands"},
     {"A", "band on/off"},
-    {"B", "filter type"},
-    {"A+B", "reset band"},
+    {"A+B", "reset band default"},
     {"SELECT", "bypass EQ"},
     {"START", "play/stop"},
     {"R+START", "stop"},

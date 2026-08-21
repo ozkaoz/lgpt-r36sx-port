@@ -339,7 +339,8 @@ void ProjectView::DrawView() {
 // Draw title
 
 	char projectString[80] ;
-    sprintf(projectString, "LGPT R36SX - Bacon 1.1");
+    // BACON_1.5_VERSION (U2.65): unified version
+    sprintf(projectString, "LGPT R36SX - Bacon 1.5");
 
     // RC4 P3 (PLAN_RC4): app title renders with the semantic title role.
     SetColor(UiColors::Resolve(UI_COLOR_TITLE));

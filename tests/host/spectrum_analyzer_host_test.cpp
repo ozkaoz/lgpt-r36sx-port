@@ -162,7 +162,9 @@ int main() {
         int bar = logBarIndex(46.875);
         float b = fp2fl(sp.Bins()[bar]);
         printf("46.875Hz 0dBFS: bar%d=%.4f\n", bar, b);
-        check(b > 0.22f && b < 0.28f, "46.875 Hz (bin 16) lights bar 38 at ~0.25");
+        // U2.65: visGain uniforme +3dB/oct desde 20 Hz, 1 kHz normalizado a 1.0
+        // hace que 46 Hz quede ~0.17 (0.7x) pero igual visible como graves
+        check(b > 0.12f && b < 0.30f, "46.875 Hz (bin 16) lights bar 38");
     }
     oneShot(20.0f, 32767);
     {

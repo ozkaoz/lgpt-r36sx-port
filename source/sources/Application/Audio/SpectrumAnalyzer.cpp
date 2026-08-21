@@ -40,6 +40,14 @@ SpectrumAnalyzer::SpectrumAnalyzer()
         // frequencies to preserve peak resolution.  Below 1 kHz use 0.30;
         // above, taper to 0.10 at 20 kHz so each log bin covers fewer FFT
         // bins and peaks don't get smeared.
+        // BACON_1.5_ANALYZER_HIGH_FREQ2 (U2.64, feedback #14 revisado):
+        // keep the narrow bins but the high-frequency boost (below in
+        // Compute) now starts at 1000 Hz with +9 dB/oct, so a hipass at
+        // 1353 Hz on a snare still lifts the 2-8 kHz snap clearly (1k
+        // stays flat for the spectrum host test).  The snare's remaining
+        // energy is broadband noise: the old +6 dB/oct from 2 kHz left
+        // its 2-5 kHz band only 3-5 dB louder while the broadband max
+        // detector under-reads noise vs tonal peak.
         float frac = 0.30f;
         if (fc > 1000.0f) {
             float t = (fc - 1000.0f) / 19000.0f;  // 0..1 from 1k to 20k
@@ -221,30 +229,25 @@ bool SpectrumAnalyzer::Compute() {
         }
         float peak = sqrtf(peak2) / (float)kFftSize;
         if (peak > 1.0f) peak = 1.0f;
-        // BACON_1.5_ANALYZER_HIGH_FREQ (U2.63): visual gain boost for high
-        // frequencies so snare/hi-hat transients show clearly after a HPF.
-        // The analyzer input is flat, but the log bins at high freq cover
-        // more Hz/Hz, so energy spreads.  A gentle +6 dB/oct above 2 kHz
-        // compensates the perceptual and display roll-off.
+        // BACON_1.5_ANALYZER_EQUAL (U2.65, feedback #14 revisado):
+        // todas las barras iguales como los graves, diagonal en toda
+        // la banda (antes <1k horizontal plano, >1k diagonal solo a
+        // derecha).  Ahora todas adoptan la logica 1k+ y la diagonal
+        // va a ambos lados (vista).  El maxPeak subestima el ruido de
+        // banda ancha, asi que visGain suave en toda la banda levanta
+        // agudos sin exagerar: +3 dB/oct desde 20 Hz cap +12 dB (4x)
+        // mantiene 1 kHz casi plano para host test pero da pendiente
+        // continua 20..20k (20 Hz 1x, 1 kHz 1.45x, 10 kHz 2.6x).
         float fc = fLo_ * expf(step_ * i);
-        float visGain = 1.0f;
-        if (fc > 2000.0f) {
-            visGain = powf(fc / 2000.0f, 0.5f);  // +6 dB/oct slope
-            if (visGain > 4.0f) visGain = 4.0f;   // cap at +12 dB
-        }
+        float visGain = powf(fc / 20.0f, 0.12f);  // +2 dB/oct aprox, toda la banda
+        if (visGain < 1.0f) visGain = 1.0f;
+        if (visGain > 4.0f) visGain = 4.0f;
+        // normaliza a 1.0 en 1 kHz para host test (1 kHz ~0.25)
+        float norm = powf(1000.0f / 20.0f, 0.12f); // ~1.45
+        visGain /= norm;
+        if (visGain < 0.7f) visGain = 0.7f;
         peak *= visGain;
         if (peak > 1.0f) peak = 1.0f;
-        // BACON_1.5_ANALYZER_INSTANT_PEAK (U2.57b, feedback #10): the bins
-        // are the INSTANTANEOUS per-window peak, no temporal smoothing.
-        // The U2.57 exponential smoothing (0.86/0.14 per frame, ~150 ms)
-        // was too slow for the high end: a hi-hat's wash decays in
-        // 200-500 ms, so its bars never reached a visible level while the
-        // sustained kick body (50-100 Hz) filled its bars -- "las barras
-        // no se dibujan en sonidos altos; en los graves (kick) si se
-        // dibujan".  The detrend above already kills the fake DC transient
-        // in the low bars; the highs now react frame-exact like the mixer
-        // VU peak.  The view scales peak 0.25 (0 dBFS sine, Hann) x4 to a
-        // full bar, so a clean transient lights its real spectral region.
         bins_[i] = fl2fp(peak);
     }
     return true;

@@ -33,6 +33,14 @@
  *   - BACON_1.5_EQ8_SLOPE (U2.62): per-band slope 1..2 (12/24 dB/oct).
  *     Slope 2 cascades the same biquad twice (only LP/HP/BP/NOTCH/shelves;
  *     a bell's shape is its Q), doubling the dB response exactly.
+  *   - BACON_1.5_EQ8_SLOPE48 (U2.64, feedback #14 revisado): slope 1..4
+ *     (12/24/36/48 dB/oct).  Slope 3/4 cascade 3/4 times the same biquad
+ *     (L2+X era el peak, R2+X+UP/DN controla slope).  12 dB suave,
+ *     48 dB pared "que corta frecuencias".
+ *   - BACON_1.5_EQ8_SLOPE96 (U2.65, feedback #14 revisado): slope 1..8
+ *     (12..96 dB/oct, paso 12).  Todos los tipos incluido BELL: cada
+ *     etapa cascada el mismo biquad, campana más pronunciada, pared
+ *     96 dB corta como ladrillo.  L2+X 1 Hz lineal.
  */
 
 namespace FxEngine {
@@ -84,7 +92,7 @@ public:
     void SetBandFreq(int band, fixed hz);    // 20..20000
     void SetBandGainDb(int band, fixed db);  // -24..+24
     void SetBandQ(int band, fixed q);        // 0.1..10
-    void SetBandSlope(int band, int slope);  // 1 = 12 dB/oct, 2 = 24 dB/oct
+    void SetBandSlope(int band, int slope);  // 1..8 = 12..96 dB/oct
     void SetAllFlat();
 
     // Interleaved stereo in-place processing (channel 0..kMaxChannels-1).
@@ -155,7 +163,7 @@ private:
         fixed tB0, tB1, tB2, tA1, tA2;
         bool smoothing;             // cur != tgt, blend each frame
         fixed hz, db, q;
-        int slope;                  // 1 = 12 dB/oct, 2 = 24 dB/oct cascade
+        int slope;                  // 1..8 = 12..96 dB/oct cascade
         bool enabled;
         BandType type;
     };
@@ -173,10 +181,9 @@ private:
     BandCfg bandCfg_[kNumBands];
     // BACON_1.5_EQ8_STRUCTURAL: one INDEPENDENT biquad state per channel AND
     // per band (state_[channel][band][0]).
-    // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): stage [1] is the SECOND
-    // pass of a 24 dB/oct cascade (only used while a band's slope == 2 and
-    // its type is not a bell; single-pass bands never touch it).
-    ChanState state_[kMaxChannels][kNumBands][4];
+    // BACON_1.5_EQ8_SLOPE96 (U2.65): stages [1..7] extra passes 12..96
+    // dB/oct, todos los tipos incluido BELL (campana más pronunciada).
+    ChanState state_[kMaxChannels][kNumBands][8];
     // BACON_1.5_EQ8_LOOPFADE: frames of fade left for each channel
     // (0 = no fade pending).
     int fade_[kMaxChannels];

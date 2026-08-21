@@ -110,7 +110,7 @@ void InstrumentEq::Reset() {
 void InstrumentEq::ResetChannelState() {
     for (int c = 0; c < kMaxChannels; c++) {
         for (int b = 0; b < kNumBands; b++) {
-            for (int s = 0; s < 4; s++) {
+            for (int s = 0; s < 8; s++) {
                 ChanState &st = state_[c][b][s];
                 st.s1L = 0; st.s2L = 0;
                 st.s1R = 0; st.s2R = 0;
@@ -164,7 +164,7 @@ void InstrumentEq::ConfigureBand(int band, BandType type, fixed hz, fixed db,
     q = fl2fp(qf);
 
     if (slope < 1) slope = 1;
-    if (slope > 4) slope = 4;
+    if (slope > 8) slope = 8;
 
     bool paramsChanged = (bg.type != type || bg.hz != hz || bg.db != db ||
                           bg.q != q || bg.slope != slope);
@@ -367,8 +367,18 @@ void InstrumentEq::recomputeBand(int band) {
     // corners below ~500 Hz keep their exact ~1e-5 RBJ values (a Q15 b1 of
     // 1.79 truncates to 1, turning the LP into a resonator; the 24 dB/oct
     // cascade of the broken stage then BOOSTED instead of squaring the cut).
+    // BACON_1.5_EQ8_WALL (U2.65): LOWPA/HIPAS wall must not boost the
+    // passband (realce antes/después de la banda).  Cascading a resonant
+    // LP/HP (Q>0.707) multiplies the peaking (Q's resonance * slope),
+    // so the wall lifts the passband.  For slope>1 on LP/HP force
+    // Butterworth Q=0.707 for the coefficients (stored Q stays for UI,
+    // but the DSP wall is flat Butterworth).
+    float qForDsp = fp2fl(bg.q);
+    if ((bg.type == TYPE_LOW_PASS || bg.type == TYPE_HIGH_PASS) && bg.slope > 1) {
+        qForDsp = 0.70710678f;
+    }
     eqBiquadCoeffsShift(mapBandType((int)bg.type), rate_, fp2fl(bg.hz),
-                        fp2fl(bg.db), fp2fl(bg.q), b0, b1, b2, a1, a2, 24);
+                        fp2fl(bg.db), qForDsp, b0, b1, b2, a1, a2, 24);
     // Set the target coefficients; the per-frame loop smooths cur -> tgt.
     bg.tB0 = b0; bg.tB1 = b1; bg.tB2 = b2; bg.tA1 = a1; bg.tA2 = a2;
     if (bg.b0 != bg.tB0 || bg.b1 != bg.tB1 || bg.b2 != bg.tB2 ||
@@ -425,7 +435,7 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
         if (fade > 0) {
             fixed r = kFadeRampQ15[kFadeFrames - (fade--)];
             for (int b = 0; b < kNumBands; b++) {
-                for (int s = 0; s < 4; s++) {
+                for (int s = 0; s < 8; s++) {
                     ChanState &st = state_[channel][b][s];
                     // 64-bit: the states are 2^24-scale (see ChanState).
                     st.s1L = (st.s1L * (long long)r) >> 15;
@@ -469,7 +479,7 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
             if (bg.tB0 == kIdentityB0 && bg.tB1 == 0 && bg.tB2 == 0 &&
                 bg.tA1 == 0 && bg.tA2 == 0) {
                 for (int c = 0; c < kMaxChannels; c++) {
-                    for (int s = 0; s < 4; s++) {
+                    for (int s = 0; s < 8; s++) {
                         ChanState &st = state_[c][b][s];
                         // 64-bit: the states are 2^24-scale (see ChanState).
                         st.s1L = (st.s1L * (long long)kCloseFadeQ15) >> 15;
@@ -540,11 +550,9 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
                          st.s2R;
                 st.s2R = (((long long)bg.b2 * (long long)xR + 16384) >> 15) -
                          (((long long)bg.a2 * (long long)yR + (1 << 23)) >> 24);
-                // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): a band with slope > 1
-                // cascades the same biquad `slope` times (12 dB/oct per stage).
-                // Only non-bell types can use it (a bell's shape is its Q),
-                // so a BELL band always runs the single stage.
-                if (bg.slope > 1 && bg.type != TYPE_BELL) {
+                // BACON_1.5_EQ8_SLOPE96 (U2.65): slope 1..8 = 12..96 dB/oct,
+                // todos los tipos incluido BELL (campana más pronunciada).
+                if (bg.slope > 1) {
                     fixed tL_cascade = tL;
                     fixed tR_cascade = tR;
                     for (int stage = 1; stage < bg.slope; stage++) {

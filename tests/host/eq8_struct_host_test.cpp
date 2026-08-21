@@ -700,8 +700,10 @@ int main() {
         CHECK(eq.GetBandSlope(0) == 1);
         eq.SetBandSlope(0, 2);
         CHECK(eq.GetBandSlope(0) == 2);
-        eq.SetBandSlope(0, 7);       // clamps to 4 (new max)
-        CHECK(eq.GetBandSlope(0) == 4);
+        eq.SetBandSlope(0, 7);       // clamps to 8 (new max 96 dB)
+        CHECK(eq.GetBandSlope(0) == 7);
+        eq.SetBandSlope(0, 9);       // clamps to 8
+        CHECK(eq.GetBandSlope(0) == 8);
         eq.SetBandSlope(0, 0);       // clamps to 1
         CHECK(eq.GetBandSlope(0) == 1);
 
@@ -754,8 +756,9 @@ int main() {
             CHECK(g2 > 0.5 * sq && g2 < 1.5 * sq);  // exactly the squared
         }
 
-        // 12c. a BELL ignores the slope (its shape is the Q): slope 2 on a
-        // bell must produce the SAME output as slope 1 (single stage).
+        // 12c. BACON_1.5_EQ8_SLOPE96 (U2.65): BELL now respects slope
+        // 1..8 (campana más pronunciada): slope 8 cascades 8x bell,
+        // so slope 1 vs 2 must be DIFFERENT (more pronounced).
         {
             InstrumentEq eq1, eq2;
             eq1.SetSampleRate(kRate);
@@ -769,7 +772,7 @@ int main() {
             memcpy(sig2, sig1, sizeof(sig1));
             eq1.Process(0, sig1, kFrames);
             eq2.Process(0, sig2, kFrames);
-            CHECK(memcmp(sig1, sig2, sizeof(sig1)) == 0);
+            CHECK(memcmp(sig1, sig2, sizeof(sig1)) != 0);
         }
     }
 

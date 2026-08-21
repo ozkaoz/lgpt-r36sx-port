@@ -1426,8 +1426,8 @@ void AppWindow::Print(char *line) {
     SetColor(CD_NORMAL);
     DrawString(_statusLine, pos, props);
     char buildString[80];
-    snprintf(buildString,sizeof(buildString),"Piggy build %s.%s.%s",PROJECT_NUMBER,
-             PROJECT_RELEASE,BUILD_COUNT);
+    // BACON_1.5_VERSION (U2.65): unified port version string
+    snprintf(buildString,sizeof(buildString),"LGPT R36SX - Bacon 1.5");
     pos._y = 28;
     pos._x = (40 - strlen(buildString)) / 2;
     DrawString(buildString, pos, props);

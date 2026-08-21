@@ -142,8 +142,7 @@ BassSynth::BassSynth() {
             sprintf(n, "eqq%d", i);
             eqQ_[i] = new Variable(n, qIDs[i], 100);
             Insert(eqQ_[i]);
-            // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): per-band slope
-            // (1 = 12 dB/oct, 2 = 24 dB/oct).
+            // BACON_1.5_EQ8_SLOPE48 (U2.64): per-band slope 1..4 (12/24/36/48)
             sprintf(n, "eqs%d", i);
             eqSlope_[i] = new Variable(n, slopeIDs[i], 1);
             Insert(eqSlope_[i]);
@@ -630,7 +629,8 @@ void BassSynth::syncInstrumentEq() {
         if (type >= (int)FxEngine::InstrumentEq::kTypeCount) type = 0;
         int slope = vals[6 + 5 * band];
         if (slope < 1) slope = 1;
-        if (slope > 2) slope = 2;
+        // BACON_1.5_EQ8_SLOPE96 (U2.65): 1..8 (12..96)
+        if (slope > 8) slope = 8;
         eqDsp_.SetBandFreq(band, fl2fp(hz));
         eqDsp_.SetBandGainDb(band, fl2fp(db));
         eqDsp_.SetBandType(band, (FxEngine::InstrumentEq::BandType)type);

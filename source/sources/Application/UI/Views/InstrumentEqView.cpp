@@ -207,7 +207,8 @@ void InstrumentEqView::loadFromInstrument() {
         if (vq) q_[i] = (float)vq->GetInt() / 100.0f;
         if (vs) slope_[i] = vs->GetInt();
         if (slope_[i] < 1) slope_[i] = 1;
-        if (slope_[i] > 2) slope_[i] = 2;
+        // BACON_1.5_EQ8_SLOPE96 (U2.65): 1..8 (12..96 dB/oct)
+        if (slope_[i] > 8) slope_[i] = 8;
         bandOn_[i] = ((mask >> i) & 1) != 0;
     }
 }
@@ -334,8 +335,10 @@ void InstrumentEqView::buildHeader(char *title, size_t titleSz, char *line,
     } else if (bypass_) {
         snprintf(status, statusSz, "EQ BYPASSED");
     } else {
+        // BACON_1.5_EQ8_SLOPE48 (U2.64): L2+X mueve Hz de banda 1-8 sin mover peak,
+        // R2+X+UP/DN slope 12/24/36/48 (pared vs suave)
         snprintf(status, statusSz,
-                 "L/R band  X f/g  Y Q  L2+R2 peak  L2+X U/D slope");
+                 "L/R band  X f/g  Y Q  L2+R2 peak  R2+X slope");
     }
 }
 
@@ -520,8 +523,11 @@ void InstrumentEqView::PostFlushDraw() {
                 // see == what you hear).
                 if (!bandOn_[b] || gainDb_[b] == 0.0f) continue;
                 fixed f0, f1, f2, fA1, fA2;
+                // BACON_1.5_EQ8_WALL (U2.65): LOWPA/HIPAS wall flat Butterworth
+                float qDraw = q_[b];
+                if ((type_[b] == 3 || type_[b] == 4) && slope_[b] > 1) qDraw = 0.70710678f;
                 FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
-                                         gainDb_[b], q_[b], f0, f1, f2,
+                                         gainDb_[b], qDraw, f0, f1, f2,
                                          fA1, fA2);
                 double b0 = fp2fl(f0), b1 = fp2fl(f1), b2 = fp2fl(f2);
                 double a1 = fp2fl(fA1), a2 = fp2fl(fA2);
@@ -533,12 +539,9 @@ void InstrumentEqView::PostFlushDraw() {
                 double imD = a1 * swv + a2 * sin(2 * w);
                 double bandDb = 10.0 * log10((reN * reN + imN * imN + 1e-12) /
                                              (reD * reD + imD * imD + 1e-12));
-                // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): a slope-2 band
-                // cascades the same biquad twice in the DSP, so its drawn
-                // response is exactly 2x the single-stage dB at every
-                // frequency.  A BELL keeps its Q shape (slope 1 only).
-                db += (slope_[b] == 2 && type_[b] != 0) ? 2.0 * bandDb
-                                                        : bandDb;
+                // BACON_1.5_EQ8_SLOPE96 (U2.65): slope 1..8 = 12..96 dB/oct,
+                // todos los tipos incl BELL (campana más pronunciada)
+                db += (double)slope_[b] * bandDb;
             }
             if (db > 24.0) db = 24.0;
             if (db < -24.0) db = -24.0;
@@ -580,6 +583,14 @@ void InstrumentEqView::PostFlushDraw() {
             const int n = sp.BinCount();
             int bw = (cX1 - cX0) / n;
             int barW = 1;
+            // BACON_1.5_ANALYZER_EQUAL (U2.65): peak hold para que todas
+            // las barras (graves, medios, agudos) se vean iguales como
+            // los graves ("todas las barras deben ser iguales").  Los
+            // graves son sostenidos, los agudos son transitorios: sin
+            // hold el snare desaparece en 1 frame y parece distinto.
+            // Hold con decay 0.92 por frame de UI (~60 fps, vida media
+            // ~500 ms) mantiene el pico visible igual que el kick.
+            static float heldH[308] = {0};
             for (int i = 0; i < n; i++) {
                 // BACON_1.5_ANALYZER_DB (U2.53, feedback #7): the bars are
                 // dB-mapped so height moves with perceived loudness and the
@@ -597,9 +608,18 @@ void InstrumentEqView::PostFlushDraw() {
                 int h = (int)(frac * (float)(cY1 - cY0));
                 if (h < 2) h = 2;
                 if (h > cY1 - cY0) h = cY1 - cY0;
+                // hold con diagonal ambos lados: todas las barras como 1k+
+                if ((float)h > heldH[i]) heldH[i] = (float)h;
+                else heldH[i] *= 0.92f;
+                int hh = (int)(heldH[i] + 0.5f);
+                if (hh < 2) hh = 2;
+                if (hh > cY1 - cY0) hh = cY1 - cY0;
                 int bx = cX0 + i * bw + (bw - barW) / 2;
-                tfFill(bx, cY1 - h, barW, h, specBlend);
-                tfFill(bx, cY1 - h, barW, 1, specTop);
+                tfFill(bx, cY1 - hh, barW, hh, specBlend);
+                // top con diagonal a ambos lados (pico dinámico)
+                tfFill(bx, cY1 - hh, barW, 1, specTop);
+                if (bx > cX0) tfFill(bx - 1, cY1 - hh + 1, 1, 1, specTop);
+                if (bx + barW < cX1) tfFill(bx + barW, cY1 - hh + 1, 1, 1, specTop);
             }
         }
 
@@ -610,8 +630,10 @@ void InstrumentEqView::PostFlushDraw() {
             for (int b = 0; b < 8; b++) {
                 if (!bandOn_[b] || gainDb_[b] == 0.0f) continue;
                 fixed f0, f1, f2, fA1, fA2;
+                float qDraw2 = q_[b];
+                if ((type_[b] == 3 || type_[b] == 4) && slope_[b] > 1) qDraw2 = 0.70710678f;
                 FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
-                                         gainDb_[b], q_[b], f0, f1, f2,
+                                         gainDb_[b], qDraw2, f0, f1, f2,
                                          fA1, fA2);
                 double b0 = fp2fl(f0), b1 = fp2fl(f1), b2 = fp2fl(f2);
                 double a1 = fp2fl(fA1), a2 = fp2fl(fA2);
@@ -623,8 +645,8 @@ void InstrumentEqView::PostFlushDraw() {
                 double imD = a1 * swv + a2 * sin(2 * w);
                 double bandDb = 10.0 * log10((reN * reN + imN * imN + 1e-12) /
                                              (reD * reD + imD * imD + 1e-12));
-                db += (slope_[b] == 2 && type_[b] != 0) ? 2.0 * bandDb
-                                                        : bandDb;
+                // SLOPE96 (U2.65): 1..8 incl BELL
+                db += (double)slope_[b] * bandDb;
             }
             if (db > 24.0) db = 24.0;
             if (db < -24.0) db = -24.0;
@@ -639,9 +661,7 @@ void InstrumentEqView::PostFlushDraw() {
         // stay "claramente identificables, no superpuestas").  Each number
         // gets a small canvas-color clear behind it so the curve/grid below
         // it never bleeds through the glyph.
-        // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): a slope-2 band shows a
-        // "2" right under its crosshair (24 dB/oct), so the extra-steep
-        // filters are identifiable at a glance.
+        // BACON_1.5_EQ8_SLOPE96 (U2.65): slope 1..8 (12..96) incl BELL
         for (int b = 0; b < 8; b++) {
             if (!bandOn_[b]) continue;
             int gx = freqToX(freqHz_[b]);
@@ -654,12 +674,13 @@ void InstrumentEqView::PostFlushDraw() {
             if (ny < cY0 + 1) ny = cY0 + 1;
             tfFill(gx - 2, ny, 7, 6, bgC);
             tfTinyText(gx - 1, ny, num, col);
-            if (slope_[b] == 2 && type_[b] != 0) {
+            if (slope_[b] > 1) {
                 int sy = gyy + 6;
                 if (sy + 6 > cY1 + 1) sy = gyy - 12;
                 if (sy < cY0 + 1) sy = cY0 + 1;
                 tfFill(gx - 2, sy, 7, 6, bgC);
-                tfTinyText(gx - 1, sy, "2", col);
+                char sTxt[2] = {(char)('0' + slope_[b]), 0};
+                tfTinyText(gx - 1, sy, sTxt, col);
             }
         }
     }
@@ -767,7 +788,9 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
     // buttons were pressed ("el pico mas alto historico, donde esta el
     // peso del sonido").  The marker NEVER moves the EQ: L2+R2+X snaps the
     // selected band to it.  R2+X+UP/DN toggles the selected band's slope
-    // (12/24/36/48 dB/oct).  L2+X+L/R steps the SELECTED BAND (1..8).
+    // (12/24/36/48 dB/oct, 12 suave -> 48 pared).  L2+X+L/R moves the
+    // SELECTED BAND's Hz (1..8) independently, without touching the peak
+    // measurement (feedback #14 revisado: L2+X no debe mover el peak).
     // All handled BEFORE the plain X+arrows so the chords are unambiguous.
     bool l2 = (mask & EPBM_L2) != 0;
     bool r2 = (mask & EPBM_R2) != 0;
@@ -807,22 +830,35 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
         return;
     }
     if (l2 && x && (left || right)) {
-        // L2+X+L/R: step the SELECTED BAND (1..8), independent of peak marker
-        selected_ = (selected_ + (left ? 7 : 1)) % 8;
+        // BACON_1.5_EQ8_1HZ (U2.65, feedback #14 revisado): L2+X+L/R
+        // moves the SELECTED BAND's Hz by 1 Hz (linear), independent of
+        // the peak marker.  Antes movia por indice log (~2 Hz abajo,
+        // ~2 kHz arriba), ahora 1 Hz exacto con o sin peak armado.
+        freqHz_[selected_] += (left ? -1.0f : 1.0f);
+        if (freqHz_[selected_] < 20.0f) freqHz_[selected_] = 20.0f;
+        if (freqHz_[selected_] > 20000.0f) freqHz_[selected_] = 20000.0f;
+        bandOn_[selected_] = true;
         char buf[88];
-        sprintf(buf, "BAND %1d  %5.0fHz  %+d dB  Q%.2f  %s",
-                selected_ + 1, freqHz_[selected_], (int)gainDb_[selected_],
-                q_[selected_], bandOn_[selected_] ? "ON" : "OFF");
+        sprintf(buf, "B%1d %5.0fHz %+d dB Q%.2f S%d", selected_ + 1,
+                freqHz_[selected_], (int)gainDb_[selected_],
+                q_[selected_], slope_[selected_]);
         setStatus(buf);
         refreshDraw();
         return;
     }
     if (r2 && x && (up || down)) {
-        // R2+X+UP/DN: toggle slope (1..4 = 12/24/36/48 dB/oct)
-        slope_[selected_] = (slope_[selected_] == 4) ? 1 : slope_[selected_] + 1;
+        // R2+X+UP/DN: slope 1..8 = 12..96 dB/oct (12 pared 96, todos los tipos incl BELL)
+        if (up) {
+            slope_[selected_] = (slope_[selected_] >= 8) ? 1 : slope_[selected_] + 1;
+        } else {
+            slope_[selected_] = (slope_[selected_] <= 1) ? 8 : slope_[selected_] - 1;
+        }
         char buf[88];
-        sprintf(buf, "B%1d SLOPE %d dB/oct", selected_ + 1,
-                slope_[selected_] * 12);
+        const char *tag = (slope_[selected_] == 1) ? "suave" :
+                          (slope_[selected_] >= 8) ? "pared" :
+                          (slope_[selected_] >= 5) ? "fuerte" : "medio";
+        sprintf(buf, "B%1d SLOPE %d dB/oct (%s)", selected_ + 1,
+                slope_[selected_] * 12, tag);
         setStatus(buf);
         refreshDraw();
         return;
@@ -881,6 +917,21 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
         refreshDraw(); return;
     }
 
+    // BACON_1.5_EQ8_B_ARROWS (U2.65): B+flechas cicla tipos en orden
+    // inmediato anterior/siguiente (BELL 0, LOWSH 1, HISHE 2, LOWPA 3,
+    // HIPAS 4, NOTCH 5, BANDP 6), no salto aleatorio.
+    if (b && (left || right || up || down)) {
+        int dir = (left || down) ? -1 : 1;
+        type_[selected_] = (type_[selected_] + dir + 7) % 7;
+        char buf[88];
+        sprintf(buf, "BAND%1d %s %5.0fHz %+3ddB Q%.2f S%d %s",
+                selected_ + 1, kEqTypeNames[type_[selected_]], freqHz_[selected_],
+                (int)gainDb_[selected_], q_[selected_], slope_[selected_],
+                bandOn_[selected_] ? "ON" : "OFF");
+        setStatus(buf);
+        refreshDraw();
+        return;
+    }
     if (a) { bandOn_[selected_] = !bandOn_[selected_]; refreshDraw(); return; }
     if (b) { cycleBandType(); return; }
 

@@ -36,8 +36,8 @@ enum InstrumentType {
 // frequency scaled by 100 (Hz).  SIP_EQG0..7: band gain in dB (-24..+24).
 // SIP_EQT0..7: band type (0=bell,1=low shelf,2=high shelf,3=low pass,
 // 4=high pass,5=notch).  SIP_EQ_Q0..7: Q scaled by 100.
-// BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): SIP_EQS0..7: per-band slope,
-// 1 = 12 dB/oct, 2 = 24 dB/oct (non-bell types only).
+// BACON_1.5_EQ8_SLOPE48 (U2.64): SIP_EQS0..7: per-band slope 1..4
+// = 12/24/36/48 dB/oct (non-bell types only, suave->pared).
 #define SIP_EQEN MAKE_FOURCC('E', 'Q', 'E', 'N')
 #define SIP_EQMASK MAKE_FOURCC('E', 'Q', 'M', 'K')
 #define SIP_EQF0 MAKE_FOURCC('E', 'Q', 'F', '0')
@@ -72,9 +72,8 @@ enum InstrumentType {
 #define SIP_EQ_Q5 MAKE_FOURCC('E', 'Q', 'Q', '5')
 #define SIP_EQ_Q6 MAKE_FOURCC('E', 'Q', 'Q', '6')
 #define SIP_EQ_Q7 MAKE_FOURCC('E', 'Q', 'Q', '7')
-// BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): per-band slope (1 = 12 dB/oct,
-// 2 = 24 dB/oct, only for non-bell types).  Controls how pronounced the
-// filter shape is, on top of the per-band Q.
+// BACON_1.5_EQ8_SLOPE48 (U2.64): per-band slope 1..4 = 12/24/36/48 dB/oct
+// (non-bell, suave->pared).  Controls how pronounced the filter is on top of Q.
 #define SIP_EQS0 MAKE_FOURCC('E', 'Q', 'S', '0')
 #define SIP_EQS1 MAKE_FOURCC('E', 'Q', 'S', '1')
 #define SIP_EQS2 MAKE_FOURCC('E', 'Q', 'S', '2')

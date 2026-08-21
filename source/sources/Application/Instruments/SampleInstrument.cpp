@@ -76,7 +76,8 @@ void SampleInstrument::syncInstrumentEq() {
         if (type >= (int)FxEngine::InstrumentEq::kTypeCount) type = 0;
         int slope = vals[6 + 5 * band];
         if (slope < 1) slope = 1;
-        if (slope > 2) slope = 2;
+        // BACON_1.5_EQ8_SLOPE96 (U2.65): 1..8 (12..96 dB/oct)
+        if (slope > 8) slope = 8;
         eqDsp_.SetBandFreq(band, fl2fp(hz));
         eqDsp_.SetBandGainDb(band, fl2fp(db));
         eqDsp_.SetBandType(band, (FxEngine::InstrumentEq::BandType)type);
