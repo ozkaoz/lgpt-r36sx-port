@@ -1,7 +1,8 @@
 # DECISIONS.md — Memoria técnica duradera
 
 **Última actualización:** 2026-08-21
-**Commit base:** 8cc0a47 (Bacon 1.5 U2.71)
+**Commit base:** e27c741 (feature/bacon-1.5-fx, Infraestructura IA)
+**Canonical WSL repository:** `/home/dafunknoise/lgpt-repo`
 
 ---
 
@@ -141,9 +142,11 @@
 
 ---
 
-## DEC-2026-08-21-08 — Analyzer hold solo >140 Hz (ya en U2.68)
+## DEC-2026-08-21-28 — Analyzer hold solo >140 Hz (ya en U2.68) [RENOMBRADO de duplicado 08]
 
 **Decisión:** `InstrumentEqView.cpp:634` — `heldH[i]` solo actualizado si `fcHold > 140 Hz`. En <140 Hz `heldH[i] = h` (sin hold).
+
+**Nota:** Renombrado desde ID duplicado 08 para garantizar unicidad. Ver entrada BELL Q para el otro 08.
 
 ---
 
@@ -169,9 +172,11 @@
 
 ---
 
-## DEC-2026-08-21-11 — Push `8cc0a47` → `origin/feature/bacon-1.5-fx`
+## DEC-2026-08-21-29 — Push `8cc0a47` → `origin/feature/bacon-1.5-fx` [RENOMBRADO de duplicado 11]
 
 **Evidencia:** `git push origin feature/bacon-1.5-fx` → `588270c..8cc0a47` ok. `git status` clean.
+
+**Nota:** Renombrado desde ID duplicado 11 para garantizar unicidad. Ver entrada SD DBAD57A7 para el otro 11.
 
 ---
 
