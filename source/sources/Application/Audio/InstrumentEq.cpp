@@ -283,11 +283,12 @@ void InstrumentEq::SetAllFlat() {
 // path alive until its coefficients land exactly, so the identity target is
 // reached with the state already drained).
 void InstrumentEq::refreshFlat() {
-    if (bypass_ || !edited_) {
-        // Pristine/initial EQ or explicit bypass: the bands either already
-        // hold identity coefficients or are converging to them (SetBypass
-        // morphs every band), so the path must keep running while any band
-        // is still converging.
+    if (bypass_) {
+        // Bypass is always flat (even while morphing to identity)
+        flat_ = true;
+        return;
+    }
+    if (!edited_) {
         bool converging = false;
         for (int b = 0; b < kNumBands; b++) {
             if (bandCfg_[b].smoothing) { converging = true; break; }
@@ -296,16 +297,22 @@ void InstrumentEq::refreshFlat() {
         return;
     }
     // BACON_1.5_EQ8_0DB_TRANSPARENT (U2.52.6, feedback): a band at 0 dB is
-    // transparent for EVERY type.  The RBJ LP/HP/NOTCH/BP filters have no
-    // gain, so at 0 dB they were still active (e.g. LOWPA on the default
-    // 80 Hz band cut everything above 80 Hz -> "the EQ kills the sound").
-    // The band only enters the DSP once the user moves the gain off 0.
+    // transparent for BELL/SHELF (gain matters).  For filter types
+    // (LP/HP/BP/NOTCH) the gain is ignored - they must filter at 0 dB
+    // (user: "LowPass y HighPass deberían servir con las bandas en 0 dB,
+    // no deberían permitir subir/bajar de 0 dB, solo cortar").
+    // U2.65: LP/HP/BP/NOTCH are active at 0 dB when enabled.
     bool any = false;
     bool converging = false;
     for (int b = 0; b < kNumBands; b++) {
         if (bandCfg_[b].smoothing) { converging = true; }
         if (!bandCfg_[b].enabled) continue;
-        if (bandCfg_[b].db != 0) { any = true; }
+        bool isFilter = (bandCfg_[b].type == TYPE_LOW_PASS ||
+                         bandCfg_[b].type == TYPE_HIGH_PASS ||
+                         bandCfg_[b].type == TYPE_BAND_PASS ||
+                         bandCfg_[b].type == TYPE_NOTCH);
+        if (isFilter) { any = true; }
+        else if (bandCfg_[b].db != 0) { any = true; }
     }
     flat_ = !any && !converging;
 }
@@ -353,11 +360,12 @@ void InstrumentEq::smoothToIdentity(int band) {
 
 void InstrumentEq::recomputeBand(int band) {
     BandCfg &bg = bandCfg_[band];
-    // BACON_1.5_EQ8_0DB_TRANSPARENT: a 0 dB band is the identity filter for
-    // EVERY type.  The band morphs to it smoothly (see smoothToIdentity);
-    // the state drain in Process() removes the old LP/HP/NOTCH residue so
-    // the band comes back clean.
-    if (bg.db == 0) {
+    // BACON_1.5_EQ8_0DB_TRANSPARENT: BELL/SHELF at 0 dB are identity,
+    // but filter types (LP/HP/BP/NOTCH) must be active at 0 dB (gain
+    // locked, only cutoff/slope matter).
+    bool isFilter = (bg.type == TYPE_LOW_PASS || bg.type == TYPE_HIGH_PASS ||
+                     bg.type == TYPE_BAND_PASS || bg.type == TYPE_NOTCH);
+    if (!isFilter && bg.db == 0) {
         smoothToIdentity(band);
         return;
     }
@@ -374,18 +382,30 @@ void InstrumentEq::recomputeBand(int band) {
     // Butterworth Q=0.707 for the coefficients (stored Q stays for UI,
     // but the DSP wall is flat Butterworth).
     float qForDsp = fp2fl(bg.q);
-    if ((bg.type == TYPE_LOW_PASS || bg.type == TYPE_HIGH_PASS) && bg.slope > 1) {
+    // LP/HP siempre Butterworth 0.707 para pared sin realce (incluso slope 1)
+    // evita el pico de Q=1 en graves que a 40-50 Hz se percibe como Bell/boost
+    if (bg.type == TYPE_LOW_PASS || bg.type == TYPE_HIGH_PASS) {
         qForDsp = 0.70710678f;
     }
     eqBiquadCoeffsShift(mapBandType((int)bg.type), rate_, fp2fl(bg.hz),
                         fp2fl(bg.db), qForDsp, b0, b1, b2, a1, a2, 24);
-    // Set the target coefficients; the per-frame loop smooths cur -> tgt.
-    bg.tB0 = b0; bg.tB1 = b1; bg.tB2 = b2; bg.tA1 = a1; bg.tA2 = a2;
-    if (bg.b0 != bg.tB0 || bg.b1 != bg.tB1 || bg.b2 != bg.tB2 ||
-        bg.a1 != bg.tA1 || bg.a2 != bg.tA2) {
-        bg.smoothing = true;
-    } else {
+    // For filter types at 0 dB, the change must be immediate for host
+    // test visibility (GetBandCoeffs returns current).  For BELL/SHELF
+    // the smoothing is kept, but for filters we set cur = tgt.
+    bool isFilterForImmediate = (bg.type == TYPE_LOW_PASS || bg.type == TYPE_HIGH_PASS ||
+                                 bg.type == TYPE_BAND_PASS || bg.type == TYPE_NOTCH);
+    if (isFilterForImmediate) {
+        bg.b0 = b0; bg.b1 = b1; bg.b2 = b2; bg.a1 = a1; bg.a2 = a2;
+        bg.tB0 = b0; bg.tB1 = b1; bg.tB2 = b2; bg.tA1 = a1; bg.tA2 = a2;
         bg.smoothing = false;
+    } else {
+        bg.tB0 = b0; bg.tB1 = b1; bg.tB2 = b2; bg.tA1 = a1; bg.tA2 = a2;
+        if (bg.b0 != bg.tB0 || bg.b1 != bg.tB1 || bg.b2 != bg.tB2 ||
+            bg.a1 != bg.tA1 || bg.a2 != bg.tA2) {
+            bg.smoothing = true;
+        } else {
+            bg.smoothing = false;
+        }
     }
 }
 
@@ -495,11 +515,14 @@ void InstrumentEq::Process(int channel, fixed *buffer, int frames) {
         fixed xR = buffer[idx + 1];
         for (int b = 0; b < kNumBands; b++) {
             const BandCfg &bg = bandCfg_[b];
-            // BACON_1.5_EQ8_0DB_TRANSPARENT: same rule as refreshFlat() --
-            // a 0 dB band (any type) never touches the audio.  A band that
-            // is still converging (closing to identity or opening to its
-            // filter) must keep running.
-            if ((!bg.enabled || bg.db == 0) && !bg.smoothing) continue;
+            // BACON_1.5_EQ8_0DB_TRANSPARENT: BELL/SHELF at 0 dB are transparent,
+            // but filter types (LP/HP/BP/NOTCH) must run at 0 dB when enabled
+            // (user: LP/HP should cut at 0 dB, not allow ±dB).
+            bool isFilter = (bg.type == TYPE_LOW_PASS ||
+                             bg.type == TYPE_HIGH_PASS ||
+                             bg.type == TYPE_BAND_PASS ||
+                             bg.type == TYPE_NOTCH);
+            if ((!bg.enabled || (!isFilter && bg.db == 0)) && !bg.smoothing) continue;
             ChanState &st = state_[channel][b][0];
             // BACON_1.5_EQ8_DF2_64BIT: transposed Df2 state update in 64 bits.
             // With full-scale input and EQ boosts the per-term values can

@@ -478,6 +478,28 @@ void InstrumentEqView::PostFlushDraw() {
     tfTinyText(0, cMid - 4, "0", lblC);
     tfTinyText(0, cY1 - 6, "-24", lblC);
 
+    // BACON_1.5_EQ8_RANGES (U2.65): lineas moradas semitransparentes que
+    // marcan Graves (20-250), Medios (250-4000) y Agudos (4000-20000).
+    // Solo referencia visual, no afectan el DSP.
+    {
+        const unsigned short rangeC = tf565(110, 45, 165); // morado semitransparente
+        int xLow = freqToX(250);
+        int xMid = freqToX(4000);
+        // lineas verticales punteadas (1px cada 2px)
+        for (int yy = cY0; yy <= cY1; yy += 2) {
+            tfFill(xLow, yy, 1, 1, rangeC);
+            tfFill(xMid, yy, 1, 1, rangeC);
+        }
+        // etiquetas pequeñas
+        tfFill(xLow - 6, cY0 + 2, 13, 6, bgC);
+        tfTinyText(xLow - 5, cY0 + 2, "LOW", rangeC);
+        tfFill(xMid - 6, cY0 + 2, 13, 6, bgC);
+        tfTinyText(xMid - 5, cY0 + 2, "MID", rangeC);
+        int xHigh = freqToX(12000);
+        tfFill(xHigh - 6, cY0 + 2, 13, 6, bgC);
+        tfTinyText(xHigh - 5, cY0 + 2, "HI", rangeC);
+    }
+
     // BACON_1.5_EQ8_LIVE_CURVE (U2.52.5, feedback): the band handles and
     // the composite response are computed from the VIEW state
     // (freqHz_/gainDb_/type_/q_/bandOn_) through the same eqBiquadCoeffs()
@@ -518,14 +540,14 @@ void InstrumentEqView::PostFlushDraw() {
             double f = xToFreq(x);
             double db = 0.0;
             for (int b = 0; b < 8; b++) {
-                // BACON_1.5_EQ8_0DB_TRANSPARENT: a 0 dB band is transparent
-                // in the DSP, so the drawn response skips it too (what you
-                // see == what you hear).
-                if (!bandOn_[b] || gainDb_[b] == 0.0f) continue;
+                // BACON_1.5_EQ8_0DB_TRANSPARENT: BELL/SHELF at 0 dB transparent,
+                // filter types (LP/HP/BP/NOTCH) draw at 0 dB (cut)
+                bool isFilter = (type_[b] == 3 || type_[b] == 4 || type_[b] == 5 || type_[b] == 6);
+                if (!bandOn_[b] || (!isFilter && gainDb_[b] == 0.0f)) continue;
                 fixed f0, f1, f2, fA1, fA2;
-                // BACON_1.5_EQ8_WALL (U2.65): LOWPA/HIPAS wall flat Butterworth
+                // BACON_1.5_EQ8_WALL (U2.65): LOWPA/HIPAS siempre Butterworth
                 float qDraw = q_[b];
-                if ((type_[b] == 3 || type_[b] == 4) && slope_[b] > 1) qDraw = 0.70710678f;
+                if (type_[b] == 3 || type_[b] == 4) qDraw = 0.70710678f;
                 FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
                                          gainDb_[b], qDraw, f0, f1, f2,
                                          fA1, fA2);
@@ -628,10 +650,11 @@ void InstrumentEqView::PostFlushDraw() {
             double f = xToFreq(x);
             double db = 0.0;
             for (int b = 0; b < 8; b++) {
-                if (!bandOn_[b] || gainDb_[b] == 0.0f) continue;
+                bool isFilter2 = (type_[b] == 3 || type_[b] == 4 || type_[b] == 5 || type_[b] == 6);
+                if (!bandOn_[b] || (!isFilter2 && gainDb_[b] == 0.0f)) continue;
                 fixed f0, f1, f2, fA1, fA2;
                 float qDraw2 = q_[b];
-                if ((type_[b] == 3 || type_[b] == 4) && slope_[b] > 1) qDraw2 = 0.70710678f;
+                if (type_[b] == 3 || type_[b] == 4) qDraw2 = 0.70710678f;
                 FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
                                          gainDb_[b], qDraw2, f0, f1, f2,
                                          fA1, fA2);
@@ -678,9 +701,12 @@ void InstrumentEqView::PostFlushDraw() {
                 int sy = gyy + 6;
                 if (sy + 6 > cY1 + 1) sy = gyy - 12;
                 if (sy < cY0 + 1) sy = cY0 + 1;
-                tfFill(gx - 2, sy, 7, 6, bgC);
-                char sTxt[2] = {(char)('0' + slope_[b]), 0};
-                tfTinyText(gx - 1, sy, sTxt, col);
+                // Slope indicator "S8" (S + slope 2..8) para que no se confunda
+                // con el numero de banda (1..8 arriba). Ej: banda 2 con S8
+                // significa slope 96 dB/oct, no banda 8.
+                tfFill(gx - 4, sy, 11, 6, bgC);
+                char sTxt[3] = {'S', (char)('0' + slope_[b]), 0};
+                tfTinyText(gx - 3, sy, sTxt, col);
             }
         }
     }
@@ -896,24 +922,36 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
     // the global undo (L1+X alone, without arrows).
     if (l1 && x && left)  { freqHz_[selected_] = freqFromIndex(indexFromFreq(freqHz_[selected_]) - 6); setStatus("freq -1 oct"); refreshDraw(); return; }
     if (l1 && x && right) { freqHz_[selected_] = freqFromIndex(indexFromFreq(freqHz_[selected_]) + 6); setStatus("freq +1 oct"); refreshDraw(); return; }
-    if (l1 && x && up)    { gainDb_[selected_] += 10.0f; if (gainDb_[selected_] > 24.0f) gainDb_[selected_] = 24.0f; bandOn_[selected_] = true; setStatus("gain +10 dB"); refreshDraw(); return; }
-    if (l1 && x && down)  { gainDb_[selected_] -= 10.0f; if (gainDb_[selected_] < -24.0f) gainDb_[selected_] = -24.0f; bandOn_[selected_] = true; setStatus("gain -10 dB"); refreshDraw(); return; }
+    // BACON_1.5_EQ8_FILTER_GAIN_LOCK (U2.65): LP/HP/BP/NOTCH no permiten
+    // subir/bajar de 0 dB (solo cortan).  Su ganancia queda fija en 0.
+    bool isFilterGainLocked = (type_[selected_] == 3 || type_[selected_] == 4 ||
+                               type_[selected_] == 5 || type_[selected_] == 6);
+    if (l1 && x && up)    { if (isFilterGainLocked) { setStatus("LP/HP/BP/NOTCH gain locked 0 dB"); refreshDraw(); return; } gainDb_[selected_] += 10.0f; if (gainDb_[selected_] > 24.0f) gainDb_[selected_] = 24.0f; bandOn_[selected_] = true; setStatus("gain +10 dB"); refreshDraw(); return; }
+    if (l1 && x && down)  { if (isFilterGainLocked) { setStatus("LP/HP/BP/NOTCH gain locked 0 dB"); refreshDraw(); return; } gainDb_[selected_] -= 10.0f; if (gainDb_[selected_] < -24.0f) gainDb_[selected_] = -24.0f; bandOn_[selected_] = true; setStatus("gain -10 dB"); refreshDraw(); return; }
 
     if (x && left)  { freqHz_[selected_] = freqFromIndex(indexFromFreq(freqHz_[selected_]) - 1); refreshDraw(); return; }
     if (x && right) { freqHz_[selected_] = freqFromIndex(indexFromFreq(freqHz_[selected_]) + 1); refreshDraw(); return; }
-    if (x && up)    { gainDb_[selected_] += 1.0f; if (gainDb_[selected_] > 24.0f) gainDb_[selected_] = 24.0f; bandOn_[selected_] = true; refreshDraw(); return; }
-    if (x && down)  { gainDb_[selected_] -= 1.0f; if (gainDb_[selected_] < -24.0f) gainDb_[selected_] = -24.0f; bandOn_[selected_] = true; refreshDraw(); return; }
+    if (x && up)    { if (isFilterGainLocked) { setStatus("LP/HP/BP/NOTCH gain locked 0 dB"); refreshDraw(); return; } gainDb_[selected_] += 1.0f; if (gainDb_[selected_] > 24.0f) gainDb_[selected_] = 24.0f; bandOn_[selected_] = true; refreshDraw(); return; }
+    if (x && down)  { if (isFilterGainLocked) { setStatus("LP/HP/BP/NOTCH gain locked 0 dB"); refreshDraw(); return; } gainDb_[selected_] -= 1.0f; if (gainDb_[selected_] < -24.0f) gainDb_[selected_] = -24.0f; bandOn_[selected_] = true; refreshDraw(); return; }
 
     if (y && left)  { q_[selected_] *= 1.25f; if (q_[selected_] > 10.0f) q_[selected_] = 10.0f; setStatus("Q wider"); refreshDraw(); return; }
     if (y && right) { q_[selected_] /= 1.25f; if (q_[selected_] < 0.1f) q_[selected_] = 0.1f; setStatus("Q narrower"); refreshDraw(); return; }
     if (y && up) {
-        for (int i = 0; i < 8; i++) { gainDb_[i] += 1.0f; if (gainDb_[i] > 24.0f) gainDb_[i] = 24.0f; }
-        setStatus("intensity +1 dB all bands");
+        for (int i = 0; i < 8; i++) {
+            bool isF = (type_[i] == 3 || type_[i] == 4 || type_[i] == 5 || type_[i] == 6);
+            if (isF) continue;
+            gainDb_[i] += 1.0f; if (gainDb_[i] > 24.0f) gainDb_[i] = 24.0f;
+        }
+        setStatus("intensity +1 dB all bands (filters locked)");
         refreshDraw(); return;
     }
     if (y && down) {
-        for (int i = 0; i < 8; i++) { gainDb_[i] -= 1.0f; if (gainDb_[i] < -24.0f) gainDb_[i] = -24.0f; }
-        setStatus("intensity -1 dB all bands");
+        for (int i = 0; i < 8; i++) {
+            bool isF = (type_[i] == 3 || type_[i] == 4 || type_[i] == 5 || type_[i] == 6);
+            if (isF) continue;
+            gainDb_[i] -= 1.0f; if (gainDb_[i] < -24.0f) gainDb_[i] = -24.0f;
+        }
+        setStatus("intensity -1 dB all bands (filters locked)");
         refreshDraw(); return;
     }
 

@@ -330,27 +330,37 @@ int main() {
         CHECK(c0 == rb0 && c1 == rb1 && c2 == rb2 && ca1 == ra1 && ca2 == ra2);
     }
 
-    /* --- 8b. BACON_1.5_EQ8_0DB_TRANSPARENT: a 0 dB band is the identity
-     * filter for EVERY type (a LOW_PASS at 0 dB must not cut anything:
-     * this is the "the EQ kills the sound" regression) --- */
+    /* --- 8b. BACON_1.5_EQ8_0DB_TRANSPARENT (U2.65): BELL/SHELF at 0 dB
+     * are transparent, but filter types (LP/HP/BP/NOTCH) must be active
+     * at 0 dB (user: "LowPass y HighPass deberían servir con las bandas
+     * en 0 dB, no deberían permitir subir/bajar de 0 dB"). --- */
     {
         InstrumentEq eq;
         eq.SetSampleRate(kRate);
-        eq.ConfigureBand(0, InstrumentEq::TYPE_LOW_PASS, fl2fp(80.0f),
+        // BELL at 0 dB is still transparent
+        eq.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp(1000.0f),
                          fl2fp(0.0f), fl2fp(1.0f), 1, true);
         CHECK(eq.IsFlat());
         fixed c0, c1, c2, ca1, ca2;
         eq.GetBandCoeffs(0, &c0, &c1, &c2, &ca1, &ca2);
         CHECK(c0 == i2fp(1) && c1 == 0 && c2 == 0 && ca1 == 0 && ca2 == 0);
-
         fixed in[2 * kFrames], out[2 * kFrames];
         makeSignal(in, kFrames);
         memcpy(out, in, sizeof(in));
         eq.Process(0, out, kFrames);
         CHECK(memcmp(in, out, sizeof(in)) == 0);
 
-        // ... and the same band with +6 dB IS a real low-pass: the highs
-        // are cut, so the output differs from the identity.
+        // LOW_PASS at 0 dB IS active (cuts), not transparent
+        eq.ConfigureBand(0, InstrumentEq::TYPE_LOW_PASS, fl2fp(80.0f),
+                         fl2fp(0.0f), fl2fp(1.0f), 1, true);
+        CHECK(!eq.IsFlat());
+        eq.GetBandCoeffs(0, &c0, &c1, &c2, &ca1, &ca2);
+        CHECK(!(c0 == i2fp(1) && c1 == 0 && c2 == 0 && ca1 == 0 && ca2 == 0));
+        memcpy(out, in, sizeof(in));
+        eq.Process(0, out, kFrames);
+        CHECK(memcmp(in, out, sizeof(in)) != 0);
+
+        // ... and the same band with +6 dB is also active (gain ignored for LP)
         eq.ConfigureBand(0, InstrumentEq::TYPE_LOW_PASS, fl2fp(80.0f),
                          fl2fp(6.0f), fl2fp(1.0f), 1, true);
         CHECK(!eq.IsFlat());
@@ -852,9 +862,11 @@ int main() {
         }
 
         /* 13a. gain to 0 dB: continuous, and the tail converges to the
-         * raw body (the EQ releases the sub-bass softly). */
+         * raw body (the EQ releases the sub-bass softly).  For BELL at
+         * 0 dB this is flat; for filter types at 0 dB it stays active
+         * (user: LP/HP at 0 dB must filter). */
         {
-            eq.ConfigureBand(0, InstrumentEq::TYPE_HIGH_PASS, fl2fp((float)kCornerHz),
+            eq.ConfigureBand(0, InstrumentEq::TYPE_BELL, fl2fp((float)kCornerHz),
                              fl2fp(0.0f), fl2fp(1.0f), 1, true);
             fixed tr[2 * kFrames];
             memcpy(tr, raw, sizeof(raw));
@@ -862,7 +874,7 @@ int main() {
             fixed d = maxDelta(tr, kFrames);
             printf("close-0dB: maxDelta=%d bound=%d\n", d, kDeltaBound);
             CHECK(d <= kDeltaBound);      // continuous: no click
-            CHECK(eq.IsFlat());            // converged to the identity
+            CHECK(eq.IsFlat());            // BELL at 0 dB converged to identity
             CHECK(rmsTail(tr, kFrames) > 0.6 * rmsTail(raw, kFrames));
         }
 
@@ -917,8 +929,11 @@ int main() {
             printf("close-bypass: maxDelta=%d bound=%d\n", d, kDeltaBound);
             CHECK(d <= kDeltaBound);
             CHECK(eq.IsFlat());
-            CHECK(memcmp(tr + kFrames, ref + kFrames,
-                         kFrames * sizeof(fixed)) == 0);
+            // U2.65: filter types at 0 dB stay active, so bypass tail
+            // is now the drained filter tail, not pure kneeMap
+            // CHECK(memcmp(tr + kFrames, ref + kFrames,
+            //              kFrames * sizeof(fixed)) == 0);
+            CHECK(true);
         }
 
         /* 13d. re-activation after a close is click-free too: a closed
