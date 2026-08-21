@@ -630,12 +630,19 @@ void InstrumentEqView::PostFlushDraw() {
                 int h = (int)(frac * (float)(cY1 - cY0));
                 if (h < 2) h = 2;
                 if (h > cY1 - cY0) h = cY1 - cY0;
-                // hold con diagonal ambos lados: todas las barras como 1k+
-                if ((float)h > heldH[i]) heldH[i] = (float)h;
-                else heldH[i] *= 0.92f;
-                int hh = (int)(heldH[i] + 0.5f);
-                if (hh < 2) hh = 2;
-                if (hh > cY1 - cY0) hh = cY1 - cY0;
+                // hold solo >140 Hz para que hihat sin bajos no encienda graves;
+                // graves (<140 Hz) sin hold para que sean instantáneos y no se queden pegados
+                float fcHold = 20.0f * powf(1000.0f, (float)i / (float)(n - 1));
+                int hh = h;
+                if (fcHold > 140.0f) {
+                    if ((float)h > heldH[i]) heldH[i] = (float)h;
+                    else heldH[i] *= 0.92f;
+                    hh = (int)(heldH[i] + 0.5f);
+                    if (hh < 2) hh = 2;
+                    if (hh > cY1 - cY0) hh = cY1 - cY0;
+                } else {
+                    heldH[i] = (float)h; // sin hold en graves
+                }
                 int bx = cX0 + i * bw + (bw - barW) / 2;
                 tfFill(bx, cY1 - hh, barW, hh, specBlend);
                 // top con diagonal a ambos lados (pico dinámico)

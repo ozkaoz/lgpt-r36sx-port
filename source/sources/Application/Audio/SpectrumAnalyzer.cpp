@@ -137,8 +137,11 @@ void SpectrumAnalyzer::runFft() {
         int idx = ringPos_ - kFftSize + i;
         if (idx < 0) idx += kRingFrames;
         float s = fp2fl(ring_[idx]) - (float)mean;
-        // Hann window
-        float w = 0.5f - 0.5f * cosf(2.0f * 3.14159265f * i / (float)(kFftSize - 1));
+        // Blackman window (-67 dB side lobes, was Hann -31 dB) para que
+        // hihat sin bajos no fugue a <140 Hz y graves queden limpios
+        float a0 = 0.42f, a1 = 0.5f, a2 = 0.08f;
+        float phase = 2.0f * 3.14159265f * i / (float)(kFftSize - 1);
+        float w = a0 - a1 * cosf(phase) + a2 * cosf(2.0f * phase);
         wre_[i] = s * w;
         wim_[i] = 0.0f;
     }

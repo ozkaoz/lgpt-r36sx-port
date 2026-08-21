@@ -58,39 +58,42 @@ enum EqBiquadType {
 inline void eqBiquadCoeffsShift(int type, int rate, float f0, float lvl,
                                 float qv, fixed &b0, fixed &b1, fixed &b2,
                                 fixed &a1, fixed &a2, int bShift) {
-    float w0 = 2.0f * 3.14159265f * f0 / (float)rate;
-    if (w0 > 3.14159265f * 0.9f) w0 = 3.14159265f * 0.9f;
-    if (w0 < 1e-6f) w0 = 1e-6f;
-    float cw = cosf(w0);
-    float sw = sinf(w0);
+    // U2.68: use double for low-freq precision (20-80 Hz w0=0.0026, 1-cw=3e-6,
+    // float loses 3 digits).  Double keeps 15 digits, so 40 Hz hipass at
+    // 45 Hz no longer boosts and low shelves/bells are stable.
+    double w0 = 2.0 * 3.141592653589793 * (double)f0 / (double)rate;
+    if (w0 > 3.141592653589793 * 0.9) w0 = 3.141592653589793 * 0.9;
+    if (w0 < 1e-9) w0 = 1e-9;
+    double cw = cos(w0);
+    double sw = sin(w0);
 
-    float A = powf(10.0f, lvl / 20.0f);
-    float alpha = sw / (2.0f * qv);
+    double A = pow(10.0, (double)lvl / 20.0);
+    double alpha = sw / (2.0 * (double)qv);
 
-    float fb0, fb1, fb2, fa0, fa1, fa2;
+    double fb0, fb1, fb2, fa0, fa1, fa2;
     switch (type) {
     case EQ_BIQUAD_LOW_SHELF: {
-        float S = qv; if (S < 0.5f) S = 0.5f; if (S > 2.0f) S = 2.0f;
-        float sqA = sqrtf(A);
-        float ac = (sw / 2.0f) * sqrtf((A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f);
-        fb0 = A * ((A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqA * ac);
-        fb1 = 2.0f * A * ((A - 1.0f) - (A + 1.0f) * cw);
-        fb2 = A * ((A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqA * ac);
-        fa0 = (A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqA * ac;
-        fa1 = -2.0f * ((A - 1.0f) + (A + 1.0f) * cw);
-        fa2 = (A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqA * ac;
+        double S = (double)qv; if (S < 0.5) S = 0.5; if (S > 2.0) S = 2.0;
+        double sqA = sqrt(A);
+        double ac = (sw / 2.0) * sqrt((A + 1.0 / A) * (1.0 / S - 1.0) + 2.0);
+        fb0 = A * ((A + 1.0) - (A - 1.0) * cw + 2.0 * sqA * ac);
+        fb1 = 2.0 * A * ((A - 1.0) - (A + 1.0) * cw);
+        fb2 = A * ((A + 1.0) - (A - 1.0) * cw - 2.0 * sqA * ac);
+        fa0 = (A + 1.0) + (A - 1.0) * cw + 2.0 * sqA * ac;
+        fa1 = -2.0 * ((A - 1.0) + (A + 1.0) * cw);
+        fa2 = (A + 1.0) + (A - 1.0) * cw - 2.0 * sqA * ac;
         break;
     }
     case EQ_BIQUAD_HIGH_SHELF: {
-        float S = qv; if (S < 0.5f) S = 0.5f; if (S > 2.0f) S = 2.0f;
-        float sqA = sqrtf(A);
-        float as = (sw / 2.0f) * sqrtf((A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f);
-        fb0 = A * ((A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqA * as);
-        fb1 = -2.0f * A * ((A - 1.0f) + (A + 1.0f) * cw);
-        fb2 = A * ((A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqA * as);
-        fa0 = (A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqA * as;
-        fa1 = 2.0f * ((A - 1.0f) - (A + 1.0f) * cw);
-        fa2 = (A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqA * as;
+        double S = (double)qv; if (S < 0.5) S = 0.5; if (S > 2.0) S = 2.0;
+        double sqA = sqrt(A);
+        double as = (sw / 2.0) * sqrt((A + 1.0 / A) * (1.0 / S - 1.0) + 2.0);
+        fb0 = A * ((A + 1.0) + (A - 1.0) * cw + 2.0 * sqA * as);
+        fb1 = -2.0 * A * ((A - 1.0) + (A + 1.0) * cw);
+        fb2 = A * ((A + 1.0) + (A - 1.0) * cw - 2.0 * sqA * as);
+        fa0 = (A + 1.0) - (A - 1.0) * cw + 2.0 * sqA * as;
+        fa1 = 2.0 * ((A - 1.0) - (A + 1.0) * cw);
+        fa2 = (A + 1.0) - (A - 1.0) * cw - 2.0 * sqA * as;
         break;
     }
     // RBJ cookbook LP/HP (the golden recomputeBand): the corner frequency is
@@ -101,37 +104,37 @@ inline void eqBiquadCoeffsShift(int type, int rate, float f0, float lvl,
     // at 100 Hz) -- a fidelity limit of the Q15 format, not a design
     // defect (the shelves/bell are unaffected; the sound is never killed).
     case EQ_BIQUAD_LOW_PASS:
-        fb0 = (1.0f - cw) / 2.0f;
-        fb1 = 1.0f - cw;
+        fb0 = (1.0 - cw) / 2.0;
+        fb1 = 1.0 - cw;
         fb2 = fb0;
-        fa0 = 1.0f + alpha;
-        fa1 = -2.0f * cw;
-        fa2 = 1.0f - alpha;
+        fa0 = 1.0 + alpha;
+        fa1 = -2.0 * cw;
+        fa2 = 1.0 - alpha;
         break;
     case EQ_BIQUAD_HIGH_PASS:
-        fb0 = (1.0f + cw) / 2.0f;
-        fb1 = -(1.0f + cw);
+        fb0 = (1.0 + cw) / 2.0;
+        fb1 = -(1.0 + cw);
         fb2 = fb0;
-        fa0 = 1.0f + alpha;
-        fa1 = -2.0f * cw;
-        fa2 = 1.0f - alpha;
+        fa0 = 1.0 + alpha;
+        fa1 = -2.0 * cw;
+        fa2 = 1.0 - alpha;
         break;
     case EQ_BIQUAD_BAND_PASS:
         // constant 0 dB peak gain
         fb0 = alpha;
-        fb1 = 0.0f;
+        fb1 = 0.0;
         fb2 = -alpha;
-        fa0 = 1.0f + alpha;
-        fa1 = -2.0f * cw;
-        fa2 = 1.0f - alpha;
+        fa0 = 1.0 + alpha;
+        fa1 = -2.0 * cw;
+        fa2 = 1.0 - alpha;
         break;
     case EQ_BIQUAD_NOTCH:
-        fb0 = 1.0f;
-        fb1 = -2.0f * cw;
-        fb2 = 1.0f;
-        fa0 = 1.0f + alpha;
-        fa1 = -2.0f * cw;
-        fa2 = 1.0f - alpha;
+        fb0 = 1.0;
+        fb1 = -2.0 * cw;
+        fb2 = 1.0;
+        fa0 = 1.0 + alpha;
+        fa1 = -2.0 * cw;
+        fa2 = 1.0 - alpha;
         break;
     // BACON_1.5_BELL_PREWARPED (U2.52.8, feedback): the old RBJ peaking
     // formula was asymmetric at low/mid frequencies: the gain at w0 is NOT
@@ -155,23 +158,22 @@ inline void eqBiquadCoeffsShift(int type, int rate, float f0, float lvl,
     case EQ_BIQUAD_BELL:
     default: {
         // sqrt(A) in the s-terms so the peak gain at w0 is A exactly
-        // (the prototype with plain A peaks at A^2 = lvl*2 dB).
-        float sA = powf(10.0f, lvl / 40.0f);
-        float K = w0 / tanf(w0 / 2.0f);
-        float kk = K * K;
-        float ww = w0 * w0;
-        float bw = sA * w0 * K / qv;
-        float aw = w0 * K / (sA * qv);
+        double sA = pow(10.0, (double)lvl / 40.0);
+        double K = w0 / tan(w0 / 2.0);
+        double kk = K * K;
+        double ww = w0 * w0;
+        double bw = sA * w0 * K / (double)qv;
+        double aw = w0 * K / (sA * (double)qv);
         fb0 = kk + ww + bw;
-        fb1 = 2.0f * (ww - kk);
+        fb1 = 2.0 * (ww - kk);
         fb2 = kk + ww - bw;
         fa0 = kk + ww + aw;
-        fa1 = 2.0f * (ww - kk);
+        fa1 = 2.0 * (ww - kk);
         fa2 = kk + ww - aw;
         break;
     }
     }
-    if (fa0 != 0.0f) {
+    if (fa0 != 0.0) {
         const double scale = (double)((int64_t)1 << bShift);
         b0 = (fixed)((double)(fb0 / fa0) * scale);
         b1 = (fixed)((double)(fb1 / fa0) * scale);
