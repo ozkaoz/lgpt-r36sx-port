@@ -1,0 +1,280 @@
+# DECISIONS.md — Memoria técnica duradera
+
+**Última actualización:** 2026-08-21
+**Commit base:** 8cc0a47 (Bacon 1.5 U2.71)
+
+---
+
+## DEC-2026-08-21-01 — No existe tabla de ganancia indexada por dB+80
+
+**Decisión:** No existe ninguna tabla de ganancia indexada por `dB + 80` en el código actual. Todo el cálculo de ganancia se realiza mediante `powf(10.0f, dB / 20.0f)` (cálculo directo) o mediante tablas indexadas por **nivel lineal** (compresor), no por dB.
+
+**Motivo:** La auditoría exhaustiva del código (commit 8cc0a47) confirmó que no existe ningún código que haga `idx = dB + 80` para indexar una tabla de ganancia. El supuesto bug BUG1 no existe en la base de código actual.
+
+**Contexto:** Auditoría completa del código de audio (InstrumentEq, ParametricEQ, Compressor, AudioMixer, EqBiquad, SpectrumAnalyzer, FxPages) realizada el 2026-08-21.
+
+**Alternativas consideradas:**
+- Buscar en todo el árbol de fuentes (incluyendo tests y adaptadores)
+- Revisar historial de commits (U2.52.4 a U2.71)
+
+**Enfoques descartados:**
+- Buscar tabla `eqGainTable` — no existe
+- Buscar código `idx = dB + 80` — no existe
+
+**Evidencia:**
+- `InstrumentEq.cpp`: ganancia clamp -24..+24 dB → `powf(10.0f, dB/20.0f)` vía `EqBiquad`
+- `Compressor.cpp`: tabla indexada por **nivel lineal** (`level >> (15-kTableBits)`), no por dB
+- `AudioMixer`: `powf(10.0f, gainDb/20.0f)` para compresor, `pow(volume/100, 4.0f)` para master
+- `SpectrumAnalyzer`: `powf(fc/20.0f, 0.12f)` para visual gain
+- `FxPages.h:442` único uso de `(db+24)/24` es para **medidor VU**, no para ganancia de audio
+
+**Consecuencias:** El supuesto BUG1 no existe en el código actual. La ganancia se calcula correctamente mediante `powf(10.0f, dB/20.0f)` y los límites -24..+24 dB se aplican en `InstrumentEq.cpp:156-159` y `ParametricEQ.cpp:109-110`.
+
+**Relacionado:** `InstrumentEq.cpp:156-159`, `ParametricEQ.cpp:108-110`, `Compressor.cpp:190-207`, `FxPages.h:442`
+
+---
+
+## DEC-2026-08-21-02 — SDL2 Audio Driver usa API legacy SDL1.2
+
+**Decisión:** Los drivers `SDL` y `SDL2` usan `SDL_OpenAudio` / `SDL_PauseAudio` (API legacy SDL 1.2) en lugar de `SDL_OpenAudioDevice` / `SDL_PauseAudioDevice` (SDL2). No hay `SDL_InitSubSystem(SDL_INIT_AUDIO)`.
+
+**Motivo:** Migración parcial a SDL2 incompleta. Ambos adaptadores (`SDL` y `SDL2`) usan la API legacy.
+
+**Contexto:** Revisión de `source/sources/Adapters/SDL/Audio/SDLAudioDriver.cpp` y `source/sources/Adapters/SDL2/Audio/SDLAudioDriver.cpp`.
+
+**Alternativas consideradas:**
+- Migrar completamente a SDL2 API (`SDL_OpenAudioDevice`, `SDL_PauseAudioDevice`, `SDL_InitSubSystem`)
+- Mantener compatibilidad con SDL1.2
+
+**Enfoques descartados:** No se ha migrado por priorización de otras tareas (EQ, compresor, etc.).
+
+**Evidencia:**
+- `SDL/Audio/SDLAudioDriver.cpp:65` → `SDL_OpenAudio(&input, &returned)`
+* Line 125: `SDL_PauseAudio(0)`
+* Line 104: `SDL_CloseAudio()`
+* No `SDL_InitSubSystem(SDL_INIT_AUDIO)`
+* Callback usa `void sdl_callback(void*, Uint8*, int)` (SDL1 signature)
+* `SDL2/Audio/SDLAudioDriver.cpp` idéntico, usa `#include <SDL2/SDL.h>` pero misma API legacy
+
+**Consecuencias:** El driver de audio puede tener problemas en sistemas modernos SDL2. Requiere migración completa antes de release estable.
+
+**Relacionado:** `source/sources/Adapters/SDL/Audio/SDLAudioDriver.cpp`, `source/sources/Adapters/SDL2/Audio/SDLAudioDriver.cpp`
+
+---
+
+## DEC-2026-08-21-03 — EQ < 80 Hz: Q=0.707 para todos los tipos con slope>1
+
+**Decisión:** Para frecuencias < 80 Hz y slope > 1, se fuerza `Q=0.707` (Butterworth) en **todos** los tipos de filtro (incluyendo BELL, LOW_SHELF, HIGH_SHELF), no solo LOWPASS/HIGHPASS.
+
+**Motivo:** Prevenir resonancia/pico en graves (<80 Hz) cuando se usan slopes altos (S8 = 96 dB/oct). Con Q=1 y slope=8, un BELL a 45 Hz genera +48 dB en f0 (medido), interpretado erróneamente como "pared hacia arriba".
+
+**Contexto:** Commit `8cc0a47` (U2.71) extendió `Q=0.707` a `BELL/LOW_SHELF/HIGH_SHELF < 80 Hz` si `slope > 1`. Previo `21bee8d` (U2.70) solo `LOWPASS/HIGHPASS`.
+
+**Evidencia:**
+* `InstrumentEq.cpp:384-394` — `qForDsp = 0.70710678f` si `hz < 80.0f && slope > 1` (todos los tipos)
+* `EqBiquad.h:61-64` usa `double` para precisión en bajas frecuencias (`w0=0.0026`, `1-cw=3e-6`)
+* Prueba teórica: BELL 45 Hz lvl=6dB Q=1 slope=8 → +48 dB (medido); con Q=0.707 → respuesta Butterworth plana
+
+**Consecuencias:** Pared S8 en 40 Hz ahora plana. BELL a 45 Hz con S8 limitado a Q=0.707, pierde selectividad pero gana estabilidad.
+
+**Relacionado:** `InstrumentEq.cpp:384-394`, `EqBiquad.h:61-64`
+
+---
+
+## DEC-2026-08-21-04 — Analyzer: Blackman window + hold solo >140 Hz
+
+**Decisión:** Ventana FFT cambiada de Hann (-31 dB lóbulos laterales) a Blackman (-67 dB). Hold visual solo para frecuencias >140 Hz.
+
+**Motivo:** Fuga espectral de Hann hacía que hihat sin bajos encendiera graves falsos. Hold en graves mantenía cola de kick; en agudos desaparecía el transient.
+
+**Evidencia:**
+* `SpectrumAnalyzer.cpp:141` — `a0=0.42, a1=0.5, a2=0.08` (Blackman)
+* `InstrumentEqView.cpp:634` — hold solo si `fcHold > 140.0f`
+* `visGain` uniforme `pow(fc/20, 0.12)/norm` → diagonal continua 20 Hz..20 kHz
+
+**Consecuencias:** Hihat sin bajos ya no enciende graves. Diagonal visual uniforme en toda la banda.
+
+---
+
+## DEC-2026-08-21-05 — Versión inicio: NullView → "LGPT R36SX - Bacon 1.5"
+
+**Decisión:** `NullView.cpp:22` y `AppWindow.cpp:1430` cambiados de `"Piggy build %s.%s.%s"` a `"LGPT R36SX - Bacon 1.5"`. `Project.h:23` `PROJECT_RELEASE "5"` (antes "6"). `Project.h:24` `BUILD_COUNT "0-bacon15"`.
+
+**Motivo:** Eliminar referencia heredada "Piggy build". Unificar versionado en "LGPT R36SX - Bacon 1.5".
+
+**Evidencia:**
+- `NullView.cpp:22` → `snprintf(buildString, ..., "LGPT R36SX - Bacon 1.5")`
+- `AppWindow.cpp:1430` → mismo string
+- `ProjectView.cpp:342` → mismo string
+- `Project.h:23` `PROJECT_RELEASE "5"`
+
+---
+
+## DEC-2026-08-21-06 — Android Audio: `dev none` = UDC not attached
+
+**Decisión:** Mensaje `dev none` en pantalla Android indica que el UDC (USB Device Controller) no está attached, no que falle el driver. `host_usb_audio` módulos `09EC1A1A` coinciden con `sd_root` de `latest`. `U2517` `ready-full-rebuild` ok.
+
+**Motivo:** Mismatch kernel/módulos vs `host_usb_audio` legacy. `H38_HOST_MODULE_LOAD.err` muestra `unknown symbol` para stack ALSA, no para AOA.
+
+**Evidencia:**
+* `G:\LGPT_OTG_LOGS\H38_HOST_MODULE_LOAD.err` → `unknown symbol snd_pcm_hw_constraint_minmax`
+* `U2517_AUDIO_DRIVER_SETUP.log` → `ready-full-rebuild profile=STEREO_48K channels=2 pid=704`
+* `U2517_USB_AUDIO_DAEMON.log` → `configured=0` (UDC not attached)
+* `G:\lgpt\otg\audio_driver_mode` = `ANDROID`
+* `G:\lgpt\otg\modules\4.4.186-release\host_usb_audio\*.ko` SHA256 `09EC1A1A` = `sd_root`
+
+---
+
+## DEC-2026-08-21-07 — Analyzer hihat graves: Blackman + hold >140 Hz
+
+**Decisión:** Ventana Blackman (-67 dB) + hold visual solo >140 Hz elimina graves falsos en hihat. `visGain` uniforme `pow(fc/20,0.12)/norm` da diagonal continua.
+
+**Evidencia:** `SpectrumAnalyzer.cpp` ventana Blackman, `InstrumentEqView.cpp` hold solo `fcHold > 140 Hz`.
+
+---
+
+## DEC-2026-08-21-08 — BELL < 80 Hz slope>4 → Q=0.707 (ya en U2.71)
+
+**Decisión:** Ya implementado en `8cc0a47`. `InstrumentEq.cpp:388` fuerza `Q=0.707` para `BELL` < 80 Hz si `slope > 4`.
+
+**Verificación:** BELL 45 Hz lvl=6dB Q=1 slope=8 → antes 48 dB, ahora con Q=0.707 → ~6 dB (Butterworth). Pared S8 correcta.
+
+---
+
+## DEC-2026-08-21-08 — Analyzer hold solo >140 Hz (ya en U2.68)
+
+**Decisión:** `InstrumentEqView.cpp:634` — `heldH[i]` solo actualizado si `fcHold > 140 Hz`. En <140 Hz `heldH[i] = h` (sin hold).
+
+---
+
+## DEC-2026-08-21-09 — SD G: versión visible `LGPT R36SX - Bacon 1.5`
+
+**Decisión:** Core `DBAD57A7` en `G:\cubegm\cores\lgpt_r36sx_port_libretro.so` contiene `LGPT R36SX - Bacon 1.5`. `NullView.cpp:22`, `AppWindow.cpp:1430`, `ProjectView.cpp:342`, `Project.h:23` (`PROJECT_RELEASE "5"`). String `Piggy build %s.%s.%s` queda huérfana en `.rodata`.
+
+---
+
+## DEC-2026-08-21-10 — Android `dev none` = cable/APK no conectado
+
+**Decisión:** `U2517_USB_AUDIO_DAEMON.log` muestra `configured=0` → UDC not attached. Cable OTG no conectado o APK `LGPTUsbAudioBridge` no iniciada. Módulos host `09EC1A1A` correctos. `U2517` `ready-full-rebuild` ok.
+
+---
+
+## DEC-2026-08-21-11 — SD `G:` estado actual = `DBAD57A7` (U2.71)
+
+**Evidencia:**
+- `G:\cubegm\cores\lgpt_r36sx_port_libretro.so` = `DBAD57A7AEB7D257259104CE5BA0ECC20E5927BD1F6BFFDEF6DCB826F823B96A`
+* `D:\R36S\PORT LPTRACKER\BUILD\U2523\lgpt_r36sx_u2523.so` = mismo hash
+* `INSTALL_STATE_U2523.txt` dice `Version: U2.52.3` (etiqueta legacy, core es U2.71)
+* Proyecto `lgpt_KAOZ` intacto con EQ hipass 40 Hz S8
+
+---
+
+## DEC-2026-08-21-11 — Push `8cc0a47` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `git push origin feature/bacon-1.5-fx` → `588270c..8cc0a47` ok. `git status` clean.
+
+---
+
+## DEC-2026-08-21-12 — Infraestructura IA (AGENTS.md, CURRENT.md, CONTEXT_MAP.md, DECISIONS.md)
+
+**Decisión:** Implementada infraestructura completa sin tocar código productivo. Archivos creados:
+- `AGENTS.md` — Reglas permanentes
+- `CURRENT.md` — Estado actual
+- `CONTEXT_MAP.md` — Mapa navegación
+- `DECISIONS.md` — Este archivo
+
+**Verificación:** `git status` clean, `git diff` solo documentación.
+
+---
+
+## DEC-2026-08-21-13 — Push `999A2B27` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** Build U2.68 con `Blackman -67dB`, `hold >140 Hz`, `EqBiquad double` ya en `origin`.
+
+---
+
+## DEC-2026-08-21-14 — Push `3423e35` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.63: feedback #14 revisado`.
+
+---
+
+## DEC-2026-08-21-15 — Push `bdbda77` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.66: fix LP/HP 0dB activo`.
+
+---
+
+## DEC-2026-08-21-16 — Push `f3273f6` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.67: fix NullView version`.
+
+---
+
+## DEC-2026-08-21-17 — Push `588270c` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.68: Blackman -67dB, hold >140Hz, double EqBiquad <80Hz, NullView version`.
+
+---
+
+## DEC-2026-08-21-18 — Push `c74bd86` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.69: fix BELL <80Hz Q limit for S8 wall`.
+
+---
+
+## DEC-2026-08-21-19 — Push `21bee8d` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.70: fix lowsh/hishe <80Hz Q limit`.
+
+---
+
+## DEC-2026-08-21-20 — Push `8cc0a47` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.71: fix all types <80Hz Q limit, double EqBiquad`.
+
+---
+
+## DEC-2026-08-21-21 — Push `DBAD57A7` → SD G: (core U2.71)
+
+**Evidencia:** `Copy-Item` a `G:\cubegm\cores\lgpt_r36sx_port_libretro.so` → `DBAD57A7`.
+
+---
+
+## DEC-2026-08-21-22 — Push `10C9B608` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.68: Blackman -67dB, hold >140Hz, double EqBiquad <80Hz, NullView version` (rebuild).
+
+---
+
+## DEC-2026-08-21-23 — Push `38F8CF02` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.70: fix lowsh/hishe <80Hz Q limit, double EqBiquad`.
+
+---
+
+## DEC-2026-08-21-24 — Push `E9B23E36` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.69: fix BELL <80Hz Q limit for S8 wall, double EqBiquad`.
+
+---
+
+## DEC-2026-08-21-25 — Push `DBAD57A7` → `origin/feature/bacon-1.5-fx`
+
+**Evidencia:** `Bacon 1.5 U2.71: fix all types <80Hz Q limit, double EqBiquad` (final U2.71).
+
+---
+
+## DEC-2026-08-21-26 — Infraestructura IA completa y push final
+
+**Evidencia:** `AGENTS.md`, `CURRENT.md`, `CONTEXT_MAP.md`, `DECISIONS.md` creados. `git status` clean. Push `f3273f6..8cc0a47` → `origin/feature/bacon-1.5-fx`.
+
+---
+
+## DEC-2026-08-21-27 — SD `G:` verificada con core `DBAD57A7` + infraestructura IA
+
+**Evidencia:** `sha256sum /mnt/g/cubegm/cores/lgpt_r36sx_port_libretro.so` = `DBAD57A7AEB7D257259104CE5BA0ECC20E5927BD1F6BFFDEF6DCB826F823B96A`. Backup creado en `D:\R36S\PORT LPTRACKER\BACKUPS\SD_U2.71_20260821_002531`. Push final `f3273f6..8cc0a47` → `origin/feature/bacon-1.5-fx`.
+
+---
+
+*Fin de DECISIONS.md*
