@@ -19,7 +19,8 @@ void NullView::DrawView() {
 	SetColor(CD_HILITE2) ;
 
 	char buildString[80] ;
-	sprintf(buildString,"Piggy build %s.%s.%s",PROJECT_NUMBER,PROJECT_RELEASE,BUILD_COUNT) ;
+	// BACON_1.5_VERSION (U2.66): unified version
+	snprintf(buildString,sizeof(buildString),"LGPT R36SX - Bacon 1.5");
 	GUIPoint pos ;
 	pos._y=28;
 	pos._x=(40-strlen(buildString))/2 ;
