@@ -12,6 +12,7 @@
 #include "Application/UI/Views/ViewData.h"
 #include "Application/UI/Views/BaseClasses/ViewEvent.h"
 #include "UIFramework/BasicDatas/GUIEvent.h"
+#include "System/System/System.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -149,7 +150,19 @@ static double xToFreq(int x) {
 
 InstrumentEqView::InstrumentEqView(GUIWindow &w, ViewData *data)
     : View(w, data), instr_(0), selected_(0), bypass_(false),
-      peakMarkerOn_(false), peakHz_(0.0f), peakManual_(false) {
+      peakMarkerOn_(false), peakHz_(0.0f), peakManual_(false),
+      renderedPeakBin_(-1), renderedPeakHz_(0.0f), renderedPeakX_(-1),
+      renderedPeakH_(-1), renderedPeakDb_(-1e30f),
+      renderedPeakUnclampedDb_(-1e30f),
+      windowPeakBin_(-1), windowPeakX_(-1), windowPeakH_(-1),
+      windowPeakHz_(0.0f), windowPeakDb_(-1e30f), windowPeakValid_(false),
+      publishedPeakBin_(-1), publishedPeakX_(-1), publishedPeakHz_(0.0f),
+      publishedPeakValid_(false), peakWindowStartMs_(0),
+      renderFrame_(0), lastSeenGeneration_(0), diagTopCount_(0) {
+    for (int i = 0; i < 3; i++) {
+        diagTopBin_[i] = -1; diagTopX_[i] = -1; diagTopH_[i] = -1;
+        diagTopDb_[i] = -1e30f; diagTopHz_[i] = 0.0f;
+    }
     status_[0] = 0;
     for (int i = 0; i < 8; i++) {
         freqHz_[i] = kDefaultFreq8[i];
@@ -159,8 +172,7 @@ InstrumentEqView::InstrumentEqView(GUIWindow &w, ViewData *data)
         bandOn_[i] = true;
         slope_[i] = 1;
     }
-    for (int i = 0; i < 308; i++) heldH_[i] = 0.0f;
-    lastUpdateMs_ = 0;
+    for (int i = 0; i < SpectrumAnalyzer::kLogBins; i++) heldH_[i] = 0.0f;
 }
 
 InstrumentEqView::~InstrumentEqView() {
@@ -256,7 +268,233 @@ void InstrumentEqView::cycleBandType() {
 
 void InstrumentEqView::refreshDraw() {
     writeToInstrument();
+    invalidatePeakAfterEqChange();
     isDirty_ = true;
+}
+
+void InstrumentEqView::invalidatePeakAfterEqChange() {
+    // BACON_1.5_PEAK_WINDOWED (U2.73): EQ edit resets window candidate and starts new 2.5s window,
+    // published marker stays until next window completes.
+    windowPeakBin_ = -1;
+    windowPeakX_ = -1;
+    windowPeakH_ = -1;
+    windowPeakHz_ = 0.0f;
+    windowPeakDb_ = -1e30f;
+    windowPeakValid_ = false;
+    peakWindowStartMs_ = System::GetInstance()->GetClock();
+    // keep renderedPeak for next frame computation, but clear diag
+    diagTopCount_ = 0;
+    for (int i = 0; i < 3; i++) {
+        diagTopBin_[i] = -1; diagTopX_[i] = -1; diagTopH_[i] = -1;
+        diagTopDb_[i] = -1e30f; diagTopHz_[i] = 0.0f;
+    }
+}
+
+AnalyzerBarState InstrumentEqView::ComputeBarStateForTest(int idx, float pLinear, float heldBefore) const {
+    AnalyzerBarState s;
+    // Same math as PostFlushDraw bars (66c966d visual, must stay identical)
+    const int cY0 = 28, cY1 = 232;
+    const int canvasH = cY1 - cY0;
+    float amplitude = pLinear;
+    float rawDb = (amplitude > 0.0f) ? 20.0f * log10f(amplitude) : -90.0f;
+    s.rawDb = rawDb;
+    int h;
+    float displayDb = -90.0f;
+    float unclamped = rawDb;
+    float frac = 0.0f;
+    if (rawDb <= -90.0f) {
+        h = 0;
+        displayDb = -90.0f;
+        frac = 0.0f;
+    } else {
+        float freqHz = SpectrumAnalyzer::Get().BinFrequency(idx);
+        float tiltDb = 4.5f * log2f(freqHz / 1000.0f);
+        displayDb = rawDb + tiltDb;
+        unclamped = displayDb;
+        frac = (displayDb + 90.0f) / 90.0f;
+        if (frac < 0.0f) frac = 0.0f;
+        if (frac > 1.0f) frac = 1.0f;
+        h = (int)(frac * (float)canvasH);
+        if (h < 0) h = 0;
+        if (h > canvasH) h = canvasH;
+    }
+    s.unclampedDisplayDb = unclamped;
+    s.displayDbClamped = displayDb;
+    s.frac = frac;
+    s.instantaneousHeight = h;
+    s.heldHeight = heldBefore;
+    s.renderedHeight = h;
+    s.x = 0;
+    s.barW = 1;
+    s.centerX = 0;
+    return s;
+}
+
+void InstrumentEqView::UpdateRenderedPeakFromBins(const fixed *bins, int n) {
+    if (!bins || n <= 0) {
+        renderedPeakBin_ = -1;
+        renderedPeakHz_ = 0.0f;
+        renderedPeakX_ = -1;
+        renderedPeakH_ = -1;
+        renderedPeakDb_ = -1e30f;
+        renderedPeakUnclampedDb_ = -1e30f;
+        diagTopCount_ = 0;
+        for (int i = 0; i < 3; i++) { diagTopBin_[i]=-1; diagTopX_[i]=-1; diagTopH_[i]=-1; diagTopDb_[i]=-1e30f; diagTopHz_[i]=0; }
+        return;
+    }
+    const int cX0 = 6, cX1 = 314, cY0 = 28, cY1 = 232;
+    const int canvasH = cY1 - cY0;
+    int bw = (cX1 - cX0) / n;
+    int barW = 1;
+    // frame-local peak
+    int framePeakBin = -1;
+    int framePeakX = -1;
+    int framePeakH = -1;
+    float framePeakUnclampedDb = -1e30f;
+    int hhBuf[SpectrumAnalyzer::kLogBins];
+    float udbBuf[SpectrumAnalyzer::kLogBins];
+    int xBuf[SpectrumAnalyzer::kLogBins];
+    for (int i = 0; i < n && i < SpectrumAnalyzer::kLogBins; i++) {
+        float amplitude = fp2fl(bins[i]);
+        float rawDb = (amplitude > 0.0f) ? 20.0f * log10f(amplitude) : -90.0f;
+        int h;
+        float displayDb = -90.0f;
+        float unclampedDb = rawDb;
+        if (rawDb <= -90.0f) {
+            h = 0;
+            displayDb = -90.0f;
+        } else {
+            float freqHz = SpectrumAnalyzer::Get().BinFrequency(i);
+            float tiltDb = 4.5f * log2f(freqHz / 1000.0f);
+            displayDb = rawDb + tiltDb;
+            unclampedDb = displayDb;
+            float frac = (displayDb + 90.0f) / 90.0f;
+            if (frac < 0.0f) frac = 0.0f;
+            if (frac > 1.0f) frac = 1.0f;
+            h = (int)(frac * (float)canvasH);
+            if (h < 0) h = 0;
+            if (h > canvasH) h = canvasH;
+        }
+        float freqHzHold = SpectrumAnalyzer::Get().BinFrequency(i);
+        int hh = h;
+        if (freqHzHold > 140.0f) {
+            if ((float)h > heldH_[i]) heldH_[i] = (float)h;
+            else heldH_[i] *= 0.92f;
+            hh = (int)(heldH_[i] + 0.5f);
+            if (hh < 0) hh = 0;
+            if (hh > canvasH) hh = canvasH;
+        } else {
+            heldH_[i] = (float)h;
+            hh = h;
+        }
+        int bx = cX0 + i * bw + (bw - barW) / 2;
+        hhBuf[i] = hh;
+        udbBuf[i] = displayDb;
+        xBuf[i] = bx;
+        if (hh > framePeakH || (hh == framePeakH && displayDb > framePeakUnclampedDb)) {
+            framePeakH = hh;
+            framePeakUnclampedDb = displayDb;
+            framePeakBin = i;
+            framePeakX = bx + barW / 2;
+        }
+    }
+    // tie-break: center of plateau when multiple equal height & db
+    if (framePeakBin >= 0) {
+        float bestDb = framePeakUnclampedDb;
+        int bestH = framePeakH;
+        // find maxDb among bestH (should be bestDb already)
+        float maxDbAmongH = -1e30f;
+        for (int i = 0; i < n; i++) if (hhBuf[i] == bestH && udbBuf[i] > maxDbAmongH) maxDbAmongH = udbBuf[i];
+        int cands[SpectrumAnalyzer::kLogBins];
+        int candN = 0;
+        for (int i = 0; i < n; i++) if (hhBuf[i] == bestH && fabsf(udbBuf[i] - maxDbAmongH) < 0.1f) cands[candN++] = i;
+        if (candN > 1) {
+            int med = cands[candN / 2];
+            framePeakBin = med;
+            framePeakX = xBuf[med] + barW / 2;
+            framePeakH = hhBuf[med];
+            framePeakUnclampedDb = udbBuf[med];
+        }
+    }
+    if (framePeakBin >= 0 && framePeakH > 0) {
+        renderedPeakBin_ = framePeakBin;
+        renderedPeakHz_ = SpectrumAnalyzer::Get().BinFrequency(framePeakBin);
+        renderedPeakX_ = framePeakX;
+        renderedPeakH_ = framePeakH;
+        renderedPeakUnclampedDb_ = framePeakUnclampedDb;
+        renderedPeakDb_ = framePeakUnclampedDb;
+    } else {
+        renderedPeakBin_ = -1;
+        renderedPeakHz_ = 0.0f;
+        renderedPeakX_ = -1;
+        renderedPeakH_ = -1;
+        renderedPeakDb_ = -1e30f;
+        renderedPeakUnclampedDb_ = -1e30f;
+    }
+    // diagnostic top3
+    {
+        int idx[SpectrumAnalyzer::kLogBins];
+        for (int i = 0; i < n; i++) idx[i] = i;
+        for (int k = 0; k < 3 && k < n; k++) {
+            int best = k;
+            for (int i = k + 1; i < n; i++) {
+                if (hhBuf[idx[i]] > hhBuf[idx[best]] ||
+                    (hhBuf[idx[i]] == hhBuf[idx[best]] && udbBuf[idx[i]] > udbBuf[idx[best]]))
+                    best = i;
+            }
+            int t = idx[k]; idx[k] = idx[best]; idx[best] = t;
+        }
+        diagTopCount_ = n < 3 ? n : 3;
+        for (int k = 0; k < diagTopCount_; k++) {
+            int b = idx[k];
+            diagTopBin_[k] = b;
+            diagTopHz_[k] = SpectrumAnalyzer::Get().BinFrequency(b);
+            diagTopX_[k] = xBuf[b] + barW / 2;
+            diagTopH_[k] = hhBuf[b];
+            diagTopDb_[k] = udbBuf[b];
+        }
+    }
+}
+
+InstrumentEqView::RenderedPeakInfo InstrumentEqView::ComputeHighestRenderedBarForTest(const fixed *bins, int n) {
+    UpdateRenderedPeakFromBins(bins, n);
+    RenderedPeakInfo info;
+    info.bin = renderedPeakBin_;
+    info.hz = renderedPeakHz_;
+    info.x = renderedPeakX_;
+    info.h = renderedPeakH_;
+    info.displayDb = renderedPeakUnclampedDb_;
+    info.clampedFrac = 0.0f;
+    if (renderedPeakBin_ >= 0) {
+        float p = fp2fl(bins[renderedPeakBin_]) * 4.0f;
+        float db = (p > 0.0f) ? 20.0f * log10f(p) : -80.0f;
+        float frac = (db + 36.0f) / 40.0f;
+        if (frac < 0.0f) frac = 0.0f;
+        if (frac > 1.0f) frac = 1.0f;
+        info.clampedFrac = frac;
+    }
+    return info;
+}
+
+void InstrumentEqView::GetDiagnosticTop3(int &n, char *out, size_t outSz) const {
+    n = diagTopCount_;
+    if (!out || outSz==0) return;
+    out[0]=0;
+    char tmp[256];
+    snprintf(tmp,sizeof(tmp),"P BIN:%d P HZ:%.0f P X:%d P H:%d P dB:%.1f FRAME:%u\n",
+             renderedPeakBin_, renderedPeakHz_, renderedPeakX_, renderedPeakH_,
+             renderedPeakUnclampedDb_, renderFrame_);
+    strncpy(out,tmp,outSz-1); out[outSz-1]=0;
+    for(int i=0;i<diagTopCount_ && i<3;i++){
+        char line[64];
+        // format #1 8.1k 174px -13.2dB etc.
+        char hzTxt[16];
+        if(diagTopHz_[i] < 1000) snprintf(hzTxt,sizeof(hzTxt),"%.0fHz",diagTopHz_[i]);
+        else if(diagTopHz_[i] < 10000) snprintf(hzTxt,sizeof(hzTxt),"%.1fk",diagTopHz_[i]/1000.0f);
+        else snprintf(hzTxt,sizeof(hzTxt),"%dk",(int)(diagTopHz_[i]/1000+0.5f));
+        snprintf(line,sizeof(line),"#%d %s %dpx %.1fdB\n",i+1,hzTxt,diagTopH_[i],diagTopDb_[i]);
+        strncat(out,line,outSz - strlen(out) -1);
+    }
 }
 
 void InstrumentEqView::OnFocus() {
@@ -270,12 +508,34 @@ void InstrumentEqView::OnFocus() {
     // click finally shows, the snare's low cut finally drops the low bars).
     SpectrumAnalyzer::Get().SetArmed(true);
     SpectrumAnalyzer::Get().SetInstrumentTarget(instr_);
-    // BACON_1.5_ANALYZER_PEAKHIST (U2.62): start the historical peak
-    // tracking from this focus, so L2+R2 marks the peak of the CURRENT
-    // listening session.
-    SpectrumAnalyzer::Get().PeakTrackReset();
-    for (int i = 0; i < 308; i++) heldH_[i] = 0.0f;
-    lastUpdateMs_ = 0;
+    // 66c966d visual: heldH reset al entrar a EQ8 para no mostrar fantasma
+    for (int i = 0; i < SpectrumAnalyzer::kLogBins; i++) heldH_[i] = 0.0f;
+    // BACON_1.5_RENDERED_PEAK (U2.72): no PeakTrackReset -- rendered peak
+    // is frame-local, not historical.
+    renderedPeakBin_ = -1;
+    renderedPeakHz_ = 0.0f;
+    renderedPeakX_ = -1;
+    renderedPeakH_ = -1;
+    renderedPeakDb_ = -1e30f;
+    renderedPeakUnclampedDb_ = -1e30f;
+    windowPeakBin_ = -1;
+    windowPeakX_ = -1;
+    windowPeakH_ = -1;
+    windowPeakHz_ = 0.0f;
+    windowPeakDb_ = -1e30f;
+    windowPeakValid_ = false;
+    publishedPeakBin_ = -1;
+    publishedPeakX_ = -1;
+    publishedPeakHz_ = 0.0f;
+    publishedPeakValid_ = false;
+    peakWindowStartMs_ = System::GetInstance()->GetClock();
+    renderFrame_ = 0;
+    lastSeenGeneration_ = 0;
+    diagTopCount_ = 0;
+    for (int i = 0; i < 3; i++) {
+        diagTopBin_[i] = -1; diagTopX_[i] = -1; diagTopH_[i] = -1;
+        diagTopDb_[i] = -1e30f; diagTopHz_[i] = 0.0f;
+    }
     setStatus(0);
     isDirty_ = true;
 }
@@ -283,8 +543,9 @@ void InstrumentEqView::OnFocus() {
 void InstrumentEqView::LooseFocus() {
     SpectrumAnalyzer::Get().SetArmed(false);
     SpectrumAnalyzer::Get().SetInstrumentTarget(0);
-    for (int i = 0; i < 308; i++) heldH_[i] = 0.0f;
-    lastUpdateMs_ = 0;
+    for (int i = 0; i < SpectrumAnalyzer::kLogBins; i++) heldH_[i] = 0.0f;
+    windowPeakValid_ = false;
+    publishedPeakValid_ = false;
     View::LooseFocus();
 }
 
@@ -552,17 +813,13 @@ void InstrumentEqView::PostFlushDraw() {
                 if (!bandOn_[b] || (!isFilter && gainDb_[b] == 0.0f)) continue;
                 fixed f0, f1, f2, fA1, fA2;
                 // BACON_1.5_EQ8_WALL (U2.65): LOWPA/HIPAS siempre Butterworth
-                // Also mirror InstrumentEq::recomputeBand Q clamping for <80Hz
                 float qDraw = q_[b];
-                if (freqHz_[b] < 80.0f && slope_[b] > 1) qDraw = 0.70710678f;
-                else if (type_[b] == 3 || type_[b] == 4 ||
-                         (type_[b] == 0 && freqHz_[b] < 80.0f && slope_[b] > 4) ||
-                         ((type_[b] == 1 || type_[b] == 2) && freqHz_[b] < 80.0f && slope_[b] > 4)) qDraw = 0.70710678f;
-                FxEngine::eqBiquadCoeffsShift(type_[b], rate, freqHz_[b],
+                if (type_[b] == 3 || type_[b] == 4) qDraw = 0.70710678f;
+                FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
                                          gainDb_[b], qDraw, f0, f1, f2,
-                                         fA1, fA2, 24);
-                double b0 = (double)f0 / (1<<24), b1 = (double)f1 / (1<<24), b2 = (double)f2 / (1<<24);
-                double a1 = (double)fA1 / (1<<24), a2 = (double)fA2 / (1<<24);
+                                         fA1, fA2);
+                double b0 = fp2fl(f0), b1 = fp2fl(f1), b2 = fp2fl(f2);
+                double a1 = fp2fl(fA1), a2 = fp2fl(fA2);
                 double w = 2.0 * 3.14159265358979323846 * f / rateD;
                 double cwv = cos(w), swv = sin(w);
                 double reN = b0 + b1 * cwv + b2 * cos(2 * w);
@@ -606,88 +863,185 @@ void InstrumentEqView::PostFlushDraw() {
             const unsigned short specBlend = tf565(24, 42, 81);
             const unsigned short specTop = tf565(90, 170, 255);
             SpectrumAnalyzer &sp = SpectrumAnalyzer::Get();
-            // BACON_1.5_ANALYZER_FINE (U2.61) -> FINER (U2.62): a 16384-point
-            // FFT every 5 frames (~12 fps at 60 fps UI) costs ~2x the 8192
-            // one -- the analyzer stays live, the UI thread stays light.
             static int fftThrottle = 0;
             if ((++fftThrottle % 5) == 0) sp.Compute();
             const fixed *bb = sp.Bins();
             const int n = sp.BinCount();
-            int canvasW = cX1 - cX0 + 1;
-            // bar width inclusive to cover 6..314 without gap
-            // BACON_1.5_ANALYZER_EQUAL (U2.65): peak hold para que todas
-            // las barras (graves, medios, agudos) se vean iguales como
-            // los graves ("todas las barras deben ser iguales").  Los
-            // graves son sostenidos, los agudos son transitorios: sin
-            // hold el snare desaparece en 1 frame y parece distinto.
-            // Hold con decay 0.92 por frame de UI (~60 fps, vida media
-            // ~500 ms) mantiene el pico visible igual que el kick.
+            int bw = (cX1 - cX0) / n;
+            int barW = 1;
+            // 66c966d visual: floor -90, ceiling 0, tilt 4.5, 308 edge-to-edge, sin visGain*4
+            int framePeakBin = -1;
+            int framePeakX = -1;
+            int framePeakH = -1;
+            float framePeakDisplayDb = -1e30f;
+            float framePeakUnclampedDb = -1e30f;
+            int hhBuf[SpectrumAnalyzer::kLogBins];
+            float displayDbBuf[SpectrumAnalyzer::kLogBins];
+            float unclampedDbBuf[SpectrumAnalyzer::kLogBins];
+            int xBuf[SpectrumAnalyzer::kLogBins];
+            for (int i = 0; i < SpectrumAnalyzer::kLogBins; i++) {
+                hhBuf[i] = 0;
+                displayDbBuf[i] = -1e30f;
+                unclampedDbBuf[i] = -1e30f;
+                xBuf[i] = 0;
+            }
+            renderFrame_++;
             for (int i = 0; i < n; i++) {
-                // BACON_1.5_ANALYZER_DB (U2.53, feedback #7): the bars are
-                // dB-mapped so height moves with perceived loudness and the
-                // EQ curve stays the reference ("+1 dB sube demasiado las
-                // barras" on the old linear map).
-                // BACON_1.5_EQ8_SPECTRUM_36DB (U2.58, feedback #11): the
-                // bars map -36..+4 dB over the canvas (floor -36 dB, 0 dBFS
-                // at 90% of the canvas, +4 dB clipped at the top) so the
-                // hi-hat highs (real kit: -25..-29 dB) read and move.
-                float p = fp2fl(bb[i]);
-                float rawDb = (p > 0.0f) ? 20.0f * log10f(p) : -90.0f;
-                const float floorDb = -90.0f;
-                const float ceilingDb = 0.0f;
-                float fcHold = sp.BinFrequency(i);
+                float amplitude = fp2fl(bb[i]);
+                float rawDb = (amplitude > 0.0f) ? 20.0f * log10f(amplitude) : -90.0f;
                 int h;
-                float displayDb;
-                if (rawDb <= floorDb) {
+                float displayDb = -90.0f;
+                float unclampedDb = rawDb;
+                if (rawDb <= -90.0f) {
                     h = 0;
-                    displayDb = floorDb;
+                    displayDb = -90.0f;
                 } else {
-                    float tiltDb = 4.5f * logf(fcHold / 1000.0f) / logf(2.0f);
+                    float freqHz = SpectrumAnalyzer::Get().BinFrequency(i);
+                    float tiltDb = 4.5f * log2f(freqHz / 1000.0f);
                     displayDb = rawDb + tiltDb;
-                    float frac = (displayDb - floorDb) / (ceilingDb - floorDb);
+                    unclampedDb = displayDb;
+                    float frac = (displayDb + 90.0f) / 90.0f;
                     if (frac < 0.0f) frac = 0.0f;
                     if (frac > 1.0f) frac = 1.0f;
                     h = (int)(frac * (float)(cY1 - cY0));
                     if (h < 0) h = 0;
                     if (h > cY1 - cY0) h = cY1 - cY0;
                 }
-                // Time-based hold: attack immediate, hold ~100ms, release ~300ms
-                unsigned long now = 0;
-                // Use System clock if available, otherwise use frame count approximation (16ms per frame)
-                // For simplicity, use System::GetClock if linked, else fallback
-                // We will use a static approximation: dt = 16ms (60fps)
-                float dt = 16.0f;
-                if (lastUpdateMs_ != 0) {
-                    // Try to get real dt from System
-                    // If System not available in this context, dt remains 16
-                }
+                // hold/release 66c966d: member heldH_ with OnFocus reset
+                float freqHzHold = SpectrumAnalyzer::Get().BinFrequency(i);
                 int hh = h;
-                // Hold for all frequencies (coherent)
-                if ((float)h > heldH_[i]) {
-                    heldH_[i] = (float)h;
+                if (freqHzHold > 140.0f) {
+                    if ((float)h > heldH_[i]) heldH_[i] = (float)h;
+                    else heldH_[i] *= 0.92f;
+                    hh = (int)(heldH_[i] + 0.5f);
+                    if (hh < 0) hh = 0;
+                    if (hh > cY1 - cY0) hh = cY1 - cY0;
                 } else {
-                    // Exponential release with tau ~300ms
-                    float tau = 300.0f;
-                    float decay = expf(-dt / tau);
-                    heldH_[i] *= decay;
-                    if (heldH_[i] < (float)h) heldH_[i] = (float)h;
+                    heldH_[i] = (float)h;
+                    hh = h;
                 }
-                // For very low levels below floor, held should also decay to 0
-                hh = (int)(heldH_[i] + 0.5f);
-                if (hh < 0) hh = 0;
-                if (hh > cY1 - cY0) hh = cY1 - cY0;
-                // If raw displayDb <= floor, allow 0 px (no minimum)
-                if (displayDb <= floorDb) {
-                    // Let held decay, but if held is still above 0, it will show
-                    // This gives peak hold behavior
-                }
-                int bx = cX0 + (i * canvasW) / n;
-                int nextBx = cX0 + ((i + 1) * canvasW) / n;
-                int barW = nextBx - bx;
+                int bx = cX0 + i * bw + (bw - barW) / 2;
+                hhBuf[i] = hh;
+                displayDbBuf[i] = displayDb;
+                unclampedDbBuf[i] = unclampedDb;
+                xBuf[i] = bx;
                 tfFill(bx, cY1 - hh, barW, hh, specBlend);
                 tfFill(bx, cY1 - hh, barW, 1, specTop);
                 if (bx > cX0) tfFill(bx - 1, cY1 - hh + 1, 1, 1, specTop);
                 if (bx + barW < cX1) tfFill(bx + barW, cY1 - hh + 1, 1, 1, specTop);
+                // peak passive: no modifica h/hh/heldH
+                if (hh > framePeakH ||
+                    (hh == framePeakH && displayDb > framePeakDisplayDb)) {
+                    framePeakH = hh;
+                    framePeakDisplayDb = displayDb;
+                    framePeakUnclampedDb = unclampedDb;
+                    framePeakBin = i;
+                    framePeakX = bx + barW / 2;
+                }
+            }
+            // Tie-break centro de meseta
+            if (framePeakBin >= 0) {
+                float maxDbAmongH = -1e30f;
+                for (int i = 0; i < n; i++) if (hhBuf[i] == framePeakH && displayDbBuf[i] > maxDbAmongH) maxDbAmongH = displayDbBuf[i];
+                int cands[SpectrumAnalyzer::kLogBins];
+                int candN = 0;
+                for (int i = 0; i < n; i++) if (hhBuf[i] == framePeakH && fabsf(displayDbBuf[i] - maxDbAmongH) < 0.1f) cands[candN++] = i;
+                if (candN > 1) {
+                    int med = cands[candN / 2];
+                    framePeakBin = med;
+                    framePeakX = xBuf[med] + barW / 2;
+                    framePeakH = hhBuf[med];
+                    framePeakDisplayDb = displayDbBuf[med];
+                    framePeakUnclampedDb = unclampedDbBuf[med];
+                }
+            }
+            if (framePeakBin >= 0 && framePeakH > 0) {
+                renderedPeakBin_ = framePeakBin;
+                renderedPeakHz_ = SpectrumAnalyzer::Get().BinFrequency(framePeakBin);
+                renderedPeakX_ = framePeakX;
+                renderedPeakH_ = framePeakH;
+                renderedPeakDb_ = framePeakDisplayDb;
+                renderedPeakUnclampedDb_ = framePeakUnclampedDb;
+            } else {
+                renderedPeakBin_ = -1;
+                renderedPeakHz_ = 0.0f;
+                renderedPeakX_ = -1;
+                renderedPeakH_ = -1;
+                renderedPeakDb_ = -1e30f;
+                renderedPeakUnclampedDb_ = -1e30f;
+            }
+            // windowed peak 2.5s: framePeak -> windowPeak -> publishedPeak
+            {
+                unsigned long now = System::GetInstance()->GetClock();
+                bool frameValid = (framePeakBin >= 0 && framePeakH > 0);
+                if (frameValid) {
+                    if (!windowPeakValid_ ||
+                        framePeakH > windowPeakH_ ||
+                        (framePeakH == windowPeakH_ && framePeakUnclampedDb > windowPeakDb_)) {
+                        windowPeakBin_ = framePeakBin;
+                        windowPeakX_ = framePeakX;
+                        windowPeakH_ = framePeakH;
+                        windowPeakHz_ = SpectrumAnalyzer::Get().BinFrequency(framePeakBin);
+                        windowPeakDb_ = framePeakUnclampedDb;
+                        windowPeakValid_ = true;
+                        if (!publishedPeakValid_) {
+                            publishedPeakBin_ = windowPeakBin_;
+                            publishedPeakX_ = windowPeakX_;
+                            publishedPeakHz_ = windowPeakHz_;
+                            publishedPeakValid_ = true;
+                            peakWindowStartMs_ = now;
+                        }
+                    }
+                }
+                if (now - peakWindowStartMs_ >= kPeakUpdateIntervalMs) {
+                    if (windowPeakValid_) {
+                        publishedPeakBin_ = windowPeakBin_;
+                        publishedPeakX_ = windowPeakX_;
+                        publishedPeakHz_ = windowPeakHz_;
+                        publishedPeakValid_ = true;
+                    }
+                    windowPeakBin_ = -1;
+                    windowPeakX_ = -1;
+                    windowPeakH_ = -1;
+                    windowPeakHz_ = 0.0f;
+                    windowPeakDb_ = -1e30f;
+                    windowPeakValid_ = false;
+                    peakWindowStartMs_ = now;
+                }
+                if (peakMarkerOn_ && !peakManual_) {
+                    if (publishedPeakValid_) {
+                        peakHz_ = publishedPeakHz_;
+                    } else if (windowPeakValid_) {
+                        peakHz_ = windowPeakHz_;
+                    } else if (renderedPeakBin_ >= 0) {
+                        peakHz_ = renderedPeakHz_;
+                    } else {
+                        peakHz_ = 0.0f;
+                    }
+                }
+            }
+            // diagnostic top3
+            {
+                int idx[SpectrumAnalyzer::kLogBins];
+                for (int i = 0; i < n; i++) idx[i] = i;
+                for (int k = 0; k < 3 && k < n; k++) {
+                    int best = k;
+                    for (int i = k + 1; i < n; i++) {
+                        if (hhBuf[idx[i]] > hhBuf[idx[best]] ||
+                            (hhBuf[idx[i]] == hhBuf[idx[best]] && displayDbBuf[idx[i]] > displayDbBuf[idx[best]]))
+                            best = i;
+                    }
+                    int t = idx[k]; idx[k] = idx[best]; idx[best] = t;
+                }
+                diagTopCount_ = n < 3 ? n : 3;
+                for (int k = 0; k < diagTopCount_; k++) {
+                    int b = idx[k];
+                    diagTopBin_[k] = b;
+                    diagTopHz_[k] = SpectrumAnalyzer::Get().BinFrequency(b);
+                    diagTopX_[k] = xBuf[b] + barW / 2;
+                    diagTopH_[k] = hhBuf[b];
+                    diagTopDb_[k] = displayDbBuf[b];
+                }
             }
         }
 
@@ -700,15 +1054,12 @@ void InstrumentEqView::PostFlushDraw() {
                 if (!bandOn_[b] || (!isFilter2 && gainDb_[b] == 0.0f)) continue;
                 fixed f0, f1, f2, fA1, fA2;
                 float qDraw2 = q_[b];
-                if (freqHz_[b] < 80.0f && slope_[b] > 1) qDraw2 = 0.70710678f;
-                else if (type_[b] == 3 || type_[b] == 4 ||
-                         (type_[b] == 0 && freqHz_[b] < 80.0f && slope_[b] > 4) ||
-                         ((type_[b] == 1 || type_[b] == 2) && freqHz_[b] < 80.0f && slope_[b] > 4)) qDraw2 = 0.70710678f;
-                FxEngine::eqBiquadCoeffsShift(type_[b], rate, freqHz_[b],
+                if (type_[b] == 3 || type_[b] == 4) qDraw2 = 0.70710678f;
+                FxEngine::eqBiquadCoeffs(type_[b], rate, freqHz_[b],
                                          gainDb_[b], qDraw2, f0, f1, f2,
-                                         fA1, fA2, 24);
-                double b0 = (double)f0 / (1<<24), b1 = (double)f1 / (1<<24), b2 = (double)f2 / (1<<24);
-                double a1 = (double)fA1 / (1<<24), a2 = (double)fA2 / (1<<24);
+                                         fA1, fA2);
+                double b0 = fp2fl(f0), b1 = fp2fl(f1), b2 = fp2fl(f2);
+                double a1 = fp2fl(fA1), a2 = fp2fl(fA2);
                 double w = 2.0 * 3.14159265358979323846 * f / rateD;
                 double cwv = cos(w), swv = sin(w);
                 double reN = b0 + b1 * cwv + b2 * cos(2 * w);
@@ -761,35 +1112,45 @@ void InstrumentEqView::PostFlushDraw() {
     }
 
     // BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13) -> BACON_1.5_ANALYZER_
-    // PEAKHIST (U2.62, feedback #14): the L2+R2 peak marker -- a yellow
-    // 1-px line at the marked frequency with a bright cap and a Hz label,
-    // drawn AFTER the curve so the tuned frequency is always on top.  The
-    // marker follows the HISTORICAL peak (the loudest spectrum peak since
-    // it was armed), refreshed every frame -- the user watches it settle on
-    // where the sound's energy is centered.  It NEVER edits the EQ on its
-    // own; L2+R2+X moves the selected band to it.  Drawn also while
-    // bypassed: it only marks the spectrum.  While the user steps the
-    // marker manually (L2+X+L/R) the auto-follow stops (peakManual_).
+    // BACON_1.5_RENDERED_PEAK (U2.72): marker follows highest RENDERED bar
+    // (hh), using its X directly -- no freqToX reconstruction.  This
+    // guarantees marker X == highest bar X.
     if (peakMarkerOn_) {
+        int markerX = -1;
+        float markerHz = 0.0f;
         if (!peakManual_) {
-            float h = SpectrumAnalyzer::Get().PeakFrequencyHistory();
-            if (h > 0.0f) peakHz_ = h;
+            if (publishedPeakValid_ && publishedPeakX_ >= 0 && publishedPeakHz_ > 0.0f) {
+                markerX = publishedPeakX_;
+                markerHz = publishedPeakHz_;
+            } else if (windowPeakValid_ && windowPeakX_ >= 0 && windowPeakHz_ > 0.0f) {
+                markerX = windowPeakX_;
+                markerHz = windowPeakHz_;
+            } else if (renderedPeakX_ >= 0 && renderedPeakBin_ >= 0 && renderedPeakHz_ > 0.0f) {
+                markerX = renderedPeakX_;
+                markerHz = renderedPeakHz_;
+            }
+        } else {
+            if (peakHz_ > 0.0f) {
+                markerX = freqToX(peakHz_);
+                markerHz = peakHz_;
+            }
         }
-        const unsigned short peakC = tf565(255, 244, 120);
-        int px = freqToX(peakHz_);
-        if (px < cX0) px = cX0;
-        if (px > cX1) px = cX1;
-        tfFill(px, cY0, 1, cY1 - cY0 + 1, peakC);
-        tfFill(px - 1, cY0, 3, 2, peakC);
-        tfFill(px - 1, cY1 - 1, 3, 2, peakC);
-        char hzTxt[8];
-        tfFormatHz(hzTxt, sizeof(hzTxt), peakHz_);
-        int lx = px + 3;
-        int tw = (int)strlen(hzTxt) * 4;
-        if (lx + tw > 320) lx = px - tw - 3;
-        if (lx < 0) lx = 0;
-        tfFill(lx, cY0, tw + 1, 6, bgC);
-        tfTinyText(lx, cY0, hzTxt, peakC);
+        if (markerX >= 0 && markerHz > 0.0f) {
+            if (markerX < cX0) markerX = cX0;
+            if (markerX > cX1) markerX = cX1;
+            const unsigned short peakC = tf565(255, 244, 120);
+            tfFill(markerX, cY0, 1, cY1 - cY0 + 1, peakC);
+            tfFill(markerX - 1, cY0, 3, 2, peakC);
+            tfFill(markerX - 1, cY1 - 1, 3, 2, peakC);
+            char hzTxt[8];
+            tfFormatHz(hzTxt, sizeof(hzTxt), markerHz);
+            int lx = markerX + 3;
+            int tw = (int)strlen(hzTxt) * 4;
+            if (lx + tw > 320) lx = markerX - tw - 3;
+            if (lx < 0) lx = 0;
+            tfFill(lx, cY0, tw + 1, 6, bgC);
+            tfTinyText(lx, cY0, hzTxt, peakC);
+        }
     }
 
     // Frequency axis labels under the canvas.  BACON_1.5_EQ8_AXIS_LABELS
@@ -856,25 +1217,24 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
 
     if (!instr_) return;
 
-    // BACON_1.5_ANALYZER_PEAKHIST (U2.62, feedback #14): L2+R2 marks the
-    // HISTORICAL peak of the instrument's post-EQ spectrum -- the loudest
-    // spectrum peak since the marker was armed, so it shows where the
-    // sound's energy is CENTERED instead of where it was the instant the
-    // buttons were pressed ("el pico mas alto historico, donde esta el
-    // peso del sonido").  The marker NEVER moves the EQ: L2+R2+X snaps the
-    // selected band to it.  R2+X+UP/DN toggles the selected band's slope
-    // (12/24/36/48 dB/oct, 12 suave -> 48 pared).  L2+X+L/R moves the
-    // SELECTED BAND's Hz (1..8) independently, without touching the peak
-    // measurement (feedback #14 revisado: L2+X no debe mover el peak).
-    // All handled BEFORE the plain X+arrows so the chords are unambiguous.
+    // BACON_1.5_RENDERED_PEAK (U2.72): L2+R2 marks the HIGHEST RENDERED BAR
+    // (hh) -- the bar currently drawn highest on the analyzer.  No historical
+    // peak; the marker follows the visible spectrum every frame.  L2+R2+X
+    // snaps the selected band to it.  R2+X+UP/DN toggles slope.
+    // L2+X+L/R moves selected band Hz (1Hz) without touching peak.
     bool l2 = (mask & EPBM_L2) != 0;
     bool r2 = (mask & EPBM_R2) != 0;
     if (l2 && r2 && x && !(left || right || up || down)) {
-        if (peakMarkerOn_ && peakHz_ > 0.0f) {
-            freqHz_[selected_] = peakHz_;
+        float snapHz = 0.0f;
+        if (peakMarkerOn_ && publishedPeakValid_ && publishedPeakHz_ > 0.0f) snapHz = publishedPeakHz_;
+        else if (peakMarkerOn_ && windowPeakValid_ && windowPeakHz_ > 0.0f) snapHz = windowPeakHz_;
+        else if (peakMarkerOn_ && renderedPeakHz_ > 0.0f) snapHz = renderedPeakHz_;
+        else if (peakMarkerOn_ && peakHz_ > 0.0f) snapHz = peakHz_;
+        if (snapHz > 0.0f) {
+            freqHz_[selected_] = snapHz;
             bandOn_[selected_] = true;
             char buf[88];
-            sprintf(buf, "B%1d -> PEAK %5.0fHz", selected_ + 1, peakHz_);
+            sprintf(buf, "B%1d -> PEAK %5.0fHz", selected_ + 1, snapHz);
             setStatus(buf);
         } else {
             setStatus("PEAK: mark first (L2+R2)");
@@ -886,20 +1246,18 @@ void InstrumentEqView::ProcessButtonMask(unsigned short mask, bool pressed) {
         if (peakMarkerOn_) {
             peakMarkerOn_ = false;
             peakManual_ = false;
-            SpectrumAnalyzer::Get().PeakTrackReset();
+            windowPeakValid_ = false;
+            publishedPeakValid_ = false;
+            peakHz_ = 0.0f;
             setStatus("PEAK OFF");
         } else {
             peakManual_ = false;
-            SpectrumAnalyzer::Get().PeakTrackReset();
             peakMarkerOn_ = true;
-            {
-                peakHz_ = SpectrumAnalyzer::Get().DisplayPeakFrequency();
-                char buf[88];
-                sprintf(buf, "PEAK %5.0fHz (hist)", peakHz_);
-                setStatus(buf);
-            } else {
-                setStatus("PEAK: listening...");
-            }
+            windowPeakValid_ = false;
+            publishedPeakValid_ = false;
+            peakWindowStartMs_ = System::GetInstance()->GetClock();
+            peakHz_ = 0.0f;
+            setStatus("PEAK: listening...");
         }
         refreshDraw();
         return;

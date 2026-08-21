@@ -1,10 +1,26 @@
 #ifndef _INSTRUMENT_EQ_VIEW_H_
 #define _INSTRUMENT_EQ_VIEW_H_
 
+#include "Application/Audio/SpectrumAnalyzer.h"
 #include "Application/UI/Views/BaseClasses/View.h"
 #include "Application/Utils/fixed.h"
 
 class I_Instrument;
+
+// BACON_1.5_RENDERED_PEAK (U2.72): pure bar state for testability -- same
+// math the renderer uses.  See InstrumentEqView::computeBarState().
+struct AnalyzerBarState {
+    float rawDb;               // 20*log10(p) before any clamp, -80 if silent
+    float unclampedDisplayDb;  // rawDb + tilt? here rawDb as displayDb before clamp
+    float displayDbClamped;    // after -36..0 clamp for frac
+    float frac;                // 0..1 clamped
+    int instantaneousHeight;   // h = frac * canvasH, 2..canvasH
+    float heldHeight;          // heldH[i] after hold/release
+    int renderedHeight;        // hh actually drawn
+    int x;                     // bx
+    int barW;                  // 1
+    int centerX;               // bx + barW/2
+};
 
 /*
  * BACON_1.5_EQ8_VIEW (bacon-1.5, items 3/5/6): fullscreen graphic 8-band
@@ -65,25 +81,83 @@ private:
 	                 char *status, size_t statusSz) const ;
 	float freqFromIndex(int idx) const ;
 	int indexFromFreq(float hz) const ;
+	void invalidatePeakAfterEqChange() ;
+	// BACON_1.5_RENDERED_PEAK (U2.72): public getters for host tests and
+	// diagnostic readout (hardware: P BIN/HZ/X/H/dB).
+	int GetRenderedPeakBin() const { return renderedPeakBin_; }
+	float GetRenderedPeakHz() const { return renderedPeakHz_; }
+	int GetRenderedPeakX() const { return renderedPeakX_; }
+	int GetRenderedPeakH() const { return renderedPeakH_; }
+	float GetRenderedPeakDb() const { return renderedPeakUnclampedDb_; }
+	float GetPeakHz() const { return peakHz_; }
+	bool GetPeakMarkerOn() const { return peakMarkerOn_; }
+	bool GetPeakManual() const { return peakManual_; }
+	int GetWindowPeakBin() const { return windowPeakBin_; }
+	int GetPublishedPeakBin() const { return publishedPeakBin_; }
+	float GetPublishedPeakHz() const { return publishedPeakHz_; }
+	int GetPublishedPeakX() const { return publishedPeakX_; }
+	// For host tests: simulate the bar-height math without framebuffer.
+	// Returns the rendered peak info for the given bins snapshot.
+	struct RenderedPeakInfo {
+	    int bin;
+	    float hz;
+	    int x;
+	    int h;
+	    float displayDb; // unclamped
+	    float clampedFrac;
+	};
+	RenderedPeakInfo ComputeHighestRenderedBarForTest(const fixed *bins, int n);
+	// Pure helper: bar state for a single bin index (same math as PostFlushDraw).
+	AnalyzerBarState ComputeBarStateForTest(int idx, float pLinear, float heldBefore) const;
+	void GetDiagnosticTop3(int &n, char *out, size_t outSz) const;
+	// Host-test helper: feed bins directly, compute peak, update rendered* (no draw).
+	void UpdateRenderedPeakFromBins(const fixed *bins, int n);
 
 	I_Instrument *instr_ ;
 	int selected_ ;
 	bool bypass_ ;
-// BACON_1.5_ANALYZER_PEAK (U2.61, feedback #13) -> BACON_1.5_ANALYZER_
-    // PEAKHIST (U2.62, feedback #14): L2+R2 toggles a marker at the
-    // HISTORICAL peak of the targeted analyzer tap (the loudest spectrum
-    // peak since the marker was armed -- where the sound's energy is
-    // centered, not where it was the instant the buttons were pressed).
-    // The marker does NOT move the EQ: L2+R2+X snaps the selected band to
-    // the marker, L2+X+L/R steps it 1 Hz at a time (peakManual_ freezes the
-    // auto-follow while stepping), L2+X+UP/DN toggles the selected band's
-    // slope (12/24 dB/oct).
+// BACON_1.5_RENDERED_PEAK (U2.72, feedback Peak FAIL): L2+R2 marks the
+    // HIGHEST RENDERED BAR that is actually drawn on the canvas (hh).
+    // The historical peak path is DIAGNOSTIC ONLY and
+    // completely disconnected from the marker.
     bool peakMarkerOn_ ;
     float peakHz_ ;
     // BACON_1.5_ANALYZER_PEAKHIST (U2.62): true while the user is stepping
-    // the marker manually (L2+X+L/R), so the per-frame history follow does
-    // not fight the stepper.
+    // the marker manually (kept for compat, now unused -- L2+X moves band).
     bool peakManual_ ;
+    // BACON_1.5_RENDERED_PEAK (U2.72): frame-local highest rendered bar.
+    // Overwritten every PostFlushDraw -- never historical.
+    int renderedPeakBin_ ;
+    float renderedPeakHz_ ;
+    int renderedPeakX_ ;
+    int renderedPeakH_ ;
+    float renderedPeakDb_ ; // unclamped displayDb for tie-break
+    float renderedPeakUnclampedDb_ ;
+    // BACON_1.5_PEAK_WINDOWED (U2.73): windowed peak 2.5s
+    static const unsigned long kPeakUpdateIntervalMs = 2500;
+    int windowPeakBin_;
+    int windowPeakX_;
+    int windowPeakH_;
+    float windowPeakHz_;
+    float windowPeakDb_;
+    bool windowPeakValid_;
+    int publishedPeakBin_;
+    int publishedPeakX_;
+    float publishedPeakHz_;
+    bool publishedPeakValid_;
+    unsigned long peakWindowStartMs_;
+    // hold buffer per bar, >140Hz holds, <140Hz instant (moved from static)
+    float heldH_[SpectrumAnalyzer::kLogBins] ;
+    // diagnostic generation counters (for hardware readout)
+    unsigned int renderFrame_ ;
+    unsigned int lastSeenGeneration_ ;
+    // diagnostic top3 (for hardware readout P BIN/HZ/X/H/dB)
+    int diagTopBin_[3];
+    int diagTopX_[3];
+    int diagTopH_[3];
+    float diagTopDb_[3];
+    float diagTopHz_[3];
+    int diagTopCount_;
     bool bandOn_[8] ;
     int type_[8] ;
     float freqHz_[8] ;
@@ -92,8 +166,6 @@ private:
     // BACON_1.5_EQ8_SLOPE (U2.62, feedback #14): per-band slope from the
     // instrument (1 = 12 dB/oct, 2 = 24 dB/oct; non-bell types).
     int slope_[8] ;
-    float heldH_[308] ;
-    unsigned long lastUpdateMs_ ;
     char status_[96] ;
 } ;
 
