@@ -384,7 +384,9 @@ void InstrumentEq::recomputeBand(int band) {
     float qForDsp = fp2fl(bg.q);
     // LP/HP siempre Butterworth 0.707 para pared sin realce (incluso slope 1)
     // evita el pico de Q=1 en graves que a 40-50 Hz se percibe como Bell/boost
-    if (bg.type == TYPE_LOW_PASS || bg.type == TYPE_HIGH_PASS) {
+    // U2.69: BELL <80 Hz con slope>4 también a 0.707 para que pared S8 no de 48 dB
+    if (bg.type == TYPE_LOW_PASS || bg.type == TYPE_HIGH_PASS ||
+        (bg.type == TYPE_BELL && fp2fl(bg.hz) < 80.0f && bg.slope > 4)) {
         qForDsp = 0.70710678f;
     }
     eqBiquadCoeffsShift(mapBandType((int)bg.type), rate_, fp2fl(bg.hz),
