@@ -46,9 +46,15 @@
 #define ASRC_FIR_LOOKAHEAD 4U
 #define ASRC_FIR_PRIME 3U
 #endif
+
 #include <time.h>
 #include <unistd.h>
 #include <sound/asound.h>
+
+/* P1: FIFO dump disabled by default (production). Enable with -DSP404_ENABLE_FIFO_DUMP=1 */
+#ifndef SP404_ENABLE_FIFO_DUMP
+#define SP404_ENABLE_FIFO_DUMP 0
+#endif
 
 /* v14.2: USBDEVFS_RESET for the SP404 bus-reset self-heal. Defined here so the
  * build does not depend on linux/usbdevice_fs.h being present in the sysroot. */
@@ -871,7 +877,43 @@ static int read_frames(int pcm, unsigned char *buf, int frames, unsigned dev_cha
 static int16_t ring[RING_SAMPLES];
 static unsigned rpos = 0, wpos = 0, rfill = 0;
 static void ring_reset(void) { rpos = wpos = rfill = 0; }
-static unsigned ring_push_samples(const int16_t *s, unsigned n) { unsigned pushed = 0; while (pushed < n && rfill < RING_SAMPLES) { ring[wpos] = s[pushed++]; wpos = (wpos + 1) % RING_SAMPLES; rfill++; } return pushed; }
+/* P1 RING BULK: wrap-aware bulk memcpy, max 2 copies. Preserves rpos/wpos/rfill, stereo alignment, overflow. */
+static unsigned ring_push_samples(const int16_t *s, unsigned n) {
+    if (!s || n == 0) return 0;
+    unsigned free = RING_SAMPLES - rfill;
+    if (n > free) n = free;
+    if (n == 0) return 0;
+    unsigned first = RING_SAMPLES - wpos;
+    if (first > n) first = n;
+    memcpy(ring + wpos, s, (size_t)first * sizeof(int16_t));
+    if (n > first) {
+        memcpy(ring, s + first, (size_t)(n - first) * sizeof(int16_t));
+    }
+    wpos += n;
+    if (wpos >= RING_SAMPLES) wpos -= RING_SAMPLES;
+    rfill += n;
+    return n;
+}
+static unsigned ring_pop_samples(int16_t *dst, unsigned n) {
+    if (!dst || n == 0) return 0;
+    if (n > rfill) n = rfill;
+    if (n == 0) return 0;
+    unsigned first = RING_SAMPLES - rpos;
+    if (first > n) first = n;
+    memcpy(dst, ring + rpos, (size_t)first * sizeof(int16_t));
+    if (n > first) {
+        memcpy(dst + first, ring, (size_t)(n - first) * sizeof(int16_t));
+    }
+    rpos += n;
+    if (rpos >= RING_SAMPLES) rpos -= RING_SAMPLES;
+    rfill -= n;
+    return n;
+}
+static unsigned ring_pop_frames_bulk(int16_t *dst, unsigned frames) {
+    unsigned samples = frames * 2u;
+    unsigned got_samples = ring_pop_samples(dst, samples);
+    return got_samples / 2u;
+}
 static long rs_fifo_total = 0;
 /* v12.1: discard stale producer data so a freshly opened stream starts with
  * current audio. Without this, the core's project audio accumulated while
@@ -937,21 +979,26 @@ static void load_playback_gain(void) {
     fclose(f);
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static int ring_pop_one_sample(int16_t *s) {
-    if (rfill == 0) return -1;
+    if (rfill == 0 || !s) return -1;
     *s = ring[rpos];
-    rpos = (rpos + 1) % RING_SAMPLES;
+    if (++rpos >= RING_SAMPLES) rpos = 0;
     --rfill;
     return 0;
 }
 static int ring_pop_frame(unsigned ch, int16_t *frm) {
+    if (!frm || rfill < ch) return -1;
     unsigned c;
-    if (rfill < ch) return -1;
     for (c = 0; c < ch; ++c) {
         if (ring_pop_one_sample(&frm[c]) != 0) return -1;
     }
     return 0;
 }
+#pragma GCC diagnostic pop
+/* Keep legacy helpers linked when P1 bulk is active */
+static void *const _p1_ring_legacy_keepalive __attribute__((used)) = (void*)ring_pop_frame;
 
 /* ---- U2.63 ABI7 ASRC engine (ported from H38.1 FIR8, 48 kHz stereo).
  * Same engine as the r36s_u2523_usb_audio_io ASRC build: PI backlog
@@ -1013,16 +1060,17 @@ static unsigned asrc_total_backlog(void) {
     return source_frames + stage_available;
 }
 static unsigned asrc_stage_append(void) {
-    int16_t tmp[2048U * 2U];
     unsigned room = ASRC_STAGE_FRAMES - asrc_stage_frames;
     unsigned want = room < 2048U ? room : 2048U;
-    unsigned got = 0U;
-    unsigned n;
-    while (got < want && rfill >= 2U) {
-        if (ring_pop_frame(2, tmp + got * 2U) != 0) break;
-        ++got;
-    }
+    if (want == 0U || rfill < 2U) return 0U;
+    unsigned frames_avail = rfill / 2u;
+    unsigned got = want < frames_avail ? want : frames_avail;
     if (got == 0U) return 0U;
+    int16_t tmp[2048U * 2U];
+    unsigned got2 = ring_pop_frames_bulk(tmp, got);
+    if (got2 == 0U) return 0U;
+    got = got2;
+    unsigned n;
     if (!asrc_stage_primed) {
         for (n = 0U; n < ASRC_FIR_PRIME; ++n) {
             asrc_stage[n * 2U] = tmp[0];
@@ -1133,10 +1181,13 @@ static void asrc_render_exact(int16_t *out, unsigned out_frames, uint64_t step) 
         if (idx > ASRC_FIR_HALF) {
             unsigned drop = idx - ASRC_FIR_HALF;
             if (drop > asrc_stage_frames) drop = asrc_stage_frames;
-            memmove(asrc_stage, asrc_stage + drop * 2U,
-                    (size_t)(asrc_stage_frames - drop) * 2U * sizeof(int16_t));
-            asrc_stage_frames -= drop;
-            asrc_phase_q32 -= (uint64_t)drop << 32;
+            /* P1 F: memmove audit. Typical drop ~ hw_period_frames (~480) => 480*4=1920B per period => ~192kB/s at 100 periods/s. Skip if drop==0 (no-op). */
+            if (drop > 0) {
+                memmove(asrc_stage, asrc_stage + drop * 2U,
+                        (size_t)(asrc_stage_frames - drop) * 2U * sizeof(int16_t));
+                asrc_stage_frames -= drop;
+                asrc_phase_q32 -= (uint64_t)drop << 32;
+            }
         }
     }
     asrc_output_frames += out_frames;
@@ -1164,6 +1215,7 @@ static void write_wav_header(int fd, uint32_t data_bytes, uint32_t rate, uint16_
  * (present in the fifo) or injected by the daemon path (absent from the
  * fifo). The WAV is plain 48 kHz stereo S16LE.
  */
+#if SP404_ENABLE_FIFO_DUMP
 #define FIFO_DUMP_DIR "/tmp/r36sx_lgpt_logs"
 #define FIFO_DUMP_PATH FIFO_DUMP_DIR "/fifo_capture.wav"
 #define FIFO_DUMP_FRAMES 96000
@@ -1231,6 +1283,13 @@ static void fifo_dump_write(const int16_t frm[2]) {
         fifo_dump_flush();
     if (fdump_frames_left <= 0) fifo_dump_finish("complete");
 }
+#else
+/* P1: FIFO dump disabled in production (zero per-frame overhead) - macros avoid unused warnings */
+#define fifo_dump_finish(why) ((void)(why))
+#define fifo_dump_start() ((void)0)
+#define fifo_dump_write(frm) ((void)(frm))
+#define fifo_dump_flush() ((void)0)
+#endif
 
 
 static int mon_fd = -1;
@@ -3224,22 +3283,46 @@ int main(int argc, char **argv) {
 
         uint64_t period_step = 0ULL;
         int used_starvation_silence = 0;
+        int local_peak = 0;
         if (asrc_prepare_period(hw_period_frames, &period_step)) {
             asrc_render_exact(out, hw_period_frames, period_step);
+            /* P1 C: fused peak + gain. Preserves exact semantics for play_peak/signal/silence, handles INT16_MIN (-32768 -> 32768). */
             if (g_playback_gain != 1.0f) {
                 unsigned g;
-                for (g = 0U; g < required_samples; ++g)
-                    out[g] = (int16_t)((float)out[g] * g_playback_gain);
+                local_peak = 0;
+                for (g = 0U; g < required_samples; ++g) {
+                    int16_t v = (int16_t)((float)out[g] * g_playback_gain);
+                    out[g] = v;
+                    int av = v;
+                    if (av < 0) av = -av; /* -32768 -> 32768 fits int */
+                    if (av > local_peak) local_peak = av;
+                }
+            } else {
+                unsigned g;
+                local_peak = 0;
+                for (g = 0U; g < required_samples; ++g) {
+                    int av = out[g];
+                    if (av < 0) av = -av;
+                    if (av > local_peak) local_peak = av;
+                }
             }
-            /* FIFO dump: capture the rendered (post-ASRC) source. */
+            if (local_peak > play_peak) play_peak = local_peak;
+            if (local_peak == 0)
+                ++source_silence_periods;
+            else
+                ++signal_periods;
+#if SP404_ENABLE_FIFO_DUMP
+            /* P1 B: FIFO dump only when enabled, zero overhead when SP404_ENABLE_FIFO_DUMP==0 */
             {
                 unsigned pd;
                 for (pd = 0U; pd < hw_period_frames; ++pd)
                     fifo_dump_write(out + pd * 2U);
             }
+#endif
         } else {
             memset(out, 0, required_samples * sizeof(int16_t));
             used_starvation_silence = 1;
+            local_peak = 0;
             ++starvation_events;
             ++asrc_clock_hold_periods;
             asrc_clock_hold_frames += hw_period_frames;
@@ -3251,34 +3334,67 @@ int main(int argc, char **argv) {
                         starvation_events, asrc_total_backlog(),
                         asrc_stage_frames);
             }
+            /* starvation silence does not affect play_peak/signal counters (preserved) */
         }
 
-        int local_peak = 0;
-        if (!used_starvation_silence) {
-            unsigned i;
-            for (i = 0; i < required_samples; ++i) {
-                int value = out[i];
-                if (value < 0) value = -value;
-                if (value > local_peak) local_peak = value;
-            }
-            if (local_peak > play_peak) play_peak = local_peak;
-            if (local_peak == 0)
-                ++source_silence_periods;
-            else
-                ++signal_periods;
-        }
-
+        /* P1 D: format conversion fastpath. If device is 2ch S16LE shift0, out is already exact ALSA payload -> direct pointer, no memcpy. For 4ch S16LE shift0, specialized L R 0 0. */
         static unsigned char devbuf[2048 * 2 * 4];
-        convert_s16_to_device(
-            out,
-            active_period_frames,
-            2u,
-            devbuf,
-            g_dev_play_channels,
-            g_dev_play_bytes,
-            g_dev_play_shift);
+        unsigned char *play_buf = devbuf;
+        int use_direct = 0;
+        if (!used_starvation_silence) {
+            /* fastpath checks are branch-predicted; dev config stable after open */
+            if (g_dev_play_channels == 2 && g_dev_play_bytes == 2 && g_dev_play_shift == 0) {
+                play_buf = (unsigned char *)out;
+                use_direct = 1;
+            } else if (g_dev_play_channels == 4 && g_dev_play_bytes == 2 && g_dev_play_shift == 0) {
+                /* P1 D 4ch S16 specialized: L R 0 0 without generic byte shift loop */
+                int16_t *d = (int16_t *)devbuf;
+                unsigned f;
+                for (f = 0; f < (unsigned)active_period_frames; ++f) {
+                    d[f*4] = out[f*2];
+                    d[f*4+1] = out[f*2+1];
+                    d[f*4+2] = 0;
+                    d[f*4+3] = 0;
+                }
+                play_buf = devbuf;
+                use_direct = 0;
+            } else {
+                convert_s16_to_device(
+                    out,
+                    active_period_frames,
+                    2u,
+                    devbuf,
+                    g_dev_play_channels,
+                    g_dev_play_bytes,
+                    g_dev_play_shift);
+                play_buf = devbuf;
+                use_direct = 0;
+            }
+        } else {
+            /* starvation silence: still need correct silent payload for negotiated format */
+            if (g_dev_play_channels == 2 && g_dev_play_bytes == 2 && g_dev_play_shift == 0) {
+                play_buf = (unsigned char *)out; /* out already zeroed */
+                use_direct = 1;
+            } else if (g_dev_play_channels == 4 && g_dev_play_bytes == 2 && g_dev_play_shift == 0) {
+                memset(devbuf, 0, (size_t)active_period_frames * 4 * 2);
+                play_buf = devbuf;
+                use_direct = 0;
+            } else {
+                convert_s16_to_device(
+                    out,
+                    active_period_frames,
+                    2u,
+                    devbuf,
+                    g_dev_play_channels,
+                    g_dev_play_bytes,
+                    g_dev_play_shift);
+                play_buf = devbuf;
+                use_direct = 0;
+            }
+        }
+        (void)use_direct;
         int wr = write_frames_exact(
-            pcm, devbuf, active_period_frames,
+            pcm, play_buf, active_period_frames,
             g_dev_play_channels, g_dev_play_bytes);
         if (wr < 0) {
             ++xruns;
