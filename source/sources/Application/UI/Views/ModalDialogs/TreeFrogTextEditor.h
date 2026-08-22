@@ -40,9 +40,15 @@ public:
 protected:
     // Re-seeds the edited text (used by NewProjectDialog::SetInitialName).
     void setInitialText(const char *text);
+    void setStatus(const char *text);
+    // TREEFROG_STARTUP_PROJECT_ACTIONS_V1: minimal opt-in extension hooks.
+    // Default behavior preserves exact validated editor FSM for all existing
+    // callers (Rename, Sample Rename, Save As, etc.).
+    virtual unsigned int GetAdditionalActionMask() const;
+    virtual bool HandlePhysicalAction(unsigned int action);
+    virtual const char *GetActionHintLine() const;
 
 private:
-    void setStatus(const char *text);
     void moveCursor(int delta);
     void cycleCharacter(int delta);
     void toggleCase();

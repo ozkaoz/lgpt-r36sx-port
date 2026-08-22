@@ -98,9 +98,21 @@ void TreeFrogTextEditor::DrawView() {
     SetColor(CD_NORMAL);
     DrawString(1, 5, "UP/DOWN char   X+UP/DOWN +/-5", props);
     DrawString(1, 6, "LEFT/RIGHT cursor   L1+X case", props);
-    DrawString(1, 7, "A confirm  B erase  R1+LEFT cancel", props);
+    DrawString(1, 7, GetActionHintLine(), props);
     SetColor(CD_HILITE1);
     DrawString(1, 8, status_, props);
+}
+
+// TREEFROG_STARTUP_PROJECT_ACTIONS_V1: default hooks preserve original FSM.
+unsigned int TreeFrogTextEditor::GetAdditionalActionMask() const {
+    return 0;
+}
+bool TreeFrogTextEditor::HandlePhysicalAction(unsigned int action) {
+    (void)action;
+    return false;
+}
+const char *TreeFrogTextEditor::GetActionHintLine() const {
+    return "A confirm  B erase  R1+LEFT cancel";
 }
 
 void TreeFrogTextEditor::OnFocus() {
@@ -239,7 +251,7 @@ void TreeFrogTextEditor::processPhysicalInput() {
 
     const unsigned int actions = newBits &
         (TFSP_UP | TFSP_DOWN | TFSP_LEFT | TFSP_RIGHT |
-         TFSP_A | TFSP_B | TFSP_X | TFSP_Y);
+         TFSP_A | TFSP_B | TFSP_X | TFSP_Y | GetAdditionalActionMask());
     if (!actions) return;
     unsigned int bits = actions;
     int count = 0;
@@ -251,6 +263,8 @@ void TreeFrogTextEditor::processPhysicalInput() {
         setStatus("Release and press one action");
         return;
     }
+
+    if (HandlePhysicalAction(actions)) return;
 
     if (actions == TFSP_LEFT) moveCursor(-1);
     else if (actions == TFSP_RIGHT) moveCursor(1);
