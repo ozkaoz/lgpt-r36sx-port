@@ -161,6 +161,22 @@ static int g_usb_channels = 2;
 static int g_usb_rate = 48000;
 static int g_engine_rate = 48000;
 static int g_mixer_volume_percent = 100;
+// H39 OPTIMIZED SP404 STABLE: cache to avoid filesystem I/O in hot path
+static long long g_last_host_generation_check_ms = -1000000;
+static char g_cached_host_generation[64] = "";
+static long long g_last_sp404_profile_validate_ms = -1000000;
+static long long g_sp404_usb_state_cache_ms = -1000000;
+static int g_sp404_usb_state_cached_raw = 0;
+static int g_sp404_usb_state_cached_out = 0;
+static pid_t g_cached_sp404_daemon_pid = -1;
+static long long g_cached_sp404_daemon_check_ms = -1000000;
+static int g_cached_sp404_daemon_alive = 0;
+// Diagnostic counters for SP404 optimization verification (H39)
+static unsigned long g_diag_profile_file_reads = 0;
+static unsigned long g_diag_usb_state_file_checks = 0;
+static unsigned long g_diag_ensure_setup_file_checks = 0;
+static unsigned long g_diag_submit_profile_reads = 0;
+static unsigned long g_diag_fifo_pending_samples_snapshot = 0;
 static int g_project_master_volume_percent = 100;
 static char g_last_capture_name[96] = "";
 static char g_last_capture_path[256] = "";
@@ -929,18 +945,56 @@ static void refresh_passive_physical_volume_file(void) {
 
 static int capture_recording_active(void); /* AU11 forward */
 
+static int daemon_pid_alive_cached(void) {
+    long long now = monotonic_milliseconds();
+    if (now > 0 && (now - g_cached_sp404_daemon_check_ms) < 1500 && g_cached_sp404_daemon_check_ms > 0) {
+        return g_cached_sp404_daemon_alive;
+    }
+    g_cached_sp404_daemon_check_ms = now;
+    int alive = daemon_pid_alive();
+    g_cached_sp404_daemon_alive = alive;
+    if (alive) {
+        // cache pid value if needed
+        for (unsigned i=0;i<3;i++) {
+            const char *candidates[] = {kDaemonPid, "/tmp/r36sx_lgpt_usb/sp404_daemon_pid", "/tmp/r36sx_lgpt_usb/midi_daemon_pid"};
+            char buf[32];
+            int fd = open(candidates[i], O_RDONLY);
+            if (fd < 0) continue;
+            ssize_t n = read(fd, buf, sizeof(buf)-1);
+            close(fd);
+            if (n>0) { buf[n]=0; long pid=strtol(buf,0,10); if(pid>1) g_cached_sp404_daemon_pid=(pid_t)pid; }
+        }
+    }
+    return g_cached_sp404_daemon_alive;
+}
 static void refresh_usb_state(void) {
-    /* Record stops the tracker transport, so submit_count may remain zero.
-     * A submit-count-only governor therefore polled sysfs on every Record
-     * frame and competed with input.  U2.51.5 uses an absolute 100 ms cache
-     * in addition to the realtime submit-count governor. */
-    const long long now_ms = monotonic_milliseconds();
-    if (now_ms > 0 && (now_ms - g_last_usb_refresh_ms) < 100) return;
-    if (g_submit_count != 0 &&
-        (g_submit_count - g_last_usb_check_submit) < 2 &&
-        g_last_usb_refresh_ms > 0) return;
-    g_last_usb_refresh_ms = now_ms;
-    g_last_usb_check_submit = g_submit_count;
+    // SP404 fast path: assume device=SP404 without filesystem scans when stable
+    if (g_driver_mode == U241_USB_OUT || g_driver_mode == U241_SP404_IN) {
+        const long long now_ms_fast = monotonic_milliseconds();
+        // Faster cache for host stable: 1500ms vs 100ms
+        if (now_ms_fast > 0 && (now_ms_fast - g_sp404_usb_state_cache_ms) < 1500 && g_sp404_usb_state_cache_ms > 0) {
+            return;
+        }
+        // If fifo is open and daemon was alive and we previously cached raw==1, keep assuming host ready without rediscovery
+        if (g_fifo_fd >= 0 && g_fifo_open_path && strcmp(g_fifo_open_path, kSp404Fifo)==0 && g_sp404_usb_state_cached_raw==1 && daemon_pid_alive_cached()) {
+            g_sp404_usb_state_cache_ms = now_ms_fast;
+            // keep cached state, no sysfs
+            return;
+        }
+        // otherwise proceed but with longer interval
+        if (now_ms_fast > 0 && (now_ms_fast - g_last_usb_refresh_ms) < 1500) return;
+        g_last_usb_refresh_ms = now_ms_fast;
+        g_last_usb_check_submit = g_submit_count;
+        g_sp404_usb_state_cache_ms = now_ms_fast;
+    } else {
+        const long long now_ms = monotonic_milliseconds();
+        if (now_ms > 0 && (now_ms - g_last_usb_refresh_ms) < 100) return;
+        if (g_submit_count != 0 &&
+            (g_submit_count - g_last_usb_check_submit) < 2 &&
+            g_last_usb_refresh_ms > 0) return;
+        g_last_usb_refresh_ms = now_ms;
+        g_last_usb_check_submit = g_submit_count;
+    }
     /*
      * Unified device detection. Android AOA, SP404MKII and MIDI are host-role
      * topologies: R36SX is USB host and readiness comes from the stream/card/
@@ -953,6 +1007,9 @@ static void refresh_usb_state(void) {
         (device == U241_DEVICE_ANDROID) ? android_stream_ready_raw() :
         (device == U241_DEVICE_SP404) ? sp404_card_present_raw() :
         (device == U241_DEVICE_MIDI) ? midi_device_present_raw() : 0;
+    if (g_driver_mode == U241_USB_OUT || g_driver_mode == U241_SP404_IN) {
+        g_sp404_usb_state_cached_raw = raw;
+    }
     if (raw != g_usb_raw) {
         g_usb_raw = raw;
         g_raw_configured_since = raw ? (g_submit_count ? g_submit_count : 1) : 0;
@@ -1065,6 +1122,29 @@ static void reap_setup_child_nonblocking(void) {
 static long long g_last_mode_refresh_ms = -1000000;
 
 static void ensure_setup_started(void) {
+    // H39 FAST RETURN for host-role stable: avoid filesystem per submit
+    if (g_setup_started && (g_driver_mode == U241_ANDROID || g_driver_mode == U241_USB_OUT || g_driver_mode == U241_SP404_IN || g_driver_mode == U241_MIDI)) {
+        long long now2 = monotonic_milliseconds();
+        if (now2 > 0 && (now2 - g_last_host_generation_check_ms) < 1500) {
+            return;
+        }
+        g_last_host_generation_check_ms = now2;
+        const char *gen_path = (g_driver_mode == U241_ANDROID) ? "/tmp/r36sx_lgpt_usb/h35_android_generation" : "/tmp/r36sx_lgpt_usb/h38_host_generation";
+        char cur_gen[64] = "";
+        int fd2 = open(gen_path, O_RDONLY);
+        if (fd2 >= 0) {
+            ssize_t n = read(fd2, cur_gen, sizeof(cur_gen)-1);
+            close(fd2);
+            if (n > 0) { cur_gen[n]=0; char *nl=strchr(cur_gen,'\n'); if(nl) *nl=0; }
+        }
+        if (cur_gen[0]!=0 && strcmp(cur_gen, g_cached_host_generation)==0) {
+            return;
+        }
+        if (cur_gen[0]!=0) {
+            snprintf(g_cached_host_generation, sizeof(g_cached_host_generation), "%s", cur_gen);
+        }
+        // generation changed or not present -> fall through to full refresh
+    }
     if (!enable_file_present()) return;
 
     const long long now_ms = monotonic_milliseconds();
@@ -1076,7 +1156,8 @@ static void ensure_setup_started(void) {
 
     if (g_driver_mode == U241_ANDROID ||
         g_driver_mode == U241_USB_OUT ||
-        g_driver_mode == U241_MIDI) {
+        g_driver_mode == U241_MIDI ||
+        g_driver_mode == U241_SP404_IN) {
         /* The Android AOA, SP404MKII and MIDI runtimes are owned by the SD
          * apply script and their supervisors. The core never forks the Windows
          * gadget setup for host-role modes, otherwise it would fight the
@@ -1167,7 +1248,12 @@ static void close_fifo_if_open(const char *why) {
         g_resample_phase_160 = 0;
         g_resample_input_fill_frames = 0;
         g_fifo_pending_samples = 0;
+        g_sp404_usb_state_cache_ms = -1000000;
+        g_sp404_usb_state_cached_raw = 0;
         log_msg(why ? why : "fifo closed");
+    } else {
+        // still reset pending even if fd already -1 (mode switch cleanup)
+        g_fifo_pending_samples = 0;
     }
 }
 
@@ -1371,7 +1457,45 @@ static int read_int_file_clamped(const char *path, int minv, int maxv, int fallb
     return v;
 }
 
-static void refresh_runtime_audio_profile(void) {
+static void refresh_runtime_audio_profile_internal(int force) {
+    // SP404 fixed contract: 2/48000 - no filesystem reads in steady state
+    if (g_driver_mode == U241_USB_OUT || g_driver_mode == U241_SP404_IN) {
+        if (!force) {
+            if (g_usb_channels == 2 && g_usb_rate == 48000) {
+                // slow validation only every 1500ms outside realtime critical path
+                long long now = monotonic_milliseconds();
+                if (now > 0 && (now - g_last_sp404_profile_validate_ms) < 1500) {
+                    return;
+                }
+                g_last_sp404_profile_validate_ms = now;
+                // still enforced without file read
+                return;
+            }
+            // mismatch -> enforce without file read
+            g_usb_channels = 2;
+            g_usb_rate = 48000;
+            g_resample_phase_160 = 0;
+            g_resample_input_fill_frames = 0;
+            monitor_ring_reset();
+            log_msg("USB audio profile forced SP404 stereo 48k");
+            g_last_sp404_profile_validate_ms = monotonic_milliseconds();
+            return;
+        } else {
+            // force path - set explicitly before first FIFO/submit
+            if (g_usb_channels != 2 || g_usb_rate != 48000) {
+                g_usb_channels = 2;
+                g_usb_rate = 48000;
+                g_resample_phase_160 = 0;
+                g_resample_input_fill_frames = 0;
+                monitor_ring_reset();
+                log_msg("USB audio profile force SP404 stereo 48k");
+            }
+            g_last_sp404_profile_validate_ms = monotonic_milliseconds();
+            return;
+        }
+    }
+    // WINDOWS and other modes keep dynamic file reads (single-rate still 48k but respect mono)
+    g_diag_profile_file_reads += 2;
     int channels = read_int_file_clamped(
         kAudioChannels,
         1,
@@ -1398,6 +1522,12 @@ static void refresh_runtime_audio_profile(void) {
             g_usb_rate);
         log_msg(message);
     }
+}
+static void refresh_runtime_audio_profile(void) {
+    refresh_runtime_audio_profile_internal(0);
+}
+static void refresh_runtime_audio_profile_force(void) {
+    refresh_runtime_audio_profile_internal(1);
 }
 
 static void refresh_capture_status_internal(int force) {
@@ -1509,7 +1639,7 @@ void TreeFrogUac2Bridge_Prime(void) {
     refresh_mode_from_file(1);
     ensure_setup_started();
     refresh_usb_state();
-    refresh_runtime_audio_profile();
+    refresh_runtime_audio_profile_internal((g_driver_mode==U241_USB_OUT||g_driver_mode==U241_SP404_IN)?1:0);
     refresh_passive_physical_volume_file();
     refresh_capture_status();
 #endif
@@ -1595,14 +1725,14 @@ void TreeFrogUac2Bridge_SubmitStereo48000(const int16_t *stereo, int frames) {
     if ((g_submit_count % 30) == 0) refresh_mode_from_file(0);
     ensure_setup_started();
     refresh_usb_state();
-    /* RC9.6: refresh the audio profile on EVERY submit instead of every 30.
-     * The SP404 daemon writes audio_channels=2 at start; a lazy refresh left
-     * the first ~0.5 s of playback streaming MONO into the stereo daemon,
-     * which drained the ring at 2x and buzzed until the switch. Applying the
-     * profile at the first playback callback keeps the fifo layout in lockstep
-     * with the daemon from sample one. */
-    refresh_runtime_audio_profile();
-    if ((g_submit_count % 12) == 0) refresh_passive_physical_volume_file();
+    // H39: SP404 profile is forced at mode entry, no per-submit file reads
+    if (g_driver_mode == U241_USB_OUT || g_driver_mode == U241_SP404_IN) {
+        // fast cached check (no file I/O) - only slow validation every 1500ms inside the function
+        refresh_runtime_audio_profile_internal(0);
+    } else {
+        refresh_runtime_audio_profile();
+    }
+    if ((g_submit_count % 60) == 0) refresh_passive_physical_volume_file();
     if ((g_submit_count % 60) == 0) refresh_capture_status();
 
     if (!mode_has_out(g_driver_mode) || !g_usb_out_allowed) {
@@ -1611,6 +1741,110 @@ void TreeFrogUac2Bridge_SubmitStereo48000(const int16_t *stereo, int frames) {
     }
     ensure_fifo_open_nonblocking();
     if (g_fifo_fd < 0) return;
+
+    // ---- H39 SP404 48K IDENTITY FAST PATH (21-24) ----
+    if (g_engine_rate == 48000 && g_usb_rate == 48000 && g_usb_channels == 2) {
+        const int usb_master = usb_effective_master_percent(g_project_master_volume_percent);
+        const int gain = g_mixer_volume_percent * usb_master;
+        // drain pending first (common to both paths)
+        if (g_fifo_pending_samples > 0) {
+            const size_t pend_bytes = (size_t)g_fifo_pending_samples * sizeof(int16_t);
+            const ssize_t n = write(g_fifo_fd, g_fifo_pending, pend_bytes);
+            if (n < 0) {
+                if (errno == EPIPE || errno == ENXIO || errno == EBADF) {
+                    close_fifo_if_open("fifo closed after hard write error (pending)");
+                    return;
+                }
+            } else if (n > 0) {
+                const size_t consumed = (size_t)n / sizeof(int16_t);
+                if (consumed >= g_fifo_pending_samples) {
+                    g_fifo_pending_samples = 0;
+                } else {
+                    memmove(g_fifo_pending, g_fifo_pending + consumed, (size_t)(g_fifo_pending_samples - consumed) * sizeof(int16_t));
+                    g_fifo_pending_samples -= (unsigned)(consumed);
+                }
+            }
+        }
+        if (gain == 10000 && g_fifo_pending_samples == 0) {
+            // fastest: direct write without intermediate buffer
+            const size_t sample_count = (size_t)frames * 2u;
+            // clamp to FIFO pending cap (should not happen for normal 800 frames)
+            if (sample_count <= H40_FIFO_PENDING_CAP_SAMPLES) {
+                ssize_t written = write(g_fifo_fd, stereo, sample_count * sizeof(int16_t));
+                if (written < 0) {
+                    if (errno == EPIPE || errno == ENXIO || errno == EBADF) {
+                        close_fifo_if_open("fifo closed after hard write error");
+                        return;
+                    }
+                    written = 0;
+                }
+                const size_t w_samples = (size_t)written / sizeof(int16_t);
+                if (w_samples < sample_count) {
+                    size_t rem = sample_count - w_samples;
+                    const int16_t *src = stereo + w_samples;
+                    ++g_fifo_pending_stage_events;
+                    if (rem > H40_FIFO_PENDING_CAP_SAMPLES) {
+                        src += rem - H40_FIFO_PENDING_CAP_SAMPLES;
+                        g_fifo_pending_drop_frames += (unsigned long)((rem - H40_FIFO_PENDING_CAP_SAMPLES) / 2u);
+                        rem = H40_FIFO_PENDING_CAP_SAMPLES;
+                    }
+                    if ((size_t)g_fifo_pending_samples + rem > H40_FIFO_PENDING_CAP_SAMPLES) {
+                        const size_t excess = (size_t)g_fifo_pending_samples + rem - H40_FIFO_PENDING_CAP_SAMPLES;
+                        memmove(g_fifo_pending, g_fifo_pending + excess, (size_t)(g_fifo_pending_samples - excess) * sizeof(int16_t));
+                        g_fifo_pending_samples -= (unsigned)(excess);
+                        g_fifo_pending_drop_frames += (unsigned long)(excess / 2u);
+                    }
+                    memcpy(g_fifo_pending + g_fifo_pending_samples, src, rem * sizeof(int16_t));
+                    g_fifo_pending_samples += (unsigned)(rem);
+                    if ((g_submit_count % 240) == 0) log_msg("fifo backpressure: staged frames pending (fast)");
+                }
+                return;
+            }
+        }
+        // gain scaled fast path without resampler/phase machinery
+        {
+            enum { FAST_MAX_FRAMES = 4096 };
+            int fast_frames = frames;
+            if (fast_frames > FAST_MAX_FRAMES) fast_frames = FAST_MAX_FRAMES;
+            int16_t out_fast[FAST_MAX_FRAMES * 2];
+            const size_t sample_count = (size_t)fast_frames * 2u;
+            for (size_t i=0;i<sample_count;++i) {
+                int v = stereo[i];
+                v = (v * gain + 5000) / 10000;
+                out_fast[i] = clamp16(v);
+            }
+            const ssize_t written = write(g_fifo_fd, out_fast, sample_count * sizeof(int16_t));
+            ssize_t w = written;
+            if (w < 0) {
+                if (errno == EPIPE || errno == ENXIO || errno == EBADF) {
+                    close_fifo_if_open("fifo closed after hard write error (fast)");
+                    return;
+                }
+                w = 0;
+            }
+            const size_t w_samples = (size_t)w / sizeof(int16_t);
+            if (w_samples < sample_count) {
+                size_t rem = sample_count - w_samples;
+                const int16_t *src = out_fast + w_samples;
+                ++g_fifo_pending_stage_events;
+                if (rem > H40_FIFO_PENDING_CAP_SAMPLES) {
+                    src += rem - H40_FIFO_PENDING_CAP_SAMPLES;
+                    g_fifo_pending_drop_frames += (unsigned long)((rem - H40_FIFO_PENDING_CAP_SAMPLES) / 2u);
+                    rem = H40_FIFO_PENDING_CAP_SAMPLES;
+                }
+                if ((size_t)g_fifo_pending_samples + rem > H40_FIFO_PENDING_CAP_SAMPLES) {
+                    const size_t excess = (size_t)g_fifo_pending_samples + rem - H40_FIFO_PENDING_CAP_SAMPLES;
+                    memmove(g_fifo_pending, g_fifo_pending + excess, (size_t)(g_fifo_pending_samples - excess) * sizeof(int16_t));
+                    g_fifo_pending_samples -= (unsigned)(excess);
+                    g_fifo_pending_drop_frames += (unsigned long)(excess / 2u);
+                }
+                memcpy(g_fifo_pending + g_fifo_pending_samples, src, rem * sizeof(int16_t));
+                g_fifo_pending_samples += (unsigned)(rem);
+                if ((g_submit_count % 240) == 0) log_msg("fifo backpressure: staged frames pending (fast scaled)");
+            }
+        }
+        return;
+    }
 
     enum {
         MAX_OUT_FRAMES = 4096,
@@ -1910,7 +2144,7 @@ int TreeFrogUac2Bridge_ShouldMuteLocal(void) {
     if (!enable_file_present()) return 0;
     if ((g_submit_count % 30) == 0) refresh_mode_from_file(0);
     refresh_usb_state();
-    if ((g_submit_count % 30) == 0) refresh_passive_physical_volume_file();
+    if ((g_submit_count % 60) == 0) refresh_passive_physical_volume_file();
     int should = should_mute_now();
     if (should != g_was_muted) {
         g_was_muted = should;
@@ -1992,6 +2226,8 @@ const char *TreeFrogUac2Bridge_GetDriverModeName(void) {
  */
 static int fifo_compatible_with_mode(int mode) {
     if (g_fifo_fd < 0) return 1;
+    // H44 P0: LOCAL is never compatible for fast path when leaving external runtime
+    // The caller must handle LOCAL full-teardown before calling this.
     if (mode == U241_LOCAL_CONSOLE) return 1;
     if (g_fifo_open_path == 0) return 0;
     return strcmp(g_fifo_open_path, kFifo) == 0;
@@ -2016,17 +2252,40 @@ const char *TreeFrogUac2Bridge_SetDriverMode(int mode) {
     }
     g_last_mode_change_ms = now_ms;
 
+    const int previous_mode = g_driver_mode;
+    const int leaving_external_runtime = (mode == U241_LOCAL_CONSOLE && previous_mode != U241_LOCAL_CONSOLE);
+
+    // H39: close previous FIFO and reset cached state before target backend (40)
+    // H44 P0: LOCAL full teardown must be complete runtime boundary
+    close_fifo_if_open(leaving_external_runtime ? "fifo closed local full teardown" : "fifo closed host-role apply");
+    g_fifo_pending_samples = 0;
+    g_fifo_pending_drop_frames = 0;
+    g_fifo_pending_stage_events = 0;
+    g_resample_phase_160 = 0;
+    g_resample_input_fill_frames = 0;
+    g_last_usb_refresh_ms = -1000000;
+    g_sp404_usb_state_cache_ms = -1000000;
+    g_sp404_usb_state_cached_raw = 0;
+    g_last_sp404_profile_validate_ms = -1000000;
+    g_last_host_generation_check_ms = -1000000;
+    g_cached_host_generation[0]=0;
+    g_cached_sp404_daemon_check_ms = -1000000;
+    g_cached_sp404_daemon_alive = 0;
+    g_last_mode_refresh_ms = -1000000;
     g_driver_mode = mode;
     g_pending_driver_mode = mode;
-    log_msg("driver mode changed");
+    log_msg(leaving_external_runtime ? "driver mode changed leaving external runtime" : "driver mode changed");
     write_mode_file(effective);
+    // H39: force SP404 profile immediately before first FIFO/submit (11-12)
+    if (effective == U241_USB_OUT || effective == U241_SP404_IN) {
+        refresh_runtime_audio_profile_force();
+    }
 
-    /*
-     * U2.41.5.2 FAST_DEVICE_SWITCH:
-     * If the gadget, daemon and FIFO are already present, changing LOCAL/USB
-     * is a core routing decision.  Do not fork the profile script.
-     */
-    if (AudioRouteIsHostRoleMode(g_driver_mode)) {
+    // H44 P0: ANY NON-LOCAL -> LOCAL must be FULL TEARDOWN, never fast
+    if (leaving_external_runtime) {
+        launch_apply_profile_once(U241_LOCAL_CONSOLE);
+        log_msg("local full teardown apply requested");
+    } else if (AudioRouteIsHostRoleMode(g_driver_mode)) {
         /*
          * U2.52 HOST_ROLE_MODE_ALWAYS_APPLY:
          * Host-role modes (Android AOA, SP404 sampler OUT/IN, MIDI) load ALSA
@@ -2650,6 +2909,51 @@ int TreeFrogUac2Bridge_SetUsbMonitor(int enable) {
 int TreeFrogUac2Bridge_GetUsbMonitor(void) {
 #if TREEFROG_UAC2_BRIDGE
     return g_usb_monitor_enabled;
+#else
+    return 0;
+#endif
+}
+
+// H39 DIAGNOSTICS: FIFO pending and optimization counters
+extern "C" unsigned long TreeFrogUac2Bridge_GetFifoPendingSamples(void) {
+#if TREEFROG_UAC2_BRIDGE
+    return g_fifo_pending_samples;
+#else
+    return 0;
+#endif
+}
+extern "C" unsigned long TreeFrogUac2Bridge_GetFifoPendingStageEvents(void) {
+#if TREEFROG_UAC2_BRIDGE
+    return g_fifo_pending_stage_events;
+#else
+    return 0;
+#endif
+}
+extern "C" unsigned long TreeFrogUac2Bridge_GetFifoPendingDropFrames(void) {
+#if TREEFROG_UAC2_BRIDGE
+    return g_fifo_pending_drop_frames;
+#else
+    return 0;
+#endif
+}
+extern "C" unsigned long TreeFrogUac2Bridge_GetDiagProfileReads(void) {
+#if TREEFROG_UAC2_BRIDGE
+    return g_diag_profile_file_reads;
+#else
+    return 0;
+#endif
+}
+extern "C" void TreeFrogUac2Bridge_ResetDiagCounters(void) {
+#if TREEFROG_UAC2_BRIDGE
+    g_diag_profile_file_reads = 0;
+    g_diag_usb_state_file_checks = 0;
+    g_diag_ensure_setup_file_checks = 0;
+    g_diag_submit_profile_reads = 0;
+#endif
+}
+extern "C" int TreeFrogUac2Bridge_IsFastPath48k(void) {
+#if TREEFROG_UAC2_BRIDGE
+    return (g_engine_rate == 48000 && g_usb_rate == 48000 && g_usb_channels == 2) ? 1 : 0;
 #else
     return 0;
 #endif

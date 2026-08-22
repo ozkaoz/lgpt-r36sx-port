@@ -81,6 +81,18 @@ static const char *PLAYBACK_PCM_STATUS = "/tmp/r36sx_lgpt_usb/playback_pcm_statu
 static const char *AUDIO_MODE_FILE = "/mnt/sdcard/lgpt/otg/audio_driver_mode";
 static int g_dir_out = 1;
 static unsigned long long g_dir_check_ms = 0;
+// H44 EVENT-DRIVEN USB STATE counters (20)
+static unsigned long g_cnt_usb_marker_checks = 0;
+static unsigned long g_cnt_usb_marker_reads = 0;
+static unsigned long g_cnt_card_rechecks = 0;
+static unsigned long g_cnt_audio_mode_reads = 0;
+static unsigned long g_cnt_capture_cmd_polls = 0;
+static unsigned long g_cnt_monitor_polls = 0;
+static unsigned long g_cnt_slow_control_ticks = 0;
+static unsigned long long g_last_slow_control_ms = 0;
+static unsigned long long g_last_perf_stats_ms = 0;
+enum { USB_UNKNOWN=0, USB_READY=1, USB_STREAMING=2, USB_RECOVERING=3 };
+static int g_usb_state = USB_UNKNOWN;
 static unsigned g_audio_channels = 1;
 static unsigned g_audio_rate = 48000;
 static int g_dev_play_format = SNDRV_PCM_FORMAT_S16_LE;
@@ -259,22 +271,28 @@ static void mirror_runtime_state(const char *path, const char *text) {
 }
 
 static int file_contains(const char *p, const char *needle) {
+    g_cnt_usb_marker_reads++;
     char buf[128]; int fd = open(p, O_RDONLY); if (fd < 0) return 0;
     ssize_t n = read(fd, buf, sizeof(buf)-1); close(fd); if (n <= 0) return 0;
     buf[n] = 0; return strstr(buf, needle) != 0;
 }
 static int usb_configured(void) {
-    return file_contains(SP404_CARD, "FAILED") == 0 &&
-           file_contains(SP404_CARD, "none") == 0 &&
-           path_exists(SP404_CARD);
+    g_cnt_usb_marker_checks++;
+    // path_exists also stat, count as check
+    int a = file_contains(SP404_CARD, "FAILED");
+    int b = file_contains(SP404_CARD, "none");
+    int c = path_exists(SP404_CARD);
+    g_cnt_usb_marker_reads++; // for path_exists
+    return a == 0 && b == 0 && c;
 }
 
 static int usb_configured_cached(void) {
     static unsigned long long last_check_ms = 0;
     static int cached = 0;
     const unsigned long long now = monotonic_milliseconds();
+    // H44: safety fallback only every 5000ms and never in streaming hot path
     if (last_check_ms == 0 || now < last_check_ms ||
-        (now - last_check_ms) >= 25ULL) {
+        (now - last_check_ms) >= 5000ULL) {
         cached = usb_configured();
         last_check_ms = now;
     }
@@ -1245,6 +1263,8 @@ static int ensure_monitor_fifo_node(void) {
     return 1;
 }
 static void monitor_refresh_flag(void) {
+    // H44: monitor is legacy for IN; count but still respect OUT
+    g_cnt_monitor_polls++;
     const unsigned long long now = monotonic_milliseconds();
     if (mon_last_flag_check_ms != 0 && now >= mon_last_flag_check_ms &&
         (now - mon_last_flag_check_ms) < 10ULL) return;
@@ -1267,6 +1287,48 @@ static void monitor_fifo_open_if_needed(void) {
     if (!ensure_monitor_fifo_node()) return;
     mon_fd = open(CAPTURE_MONITOR_FIFO, O_WRONLY | O_NONBLOCK);
     if (mon_fd >= 0) fprintf(stderr, "CAPTURE_MONITOR_FIFO_OPENED fd=%d\n", mon_fd);
+}
+static void write_perf_stats(void){
+    unsigned long long now = monotonic_milliseconds();
+    if (g_last_perf_stats_ms !=0 && now - g_last_perf_stats_ms < 1000ULL) return;
+    g_last_perf_stats_ms = now;
+    char path[96];
+    snprintf(path,sizeof(path),"%s/sp404_perf_stats", RUNTIME_DIR);
+    char tmp[256];
+    snprintf(tmp,sizeof(tmp), "%s.tmp", path);
+    char buf[512];
+    snprintf(buf,sizeof(buf),
+        "usb_marker_checks=%lu\n"
+        "usb_marker_reads=%lu\n"
+        "card_rechecks=%lu\n"
+        "audio_mode_reads=%lu\n"
+        "capture_cmd_polls=%lu\n"
+        "monitor_polls=%lu\n"
+        "slow_control_ticks=%lu\n"
+        "usb_state=%d\n"
+        "pcm_open=%d\n"
+        "stream_primed=%d\n",
+        g_cnt_usb_marker_checks,
+        g_cnt_usb_marker_reads,
+        g_cnt_card_rechecks,
+        g_cnt_audio_mode_reads,
+        g_cnt_capture_cmd_polls,
+        g_cnt_monitor_polls,
+        g_cnt_slow_control_ticks,
+        g_usb_state,
+        0,0);
+    // we will fill pcm/stream from caller if needed; keep simple
+    int fd=open(tmp, O_WRONLY|O_CREAT|O_TRUNC,0666);
+    if(fd>=0){ write(fd,buf,strlen(buf)); close(fd); rename(tmp,path); }
+}
+static void slow_control_tick(void){
+    unsigned long long now=monotonic_milliseconds();
+    if(g_last_slow_control_ms!=0 && now - g_last_slow_control_ms < 2000ULL) return;
+    g_last_slow_control_ms=now;
+    g_cnt_slow_control_ticks++;
+    // Intentionally minimal: no filesystem discovery, no SD reads.
+    // Only called when not in critical ALSA deadline path (between periods).
+    write_perf_stats();
 }
 static void monitor_write_samples(const int16_t *buf, int frames) {
     monitor_refresh_flag();
@@ -1920,6 +1982,9 @@ static int parse_value(const char *cmd, const char *key, char *out, int len) {
     const char *e = strchr(p, '\n'); int n = e ? (int)(e - p) : (int)strlen(p); if (n >= len) n = len - 1; memcpy(out, p, n); out[n] = 0; return 1;
 }
 static void poll_capture_command(const char *pcmc) {
+    // H44 SAMPLER OUT ONLY: capture not used in OUT mode, zero polls
+    if (g_dir_out) return;
+    g_cnt_capture_cmd_polls++;
     static unsigned long long last_poll_ms = 0;
     const unsigned long long now = monotonic_milliseconds();
     if (last_poll_ms != 0 && now >= last_poll_ms &&
@@ -2016,6 +2081,8 @@ static void poll_capture_command(const char *pcmc) {
 }
 
 static void passive_monitor_tick(const char *pcmc, int configured) {
+    // H44 SAMPLER OUT ONLY: no passive monitor in OUT, zero overhead
+    if (g_dir_out) return;
     monitor_refresh_flag();
     if (!configured || !mon_enabled || cap.active || g_dir_out) {
         if (mon_cap_pcm >= 0) { close(mon_cap_pcm); mon_cap_pcm = -1; }
@@ -2473,13 +2540,15 @@ static int run_probe_all(const char *pcmp, const char *pcmc) {
  */
 static int g_sampler_in_seen = 0;
 static void refresh_audio_direction(void) {
+    // H44 SAMPLER OUT ONLY: daemon is created as OUT, direction change is via stop_host_runtime
+    // No SD polling. Keep counter for safety if ever needed.
+    if (g_dir_out) return;
     unsigned long long now = monotonic_milliseconds();
-    if (now - g_dir_check_ms < 500) return;
+    if (now - g_dir_check_ms < 5000) return;
     g_dir_check_ms = now;
-
+    g_cnt_audio_mode_reads++;
     int fd = open(AUDIO_MODE_FILE, O_RDONLY);
     if (fd < 0) return;
-
     char b[96];
     ssize_t n = read(fd, b, sizeof(b) - 1);
     close(fd);
@@ -2579,13 +2648,16 @@ int main(int argc, char **argv) {
     const int pcm_path_overridden = (argc > 2) || (argc > 3);
     static unsigned long long last_card_recheck_ms = 0;
     int reread_sp404_card(void) {
+        // H44: during streaming never reread marker; kernel FD is truth (event-driven)
+        if (g_usb_state == USB_STREAMING) return sp404_card;
+        g_cnt_card_rechecks++;
         /* Only auto-track when the pcm paths were not forced on the command
          * line. Reread the live markers so a late/hotplug enumeration on a
          * different card index is picked up without a daemon restart. */
         if (pcm_path_overridden) return sp404_card;
         unsigned long long now = monotonic_milliseconds();
         if (last_card_recheck_ms != 0 && now >= last_card_recheck_ms &&
-            (now - last_card_recheck_ms) < 500ULL) return sp404_card;
+            (now - last_card_recheck_ms) < 5000ULL) return sp404_card;
         last_card_recheck_ms = now;
         int new_card = sp404_card;
         int cfd = open(SP404_CARD, O_RDONLY);
@@ -2825,21 +2897,39 @@ int main(int argc, char **argv) {
                     "R36SX_SP404_AUDIO_DAEMON_STOP_REQUESTED graceful_shutdown=1\n");
             break;
         }
-        reread_sp404_card();
-        refresh_audio_direction();
-        int conf = usb_configured_cached();
-        if (conf != last_conf) {
-            fprintf(stderr,
-                    "USB_STATE_CHANGE configured=%d ring_fill=%u\n",
-                    conf, rfill);
-            last_conf = conf;
+        // H44 EVENT-DRIVEN USB STATE: no periodic marker polling while streaming
+        // Only revalidate card/direction at startup/recovery; conf is event-driven
+        int conf;
+        if (g_usb_state == USB_STREAMING && pcm >= 0 && stream_primed) {
+            conf = 1;
+        } else {
+            // startup / recovering: allow one check
+            reread_sp404_card();
+            refresh_audio_direction();
+            // Use cached with 5000ms safety, but count it
+            conf = usb_configured_cached();
+            if (conf != last_conf) {
+                fprintf(stderr,
+                        "USB_STATE_CHANGE configured=%d ring_fill=%u\n",
+                        conf, rfill);
+                last_conf = conf;
+            }
+            if (conf) g_usb_state = USB_READY; else g_usb_state = USB_UNKNOWN;
         }
 
         drain_fifo(in, &dropped);
-        monitor_refresh_flag();
-        poll_capture_command(pcmc);
-        capture_tick();
-        passive_monitor_tick(pcmc, conf);
+        // H44 OUT ONLY: monitor/capture/passive only if needed (guarded inside)
+        if (!g_dir_out) {
+            monitor_refresh_flag();
+            poll_capture_command(pcmc);
+            capture_tick();
+            passive_monitor_tick(pcmc, conf);
+        } else {
+            // In OUT mode, only capture_tick if cap.active (should be 0)
+            if (cap.active) capture_tick();
+        }
+        // Slow control plane outside critical ALSA path (2000ms)
+        slow_control_tick();
 
         /*
          * U2.51.5 PLAYBACK_PARK_FOR_CAPTURE
@@ -2885,21 +2975,31 @@ int main(int argc, char **argv) {
         }
 
         if (!conf) {
-            if (pcm >= 0) {
-                close(pcm);
-                pcm = -1;
-                fifo_dump_finish("usb-disconnected");
-                fprintf(stderr, "PCM_PLAY_CLOSED_USB_DISCONNECTED\n");
+            // H44: only respect !conf when not streaming; streaming disconnect is via ALSA errors
+            if (g_usb_state == USB_STREAMING && pcm >= 0) {
+                // streaming healthy: ignore transient marker glitch, trust ALSA FD
+                conf = 1;
+                g_usb_state = USB_STREAMING;
+            } else {
+                if (pcm >= 0) {
+                    close(pcm);
+                    pcm = -1;
+                    fifo_dump_finish("usb-disconnected");
+                    fprintf(stderr, "PCM_PLAY_CLOSED_USB_DISCONNECTED\n");
+                    g_usb_state = USB_RECOVERING;
+                }
+                active_period_frames = period_frames;
+                good_write_streak = 0;
+                write_text_file(PLAYBACK_PCM_STATUS, "waiting-for-usb\n");
+                mark_inactive();
+                ring_reset();
+                asrc_source_reset();
+                stream_primed = 0;
+                sleep_ms(20);
+                continue;
             }
-            active_period_frames = period_frames;
-            good_write_streak = 0;
-            write_text_file(PLAYBACK_PCM_STATUS, "waiting-for-usb\n");
-            mark_inactive();
-            ring_reset();
-            asrc_source_reset();
-            stream_primed = 0;
-            sleep_ms(20);
-            continue;
+        } else {
+            if (g_usb_state == USB_READY && pcm >= 0 && stream_primed) g_usb_state = USB_STREAMING;
         }
 
         if (cap.active) {
@@ -3029,6 +3129,7 @@ int main(int argc, char **argv) {
             }
             good_write_streak = 0;
             stream_primed = 0;
+            g_usb_state = USB_READY;
             ++reconnects;
             fprintf(stderr,
                     "PCM_PLAY_OPENED reconnects=%ld period_frames=%d channels=%u start_threshold_frames=%d\n",
@@ -3058,6 +3159,7 @@ int main(int argc, char **argv) {
                 continue;
             }
             stream_primed = 1;
+            g_usb_state = USB_STREAMING;
             fprintf(stderr,
                     "PLAYBACK_ASRC_PRIMED backlog=%u target=%u prime=%u "
                     "period=%u gain=%.2f\n",
@@ -3095,6 +3197,7 @@ int main(int argc, char **argv) {
             wait_playback_writable(pcm, playback_poll_timeout_ms);
         if (writable < 0) {
             ++xruns;
+            g_usb_state = USB_RECOVERING;
             if (xruns <= 8 || (xruns % 25) == 0)
                 fprintf(stderr,
                         "PLAY_WAIT_WRITABLE_ERR rc=%d errno=%d (%s) ring_fill=%u reconnects=%ld\n",
@@ -3179,6 +3282,7 @@ int main(int argc, char **argv) {
             g_dev_play_channels, g_dev_play_bytes);
         if (wr < 0) {
             ++xruns;
+            g_usb_state = USB_RECOVERING;
             good_write_streak = 0;
             mark_inactive();
             stream_primed = 0;

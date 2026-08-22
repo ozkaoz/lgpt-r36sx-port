@@ -92,6 +92,13 @@ int TreeFrogUac2Bridge_DiscardUsbCapture(void);
 int TreeFrogUac2Bridge_CommitUsbCapture(void);
 int TreeFrogUac2Bridge_SetUsbMonitor(int enable);
 int TreeFrogUac2Bridge_GetUsbMonitor(void);
+/* H39 diagnostics for SP404 optimization */
+unsigned long TreeFrogUac2Bridge_GetFifoPendingSamples(void);
+unsigned long TreeFrogUac2Bridge_GetFifoPendingStageEvents(void);
+unsigned long TreeFrogUac2Bridge_GetFifoPendingDropFrames(void);
+unsigned long TreeFrogUac2Bridge_GetDiagProfileReads(void);
+void TreeFrogUac2Bridge_ResetDiagCounters(void);
+int TreeFrogUac2Bridge_IsFastPath48k(void);
 #ifdef __cplusplus
 }
 #endif
