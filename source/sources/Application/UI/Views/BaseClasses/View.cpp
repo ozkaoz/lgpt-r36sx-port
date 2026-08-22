@@ -390,11 +390,16 @@ void View::SetColor(ColorDefinition cd) {
 } ;
 
 void View::ClearRect(int x,int y,int w,int h) {
-	int x0 = x; int y0 = y; int x1 = x+w; int y1 = y+h;
-	if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
-	if (x1 > 40) x1 = 40; if (y1 > 30) y1 = 30;
-	if (x0 >= x1 || y0 >= y1) return;
-	GUIRect rect(x0,y0,x1,y1) ;
+	if (w <= 0 || h <= 0) return;
+	long long x0 = x; long long y0 = y;
+	long long x1 = (long long)x + (long long)w;
+	long long y1 = (long long)y + (long long)h;
+	if (x0 < 0) x0 = 0; if (x0 > 40) x0 = 40;
+	if (y0 < 0) y0 = 0; if (y0 > 30) y0 = 30;
+	if (x1 < 0) x1 = 0; if (x1 > 40) x1 = 40;
+	if (y1 < 0) y1 = 0; if (y1 > 30) y1 = 30;
+	if (x1 <= x0 || y1 <= y0) return;
+	GUIRect rect((int)x0,(int)y0,(int)x1,(int)y1) ;
 	w_.ClearRect(rect) ;
 } ;
 

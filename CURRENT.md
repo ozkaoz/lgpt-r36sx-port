@@ -241,3 +241,9 @@ STABLE RC validated runtime HEAD: 58ed2f5
   Message: Bacon 1.5 STABLE RC: Chopper L1+R1 + driver lag (core dbaed387ff72)
   Validated artifact: source/dist/lgpt_libretro.so SHA256 dbaed387ff72 (1.4M) HEAD 58ed2f5
   SD TEST: PENDING 2026-08-21 20:53 (STABLE RC READY FOR FULL PHYSICAL MATRIX — core dbaed387ff72)
+
+Chopper Bacon14 visual contract validated runtime HEAD: 9df8717
+  Message: Bacon 1.5: restore Bacon 1.4 Chopper/Pitch visual contract (core 91f2a457)
+  Validated artifact: source/dist/lgpt_libretro.so SHA256 91f2a4570747a2cc (1.4M) 2026-08-21 21:23
+  SD TEST: PASS 2026-08-21 21:30 (usuario: Aprobado, continua.)
+  Visual: View/AppWindow ClearRect hardened x,y,w,h long long clamp, pitch panel 60,116 y=60..175 preserved, operation panel 64,112 ClearRect 0,8,40,14=560, Sleep(90) preserved, fullscreen pitch 0,0,320,240 removed, Flush order golden

@@ -313,6 +313,17 @@ void AppWindow::ClearRect(GUIRect &r) {
     int y = r.Top();
     int w = r.Width();
     int h = r.Height();
+    if (w <= 0 || h <= 0) return;
+    long long x0 = x;
+    long long y0 = y;
+    long long x1 = (long long)x + (long long)w;
+    long long y1 = (long long)y + (long long)h;
+    if (x0 < 0) x0 = 0; if (x0 > 40) x0 = 40;
+    if (y0 < 0) y0 = 0; if (y0 > 30) y0 = 30;
+    if (x1 < 0) x1 = 0; if (x1 > 40) x1 = 40;
+    if (y1 < 0) y1 = 0; if (y1 > 30) y1 = 30;
+    if (x1 <= x0 || y1 <= y0) return;
+    x = (int)x0; y = (int)y0; w = (int)(x1 - x0); h = (int)(y1 - y0);
 
     unsigned char *st = _charScreen + x + (40 * y);
     unsigned char *pr = _charScreenProp + x + (40 * y);
