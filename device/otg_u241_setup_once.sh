@@ -17,11 +17,14 @@ UDC_NAME=musb-hdrc.0.auto
 mkdir -p "$LOGROOT" "$INTERNAL_LOG" "$INTERNAL_LOG/runtime_state" "$RUNTIME" 2>/dev/null || true
 
 LOCK=/tmp/r36sx_u2414_audio_driver_lock
+PIDFILE=/tmp/r36sx_lgpt_usb/u241_setup_pid
+mkdir -p "$(dirname "$PIDFILE")" 2>/dev/null || true
+echo $$ > "$PIDFILE" 2>/dev/null || true
 if ! mkdir "$LOCK" 2>/dev/null; then
     echo "U2517_SETUP_ALREADY_RUNNING" >> "$LOG"
     exit 0
 fi
-trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT INT TERM
+trap 'rm -f "$PIDFILE" 2>/dev/null || true; rmdir "$LOCK" 2>/dev/null || true' EXIT INT TERM
 
 if [ -f "$LOG" ] && [ "$(wc -c < "$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
     mv -f "$LOG" "$LOG.previous" 2>/dev/null || true
@@ -61,10 +64,22 @@ case "$REQUESTED_PROFILE" in
         ;;
 esac
 
+GENERATION_FILE="$RUNTIME/h35_android_generation"
+MY_GENERATION="$(cat "$GENERATION_FILE" 2>/dev/null || echo 0)"
+check_generation() {
+    cur="$(cat "$GENERATION_FILE" 2>/dev/null || echo 0)"
+    [ "$cur" = "$MY_GENERATION" ]
+}
+
 write_setup_result() {
     text="$1"
     printf '%s\n' "$text" > "$RUNTIME/setup_result" 2>/dev/null || true
     printf '%s\n' "$text" > "$INTERNAL_LOG/runtime_state/setup_result" 2>/dev/null || true
+}
+
+still_windows_requested() {
+    cur="$(cat "$RUNTIME/audio_driver_policy" 2>/dev/null || cat "$BASE/audio_driver_policy" 2>/dev/null || echo LOCAL_CONSOLE)"
+    [ "$cur" = "USB_DUPLEX_OTG" ] || [ "$cur" = "WINDOWS" ]
 }
 
 ensure_monitor_fifo() {
@@ -197,6 +212,9 @@ done
 rm -f "$RUNTIME/daemon_pid"
 sleep 1
 
+if ! still_windows_requested; then echo "ABORT U241 SETUP: policy no longer WINDOWS before cleanup"; exit 0; fi
+if ! check_generation; then echo "ABORT U241 SETUP: generation changed before cleanup"; exit 0; fi
+
 u2414_cleanup_gadgets
 UNLOAD_OK=0
 for attempt in 1 2 3 4 5; do
@@ -213,18 +231,27 @@ done
     exit 4
 }
 
+if ! still_windows_requested; then echo "ABORT U241 SETUP: policy no longer WINDOWS before load_stack"; exit 0; fi
+if ! check_generation; then echo "ABORT U241 SETUP: generation changed before load_stack"; exit 0; fi
+
 u2414_load_stack || {
     rc=$?
     echo "ERROR_LOAD_AU8_SYNC_STACK_RC=$rc"
     u2414_snapshot
     exit "$rc"
 }
+if ! still_windows_requested; then echo "ABORT U241 SETUP: policy no longer WINDOWS before create_gadget"; exit 0; fi
+if ! check_generation; then echo "ABORT U241 SETUP: generation changed before create_gadget"; exit 0; fi
+
 u2414_create_gadget || {
     rc=$?
     echo "ERROR_CREATE_GADGET_RC=$rc"
     u2414_snapshot
     exit "$rc"
 }
+if ! still_windows_requested; then echo "ABORT U241 SETUP: policy no longer WINDOWS before bind"; exit 0; fi
+if ! check_generation; then echo "ABORT U241 SETUP: generation changed before bind"; exit 0; fi
+
 u2414_bind || {
     rc=$?
     echo "ERROR_BIND_GADGET_RC=$rc"

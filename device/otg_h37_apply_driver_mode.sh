@@ -40,7 +40,31 @@ stop_android_runtime(){
     "$RUNTIME/daemon_pid" /tmp/r36sx_aoa_bulk_pcm_fifo /tmp/r36sx_android_project_fifo 2>/dev/null || true
 }
 stop_windows_runtime(){
-  if [ -r "$BIN/otg_u241_shutdown.sh" ]; then /bin/sh "$BIN/otg_u241_shutdown.sh" >>"$LOG" 2>&1 || true; fi
+  # 1. invalidate Windows generation/policy is done by caller via atomic_write
+  # 2. locate u241 setup PID
+  pid="$(cat /tmp/r36sx_lgpt_usb/u241_setup_pid 2>/dev/null || true)"
+  # 3. TERM setup process
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    # 4. wait with polling 50ms up to 2s
+    n=0; while kill -0 "$pid" 2>/dev/null && [ "$n" -lt 40 ]; do sleep 0.05; n=$((n+1)); done
+    # 5. KILL if still alive
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+      n=0; while kill -0 "$pid" 2>/dev/null && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done
+    fi
+  fi
+  rm -f /tmp/r36sx_lgpt_usb/u241_setup_pid 2>/dev/null || true
+  # 6. wait lock free with polling
+  n=0; while [ -d /tmp/r36sx_u2414_audio_driver_lock ] && [ "$n" -lt 40 ]; do sleep 0.05; n=$((n+1)); done
+  # 7. shutdown UAC2
+  if [ -r "$BIN/otg_u241_shutdown.sh" ]; then /bin/sh "$BIN/otg_u241_shutdown.sh" >>"$LOG" 2>&1; fi
+  # 8. confirm UDC unbound with polling
+  n=0; while [ "$n" -lt 40 ]; do
+    udc="$(cat /sys/kernel/config/usb_gadget/r36sx_lgpt_u2414/UDC 2>/dev/null || echo none)"
+    [ -z "$udc" ] || [ "$udc" = "" ] && break
+    sleep 0.05; n=$((n+1))
+  done
   kill_name r36s_u241_usb_audio_io; kill_name r36s_u240_usb_audio_io; kill_name r36s_au11_usb_audio_io
   kill_name r36s_h37_usb_audio_io
 }
@@ -237,9 +261,28 @@ case "$MODE" in
       exit 0
     fi
     stop_windows_runtime
+    # verify UDC unbound after Windows shutdown
+    n=0; while [ "$n" -lt 20 ]; do
+      udc="$(cat /sys/kernel/config/usb_gadget/r36sx_lgpt_u2414/UDC 2>/dev/null || echo none)"
+      [ -z "$udc" ] || [ "$udc" = "" ] && break
+      sleep 0.05; n=$((n+1))
+    done
+    udc="$(cat /sys/kernel/config/usb_gadget/r36sx_lgpt_u2414/UDC 2>/dev/null || echo none)"
+    if [ -n "$udc" ] && [ "$udc" != "" ]; then
+      atomic_write "$STATUS" "ERROR mode=ANDROID reason=UDC_still_bound udc=$udc" || true
+      log "ANDROID_UDC_STILL_BOUND udc=$udc"
+      exit 35
+    fi
     stop_android_runtime
     h35_clear_transient_state
     h35_switch_host_role || exit $?
+    # verify MUSB HOST stable for 1s
+    n=0; while [ "$n" -lt 10 ]; do
+      role="$(cat "$H35_ROLE_PATH" 2>/dev/null || echo none)"
+      echo "H35_ANDROID_ROLE_CHECK n=$n role=$role" >>"$LOG" 2>&1 || true
+      echo "$role" | grep -q host || { atomic_write "$STATUS" "ERROR mode=ANDROID reason=MUSB_not_host role=$role" || true; log "ANDROID_HOST_ROLE_FAIL role=$role"; exit 36; }
+      sleep 0.1; n=$((n+1))
+    done
     gen_file="$RUNTIME/h35_android_generation"
     old_gen="$(cat "$gen_file" 2>/dev/null || echo 0)"
     case "$old_gen" in ''|*[!0-9]*) old_gen=0;; esac
