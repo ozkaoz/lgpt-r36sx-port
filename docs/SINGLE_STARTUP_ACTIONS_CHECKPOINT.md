@@ -4,7 +4,9 @@
 **BASE_COMMIT=b7b2e46b9061bdfd71e16c8aea21b65368ddc305**
 **BASE_TAG=single-lgpt-functional**
 **BRANCH=feature/startup-project-actions**
-**NEW_COMMIT=single-startup-actions (to be created)**
+**NEW_COMMIT=557b26d186a9d4bf78cb5d8c3bdd20d83ed7e836**
+**FUNCTIONAL_CHECKPOINT_COMMIT=557b26d186a9d4bf78cb5d8c3bdd20d83ed7e836**
+**FUNCTIONAL_CHECKPOINT_TAG=single-startup-actions**
 **PHYSICAL_TREEFROGUI_VERSION=v1.0.14_a**
 **PHYSICAL_TEST=PASS**
 **VISIBLE_LGPT_ENTRIES=1**
@@ -112,4 +114,4 @@ No source functional changes after final physical test except packaging/docs syn
 
 ## Next
 
-Tag `single-startup-actions` is checkpoint before Bacon-1.5 release update. Ancestry: `sp404-functional-p3` -> `single-lgpt-functional` (b7b2e46) -> `single-startup-actions` (46bd84). Bacon-1.5 tag will be force-moved to this commit and release converted to LATEST.
+Tag `single-startup-actions` is the immutable functional checkpoint (557b26d). Ancestry: `sp404-functional-p3` (beb8a12) -> `single-lgpt-functional` (b7b2e46) -> `single-startup-actions` (557b26d). Bacon-1.5 release was subsequently published from this checkpoint lineage (now at 557b26d, LATEST=true, PRERELEASE=false).
