@@ -94,12 +94,10 @@ void AudioDriverModalApplyCallback(View &view, ModalView &dialog) {
     const int activeMode = TreeFrogUac2Bridge_GetDriverMode();
     if (mode != activeMode) {
         MixerService::GetInstance()->SetRenderMode(0);
-        PersistencyService::GetInstance()->Save();
-        sync();
-        view.SetNotification("Project saved; changing Audio Driver");
+        view.SetNotification("Audio Driver: changing");
     }
     const char *name = TreeFrogUac2Bridge_SetDriverMode(mode);
     char message[96];
-    snprintf(message, sizeof(message), "Saved; Audio Driver: %s", name ? name : "");
+    snprintf(message, sizeof(message), "Audio Driver: %s", name ? name : "");
     view.SetNotification(message);
 }

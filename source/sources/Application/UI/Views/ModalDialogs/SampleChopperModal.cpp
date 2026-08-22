@@ -315,7 +315,9 @@ static bool lgptGetSampleIdentityBySampleIndex(int sampleIndex,
     int count = pool->GetNameListSize();
     if (!names || sampleIndex >= count || !names[sampleIndex]) return false;
     sampleName = names[sampleIndex];
+    if (sampleIndex < 0 || sampleIndex >= pool->GetNameListSize()) return false;
     SoundSource *source = pool->GetSource(sampleIndex);
+    if (!source) return false;
     sourceSize = source ? source->GetSize(-1) : 0;
     return !sampleName.empty() && sourceSize > 1;
 }
