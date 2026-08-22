@@ -276,7 +276,7 @@ COMMONFILES := \
 	Variable.o VariableContainer.o WatchedVariable.o \
 	SoundFontPreset.o SoundFontManager.o SoundFontSample.o \
 	ENAB.o HYDRA.o OMEGA.o RIFF.o SFDETECT.o SFLOOKUP.o SFNAV.o SFREADER.o WIN_MEM.o \
-	HexBuffers.o lz.o \
+	HexBuffers.o lz.o PerfDiag.o \
 	tinyxmlparser.o tinyxml.o tinyxmlerror.o tinystr.o Tiny2NosStub.o
 
 #---------------------------------------------------------------------------------

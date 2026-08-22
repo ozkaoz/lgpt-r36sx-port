@@ -1,4 +1,5 @@
 #include "SpectrumAnalyzer.h"
+#include "Application/Utils/PerfDiag.h"
 
 #include "Application/Instruments/I_Instrument.h"
 #include <math.h>
@@ -155,6 +156,8 @@ void SpectrumAnalyzer::runFft() {
 }
 
 bool SpectrumAnalyzer::Compute() {
+    bool willCompute = (generation_ != lastSeenGeneration_);
+    PerfDiag::CountAnalyzer(willCompute);
     if (generation_ == lastSeenGeneration_) return false;
     lastSeenGeneration_ = generation_;
     if (!windowReady_) {

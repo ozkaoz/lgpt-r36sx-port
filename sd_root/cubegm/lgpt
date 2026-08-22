@@ -142,6 +142,32 @@ fi
 printf 'LOCAL_CONSOLE\n' >"$DATA/otg/audio_driver_mode" 2>>"$LOG" || true
 printf 'LOCAL_CONSOLE\n' >"$DATA/otg/audio_driver_policy" 2>>"$LOG" || true
 log "AUDIO_DRIVER_MODE_FORCED=LOCAL_CONSOLE"
+# H44 P0: capture COLD_LOCAL MUSB baseline once per boot (tmpfs cleared on reboot)
+RUNTIME_DIR="/tmp/r36sx_lgpt_usb"
+mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
+if [ ! -s "$RUNTIME_DIR/cold_local_musb_role" ]; then
+  MUSB_PATH="/sys/devices/platform/soc/18844000.usb/musb-hdrc.0.auto/mode"
+  if [ ! -e "$MUSB_PATH" ]; then MUSB_PATH="$(find /sys/devices -path '*musb-hdrc.0.auto/mode' -print -quit 2>/dev/null || true)"; fi
+  if [ -n "$MUSB_PATH" ] && [ -e "$MUSB_PATH" ]; then
+    _role="$(cat "$MUSB_PATH" 2>/dev/null || echo unknown)"
+    _role="$(printf '%s' "$_role" | tr -d '\r\n' | awk '{print $1}')"
+    if [ -z "$_role" ]; then _role="unknown"; fi
+    printf '%s\n' "$_role" > "$RUNTIME_DIR/cold_local_musb_role" 2>/dev/null || true
+    log "COLD_LOCAL_MUSB_BASELINE_CAPTURED role=$_role path=$MUSB_PATH (launcher)"
+    {
+      echo "===== LAUNCHER COLD_SNAPSHOT ts=$(date 2>/dev/null || echo no-date) ====="
+      echo "MUSB_ROLE_PATH=$MUSB_PATH"
+      echo "MUSB_ROLE=$(cat "$MUSB_PATH" 2>/dev/null || echo none)"
+      echo "--- UDC ---"
+      for g in /sys/kernel/config/usb_gadget/*/UDC; do [ -e "$g" ] || continue; echo "$g: $(cat "$g" 2>/dev/null || echo none)"; done
+      cat /proc/asound/cards 2>/dev/null || echo none
+      ls -l /dev/snd 2>/dev/null || echo none
+      cat /proc/interrupts 2>/dev/null | head -n 30 || echo none
+      cat /proc/softirqs 2>/dev/null || echo none
+      cat /proc/loadavg 2>/dev/null || echo none
+    } > "$RUNTIME_DIR/cold_local_snapshot.log" 2>/dev/null || true
+  fi
+fi
 
 # LOCAL_CONSOLE must NOT auto-start UAC2 setup; Windows setup only on explicit Audio Driver -> Windows
 

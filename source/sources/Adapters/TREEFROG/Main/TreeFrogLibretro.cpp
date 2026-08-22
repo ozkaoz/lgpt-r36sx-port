@@ -16,6 +16,7 @@
 #include "Adapters/TREEFROG/Timer/TreeFrogTimer.h"
 #include "Application/Application.h"
 #include "System/System/System.h"
+#include "Application/Utils/PerfDiag.h"
 
 extern "C" void TreeFrogAppWindow_SynchronizeInputMask(
     unsigned short mask);
@@ -825,6 +826,7 @@ static void dispatch_atomic_logical_mask(
 }
 
 static void poll_input(void) {
+    PerfDiag::CountInputPoll();
     if (!app_ready)
         return;
 
@@ -1038,6 +1040,7 @@ void retro_set_environment(retro_environment_t cb) {
 void retro_set_video_refresh(retro_video_refresh_t cb) { video_cb = cb; }
 
 void TreeFrogForceVideoRefresh(void) {
+    PerfDiag::CountVideoRefresh();
     if (!video_cb) return;
     unsigned vw, vh; size_t vp;
     uint16_t *vf = make_video_output(TreeFrogGetFramebuffer(), &vw, &vh, &vp);
@@ -1151,6 +1154,7 @@ static void TreeFrogV51LogProjectRoot(const char *) {}
 
 
 void retro_init(void) {
+    PerfDiag::Init();
     boot_diag_log("retro_init.enter");
     /*
      * H43 CRASH FIX: the USB bridge writes to the SP404/UAC2 FIFOs with a
@@ -1221,6 +1225,7 @@ void retro_deinit(void) {
 }
 
 void retro_run(void) {
+    PerfDiag::CountFrame();
     ++treefrog_v11_frame_counter;
     if (g_treefrog_v40_run_count < 32) {
         char msg[128];
@@ -1312,7 +1317,10 @@ void retro_run(void) {
         unsigned vw, vh; size_t vp;
         uint16_t *vf = make_video_output(TreeFrogGetFramebuffer(), &vw, &vh, &vp);
         video_cb(vf, vw, vh, vp);
+        PerfDiag::CountVideoRefresh();
     }
+    PerfDiag::SetDriverMode(TreeFrogUac2Bridge_GetDriverMode());
+    PerfDiag::PeriodicCheck(System::GetInstance()->GetClock());
 
     if (TreeFrogUac2Bridge_ShouldRequestManagedRestartShutdown()) {
         TreeFrogSetQuitRequested(true);

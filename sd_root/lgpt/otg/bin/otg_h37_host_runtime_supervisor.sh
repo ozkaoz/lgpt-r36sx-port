@@ -270,7 +270,7 @@ while [ "$STOP" -eq 0 ] && policy_host; do
         [ "$backoff" -lt 4 ] && backoff=$((backoff+1))
         continue
       fi
-      "$SP404_DAEMON" "$SP404_FIFO" "$sp_play" "$sp_cap" 2 >>"$(pick_log_path "$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log")" 2>&1 &
+      nice -n 1 "$SP404_DAEMON" "$SP404_FIFO" "$sp_play" "$sp_cap" 2 >>"$(pick_log_path "$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log")" 2>&1 &
       sp_pid=$!
       atomic_write "$RUNTIME/sp404_daemon_pid" "$sp_pid" || true
       atomic_write "$RUNTIME/daemon_pid" "$sp_pid" || true

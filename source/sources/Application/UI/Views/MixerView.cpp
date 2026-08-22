@@ -1,5 +1,6 @@
 // TREEFROG_V42_NO_WHITE_BOX_UI
 #include "MixerView.h"
+#include "Application/Utils/PerfDiag.h"
 #include "Application/Model/Mixer.h"
 #include "Application/Mixer/MixerService.h"
 #include "Application/Mixer/MixerMenu.h"
@@ -1084,6 +1085,7 @@ void MixerView::drawMeterBar(int x,int y,int height,float peak,int volume,
 // 0 dBFS), the clip lamp -- 0 dBFS is now the top of the bar like other
 // consoles/DAWs.
 void MixerView::PostFlushDraw() {
+    PerfDiag::CountMixerDraw();
 #if defined(PLATFORM_TREEFROG)
 	AppWindow *app=(AppWindow *)&w_ ;
 	uint16_t *fb=TreeFrogGetFramebuffer() ;

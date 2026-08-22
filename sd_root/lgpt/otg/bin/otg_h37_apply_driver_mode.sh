@@ -29,6 +29,149 @@ log(){ printf '%s H35 mode=%s supervisor=%s %s\n' "$(date 2>/dev/null || echo no
 pid_alive(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] && kill -0 "$p" 2>/dev/null; }
 terminate_pid(){ p="$1"; [ -n "$p" ] && [ "$p" != "0" ] || return 0; pid_alive "$p" || return 0; kill "$p" 2>/dev/null || true; n=0; while pid_alive "$p" && [ "$n" -lt 20 ]; do sleep 0.05; n=$((n+1)); done; pid_alive "$p" && kill -9 "$p" 2>/dev/null || true; }
 kill_name(){ name="$1"; for p in $(pidof "$name" 2>/dev/null || true); do terminate_pid "$p"; done; }
+# ---- H44 P0 MUSB HARDWARE STATE (NO POLLING, BASELINE CAPTURE ONCE PER BOOT) ----
+h37_find_musb_role_path(){
+  p="/sys/devices/platform/soc/18844000.usb/musb-hdrc.0.auto/mode"
+  if [ -e "$p" ]; then printf '%s' "$p"; return 0; fi
+  p="$(find /sys/devices -path '*musb-hdrc.0.auto/mode' -print -quit 2>/dev/null || true)"
+  if [ -n "$p" ] && [ -e "$p" ]; then printf '%s' "$p"; return 0; fi
+  return 1
+}
+h37_read_musb_role(){
+  rp="$(h37_find_musb_role_path 2>/dev/null || true)"
+  if [ -n "$rp" ] && [ -e "$rp" ]; then
+    r="$(cat "$rp" 2>/dev/null || echo unknown)"
+    r="$(printf '%s' "$r" | tr -d '\r\n' | awk '{print $1}')"
+    if [ -z "$r" ]; then r="unknown"; fi
+    printf '%s' "$r"
+    return 0
+  fi
+  printf 'unknown'
+  return 1
+}
+h37_capture_usb_snapshot(){
+  tag="$1"
+  out="$2"
+  if [ -z "$tag" ]; then tag="UNKNOWN"; fi
+  if [ -z "$out" ]; then out="$RUNTIME/musb_snapshot_${tag}.log"; fi
+  {
+    echo "===== MUSB_SNAPSHOT tag=$tag ts=$(date 2>/dev/null || echo no-date) ====="
+    rp="$(h37_find_musb_role_path 2>/dev/null || echo none)"
+    echo "MUSB_ROLE_PATH=$rp"
+    if [ -n "$rp" ] && [ -e "$rp" ]; then echo "MUSB_ROLE=$(cat "$rp" 2>/dev/null || echo none)"; else echo "MUSB_ROLE=unknown (path missing)"; fi
+    echo "--- UDC state ---"
+    for g in /sys/kernel/config/usb_gadget/*/UDC; do [ -e "$g" ] || continue; echo "$g: $(cat "$g" 2>/dev/null || echo none)"; done
+    echo "--- USB devices ---"
+    for d in /sys/bus/usb/devices/*; do [ -d "$d" ] || continue; b="$(basename "$d")"; if [ -r "$d/idVendor" ] && [ -r "$d/idProduct" ]; then v="$(cat "$d/idVendor" 2>/dev/null || echo ?)"; p="$(cat "$d/idProduct" 2>/dev/null || echo ?)"; sp="$(cat "$d/speed" 2>/dev/null || echo ?)"; pr="$(cat "$d/product" 2>/dev/null || true)"; mk="$(cat "$d/manufacturer" 2>/dev/null || true)"; echo "USB $b vid=$v pid=$p speed=$sp product=$pr manufacturer=$mk"; fi; done
+    echo "--- /proc/asound/cards ---"
+    cat /proc/asound/cards 2>/dev/null || echo none
+    echo "--- /dev/snd ---"
+    ls -l /dev/snd 2>/dev/null || echo none
+    echo "--- /proc/modules (snd/usb) ---"
+    grep -E '^(snd|soundcore|usbcore|musb)' /proc/modules 2>/dev/null || cat /proc/modules 2>/dev/null | head -n 50 || echo none
+    echo "--- /proc/interrupts ---"
+    cat /proc/interrupts 2>/dev/null | head -n 60 || echo none
+    echo "--- /proc/softirqs ---"
+    cat /proc/softirqs 2>/dev/null || echo none
+    echo "--- /proc/stat ---"
+    head -n 20 /proc/stat 2>/dev/null || echo none
+    echo "--- loadavg ---"
+    cat /proc/loadavg 2>/dev/null || echo none
+    echo "--- ps ---"
+    ps 2>/dev/null | head -n 40 || echo none
+    echo "--- PIDs ---"
+    for pf in "$RUNTIME/h38_host_supervisor_pid" "$RUNTIME/sp404_daemon_pid" "$RUNTIME/midi_daemon_pid" "$RUNTIME/daemon_pid" "$RUNTIME/h35_android_supervisor_pid" "/tmp/r36sx_lgpt_usb/u241_setup_pid"; do echo "$pf: $(cat "$pf" 2>/dev/null || echo none)"; done
+    echo "--- runtime mode ---"
+    echo "audio_driver_mode=$(cat "$RUNTIME/audio_driver_mode" 2>/dev/null || echo none)"
+    echo "audio_driver_policy=$(cat "$RUNTIME/audio_driver_policy" 2>/dev/null || echo none)"
+    echo "sp404_card=$(cat "$RUNTIME/sp404_card" 2>/dev/null || echo none)"
+    echo "sp404_playback_pcm=$(cat "$RUNTIME/sp404_playback_pcm" 2>/dev/null || echo none)"
+    echo "sp404_capture_pcm=$(cat "$RUNTIME/sp404_capture_pcm" 2>/dev/null || echo none)"
+    echo "cold_local_musb_role=$(cat "$RUNTIME/cold_local_musb_role" 2>/dev/null || echo none)"
+    echo "===== END SNAPSHOT tag=$tag ====="
+  } > "$out" 2>/dev/null || true
+  log "MUSB_SNAPSHOT tag=$tag out=$out"
+}
+h37_ensure_cold_baseline(){
+  baseline_file="$RUNTIME/cold_local_musb_role"
+  if [ -s "$baseline_file" ]; then return 0; fi
+  mkdir -p "$RUNTIME" 2>/dev/null || true
+  role="$(h37_read_musb_role 2>/dev/null || echo unknown)"
+  role="$(printf '%s' "$role" | tr -d '\r\n' | awk '{print $1}')"
+  if [ -z "$role" ]; then role="unknown"; fi
+  atomic_write "$baseline_file" "$role" 2>/dev/null || printf '%s\n' "$role" > "$baseline_file" 2>/dev/null || true
+  log "COLD_LOCAL_MUSB_BASELINE_CAPTURED role=$role path=$(h37_find_musb_role_path 2>/dev/null || echo none)"
+  h37_capture_usb_snapshot "COLD_LOCAL" "$RUNTIME/cold_local_snapshot.log" 2>/dev/null || true
+  # RAM-only: also mirror to /tmp/r36sx_lgpt_logs for flush at exit
+  mkdir -p /tmp/r36sx_lgpt_logs 2>/dev/null || true
+  cp -f "$RUNTIME/cold_local_snapshot.log" "/tmp/r36sx_lgpt_logs/COLD_LOCAL_SNAPSHOT.log" 2>/dev/null || true
+}
+restore_local_usb_role(){
+  baseline_file="$RUNTIME/cold_local_musb_role"
+  rp="$(h37_find_musb_role_path 2>/dev/null || true)"
+  if [ -z "$rp" ] || [ ! -e "$rp" ]; then
+    log "MUSB_RESTORE_SKIP reason=role_path_missing baseline_file=$baseline_file"
+    return 0
+  fi
+  if [ ! -s "$baseline_file" ]; then
+    log "MUSB_RESTORE_SKIP reason=baseline_unknown baseline_file missing or empty"
+    return 1
+  fi
+  baseline_role="$(cat "$baseline_file" 2>/dev/null | tr -d '\r\n' | awk '{print $1}')"
+  current_role="$(cat "$rp" 2>/dev/null | tr -d '\r\n' | awk '{print $1}')"
+  if [ -z "$baseline_role" ]; then baseline_role="unknown"; fi
+  if [ -z "$current_role" ]; then current_role="unknown"; fi
+  if [ "$baseline_role" = "unknown" ] || [ "$baseline_role" = "none" ] || [ -z "$baseline_role" ]; then
+    log "MUSB_RESTORE_SKIP reason=baseline_invalid baseline=$baseline_role"
+    return 1
+  fi
+  if [ "$current_role" = "$baseline_role" ]; then
+    log "MUSB_RESTORE_NOOP current=$current_role baseline=$baseline_role already matches"
+    return 0
+  fi
+  {
+    echo "===== PRE_LOCAL_ROLE_RESTORE ts=$(date 2>/dev/null || echo no-date) ====="
+    echo "current_role=$current_role baseline_role=$baseline_role role_path=$rp"
+    echo "--- UDC ---"
+    for g in /sys/kernel/config/usb_gadget/*/UDC; do [ -e "$g" ] || continue; echo "$g: $(cat "$g" 2>/dev/null || echo none)"; done
+    echo "--- USB devices ---"
+    for d in /sys/bus/usb/devices/*; do [ -d "$d" ] || continue; if [ -r "$d/idVendor" ]; then echo "$d: $(cat "$d/idVendor" 2>/dev/null):$(cat "$d/idProduct" 2>/dev/null)"; fi; done
+    cat /proc/asound/cards 2>/dev/null || echo none
+    ls -l /dev/snd 2>/dev/null || echo none
+  } >>"$LOG" 2>/dev/null || true
+  log "PRE_LOCAL_ROLE_RESTORE current=$current_role target=$baseline_role path=$rp"
+  if ! printf '%s' "$baseline_role" > "$rp" 2>>"$LOG"; then
+    if ! echo "$baseline_role" > "$rp" 2>>"$LOG"; then
+      log "MUSB_RESTORE_WRITE_FAIL role=$baseline_role path=$rp"
+      return 1
+    fi
+  fi
+  n=0; new_role=""
+  while [ "$n" -lt 20 ]; do
+    sleep 0.1
+    new_role="$(cat "$rp" 2>/dev/null | tr -d '\r\n' | awk '{print $1}')"
+    if [ "$new_role" = "$baseline_role" ]; then break; fi
+    n=$((n+1))
+  done
+  if [ "$new_role" != "$baseline_role" ]; then
+    log "MUSB_RESTORE_VERIFY_FAIL expected=$baseline_role got=$new_role after $n polls"
+    return 1
+  fi
+  sleep 0.5
+  stable_role="$(cat "$rp" 2>/dev/null | tr -d '\r\n' | awk '{print $1}')"
+  if [ "$stable_role" != "$baseline_role" ]; then
+    log "MUSB_RESTORE_STABILITY_FAIL expected=$baseline_role got=$stable_role"
+    return 1
+  fi
+  {
+    echo "===== POST_LOCAL_ROLE_RESTORE ts=$(date 2>/dev/null || echo no-date) ====="
+    echo "current=$stable_role baseline=$baseline_role"
+    for g in /sys/kernel/config/usb_gadget/*/UDC; do [ -e "$g" ] || continue; echo "$g: $(cat "$g" 2>/dev/null || echo none)"; done
+  } >>"$LOG" 2>/dev/null || true
+  log "POST_LOCAL_ROLE_RESTORE current=$stable_role baseline=$baseline_role SUCCESS"
+  h37_capture_usb_snapshot "POST_LOCAL_RESTORE" "$RUNTIME/post_local_restore_snapshot.log" 2>/dev/null || true
+  return 0
+}
 stop_host_runtime(){
   hp="$(cat "$RUNTIME/h38_host_supervisor_pid" 2>/dev/null || true)"
   if [ -n "$hp" ] && pid_alive "$hp"; then
@@ -84,11 +227,28 @@ verify_local_runtime_clean(){
   fi
   if [ -e "/tmp/r36sx_h38_host_runtime.lock" ] || [ -e "/tmp/r36sx_h38_host_detect.lock" ]; then
     log "LOCAL_CLEAN_FAIL stale lock still exists"
+    fail=1
   fi
   if [ -p "/tmp/r36sx_sp404_pcm_fifo" ]; then
     if lsof /tmp/r36sx_sp404_pcm_fifo 2>/dev/null | grep -q "r36s_sp404"; then
       log "LOCAL_CLEAN_FAIL fifo still held by daemon"
       fail=1
+    fi
+  fi
+  # H44 P0 MUSB ROLE MUST MATCH COLD BASELINE (when baseline known)
+  baseline_file="$RUNTIME/cold_local_musb_role"
+  if [ -s "$baseline_file" ]; then
+    baseline_role="$(cat "$baseline_file" 2>/dev/null | tr -d '\r\n' | awk '{print $1}')"
+    if [ -n "$baseline_role" ] && [ "$baseline_role" != "unknown" ] && [ "$baseline_role" != "none" ]; then
+      current_role="$(h37_read_musb_role 2>/dev/null || echo unknown)"
+      current_role="$(printf '%s' "$current_role" | tr -d '\r\n' | awk '{print $1}')"
+      if [ -z "$current_role" ]; then current_role="unknown"; fi
+      if [ "$current_role" != "$baseline_role" ]; then
+        log "LOCAL_CLEAN_FAIL MUSB_ROLE_MISMATCH current=$current_role baseline=$baseline_role"
+        fail=1
+      else
+        log "LOCAL_MUSB_ROLE_CLEAN current=$current_role baseline=$baseline_role"
+      fi
     fi
   fi
   if [ "$fail" -eq 0 ]; then
@@ -201,6 +361,8 @@ android_runtime_ready(){
 }
 MODE="$(normalize_mode "$MODE_RAW")"; POLICY="$(policy_for_mode "$MODE")"
 PREVIOUS_POLICY="$(cat "$RUNTIME/audio_driver_policy" 2>/dev/null || echo LOCAL_CONSOLE)"
+# H44 P0: ensure cold baseline is captured before any host switch (once per boot, /tmp cleared on reboot)
+h37_ensure_cold_baseline 2>/dev/null || true
 if [ "${LGPT_H35_SUPERVISOR_APPLY:-0}" != 1 ] || [ -z "${LGPT_H35_SUPERVISOR_PID:-}" ]; then
   atomic_write "$STATUS" "REFUSED reason=SUPERVISOR_ONLY mode=$MODE" || true
   log "MODE_APPLY_REFUSED supervisor_only=1"
@@ -324,6 +486,9 @@ case "$MODE" in
     wait_windows_teardown || true
     verify_all_udc_unbound || log "LOCAL_CONSOLE UDC still bound after teardown (non-fatal)"
     h35_clear_transient_state
+    # H44 P0: restore MUSB to cold baseline (single controlled transition, logs PRE/POST)
+    restore_local_usb_role 2>>"$LOG" || log "MUSB_RESTORE_ATTEMPT_DONE rc=$? (verify will enforce)"
+    h37_ensure_cold_baseline 2>/dev/null || true
     if ! verify_local_runtime_clean; then
       atomic_write "$STATUS" "ERROR mode=LOCAL_CONSOLE reason=LOCAL_RUNTIME_NOT_CLEAN" || true
       log "LOCAL_RUNTIME_NOT_CLEAN"
@@ -331,6 +496,10 @@ case "$MODE" in
     fi
     atomic_write "$STATUS" "READY mode=LOCAL_CONSOLE" || true
     log MODE_APPLY_READY
+    mkdir -p /tmp/r36sx_lgpt_logs 2>/dev/null || true
+    printf "HOOK_POST_LOCAL_STARTED ts=%s\n" "$(date 2>/dev/null || echo no-date)" >>/tmp/r36sx_lgpt_logs/MUSB_HOOK_STATUS.log 2>/dev/null || true
+    # H44 lightweight post-transition snapshot (background, low prio, after READY) RAM-only
+    ( sleep 2; nice -n 19 /bin/sh "$BIN/diagnose_musb_hardware_state.sh" POST_LOCAL >/dev/null 2>&1 & ) 2>/dev/null &
     ;;
   WINDOWS)
     invalidate_host_generation
@@ -376,6 +545,10 @@ case "$MODE" in
     LGPT_H38_POLICY=USB_OUT_OTG /bin/sh "$BIN/otg_h37_host_runtime_supervisor.sh" >>"$LOG" 2>&1 & p=$!
     atomic_write "$STATUS" "STARTED mode=$MODE supervisor_pid=$p generation=$new_gen" || true
     log "MODE_APPLY_STARTED ${MODE}_supervisor_pid=$p generation=$new_gen"
+    mkdir -p /tmp/r36sx_lgpt_logs 2>/dev/null || true
+    printf "HOOK_SP404_STARTED ts=%s pid=%s\n" "$(date 2>/dev/null || echo no-date)" "$p" >>/tmp/r36sx_lgpt_logs/MUSB_HOOK_STATUS.log 2>/dev/null || true
+    # H44 lightweight SP404 active snapshot (background, low prio) RAM-only
+    ( sleep 3; nice -n 19 /bin/sh "$BIN/diagnose_musb_hardware_state.sh" SP404_ACTIVE >/dev/null 2>&1 & ) 2>/dev/null &
     ;;
   MIDI)
     invalidate_host_generation

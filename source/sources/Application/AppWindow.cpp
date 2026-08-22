@@ -1,4 +1,5 @@
 #include "AppWindow.h"
+#include "Application/Utils/PerfDiag.h"
 #include "Application/Commands/ApplicationCommandDispatcher.h"
 #include "Application/Commands/EventDispatcher.h"
 #include "Application/Instruments/SamplePool.h"
@@ -356,6 +357,11 @@ void AppWindow::Redraw() {
 //
 
 void AppWindow::Flush() {
+    PerfDiag::CountFlush();
+    if (_currentView == _instrumentEqView) PerfDiag::SetView("EQ8");
+    else if (_currentView == _mixerView) PerfDiag::SetView("Mixer");
+    else if (_currentView == _songView) PerfDiag::SetView("Song");
+    else PerfDiag::SetView("Other");
 
     SysMutexLocker locker(drawMutex_);
 
@@ -701,6 +707,7 @@ extern "C" void TreeFrogAppWindow_SynchronizeInputMask(
 }
 
 bool AppWindow::onEvent(GUIEvent &event) {
+    PerfDiag::CountInputEvent();
 
     // We need to tell the app to quit once we're out of the
     // mixer lock, otherwise the windows driver will never return

@@ -1,4 +1,5 @@
 #include "InstrumentEqView.h"
+#include "Application/Utils/PerfDiag.h"
 
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
 #include "Application/AppWindow.h"
@@ -556,6 +557,7 @@ void InstrumentEqView::OnFrameUpdate(unsigned long frameClock) {
 }
 
 void InstrumentEqView::DrawView() {
+    PerfDiag::CountEqDraw();
     Clear();
     View::EnableNotification();
 

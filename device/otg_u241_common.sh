@@ -342,3 +342,115 @@ u2414_snapshot() {
         2>/dev/null || true
     echo "SNAPSHOT=$OUT"
 }
+
+u2414_flush_logs_to_sd(){
+    SRC="/tmp/r36sx_lgpt_logs"
+    DST="/mnt/sdcard/LGPT_OTG_LOGS"
+    [ -d "$SRC" ] || return 0
+    if ! mkdir -p "$DST" 2>/dev/null; then
+        echo "FLUSH_SKIP dst_mkdir_fail DST=$DST" >&2 || true
+        return 0
+    fi
+    if ! ( : >> "$DST/.flush_probe" ) 2>/dev/null; then
+        echo "FLUSH_SKIP dst_not_writable DST=$DST" >&2 || true
+        return 0
+    fi
+    rm -f "$DST/.flush_probe" 2>/dev/null || true
+    max_bytes=262144
+    total=0
+    # Create FLUSH_MANIFEST in RAM before copy
+    manifest="$SRC/FLUSH_MANIFEST.log"
+    {
+        echo "SESSION=$(date 2>/dev/null || echo no-date)"
+        echo "CORE_BUILD=$(cat /tmp/r36sx_lgpt_usb/perf_diag.log 2>/dev/null | head -1 || echo unknown)"
+        echo "SRC=$SRC DST=$DST"
+        echo "--- files_present ---"
+        ls -lh "$SRC" 2>/dev/null || true
+    } > "$manifest" 2>/dev/null || true
+    # Copy diagnostic files FIRST (exclude launcher log, it will be last)
+    for src in \
+        "$SRC/PERF_DIAG_BOOT.log" \
+        "$SRC/PERF_AUTO_LOCAL_MAIN.log" \
+        "$SRC/PERF_AUTO_LOCAL_MIXER.log" \
+        "$SRC/PERF_AUTO_LOCAL_EQ8.log" \
+        "$SRC/PERF_AUTO_SP404_MAIN.log" \
+        "$SRC/PERF_AUTO_SP404_MIXER.log" \
+        "$SRC/PERF_AUTO_SP404_EQ8.log" \
+        "$SRC/MUSB_HOOK_STATUS.log" \
+        "$SRC/MUSB_SNAPSHOT_COLD_LOCAL"*.log \
+        "$SRC/MUSB_SNAPSHOT_SP404_ACTIVE"*.log \
+        "$SRC/MUSB_SNAPSHOT_POST_LOCAL"*.log \
+        "$SRC/COLD_LOCAL_SNAPSHOT.log" \
+        "$SRC/PERF_DIAG.log"; do
+        # Expand glob (if no match, skip)
+        for f in $src; do
+            [ -e "$f" ] || continue
+            # size check
+            sz=$(stat -c%s "$f" 2>/dev/null || wc -c < "$f" 2>/dev/null || echo 0)
+            case "$sz" in ''|*[!0-9]*) sz=0;; esac
+            if [ "$sz" -eq 0 ]; then continue; fi
+            if [ "$sz" -gt 65536 ]; then
+                echo "FLUSH_SKIP too_large src=$f sz=$sz" >&2 || true
+                continue
+            fi
+            total=$((total + sz))
+            if [ "$total" -gt "$max_bytes" ]; then
+                echo "FLUSH_STOP budget_exceeded total=$total max=$max_bytes" >&2 || true
+                break 2
+            fi
+            base=$(basename "$f")
+            tmp="$DST/.flush_tmp.$base.$$"
+            if cp -f "$f" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/$base" 2>/dev/null; then
+                echo "FLUSH_OK src=$f dst=$DST/$base sz=$sz" || true
+            else
+                echo "FLUSH_FAIL src=$f dst=$DST/$base" >&2 || true
+                rm -f "$tmp" 2>/dev/null || true
+            fi
+        done
+    done
+    # Also flush from /tmp/r36sx_lgpt_usb for backward compat (cold_local, etc.)
+    for src in \
+        "/tmp/r36sx_lgpt_usb/perf_diag.log" \
+        "/tmp/r36sx_lgpt_usb/PERF_DIAG_BOOT.log"; do
+        [ -e "$src" ] || continue
+        sz=$(stat -c%s "$src" 2>/dev/null || wc -c < "$src" 2>/dev/null || echo 0)
+        case "$sz" in ''|*[!0-9]*) sz=0;; esac
+        if [ "$sz" -eq 0 ] || [ "$sz" -gt 65536 ]; then continue; fi
+        total=$((total + sz))
+        if [ "$total" -gt "$max_bytes" ]; then break; fi
+        base=$(basename "$src")
+        tmp="$DST/.flush_tmp.$base.$$"
+        cp -f "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/$base" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
+    done
+    # Emit FLUSH_DONE to RAM launcher log before copying it last
+    launcher_ram="$SRC/LGPT_U2524_COPYROOT_UAC2_LAUNCHER.log"
+    if [ -f "$launcher_ram" ]; then
+        echo "FLUSH_DONE total_bytes=$total" >> "$launcher_ram" 2>/dev/null || true
+        echo "FLUSH_MANIFEST $manifest" >> "$launcher_ram" 2>/dev/null || true
+    fi
+    # Copy manifest
+    if [ -e "$manifest" ]; then
+        sz=$(stat -c%s "$manifest" 2>/dev/null || wc -c < "$manifest" 2>/dev/null || echo 0)
+        total=$((total + sz))
+        base=$(basename "$manifest")
+        tmp="$DST/.flush_tmp.$base.$$"
+        if cp -f "$manifest" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/$base" 2>/dev/null; then
+            echo "FLUSH_OK src=$manifest dst=$DST/$base sz=$sz" || true
+        fi
+    fi
+    # Copy launcher log LAST after FLUSH_DONE appended
+    if [ -e "$launcher_ram" ]; then
+        sz=$(stat -c%s "$launcher_ram" 2>/dev/null || wc -c < "$launcher_ram" 2>/dev/null || echo 0)
+        if [ "$sz" -gt 0 ] && [ "$sz" -le 65536 ]; then
+            total=$((total + sz))
+            base=$(basename "$launcher_ram")
+            tmp="$DST/.flush_tmp.$base.$$"
+            if cp -f "$launcher_ram" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/$base" 2>/dev/null; then
+                echo "FLUSH_OK src=$launcher_ram dst=$DST/$base sz=$sz (launcher last)" || true
+            fi
+        fi
+    fi
+    sync 2>/dev/null || true
+    echo "FLUSH_DONE total_bytes=$total dst=$DST"
+    return 0
+}

@@ -342,3 +342,81 @@ u2414_snapshot() {
         2>/dev/null || true
     echo "SNAPSHOT=$OUT"
 }
+
+u2414_flush_logs_to_sd(){
+    SRC="/tmp/r36sx_lgpt_logs"
+    DST="/mnt/sdcard/LGPT_OTG_LOGS"
+    [ -d "$SRC" ] || return 0
+    # Check SD writable (best-effort, do not block TreeFrogUI)
+    if ! mkdir -p "$DST" 2>/dev/null; then
+        echo "FLUSH_SKIP dst_mkdir_fail DST=$DST" >&2 || true
+        return 0
+    fi
+    if ! ( : >> "$DST/.flush_probe" ) 2>/dev/null; then
+        echo "FLUSH_SKIP dst_not_writable DST=$DST" >&2 || true
+        return 0
+    fi
+    rm -f "$DST/.flush_probe" 2>/dev/null || true
+    # Bounded set - only known diagnostic files, max 256 KiB total
+    max_bytes=262144
+    total=0
+    # List of patterns to flush (RAM -> SD, one copy per file, atomic via tmp+rename)
+    for src in \
+        "$SRC/LGPT_U2524_COPYROOT_UAC2_LAUNCHER.log" \
+        "$SRC/PERF_DIAG_BOOT.log" \
+        "$SRC/PERF_AUTO_LOCAL_MAIN.log" \
+        "$SRC/PERF_AUTO_LOCAL_MIXER.log" \
+        "$SRC/PERF_AUTO_LOCAL_EQ8.log" \
+        "$SRC/PERF_AUTO_SP404_MAIN.log" \
+        "$SRC/PERF_AUTO_SP404_MIXER.log" \
+        "$SRC/PERF_AUTO_SP404_EQ8.log" \
+        "$SRC/MUSB_HOOK_STATUS.log" \
+        "$SRC/MUSB_SNAPSHOT_COLD_LOCAL"*.log \
+        "$SRC/MUSB_SNAPSHOT_SP404_ACTIVE"*.log \
+        "$SRC/MUSB_SNAPSHOT_POST_LOCAL"*.log \
+        "$SRC/COLD_LOCAL_SNAPSHOT.log" \
+        "$SRC/PERF_DIAG.log"; do
+        # Expand glob (if no match, skip)
+        for f in $src; do
+            [ -e "$f" ] || continue
+            # size check
+            sz=$(stat -c%s "$f" 2>/dev/null || wc -c < "$f" 2>/dev/null || echo 0)
+            case "$sz" in ''|*[!0-9]*) sz=0;; esac
+            if [ "$sz" -eq 0 ]; then continue; fi
+            if [ "$sz" -gt 65536 ]; then
+                echo "FLUSH_SKIP too_large src=$f sz=$sz" >&2 || true
+                continue
+            fi
+            total=$((total + sz))
+            if [ "$total" -gt "$max_bytes" ]; then
+                echo "FLUSH_STOP budget_exceeded total=$total max=$max_bytes" >&2 || true
+                break 2
+            fi
+            base=$(basename "$f")
+            tmp="$DST/.flush_tmp.$base.$$"
+            if cp -f "$f" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/$base" 2>/dev/null; then
+                echo "FLUSH_OK src=$f dst=$DST/$base sz=$sz" || true
+            else
+                echo "FLUSH_FAIL src=$f dst=$DST/$base" >&2 || true
+                rm -f "$tmp" 2>/dev/null || true
+            fi
+        done
+    done
+    # Also flush from /tmp/r36sx_lgpt_usb for backward compat (cold_local, etc.)
+    for src in \
+        "/tmp/r36sx_lgpt_usb/perf_diag.log" \
+        "/tmp/r36sx_lgpt_usb/PERF_DIAG_BOOT.log"; do
+        [ -e "$src" ] || continue
+        sz=$(stat -c%s "$src" 2>/dev/null || wc -c < "$src" 2>/dev/null || echo 0)
+        case "$sz" in ''|*[!0-9]*) sz=0;; esac
+        if [ "$sz" -eq 0 ] || [ "$sz" -gt 65536 ]; then continue; fi
+        total=$((total + sz))
+        if [ "$total" -gt "$max_bytes" ]; then break; fi
+        base=$(basename "$src")
+        tmp="$DST/.flush_tmp.$base.$$"
+        cp -f "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/$base" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
+    done
+    sync 2>/dev/null || true
+    echo "FLUSH_DONE total_bytes=$total dst=$DST"
+    return 0
+}
