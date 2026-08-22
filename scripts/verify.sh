@@ -9,7 +9,9 @@ SP404_BUILD="$BUILD/r36s_sp404_host_audio_io"
 MIDI_BUILD="$BUILD/r36s_midi_host_io"
 HOST_AUDIO_BUILD="$PROJECT_ROOT/BUILD/HOST_USB_AUDIO/snd-usb-audio.ko"
 HOST_USBMIDI_BUILD="$PROJECT_ROOT/BUILD/HOST_USB_AUDIO/snd-usbmidi-lib.ko"
-CORE="$SD/cubegm/cores/lgpt_r36sx_port_libretro.so"
+CORE="$SD/cubegm/cores/lgpt_core.so"
+LEGACY_CORE="$SD/cubegm/cores/lgpt_r36sx_port_libretro.so"
+LEGACY_CANONICAL_OLD="$SD/cubegm/cores/lgpt_libretro.so"
 DAEMON="$SD/lgpt/otg/bin/r36s_u241_usb_audio_io"
 SP404="$SD/lgpt/otg/bin/r36s_sp404_host_audio_io"
 MIDI="$SD/lgpt/otg/bin/r36s_midi_host_io"
@@ -18,10 +20,6 @@ HOST_AUDIO="$SD/lgpt/otg/modules/4.4.186-release/host_usb_audio/snd-usb-audio.ko
 HOST_USBMIDI="$SD/lgpt/otg/modules/4.4.186-release/host_usb_audio/snd-usbmidi-lib.ko"
 ERRORS=0
 for f in "$CORE_BUILD" "$DAEMON_BUILD" "$CORE" "$DAEMON" "$MODULE" "$SD/cubegm/lgpt"; do [[ -s "$f" ]] || ERRORS=$((ERRORS+1)); done
-# U2.56.1 ALSA_STACK: the UAC2 gadget needs the port's ALSA core modules next
-# to usb_f_uac2.ko. Missing them makes the gadget never appear (unknown
-# symbol) and the PC never detects the console - a fresh install_stock.sh
-# regression guard.
 for m in soundcore.ko snd.ko snd-timer.ko snd-pcm.ko; do
   [[ -s "$SD/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/$m" ]] || ERRORS=$((ERRORS+1))
 done
@@ -44,24 +42,24 @@ else
   echo "WARN: host USB audio modules not built/installed"
 fi
 [[ "$(cat "$SD/lgpt/otg/audio_usb_profile" 2>/dev/null)" == STEREO_48K ]] || ERRORS=$((ERRORS+1))
-# BACON_1.5_CONFIG_THEME (U2.58): the live config.xml must carry the blue
-# theme (BORDER 3F5FBF), NOT the stock magenta (FF008C); config.stock.xml
-# must exist as the launcher's fallback (lgpt_launcher_u241.sh fails with
-# code 21 when both config files are missing).
 grep -aFq 'value="3F5FBF"' "$SD/lgpt/config.xml" || ERRORS=$((ERRORS+1))
 grep -aFq 'FF008C' "$SD/lgpt/config.xml" && ERRORS=$((ERRORS+1))
 [[ -s "$SD/lgpt/config.stock.xml" ]] || ERRORS=$((ERRORS+1))
-# Android AOA payload (H36) - required for Android audio driver
 [[ -s "$SD/lgpt/otg/bin/r36s_aoa_bulk_audio_io_h36" ]] || ERRORS=$((ERRORS+1))
 [[ -x "$SD/lgpt/otg/bin/r36s_aoa_bulk_audio_io_h36" ]] || ERRORS=$((ERRORS+1))
 [[ -s "$SD/lgpt/otg/bin/r36s_aoa_bulk_receiver_h36" ]] || ERRORS=$((ERRORS+1))
 [[ -x "$SD/lgpt/otg/bin/r36s_aoa_bulk_receiver_h36" ]] || ERRORS=$((ERRORS+1))
 [[ -s "$SD/ANDROID/LGPTUsbAudioBridge-H36-debug.apk" ]] || ERRORS=$((ERRORS+1))
 [[ -s "$SD/ANDROID/LGPTUsbAudioBridge-H38-debug.apk" ]] || ERRORS=$((ERRORS+1))
-# TreeFrogUI: port core must be available as lgpt_libretro.so for auto-selection
-[[ -s "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so" ]] || ERRORS=$((ERRORS+1))
-[[ -s "$SD/cubegm/cores/lgpt_libretro.so" ]] || ERRORS=$((ERRORS+1))
-[[ "$(sha256sum "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so" | awk '{print $1}')" == "$(sha256sum "$SD/cubegm/cores/lgpt_libretro.so" | awk '{print $1}')" ]] || ERRORS=$((ERRORS+1))
+[[ -s "$CORE" ]] || ERRORS=$((ERRORS+1))
+if [[ -s "$LEGACY_CORE" ]]; then
+  [[ "$(sha256sum "$CORE" | awk '{print $1}')" == "$(sha256sum "$LEGACY_CORE" | awk '{print $1}')" ]] || ERRORS=$((ERRORS+1))
+fi
+if [[ -s "$LEGACY_CANONICAL_OLD" ]]; then
+  [[ "$(sha256sum "$CORE" | awk '{print $1}')" == "$(sha256sum "$LEGACY_CANONICAL_OLD" | awk '{print $1}')" ]] || ERRORS=$((ERRORS+1))
+fi
+grep -q "cubegm/cores/lgpt_core.so" "$SD/frogui/core_overrides.txt" 2>/dev/null || ERRORS=$((ERRORS+1))
+[[ -s "$SD/cubegm/lgpt.elf" ]] || echo "WARN: stock lgpt.elf missing (expected on TreeFrog cards)"
 echo "ERRORS=$ERRORS"
 [[ "$ERRORS" -eq 0 ]]
 echo VERIFY_U2523_OK

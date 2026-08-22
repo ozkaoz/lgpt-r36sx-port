@@ -15,7 +15,7 @@ HOTFIX_OVERLAY_ONLY="${HOTFIX_OVERLAY_ONLY:-0}"
 "$REPO_ROOT/tests/test_copy_root_launcher.sh"
 
 required_binaries=(
-    "cubegm/cores/lgpt_r36sx_port_libretro.so"
+    "cubegm/cores/lgpt_core.so"
     "lgpt/otg/bin/r36s_u241_usb_audio_io"
     "lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/soundcore.ko"
     "lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd.ko"

@@ -5,7 +5,7 @@ set -u
 
 ROOT="${LGPT_SD_ROOT:-/mnt/sdcard}"
 PICO="${LGPT_PICO:-$ROOT/cubegm/picoarch}"
-CORE="${LGPT_CORE:-$ROOT/cubegm/cores/lgpt_r36sx_port_libretro.so}"
+CORE="${LGPT_CORE:-$ROOT/cubegm/cores/lgpt_core.so}"
 ROM="${1:-${LGPT_ROM:-$ROOT/roms/lgpt/start.lgpt}}"
 DATA="${LGPT_DATA:-$ROOT/lgpt}"
 # SD lifecycle U2.54: the launcher log captures ALL of picoarch/core stdout

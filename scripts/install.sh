@@ -13,7 +13,8 @@ HOST_USBMIDI_MODULE="$PROJECT_ROOT/BUILD/HOST_USB_AUDIO/snd-usbmidi-lib.ko"
 # ALSA core stack modules required before snd-usbmidi-lib/snd-usb-audio load.
 HOST_CORE_MODULE_SRC="$PROJECT_ROOT/BUILD/HOST_USB_AUDIO"
 HOST_CORE_MODULES="snd.ko snd-timer.ko snd-pcm.ko snd-hwdep.ko snd-seq-device.ko snd-rawmidi.ko"
-ACTIVE_CORE="$SD/cubegm/cores/lgpt_r36sx_port_libretro.so"
+ACTIVE_CORE="$SD/cubegm/cores/lgpt_core.so"
+LEGACY_CORE="$SD/cubegm/cores/lgpt_r36sx_port_libretro.so"
 ACTIVE_DAEMON="$SD/lgpt/otg/bin/r36s_u241_usb_audio_io"
 ACTIVE_SP404_DAEMON="$SD/lgpt/otg/bin/r36s_sp404_host_audio_io"
 ACTIVE_MIDI_DAEMON="$SD/lgpt/otg/bin/r36s_midi_host_io"
@@ -38,13 +39,18 @@ else
   HOST_MODULES=0
 fi
 mkdir -p "$BACKUP/otg_bin" "$SD/lgpt/tmp/record" "$SD/lgpt/samples/records" "$SD/LGPT_OTG_LOGS"
-cp -f "$ACTIVE_CORE" "$BACKUP/lgpt_r36sx_port_libretro.previous.so"
+cp -f "$ACTIVE_CORE" "$BACKUP/lgpt_core.previous.so"
 cp -f "$ACTIVE_DAEMON" "$BACKUP/r36s_usb_audio_io.previous"
 [[ -f "$SD/cubegm/lgpt" ]] && cp -f "$SD/cubegm/lgpt" "$BACKUP/lgpt_launcher.previous"
 for f in otg_u241_common.sh otg_u241_setup_once.sh otg_u241_apply_profile_once.sh otg_u241_shutdown.sh otg_h37_apply_driver_mode.sh otg_h37_android_runtime_supervisor.sh otg_h37_host_runtime_supervisor.sh otg_h37_host_device_detect.sh; do
   [[ -f "$SD/lgpt/otg/bin/$f" ]] && cp -f "$SD/lgpt/otg/bin/$f" "$BACKUP/otg_bin/$f"
 done
 [[ -f "$SD/lgpt/otg/audio_usb_profile" ]] && cp -f "$SD/lgpt/otg/audio_usb_profile" "$BACKUP/audio_usb_profile.previous"
+# Preserve SD stock core outside active cores if present (TreeFrog does not ship lgpt_libretro.so, so normally no-op)
+if [[ -s "$ACTIVE_CORE" && ! -f "$SD/lgpt/backup/lgpt_libretro.stock.original.so" ]]; then
+  mkdir -p "$SD/lgpt/backup"
+  cp -f "$ACTIVE_CORE" "$SD/lgpt/backup/lgpt_libretro.stock.original.so" 2>/dev/null || true
+fi
 install -m 0755 "$CORE" "$ACTIVE_CORE"
 install -m 0755 "$DAEMON" "$ACTIVE_DAEMON"
 install -m 0755 "$ROOT/device/lgpt_launcher_u241.sh" "$SD/cubegm/lgpt"
@@ -57,14 +63,26 @@ install -m 0755 "$ROOT/sd_root/lgpt/otg/bin/r36s_aoa_bulk_receiver_h36" "$SD/lgp
 mkdir -p "$SD/ANDROID"
 install -m 0644 "$ROOT/sd_root/ANDROID/LGPTUsbAudioBridge-H36-debug.apk" "$SD/ANDROID/LGPTUsbAudioBridge-H36-debug.apk"
 install -m 0644 "$ROOT/sd_root/ANDROID/LGPTUsbAudioBridge-H38-debug.apk" "$SD/ANDROID/LGPTUsbAudioBridge-H38-debug.apk"
-# TreeFrogUI: ensure LGPT stock entry uses port core automatically (second copy)
-# Stock LGPT core filename expected by TreeFrogUI is lgpt_libretro.so (fallback)
-if [ -f "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so" ]; then
-  cp -f "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so" "$SD/cubegm/cores/lgpt_libretro.so" 2>/dev/null || true
-  # Also ensure the port core is available under stock name for auto-selection
-  if [ ! -f "$SD/cubegm/cores/lgpt_libretro.so" ]; then
-    install -m 0755 "$ROOT/sd_root/cubegm/cores/lgpt_r36sx_port_libretro.so" "$SD/cubegm/cores/lgpt_libretro.so"
-  fi
+# Canonical LGPT core: primary is lgpt_libretro.so
+# Legacy fallback (Phase 1 only): keep lgpt_r36sx_port_libretro.so as byte-identical copy for rollback
+if [[ -f "$ACTIVE_CORE" ]]; then
+  cp -f "$ACTIVE_CORE" "$LEGACY_CORE" 2>/dev/null || true
+  # Phase 1B keep old canonical as second fallback for rollback
+  cp -f "$ACTIVE_CORE" "$SD/cubegm/cores/lgpt_libretro.so" 2>/dev/null || true 2>/dev/null || true
+fi
+# FrogUI core_overrides: idempotent merge for LGPT entries to canonical path (port-owned, shared file)
+if [[ -d "$SD/frogui" ]]; then
+  OVERRIDE="$SD/frogui/core_overrides.txt"
+  TMP_OVERRIDE="$OVERRIDE.tmp.$$"
+  mkdir -p "$(dirname "$OVERRIDE")"
+  touch "$OVERRIDE" 2>/dev/null || true
+  # Remove any legacy LGPT lines, then append canonical ones if missing
+  grep -v "cubegm/cores/lgpt_r36sx_port_libretro.so" "$OVERRIDE" 2>/dev/null | grep -v "cubegm/cores/lgpt_libretro.so" | grep -v "cubegm/cores/lgpt_core.so" > "$TMP_OVERRIDE" 2>/dev/null || true
+  cat >> "$TMP_OVERRIDE" <<OVERRIDE_EOF
+/mnt/sdcard/roms/lgpt|/mnt/sdcard/cubegm/cores/lgpt_core.so
+/mnt/sdcard/roms/lgpt/start.lgpt|/mnt/sdcard/cubegm/cores/lgpt_core.so
+OVERRIDE_EOF
+  mv -f "$TMP_OVERRIDE" "$OVERRIDE" 2>/dev/null || true
 fi
 if [[ "$HOST_BACKENDS" -eq 1 ]]; then
   install -m 0755 "$SP404_DAEMON" "$ACTIVE_SP404_DAEMON"

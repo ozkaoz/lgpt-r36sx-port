@@ -34,7 +34,8 @@ printf 'MOCK_PICOARCH core=%s rom=%s\n' "$1" "$2"
 [ -r "$2" ]
 MOCK
 chmod +x "$SD/cubegm/picoarch"
-printf 'mock arm core for host layout test\n' > "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so"
+printf 'mock arm core for host layout test\n' > "$SD/cubegm/cores/lgpt_core.so"
+cp -f "$SD/cubegm/cores/lgpt_core.so" "$SD/cubegm/cores/lgpt_r36sx_port_libretro.so" 2>/dev/null || true
 
 sh -n "$SD/cubegm/lgpt"
 LGPT_SD_ROOT="$SD" LGPT_LOGROOT="$SD/LGPT_OTG_LOGS" "$SD/cubegm/lgpt"

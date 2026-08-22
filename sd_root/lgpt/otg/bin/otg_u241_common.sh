@@ -347,7 +347,6 @@ u2414_flush_logs_to_sd(){
     SRC="/tmp/r36sx_lgpt_logs"
     DST="/mnt/sdcard/LGPT_OTG_LOGS"
     [ -d "$SRC" ] || return 0
-    # Check SD writable (best-effort, do not block TreeFrogUI)
     if ! mkdir -p "$DST" 2>/dev/null; then
         echo "FLUSH_SKIP dst_mkdir_fail DST=$DST" >&2 || true
         return 0
@@ -357,12 +356,19 @@ u2414_flush_logs_to_sd(){
         return 0
     fi
     rm -f "$DST/.flush_probe" 2>/dev/null || true
-    # Bounded set - only known diagnostic files, max 256 KiB total
     max_bytes=262144
     total=0
-    # List of patterns to flush (RAM -> SD, one copy per file, atomic via tmp+rename)
+    # Create FLUSH_MANIFEST in RAM before copy
+    manifest="$SRC/FLUSH_MANIFEST.log"
+    {
+        echo "SESSION=$(date 2>/dev/null || echo no-date)"
+        echo "CORE_BUILD=$(cat /tmp/r36sx_lgpt_usb/perf_diag.log 2>/dev/null | head -1 || echo unknown)"
+        echo "SRC=$SRC DST=$DST"
+        echo "--- files_present ---"
+        ls -lh "$SRC" 2>/dev/null || true
+    } > "$manifest" 2>/dev/null || true
+    # Copy diagnostic files FIRST (exclude launcher log, it will be last)
     for src in \
-        "$SRC/LGPT_U2524_COPYROOT_UAC2_LAUNCHER.log" \
         "$SRC/PERF_DIAG_BOOT.log" \
         "$SRC/PERF_AUTO_LOCAL_MAIN.log" \
         "$SRC/PERF_AUTO_LOCAL_MIXER.log" \
@@ -416,6 +422,34 @@ u2414_flush_logs_to_sd(){
         tmp="$DST/.flush_tmp.$base.$$"
         cp -f "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/$base" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
     done
+    # Emit FLUSH_DONE to RAM launcher log before copying it last
+    launcher_ram="$SRC/LGPT_U2524_COPYROOT_UAC2_LAUNCHER.log"
+    if [ -f "$launcher_ram" ]; then
+        echo "FLUSH_DONE total_bytes=$total" >> "$launcher_ram" 2>/dev/null || true
+        echo "FLUSH_MANIFEST $manifest" >> "$launcher_ram" 2>/dev/null || true
+    fi
+    # Copy manifest
+    if [ -e "$manifest" ]; then
+        sz=$(stat -c%s "$manifest" 2>/dev/null || wc -c < "$manifest" 2>/dev/null || echo 0)
+        total=$((total + sz))
+        base=$(basename "$manifest")
+        tmp="$DST/.flush_tmp.$base.$$"
+        if cp -f "$manifest" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/$base" 2>/dev/null; then
+            echo "FLUSH_OK src=$manifest dst=$DST/$base sz=$sz" || true
+        fi
+    fi
+    # Copy launcher log LAST after FLUSH_DONE appended
+    if [ -e "$launcher_ram" ]; then
+        sz=$(stat -c%s "$launcher_ram" 2>/dev/null || wc -c < "$launcher_ram" 2>/dev/null || echo 0)
+        if [ "$sz" -gt 0 ] && [ "$sz" -le 65536 ]; then
+            total=$((total + sz))
+            base=$(basename "$launcher_ram")
+            tmp="$DST/.flush_tmp.$base.$$"
+            if cp -f "$launcher_ram" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/$base" 2>/dev/null; then
+                echo "FLUSH_OK src=$launcher_ram dst=$DST/$base sz=$sz (launcher last)" || true
+            fi
+        fi
+    fi
     sync 2>/dev/null || true
     echo "FLUSH_DONE total_bytes=$total dst=$DST"
     return 0

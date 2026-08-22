@@ -1,0 +1,2 @@
+/mnt/sdcard/roms/lgpt|/mnt/sdcard/cubegm/cores/lgpt_core.so
+/mnt/sdcard/roms/lgpt/start.lgpt|/mnt/sdcard/cubegm/cores/lgpt_core.so
