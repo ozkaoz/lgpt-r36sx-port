@@ -236,3 +236,8 @@ Android AOA validated runtime HEAD: d906c28
   Message: Fix Android AOA race: cancelable U241 setup, generation guard, transactional Android (core 967137865e2a)
   Validated artifact: source/dist/lgpt_libretro.so SHA256 967137865e2a3dfe22e29074047d81da540f6d3d2f4e1404a1ba5820b1b2345b8 (1.4M)
   SD TEST: PASS 2026-08-21 19:10 (usuario: Todo correcto en la prueba, el Audio Driver Android Ya funciono, podemos continuar.)
+
+STABLE RC validated runtime HEAD: 58ed2f5
+  Message: Bacon 1.5 STABLE RC: Chopper L1+R1 + driver lag (core dbaed387ff72)
+  Validated artifact: source/dist/lgpt_libretro.so SHA256 dbaed387ff72 (1.4M) HEAD 58ed2f5
+  SD TEST: PENDING 2026-08-21 20:53 (STABLE RC READY FOR FULL PHYSICAL MATRIX — core dbaed387ff72)
