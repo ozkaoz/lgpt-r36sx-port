@@ -231,3 +231,8 @@ Analyzer Peak validated runtime HEAD: 0549d71
   Message: Bacon 1.5 U2.73: DEC-32 visual + windowed Peak 2.5s (core 967137865e2a)
   Validated artifact: source/dist/lgpt_libretro.so SHA256 967137865e2a3dfe22e29074047d81da540f6d3d2f4e1404a1ba5820b1b2345b8 (1.4M)
   SD TEST: PASS 2026-08-21 18:35 (usuario: La prueba en la SD es correcta. Aprobado, continua.)
+
+Android AOA validated runtime HEAD: d906c28
+  Message: Fix Android AOA race: cancelable U241 setup, generation guard, transactional Android (core 967137865e2a)
+  Validated artifact: source/dist/lgpt_libretro.so SHA256 967137865e2a3dfe22e29074047d81da540f6d3d2f4e1404a1ba5820b1b2345b8 (1.4M)
+  SD TEST: PASS 2026-08-21 19:10 (usuario: Todo correcto en la prueba, el Audio Driver Android Ya funciono, podemos continuar.)
