@@ -242,8 +242,17 @@ STABLE RC validated runtime HEAD: 58ed2f5
   Validated artifact: source/dist/lgpt_libretro.so SHA256 dbaed387ff72 (1.4M) HEAD 58ed2f5
   SD TEST: PENDING 2026-08-21 20:53 (STABLE RC READY FOR FULL PHYSICAL MATRIX — core dbaed387ff72)
 
-Chopper Bacon14 visual contract validated runtime HEAD: 9df8717
+Chopper Bacon14 visual contract validated runtime HEAD: 9a326fe
   Message: Bacon 1.5: restore Bacon 1.4 Chopper/Pitch visual contract (core 91f2a457)
   Validated artifact: source/dist/lgpt_libretro.so SHA256 91f2a4570747a2cc (1.4M) 2026-08-21 21:23
-  SD TEST: PASS 2026-08-21 21:30 (usuario: Aprobado, continua.)
-  Visual: View/AppWindow ClearRect hardened x,y,w,h long long clamp, pitch panel 60,116 y=60..175 preserved, operation panel 64,112 ClearRect 0,8,40,14=560, Sleep(90) preserved, fullscreen pitch 0,0,320,240 removed, Flush order golden
+  HOST TEST: PASS (clearrect 560, bacon14 contract 60,116, chopper_draw/view, analyzer)
+  SD TEST: PHYSICAL FAIL 2026-08-21 22:00 — Chopper crash PASS, Pitch/Env logic PASS, Pitch/Env rendering FAIL (blank panel on L1+R1), Preview/Apply/Undo/Redo rendering FAIL (no panel/progress)
+  Visual: View/AppWindow ClearRect hardened, pitch 60,116 preserved, operation 64,112 ClearRect 0,8,40,14, fullscreen removal caused blank due to char cache
+
+Chopper Pitch direct-render validated runtime HEAD: c36c2d9
+  Message: Bacon 1.5: chopper pitch/operation direct limited render + outer border removal (core d86c0272)
+  Validated artifact: source/dist/lgpt_libretro.so SHA256 d86c0272ce7f230c (1.4M) 2026-08-21 22:05
+  HOST TEST: PASS (char cache invalidation, no outer border, pitch entry, operation render, clearrect, bacon14)
+  SD TEST: PASS 2026-08-21 22:10 (usuario: En la prueba todo OK. Podemos continuar)
+  Visual: direct TreeFrog overlay pitch 60,116 y=60..175 + operation 64,112 y=64..176 post-flush limited, not fullscreen; outer blue border removed via drawFrame guard; char cache bypassed
+

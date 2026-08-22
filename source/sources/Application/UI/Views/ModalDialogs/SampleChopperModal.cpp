@@ -13,6 +13,7 @@
 #include <unistd.h>
 #if defined(PLATFORM_TREEFROG)
 #include "Adapters/TREEFROG/GUI/TreeFrogGUIWindowImp.h"
+#include "UIFramework/BasicDatas/FontConfig.h"
 extern "C" void TreeFrogForceVideoRefresh(void);
 #endif
 #include <stdio.h>
@@ -834,6 +835,15 @@ static int g_chopperPreviewStartFrame = 0;
 static int g_chopperPreviewEndFrame = 0;
 static int g_chopperOperationActive = 0;
 static int g_chopperOperationPercent = 0;
+static char g_chopperOperationMessage[64];
+static char g_chopperOperationCombo[16];
+static int g_chopperPitchActive = 0;
+static int g_chopperPitchSelected = 0;
+static char g_chopperPitchHeader[40];
+static char g_chopperPitchLabels[6][24];
+static char g_chopperPitchValues[6][20];
+static char g_chopperPitchHints[2][40];
+static char g_chopperPitchStatus[40];
 
 static unsigned short tf_rgb565(unsigned char r, unsigned char g, unsigned char b) {
     return (unsigned short)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
@@ -859,7 +869,93 @@ static void tf_vline(int x, int y0, int y1, unsigned short color) {
     tf_rect(x, y0, 1, y1 - y0 + 1, color);
 }
 
+static void tf_text(int x, int y, const char *s, unsigned short fg, unsigned short bg, int invert) {
+    uint16_t *fb = TreeFrogGetFramebuffer();
+    if (!fb || !s) return;
+    for (const unsigned char *c = (const unsigned char *)s; *c && x < TF_W; ++c, x += 8) {
+        if (x + 8 <= 0 || *c >= 128) continue;
+        const unsigned char *g = &font[*c * 8];
+        for (int r = 0; r < 8; r++) {
+            int py = y + r;
+            if (py < 0 || py >= TF_H) continue;
+            for (int b = 0; b < 8; b++) {
+                int px = x + b;
+                if (px < 0 || px >= TF_W) continue;
+                int bit = (g[r * FONT_WIDTH + b] == 0);
+                fb[py * TF_W + px] = (bit ^ invert) ? fg : bg;
+            }
+        }
+    }
+}
+
 extern "C" void TreeFrogChopperOverlayDraw(void) {
+    // Operation direct overlay (post-char-flush) - limited panel 64,112 (y=64..176)
+    if (g_chopperOperationActive) {
+        const unsigned short pbg    = tf_rgb565(10, 10, 24);
+        const unsigned short pframe = tf_rgb565(63, 95, 191);
+        const unsigned short pnorm  = tf_rgb565(0xE8, 0xE4, 0xF8);
+        const unsigned short ph1    = tf_rgb565(0x5B, 0x8C, 0xFF);
+        const unsigned short ph2    = tf_rgb565(0x9D, 0x5B, 0xFF);
+        tf_rect(0, 64, 320, 112, pbg);
+        tf_rect(0, 63, 320, 1, pframe);
+        tf_rect(0, 176, 320, 1, pframe);
+        tf_rect(0, 64, 1, 112, pframe);
+        tf_rect(319, 64, 1, 112, pframe);
+        // Title OPERATION centered at y=64+8=72 (row 9)
+        tf_text(((40 - (int)strlen("OPERATION"))/2)*8, 72, "OPERATION", ph1, pbg, 0);
+        // Status row at y=88 (row 11)
+        tf_text(64, 88, "Status", pnorm, pbg, 0);
+        {
+            char msg[64]; snprintf(msg, sizeof(msg), "%-22.22s", g_chopperOperationMessage);
+            tf_text(168, 88, msg, ph2, pbg, 0);
+        }
+        // Percent row at y=96 (row 12) inverted
+        {
+            char pct[32]; snprintf(pct, sizeof(pct), "%3d%%", g_chopperOperationPercent);
+            // center percent
+            int px = ((40 - (int)strlen(pct))/2)*8;
+            tf_text(px, 96, pct, ph1, pbg, 1);
+        }
+        // Hints
+        if (g_chopperOperationPercent >= 100) {
+            tf_text(16, 112, "A close  L1+X undo  R1+X redo", pnorm, pbg, 0);
+        } else {
+            tf_text(16, 112, "Processing sample, please wait", pnorm, pbg, 0);
+        }
+        // Combo if present at top of panel
+        if (g_chopperOperationCombo[0]) {
+            tf_text(4, 64, g_chopperOperationCombo, ph1, pbg, 0);
+        }
+        return;
+    }
+    // Pitch direct overlay - limited panel 60,116 (y=60..176) post-char-flush, not fullscreen
+    if (g_chopperPitchActive) {
+        const unsigned short pbg    = tf_rgb565(10, 10, 24);
+        const unsigned short pframe = tf_rgb565(63, 95, 191);
+        const unsigned short pnorm  = tf_rgb565(0xE8, 0xE4, 0xF8);
+        const unsigned short ph1    = tf_rgb565(0x5B, 0x8C, 0xFF);
+        const unsigned short ph2    = tf_rgb565(0x9D, 0x5B, 0xFF);
+        tf_rect(0, 60, 320, 116, pbg);
+        tf_rect(0, 59, 320, 1, pframe);
+        tf_rect(0, 176, 320, 1, pframe);
+        tf_rect(0, 60, 1, 116, pframe);
+        tf_rect(319, 60, 1, 116, pframe);
+        tf_text(((40 - (int)strlen("PITCH/ENV"))/2)*8, 64, "PITCH/ENV", ph1, pbg, 0);
+        tf_text(((40 - (int)strlen(g_chopperPitchHeader))/2)*8, 80, g_chopperPitchHeader, pnorm, pbg, 0);
+        for (int i = 0; i < 6; i++) {
+            int y = 96 + i*8;
+            int sel = (g_chopperPitchSelected == i);
+            tf_text(64, y, g_chopperPitchLabels[i], pnorm, pbg, 0);
+            tf_text(168, y, g_chopperPitchValues[i], sel ? ph2 : ph1, pbg, sel);
+        }
+        // Hints at bottom of panel (inside, y=152,160) - keep status/hints rows 23-25 char outside intact
+        tf_text(((40 - (int)strlen(g_chopperPitchHints[0]))/2)*8, 152, g_chopperPitchHints[0], pnorm, pbg, 0);
+        tf_text(((40 - (int)strlen(g_chopperPitchHints[1]))/2)*8, 160, g_chopperPitchHints[1], pnorm, pbg, 0);
+        if (g_chopperPitchStatus[0]) {
+            tf_text(((40 - (int)strlen(g_chopperPitchStatus))/2)*8, 168, g_chopperPitchStatus, ph1, pbg, 0);
+        }
+        return;
+    }
     if (!g_chopperOverlayActive) return;
 
     const unsigned short bg       = tf_rgb565(10, 10, 24);
@@ -2666,12 +2762,30 @@ void SampleChopperModal::publishOverlayState() {
             g_chopperSelectedRangeEndPx = frameToPixel(clipEnd);
         }
     }
+    // Pitch direct overlay state (limited panel, not fullscreen)
+    g_chopperPitchActive = (!suspended_ && !operationActive_ && pitchMode_) ? 1 : 0;
+    g_chopperPitchSelected = pitchEnvTool_.EditParam();
+    if (g_chopperPitchActive) {
+        if (hasAssignedSample() && sourceSize_ > 1) {
+            ChopperView::ComposeHeaderLine(g_chopperPitchHeader, sizeof(g_chopperPitchHeader), instrumentIndex_, sampleIndex_, chopModel_.selected + 1, (chopModel_.boundaryCount > 1 ? chopModel_.boundaryCount - 1 : 1));
+        } else {
+            snprintf(g_chopperPitchHeader, sizeof(g_chopperPitchHeader), "%s", "No sample loaded");
+        }
+        for (int i = 0; i < 6; i++) {
+            strncpy(g_chopperPitchLabels[i], ChopperView::PitchLabel(i), sizeof(g_chopperPitchLabels[i])-1); g_chopperPitchLabels[i][sizeof(g_chopperPitchLabels[i])-1]=0;
+            ChopperView::ComposePitchValue(g_chopperPitchValues[i], sizeof(g_chopperPitchValues[i]), i, pitchEnvTool_.Params().semitones, pitchEnvTool_.Params().attackMs, pitchEnvTool_.Params().sustainPercent, pitchEnvTool_.Params().releaseMs, pitchEnvTool_.Params().scope, sampleIndex_);
+        }
+        snprintf(g_chopperPitchHints[0], sizeof(g_chopperPitchHints[0]), "%s", ChopperView::PitchHint(0));
+        snprintf(g_chopperPitchHints[1], sizeof(g_chopperPitchHints[1]), "%s", ChopperView::PitchHint(1));
+        snprintf(g_chopperPitchStatus, sizeof(g_chopperPitchStatus), "%.39s", statusMessage_[0] ? statusMessage_ : "");
+    }
 #endif
 }
 
 void SampleChopperModal::clearOverlayState() {
 #if defined(PLATFORM_TREEFROG)
     g_chopperOverlayActive = 0;
+    g_chopperPitchActive = 0;
     g_chopperSelectedRangeStartPx = -1;
     g_chopperSelectedRangeEndPx = -1;
     g_chopperTrimMode = 0;
@@ -2927,6 +3041,10 @@ void SampleChopperModal::drawTopBar(GUITextProperties &props) {
 }
 
 void SampleChopperModal::drawFrame(GUITextProperties &props) {
+#if defined(PLATFORM_TREEFROG)
+    (void)props;
+    return;
+#else
     /* RC4 P6 (PLAN_RC4 11.7): solid-border frame, no ASCII box-drawing.
        Same 40-cell geometry (rows 1..22, columns 0/39) so the waveform
        overlay and the char-screen text stay aligned.  F3-3b: la geometria
@@ -2934,6 +3052,7 @@ void SampleChopperModal::drawFrame(GUITextProperties &props) {
     ChopperGrid grid; grid.Clear();
     ChopperView::DrawFrame(grid);
     drainChopperGrid(grid, props);
+#endif
 }
 
 void SampleChopperModal::drawSampleInfo(GUITextProperties &props) {
@@ -2974,6 +3093,8 @@ void SampleChopperModal::showOperationProgress(const char *message, int percent)
 #if defined(PLATFORM_TREEFROG)
     g_chopperOperationActive = 1;
     g_chopperOperationPercent = operationPercent_;
+    snprintf(g_chopperOperationMessage, sizeof(g_chopperOperationMessage), "%s", operationMessage_);
+    snprintf(g_chopperOperationCombo, sizeof(g_chopperOperationCombo), "%s", operationComboLabel_);
 #endif
     char status[64];
     /* Bacon 1.1.1 V17: progress overlays name the operation AND the trigger
@@ -3006,6 +3127,8 @@ void SampleChopperModal::clearOperationProgress() {
 #if defined(PLATFORM_TREEFROG)
     g_chopperOperationActive = 0;
     g_chopperOperationPercent = 0;
+    g_chopperOperationMessage[0] = 0;
+    g_chopperOperationCombo[0] = 0;
 #endif
     isDirty_ = true;
 }
