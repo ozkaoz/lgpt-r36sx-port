@@ -1,5 +1,5 @@
 diff --git a/frogui_libretro.c b/frogui_libretro.c
-index 95edc89..e14d42b 100644
+index 95edc89..8323f4d 100644
 --- a/frogui_libretro.c
 +++ b/frogui_libretro.c
 @@ -1967,6 +1967,7 @@ typedef struct { const char *key; const char *label; const char *folder_a; const
@@ -10,6 +10,15 @@ index 95edc89..e14d42b 100644
      {"ebook", "Ebook Reader", "Ebook", "ebooks", NULL},
      {"images", "Image Viewer", "images", "photos", NULL},
      {"videos",  "Videos",  "videos",  "video", NULL},
+@@ -1992,7 +1993,7 @@ static int is_app_folder_name(const char *name) {
+                     !strcasecmp(name, "audio") || !strcasecmp(name, "videos") ||
+                     !strcasecmp(name, "video") || !strcasecmp(name, "images") ||
+                     !strcasecmp(name, "photos") || !strcasecmp(name, "ebook") ||
+-                    !strcasecmp(name, "ebooks"));
++                    !strcasecmp(name, "ebooks") || !strcasecmp(name, "lgpt"));
+ }
+ 
+ static void scan_apps_tab(void) {
 @@ -3140,7 +3141,10 @@ static void handle_input(void) {
                  ui_transition_start(1);
                  enter_activity_view();

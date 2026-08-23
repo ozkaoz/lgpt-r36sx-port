@@ -2,12 +2,12 @@
 """
 test_frogui_apps_lgpt.py — Phase B/C host regression for FrogUI LGPT Apps entry.
 
-Phase B (this file's default): LGPT must exist once in app_defs as LGPT_BIN,
-and must NOT yet be hidden from Games (is_app_folder_name must NOT contain lgpt).
+Phase C (final): LGPT must exist once in app_defs as LGPT_BIN,
+and MUST be hidden from Games (is_app_folder_name must contain lgpt).
 
-Phase C will invert the second check (must be hidden).
+Phase B was dual-entry (not hidden); Phase C inverts the check.
 
-Checks the patched source in /tmp/FrogUI_r36sx/frogui_libretro.c if present,
+Checks the patched source in $HOME/sf3000-work/FrogUI-lgpt-apps-patched/frogui_libretro.c if present,
 otherwise skips with warning. Also validates the built patched binary if present.
 """
 import pathlib, re, hashlib, sys
@@ -61,12 +61,16 @@ def test_app_defs_has_lgpt():
     assert "LGPT_BIN" in block, "LGPT entry must use LGPT_BIN"
     # No duplicate definition
     assert txt.count("#define LGPT_BIN") == 1, "LGPT_BIN must be defined once"
-    # Phase B: lgpt NOT in is_app_folder_name
-    is_app_block = re.search(r'static int is_app_folder_name.*?\{.*?\}', txt, re.DOTALL)
+    # Phase C: lgpt MUST be in is_app_folder_name (Apps-only)
+    is_app_block = re.search(r'static int is_app_folder_name\(const char \*name\)\s*\{[^}]+\}', txt, re.DOTALL)
     if is_app_block:
         block2 = is_app_block.group(0)
-        assert 'lgpt' not in block2.lower(), "Phase B: is_app_folder_name must NOT contain lgpt (dual entry)"
-    print("APP_DEFS_HAS_LGPT: PASS (1 entry, LGPT_BIN, ROM correct, Games not hidden)")
+        assert 'lgpt' in block2.lower(), "Phase C: is_app_folder_name must contain lgpt (Apps-only)"
+    # Also check patch file contains hide
+    patch = pathlib.Path("patches/frogui_apps_lgpt.patch")
+    if patch.exists():
+        assert 'is_app_folder_name' in patch.read_text() and 'lgpt' in patch.read_text().lower(), "patch must hide lgpt from Games"
+    print("APP_DEFS_HAS_LGPT: PASS (1 entry, LGPT_BIN, ROM correct, Games hidden)")
 
 def test_launch_semantics():
     candidates = [
@@ -89,8 +93,9 @@ def test_launch_semantics():
     print("LAUNCH_SEMANTICS: PASS")
 
 def test_patched_binary_contains_lgpt():
-    # Prefer new official dual candidate, fallback to old path
+    # Prefer new official Apps-only candidate, then dual, fallback
     candidates = [
+        pathlib.Path("build/frogui_candidate/apps_only/frogui_libretro.so"),
         pathlib.Path("build/frogui_candidate/apps_dual/frogui_libretro.so"),
         pathlib.Path("build/frogui_candidate/frogui_libretro.so"),
         PATCHED_SO,
