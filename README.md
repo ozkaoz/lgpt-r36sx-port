@@ -2,13 +2,14 @@
 
 Little Piggy Tracker port for the R36SX V2.6 handheld, integrated with TreeFrogUI and bidirectional USB-C OTG audio.
 
-**Current release candidate: RC3 (Bacon 1.1 - FX Dev full)** — modernización
-visual integral con ayuda contextual, páginas FX master modernizadas y
-chopper gráfico. Ver [CHANGELOG](CHANGELOG.md).
+**Current release: Bacon 1.5 — Latest**
+
+Physically validated on R36SX. Single LGPT TreeFrogUI integration, Local / Windows / Android audio, SP404 USB Audio Host, Synths, EQ8 / Analyzer, Pitch / Chopper, Startup project actions via SELECT (Rename / Duplicate / Export / Delete), New: A random / START confirm, Save Song As under projects/
+See [CHANGELOG](CHANGELOG.md).
 
 ## Main features
 
-- Three selectable USB audio driver modes: Local, Windows (UAC2) and Android (h36 AOA bulk).
+- Three selectable USB audio driver modes: Local, Windows (UAC2) and Android (H38 bridge, LGPTUsbAudioBridge-H38-debug.apk).
 - LGPT audio output to Windows through USB Audio at 48 kHz.
 - Windows audio capture from the LGPT Record screen.
 - Android bidirectional audio bridge with the LGPTUsbAudioBridge APK.
@@ -41,7 +42,11 @@ sample browser and chopper shortcuts.
 
 ## Download
 
-Use the latest GitHub Release to install the precompiled port. The repository contains source code; release assets contain the compiled core and SD installer.
+Use the latest GitHub Release **Bacon-1.5** to install the precompiled port. The repository contains source code; release assets contain the compiled core and SD installer.
+
+**Download:**
+- `LGPT_R36SX_Bacon-1.5_SD_ROOT.zip` (direct-copy SD root, 7-8M) — extract and copy CONTENTS to SD root
+- `LGPT_R36SX_Bacon-1.5_Android.apk` (H38, 298118, validated) — separate asset and also inside ZIP at root
 
 - [Installation guide — English](docs/INSTALL_EN.md)
 - [Guía de instalación — Español](docs/INSTALL_ES.md)
@@ -66,4 +71,4 @@ Use the latest GitHub Release to install the precompiled port. The repository co
 
 ## License
 
-See [LICENSE](LICENSE). TreeFrogUI and `picoarch` are not redistributed in this repository or in the binary release.
+See [LICENSE](LICENSE). The repository may not contain the complete TreeFrogUI vendor base, but the Bacon-1.5 direct-copy release ZIP (`LGPT_R36SX_Bacon-1.5_SD_ROOT.zip`) contains the required integration/vendor runtime files deliberately packaged for this validated configuration, including `cubegm/picoarch` and `cubegm/lgpt.elf` as applicable.

@@ -24,10 +24,23 @@ public:
     // directory in place (no project is loaded at the startup menu, so the
     // rename can never corrupt a running session).
     Result OnRenameProject(const char *newBaseName);
+    // TREEFROG_STARTUP_PROJECT_ACTIONS_V1: duplicates the selected project.
+    Result OnDuplicateProject();
+    bool HasValidCurrentProjectSelection();
     // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): loads the selected project and
     // immediately starts a render export. mode is 1 = mixdown (master),
     // 2 = stems (multitrack).
     void StartProjectExport(int mode);
+
+    // TREEFROG_STARTUP_PROJECT_ACTIONS_V1: explicit action codes to avoid
+    // repurposing Export (2) as Duplicate.
+    enum ProjectDeferredAction {
+        PA_NONE = 0,
+        PA_RENAME = 1,
+        PA_EXPORT = 2,
+        PA_DELETE = 3,
+        PA_DUPLICATE = 4
+    };
 
     // TREEFROG_MIXER_STARTUP_MENU_V2 (H38.7): the actions menu callback must
     // not open a nested modal while the finished menu is still being deleted

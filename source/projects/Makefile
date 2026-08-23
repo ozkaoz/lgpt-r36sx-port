@@ -251,7 +251,7 @@ COMMONFILES := \
 	Application.o AppWindow.o SelectProjectDialog.o \
 	NewProjectDialog.o \
 	ImportSampleDialog.o SampleChopperModal.o SampleManagerDialog.o UsbRecordModal.o AudioDriverModal.o \
-	TreeFrogTextEditor.o TreeFrogMenuModal.o HelpOverlay.o HelpRegistry.o \
+	TreeFrogTextEditor.o TreeFrogMenuModal.o TreeFrogProjectActionModal.o HelpOverlay.o HelpRegistry.o \
 	MixerView.o NullView.o \
 	SongView.o ChainView.o PhraseView.o ViewData.o ConsoleView.o ProjectView.o InstrumentView.o InstrumentEqView.o UIController.o \
 	View.o ModalView.o FieldView.o UIField.o UIIntField.o \

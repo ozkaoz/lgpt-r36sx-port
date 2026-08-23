@@ -1,12 +1,15 @@
 
 // TREEFROG_V42_NO_WHITE_BOX_UI
+// TREEFROG_STARTUP_PROJECT_ACTIONS_V1: plain SELECT menu + duplicate + startup NEW random
 #include "SelectProjectDialog.h"
 #include "NewProjectDialog.h"
 #include "TreeFrogTextEditor.h"
 #include "TreeFrogMenuModal.h"
+#include "TreeFrogProjectActionModal.h"
 #include "System/Console/Trace.h"
 #include "Application/UI/Views/ModalDialogs/MessageBox.h"
 #include "Application/AppWindow.h"
+#include <unistd.h>
 
 #include <algorithm>
 #include <ctype.h>
@@ -113,16 +116,44 @@ static void ProjectActionsMenuCallback(View &v, ModalView &dialog) {
     spd.DeferProjectAction(code);
 }
 
+// TREEFROG_STARTUP_PROJECT_ACTIONS_V1: plain SELECT menu (Rename/Duplicate/Export/Delete)
+// Centralizes all startup project management under SELECT. Uses same deferred
+// pattern as legacy R1+A to avoid nested-modal lifecycle deletion.
+static void StartupProjectActionMenuCallback(View &v, ModalView &dialog) {
+    int code = dialog.GetReturnCode();
+    if (code == 0) return;
+    SelectProjectDialog &spd = (SelectProjectDialog &)v;
+    // Menu returns 1=Rename 2=Duplicate 3=Export 4=Delete
+    if (code == 1) spd.DeferProjectAction(SelectProjectDialog::PA_RENAME);
+    else if (code == 2) spd.DeferProjectAction(SelectProjectDialog::PA_DUPLICATE);
+    else if (code == 3) spd.DeferProjectAction(SelectProjectDialog::PA_EXPORT);
+    else if (code == 4) spd.DeferProjectAction(SelectProjectDialog::PA_DELETE);
+}
+
 void SelectProjectDialog::DeferProjectAction(int code) {
     pendingAction_ = code;
+}
+
+bool SelectProjectDialog::HasValidCurrentProjectSelection() {
+    if (currentProject_ < 0) return false;
+    if (currentProject_ >= content_.Size()) return false;
+    Path p = GetCurrentProjectPath();
+    if (p.GetPath().empty()) return false;
+    std::string name = p.GetName();
+    if (!TreeFrogV40IsLgptProjectName(name)) return false;
+    if (!p.IsDirectory()) return false;
+    if (!TreeFrogV40ProjectHasSaveFile(p)) return false;
+    return true;
 }
 
 // TREEFROG_MIXER_STARTUP_MENU_V2 (H38.7): actually launches the deferred
 // action. Runs from OnFrameUpdate, i.e. after the actions menu modal has been
 // deleted by the base class, so a nested modal opened here survives.
+// TREEFROG_STARTUP_PROJECT_ACTIONS_V1: adds PA_DUPLICATE handling via
+// OnDuplicateProject (copy-keep, no delete of source).
 void SelectProjectDialog::launchProjectAction(int code) {
     switch (code) {
-    case 1:
+    case PA_RENAME:
         {
             TreeFrogTextEditor *editor = new TreeFrogTextEditor(
                 *this, "RENAME PROJECT",
@@ -130,7 +161,7 @@ void SelectProjectDialog::launchProjectAction(int code) {
             DoModal(editor, RenameProjectCallback);
         }
         break;
-    case 2:
+    case PA_EXPORT:
         {
             static const char *exportItems[] = {"Full project (master)",
                                                 "Multitrack"};
@@ -139,7 +170,7 @@ void SelectProjectDialog::launchProjectAction(int code) {
             DoModal(menu, ProjectExportMenuCallback);
         }
         break;
-    case 3:
+    case PA_DELETE:
         {
             Path projectPath = GetCurrentProjectPath();
             std::string message =
@@ -148,6 +179,15 @@ void SelectProjectDialog::launchProjectAction(int code) {
                 new MessageBox(*this, message.c_str(), MBBF_YES | MBBF_NO);
             DoModal(mb, DeleteProjectCallback);
             DrawView();
+        }
+        break;
+    case PA_DUPLICATE:
+        {
+            Result r = OnDuplicateProject();
+            if (r.Failed()) {
+                Trace::Log("SelectProjectDialog:Duplicate", "%s",
+                           r.GetDescription().c_str());
+            }
         }
         break;
     }
@@ -370,52 +410,40 @@ void SelectProjectDialog::OnFocus() {
 void SelectProjectDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
 	if (!pressed) return ;
 
-    // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): R1+A on the startup menu opens
-    // a project actions menu (Rename / Export / Delete). Must be checked
-    // before the plain A branch below (Load/New/Exit).
-    if ((mask & EPBM_R) && (mask & EPBM_A)) {
-        if (currentProject_ >= 0 && currentProject_ < content_.Size()) {
-            static const char *actionItems[] = {"Rename", "Export", "Delete"};
-            TreeFrogMenuModal *menu =
-                new TreeFrogMenuModal(*this, "PROJECT ACTIONS",
-                                      actionItems, 3);
-            DoModal(menu, ProjectActionsMenuCallback);
+    // TREEFROG_STARTUP_PROJECT_ACTIONS_V1: plain SELECT on a valid project
+    // opens the startup project menu (Rename/Duplicate/Export/Delete).
+    // Centralizes all project management under SELECT.
+    // Must require SELECT ALONE to avoid consuming SELECT+R1/R2.
+    if (mask == EPBM_SELECT) {
+        if (HasValidCurrentProjectSelection()) {
+            TreeFrogProjectActionModal *menu =
+                new TreeFrogProjectActionModal(*this);
+            DoModal(menu, StartupProjectActionMenuCallback);
         }
+        return;
+    }
+    // REVISION: centralize under SELECT — remove startup R1+A and A+B entry points.
+    // Preserve SELECT+R1/R2 globally: any mask containing SELECT but not plain SELECT is not consumed here.
+    if (mask & EPBM_SELECT) {
+        return;
+    }
+    // R1+A must NOT open menu nor fall through to Load
+    if ((mask & EPBM_R) && (mask & EPBM_A)) {
+        return;
+    }
+    // A+B must NOT delete nor fall through to Load
+    if ((mask & EPBM_A) && (mask & EPBM_B)) {
         return;
     }
 
     if (mask&EPBM_B) {
-        // Handle A + B combination for delete
-        if (mask & EPBM_A) {
-            int count = 0;
-            Path *current = 0;
-
-            IteratorPtr<Path> it(content_.GetIterator());
-            for (it->Begin(); !it->IsDone(); it->Next()) {
-                if (count == currentProject_) {
-                    current = &it->CurrentItem();
-                    break;
-                }
-                count++;
-            }
-
-            if (current != 0) {
-                std::string message =
-                    "Delete project '" + current->GetName() + "' ?";
-                MessageBox *mb =
-                    new MessageBox(*this, message.c_str(), MBBF_YES | MBBF_NO);
-                DoModal(mb, DeleteProjectCallback);
-                DrawView();
-            }
-            return;
-        }
         if (mask & EPBM_UP)
             warpToNextProject(-LIST_SIZE);
         if (mask&EPBM_DOWN) warpToNextProject(LIST_SIZE) ;
     } else {
 
-        // A modifier
-        if (mask & EPBM_A) {
+        // A modifier — Load must require PLAIN A, not mask contains A, to prevent R1+A/A+B fallthrough
+        if (mask == EPBM_A) {
             switch (selected_) {
 			case 0: // load
 				{
@@ -469,7 +497,7 @@ void SelectProjectDialog::ProcessButtonMask(unsigned short mask,bool pressed) {
 			case 1: // new
 			{
                 NewProjectDialog *npd =
-                    new NewProjectDialog(*this, currentPath_);
+                    new NewProjectDialog(*this, currentPath_, true);
                 DoModal(npd,NewProjectCallback) ;
 				break ;
             }
@@ -760,6 +788,87 @@ Result SelectProjectDialog::OnRenameProject(const char *newBaseName) {
     }
     isDirty_ = true;
     return Result::NoError;
+}
+
+// TREEFROG_STARTUP_PROJECT_ACTIONS_V1: duplicates the selected project.
+// Source: GetCurrentProjectPath(). Destination: lgpt_<base>_c.
+// Validates source, checks name length (+2), checks collision ("Copy exists"),
+// recursively copies via RecursiveCopyDirectory, cleans partial destination on
+// failure, refreshes list and selects the duplicate on success.
+Result SelectProjectDialog::OnDuplicateProject() {
+    Path srcPath = GetCurrentProjectPath();
+    if (srcPath.GetPath().empty()) {
+        Trace::Log("SelectProjectDialog:Duplicate", "no current project cur=%d size=%d",
+                   currentProject_, content_.Size());
+        View::SetNotification("No project selected", 0);
+        return Result("No project selected");
+    }
+    std::string srcName = srcPath.GetName();
+    if (!TreeFrogV40IsLgptProjectName(srcName)) {
+        View::SetNotification("No project selected", 0);
+        return Result("No project selected");
+    }
+    if (!srcPath.IsDirectory()) {
+        View::SetNotification("No project selected", 0);
+        return Result("No project selected");
+    }
+    if (!TreeFrogV40ProjectHasSaveFile(srcPath)) {
+        View::SetNotification("No project selected", 0);
+        return Result("No project selected");
+    }
+    std::string srcBase = GetCurrentProjectBaseName();
+    if (srcBase.empty()) {
+        View::SetNotification("Name cannot be empty", 0);
+        return Result("Name cannot be empty");
+    }
+    std::string dstBase = srcBase + "_c";
+    // Audit safe stem length: TreeFrogTextEditor maxStem is 24.
+    const int kMaxStem = 24;
+    if ((int)dstBase.size() > kMaxStem) {
+        View::SetNotification("Name too long", 0);
+        return Result("Name too long");
+    }
+    std::string dstFull = "lgpt_" + dstBase;
+    Path dstPath = currentPath_.Descend(dstFull);
+    if (dstPath.Exists()) {
+        View::SetNotification("Copy exists", 0);
+        return Result("Copy exists");
+    }
+    Trace::Log("SelectProjectDialog:Duplicate", "duplicating %s to %s",
+               srcPath.GetPath().c_str(), dstPath.GetPath().c_str());
+    if (!RecursiveCopyDirectory(srcPath, dstPath)) {
+        View::SetNotification("Duplicate failed", 0);
+        RecursiveDeleteDirectory(dstPath);
+        return Result("Duplicate failed");
+    }
+    // Ensure data reaches SD (Save-As uses sync).
+    sync();
+    std::string successMsg = "Project duplicated: " + dstBase;
+    View::SetNotification(successMsg.c_str(), 0);
+    setCurrentFolder(currentPath_);
+    int listSize = content_.Size();
+    if (listSize > 0) {
+        int foundIndex = -1;
+        int idx = 0;
+        IteratorPtr<Path> it(content_.GetIterator());
+        for (it->Begin(); !it->IsDone(); it->Next()) {
+            if (it->CurrentItem().GetName() == dstFull) {
+                foundIndex = idx;
+                break;
+            }
+            idx++;
+        }
+        if (foundIndex >= 0) currentProject_ = foundIndex;
+    } else {
+        currentProject_ = 0;
+    }
+    isDirty_ = true;
+    return Result::NoError;
+}
+
+// TREEFROG_STARTUP_PROJECT_ACTIONS_V1: build marker for new actions.
+extern "C" const char *TreeFrogStartupProjectActionsBuildMarker(void) {
+    return "TREEFROG_STARTUP_PROJECT_ACTIONS_V1";
 }
 
 // TREEFROG_MIXER_STARTUP_MENU_V1 (H38.7): build marker verified on install.

@@ -45,8 +45,8 @@ static void SaveAsProjectCallback(View &v,ModalView &dialog) {
 		std::string str_dstprjdir;
 		std::string str_dstsmpdir;
 
-		Path root("root:");
-		str_dstprjdir = root.GetName() + "/" + npd.GetName();
+		Path projectsRoot("root:projects");
+		str_dstprjdir = projectsRoot.GetName() + "/" + npd.GetName();
 		str_dstsmpdir = str_dstprjdir + "/samples/";
 
 		Path path_srcprjdir("project:");
@@ -401,7 +401,7 @@ void ProjectView::Update(Observable &,I_ObservableData *data) {
         case ACTION_SAVE_AS: {
             PersistencyService *service = PersistencyService::GetInstance();
             service->Save("project:lgptsav_tmp.dat");
-            NewProjectDialog *mb = new NewProjectDialog(*this, "root:");
+            NewProjectDialog *mb = new NewProjectDialog(*this, "root:projects");
             DoModal(mb, SaveAsProjectCallback);
             break;
         }
