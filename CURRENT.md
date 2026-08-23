@@ -42,8 +42,8 @@ Do not trust hardcoded historical state.
 
 ## Current Objective
 
-- Multi-agent V2.1 consistency/enforcement cleanup; Bacon-1.5 runtime protected.
-- After this task: No active runtime task. Repository at stable agent-infrastructure baseline; next objective must be supplied/confirmed.
+- No active implementation/runtime task. Await explicit user-approved objective.
+- At next task: run `bash scripts/agent_preflight.sh`, classify A/B/C/D/E via `docs/ai/VALIDATION.md`, route through `CONTEXT_MAP.md`.
 
 ## Last Relevant Validation
 

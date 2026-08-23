@@ -8,14 +8,19 @@
 
 - `main` — canonical accepted state; advances by fast-forward from validated checkpoints.
 - Feature: `feature/<name>` short-lived, created from `main`.
-  1. Implement (no audio/driver/FrogUI changes unless validated)
-  2. Host tests (`run_host_startup_project_actions.sh`, `host_syntax_check.sh`)
-  3. MIPS build (`BUILD_TREEFROG_R36SX_BADGE_OFF_SELECT_OFF.sh`, TC mipsel)
-  4. Physical R36SX validation (Local/Mixer/EQ8/Analyzer/Pitch/Chopper/Sampler, projects)
-  5. Checkpoint/tag if needed (`single-*`, `checkpoint-*`)
-  6. Fast-forward to `main` (`git merge --ff-only`), push, delete feature branch (`git push origin --delete`).
+  1. Classify change using `AGENTS.md` / `docs/ai/VALIDATION.md` (CLASS A/B/C/D/E)
+  2. Execute ONLY the validation gate required by that class (see `docs/ai/VALIDATION.md` as authority)
+  3. Accepted checkpoint/tag if applicable
+  4. Fast-forward/approved merge to `main`, push, delete short-lived feature branch when appropriate (`git push origin --delete`).
 
-Do not accumulate permanent feature branches. `main` → feature → physical PASS → main → tag → delete.
+  Examples:
+  - CLASS A: context/static tests only
+  - CLASS B: relevant host/tool tests
+  - CLASS C: build + host + physical R36SX
+  - CLASS D: package + physical clean-install implications
+  - CLASS E: deterministic package + clean-install physical + download-back
+
+Do not accumulate permanent feature branches.
 
 ## Tags
 
@@ -28,6 +33,6 @@ Tags are cheap, preserve history. Do not delete release/checkpoint/legacy tags. 
 
 ## Hygiene
 
-- Release ZIP `LGPT_R36SX_Bacon-1.5_SD_ROOT.zip` (direct-copy, no wrapper, H38-only APK at root) + `LGPT_R36SX_Bacon-1.5_Android.apk` + `SHA256SUMS.txt` are the public artifacts (see `docs/ai/RELEASE_CONTRACT.md`).
+- Release ZIP `LGPT_R36SX_Bacon-X.Y_SD_ROOT.zip` (e.g. `LGPT_R36SX_Bacon-1.5_SD_ROOT.zip`, direct-copy, no wrapper, H38-only APK at root — resolve current concrete release identity from `CURRENT.md` and authoritative release manifest) + `LGPT_R36SX_Bacon-1.5_Android.apk` + `SHA256SUMS.txt` are the public artifacts (see `docs/ai/RELEASE_CONTRACT.md`).
 - `sd_root/` is the canonical public payload (port overlay). TreeFrog vendor base (e.g. `cubegm/cores/libemu_*`) is not duplicated in git; recorded in `PHYSICAL_SD_FINAL_*` manifests.
 - Docs: `SINGLE_STARTUP_ACTIONS_CHECKPOINT.md`, `BACON_1_5_RELEASE_MANIFEST.md`, `PHYSICAL_SD_FINAL_*`, `RELEASE_SD_*` document exact validated state.

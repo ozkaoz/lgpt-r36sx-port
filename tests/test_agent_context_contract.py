@@ -269,6 +269,47 @@ def check_readme():
     if "scripts/: current build, install, verification" in t:
         errors.append("README.md still describes scripts/: current build, install, verification — must be corrected to build/audit/release/legacy")
 
+def check_agents_version_consistency():
+    agents_text = (REPO / "AGENTS.md").read_text(encoding="utf-8", errors="ignore")
+    current_text = (REPO / "CURRENT.md").read_text(encoding="utf-8", errors="ignore")
+    m1 = re.search(r"\*\*Version:\*\*\s*([0-9]+\.[0-9]+)", agents_text)
+    m2 = re.search(r"Constitution:\s*`AGENTS\.md v([0-9]+\.[0-9]+)`", current_text)
+    if not m1:
+        errors.append("AGENTS.md missing **Version:** X.Y")
+        return
+    if not m2:
+        errors.append("CURRENT.md missing Constitution: AGENTS.md vX.Y")
+        return
+    if m1.group(1) != m2.group(1):
+        errors.append(f"AGENTS version {m1.group(1)} != CURRENT declared AGENTS version {m2.group(1)} — must be consistent")
+
+def check_branch_policy_class_aware():
+    p = REPO / "docs" / "BRANCH_TAG_POLICY.md"
+    if not p.exists():
+        return
+    t = p.read_text(encoding="utf-8", errors="ignore")
+    # Must reference VALIDATION routing
+    if "VALIDATION.md" not in t:
+        errors.append("BRANCH_TAG_POLICY.md must reference docs/ai/VALIDATION.md for class routing")
+    if "CLASS A" not in t or "CLASS B" not in t or "CLASS C" not in t:
+        errors.append("BRANCH_TAG_POLICY.md must reference change-class gates (CLASS A/B/C...) not universal physical gate")
+    # Must not require physical R36SX universally for all classes (old universal list)
+    # Old pattern: Implement → Host tests → MIPS build → Physical R36SX validation as mandatory for every feature branch
+    if "Physical R36SX validation" in t and "Classify change" not in t:
+        errors.append("BRANCH_TAG_POLICY.md must not require physical R36SX universally for all classes — use class-aware gates via VALIDATION.md")
+    # Generic hygiene: should not hardcode specific release ZIP as eternal policy, prefer pattern
+    if "LGPT_R36SX_Bacon-1.5_SD_ROOT.zip" in t and "LGPT_R36SX_Bacon-X.Y" not in t:
+        warns.append("BRANCH_TAG_POLICY.md Hygiene should use generic pattern LGPT_R36SX_Bacon-X.Y_SD_ROOT.zip with resolve note, not just concrete 1.5")
+
+def check_current_objective_idle():
+    t = (REPO / "CURRENT.md").read_text(encoding="utf-8", errors="ignore")
+    if "Multi-agent V2.1 consistency/enforcement cleanup" in t:
+        errors.append("CURRENT.md still presents 'Multi-agent V2.1 consistency/enforcement cleanup' as active objective — should be idle: No active implementation/runtime task")
+    if "No active implementation/runtime task" not in t:
+        warns.append("CURRENT.md Current Objective should be idle: No active implementation/runtime task")
+    if "Await explicit" not in t:
+        warns.append("CURRENT.md should say 'Await explicit user-approved objective'")
+
 def check_referenced_exist():
     for p in REFERENCED_MUST_EXIST:
         if not p.exists():
@@ -348,12 +389,15 @@ def main():
     check_required()
     check_agents_no_hardcode()
     check_agents_v21()
+    check_agents_version_consistency()
     check_current()
+    check_current_objective_idle()
     check_context_map()
     check_decisions()
     check_release_contract()
     check_validation_doc()
     check_branch_tag_policy()
+    check_branch_policy_class_aware()
     check_readme()
     check_referenced_exist()
     check_agents_core_path()

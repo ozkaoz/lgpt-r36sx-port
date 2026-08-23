@@ -1,6 +1,6 @@
 # AGENTS.md — Project Constitution
 
-**Version:** 2.0
+**Version:** 2.1
 **Date:** 2026-08-23
 **Repo:** https://github.com/ozkaoz/lgpt-r36sx-port
 **Scope:** Multi-agent operating contract for LGPT R36SX (Bacon-1.5 Golden Bootstrap)
