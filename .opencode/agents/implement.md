@@ -37,6 +37,10 @@ permission:
     "rm -rf *": deny
     "fsck*": deny
     "chkdsk*": deny
+  task:
+    "*": deny
+    "audit": allow
+    "review": allow
   external_directory: ask
 ---
 
@@ -59,6 +63,7 @@ Implement `CLASS A` (docs/context) and `CLASS B` (host tooling) freely.
 - Destructive SD ops: ask by frontmatter (`bash "*": ask`, `cp *": ask`)
 - Release publish: ask by frontmatter (`gh release*": ask`, `git push*": ask`)
 - Force push/reset/clean: denied (`git reset*": deny`, etc.)
+- Subagent launch: least privilege `task: "*":deny, audit/review:allow` — cannot escalate to release/implement
 
 ## Must Do
 

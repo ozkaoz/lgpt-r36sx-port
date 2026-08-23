@@ -366,6 +366,9 @@ def check_opencode_agents():
             # must have edit: deny in frontmatter, not just prose
             if not re.search(r"edit:\s*deny", fm):
                 errors.append(f"{p.relative_to(REPO)} must have frontmatter edit: deny (not just prose)")
+            # V2.1.2: read-only agents must not be able to bypass via task
+            if not re.search(r"task:\s*deny", fm):
+                errors.append(f"{p.relative_to(REPO)} must have frontmatter task: deny (prevent privilege escalation via subagents)")
         if name == "audit.md":
             # bash should be deny or limited
             if "bash:" not in fm:
@@ -380,6 +383,25 @@ def check_opencode_agents():
             # check for ask/deny for destructive
             if name == "release.md" and "edit:" not in fm:
                 warns.append(f"{p.relative_to(REPO)} release should have edit permission configured")
+            # V2.1.2: least privilege task — must not permit escalation to more privileged agents
+            if "task:" not in fm:
+                errors.append(f"{p.relative_to(REPO)} must have task permission for least privilege (deny * then allow audit/review)")
+            else:
+                # Check unrestricted allow
+                if re.search(r'task:\s*\n\s*"\*"\s*:\s*allow', fm):
+                    errors.append(f"{p.relative_to(REPO)} task must not have unrestricted \"*\": allow — use \"*\": deny + explicit audit/review allow")
+                # Implement must not allow release
+                if name == "implement.md" and re.search(r'"release"\s*:\s*allow', fm, re.I):
+                    errors.append(f"{p.relative_to(REPO)} task must not permit release — prevents implement→release escalation")
+                # Release must not allow implement
+                if name == "release.md" and re.search(r'"implement"\s*:\s*allow', fm, re.I):
+                    errors.append(f"{p.relative_to(REPO)} task must not permit implement — prevents release→implement escalation")
+                # Must at least allow audit/review if using granular (preferred)
+                if re.search(r'task:\s*\n\s*"\*"\s*:\s*deny', fm):
+                    if not re.search(r'"audit"\s*:\s*allow', fm):
+                        warns.append(f"{p.relative_to(REPO)} task should allow audit for independent review")
+                    if not re.search(r'"review"\s*:\s*allow', fm):
+                        warns.append(f"{p.relative_to(REPO)} task should allow review for independent review")
     # discovery count
     found = list(agents_dir.glob("*.md"))
     if len(found) < 4:

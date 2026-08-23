@@ -23,6 +23,7 @@ permission:
     "bash -n *": allow
   webfetch: allow
   external_directory: deny
+  task: deny
 ---
 
 # review — Independent Read-Only Review
@@ -37,6 +38,7 @@ Independent read-only review: diff inspection, test verification, policy consist
 
 - Edit: denied by frontmatter (`edit: deny`) — reviewer must not modify code to make its own review pass
 - Destructive: denied by frontmatter (`bash "*": deny`)
+- Subagent launch: denied by frontmatter (`task: deny`) — cannot launch another agent to alter findings
 
 ## Checklist
 

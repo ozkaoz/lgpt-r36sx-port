@@ -27,6 +27,10 @@ permission:
     "rm *": deny
     "git reset*": deny
     "git clean*": deny
+  task:
+    "*": deny
+    "audit": allow
+    "review": allow
   webfetch: allow
   external_directory: ask
 ---
@@ -48,6 +52,7 @@ Release-specific verification: manifest consistency, package identity, clean-ins
 - Edit: ask by frontmatter (`edit: ask`) — only for manifest/docs packaging checks
 - Destructive / external publication: ask (`gh release*": ask`, `git push*": ask`)
 - SD write / hardware deploy: ask (`cp *": ask`)
+- Subagent launch: least privilege `task: "*":deny, audit/review:allow` — cannot escalate to implement/release
 
 ## Must Do
 

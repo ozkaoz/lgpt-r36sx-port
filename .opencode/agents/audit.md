@@ -29,6 +29,7 @@ permission:
   websearch: allow
   skill: allow
   external_directory: deny
+  task: deny
 ---
 
 # audit — Read-Only Investigation
@@ -47,7 +48,8 @@ Inspect Git, filesystem, builds, logs, device manifests; produce audit tables / 
 
 - Edit: denied by frontmatter (`edit: deny`)
 - Destructive operations: denied by frontmatter (`bash "*": deny`)
-- Allowed: `read`, `glob`, `grep`, `bash` (safe read-only list above), `task` (explore)
+- Subagent launch: denied by frontmatter (`task: deny`) — cannot bypass edit deny via implement/release
+- Allowed: `read`, `glob`, `grep`, `bash` (safe read-only list above)
 
 ## Must Do
 

@@ -33,6 +33,6 @@ Tags are cheap, preserve history. Do not delete release/checkpoint/legacy tags. 
 
 ## Hygiene
 
-- Release ZIP `LGPT_R36SX_Bacon-X.Y_SD_ROOT.zip` (e.g. `LGPT_R36SX_Bacon-1.5_SD_ROOT.zip`, direct-copy, no wrapper, H38-only APK at root — resolve current concrete release identity from `CURRENT.md` and authoritative release manifest) + `LGPT_R36SX_Bacon-1.5_Android.apk` + `SHA256SUMS.txt` are the public artifacts (see `docs/ai/RELEASE_CONTRACT.md`).
+- Release ZIP `LGPT_R36SX_Bacon-X.Y_SD_ROOT.zip` (e.g. `LGPT_R36SX_Bacon-1.5_SD_ROOT.zip`, direct-copy, no wrapper, H38-only APK at root — resolve current concrete release identity from `CURRENT.md` and authoritative release manifest) + `LGPT_R36SX_Bacon-X.Y_Android.apk` (separate Android asset when applicable per authoritative release manifest) + `SHA256SUMS.txt` are the public artifacts (see `docs/ai/RELEASE_CONTRACT.md`).
 - `sd_root/` is the canonical public payload (port overlay). TreeFrog vendor base (e.g. `cubegm/cores/libemu_*`) is not duplicated in git; recorded in `PHYSICAL_SD_FINAL_*` manifests.
 - Docs: `SINGLE_STARTUP_ACTIONS_CHECKPOINT.md`, `BACON_1_5_RELEASE_MANIFEST.md`, `PHYSICAL_SD_FINAL_*`, `RELEASE_SD_*` document exact validated state.
