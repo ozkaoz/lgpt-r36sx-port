@@ -65,7 +65,7 @@ Use the latest GitHub Release **Bacon-1.5** to install the precompiled port. The
 - `deployment/`: files installed on the SD card.
 - `recovery/`: validated UAC2 kernel module.
 - `kernel_module_tools/`: module rebuild and verification tools.
-- `scripts/`: current build, install, verification and recovery commands.
+- `scripts/`: build, audit, release, verification and legacy deployment utilities. `scripts/install.sh` and `scripts/verify.sh` are legacy U2523 and are **not** the canonical Bacon-1.5 installation path. Current installation: GitHub Bacon release ZIP → contents to SD root (see `docs/ai/RELEASE_CONTRACT.md`).
 - `tests/`: current regression tests.
 - `docs/`: consolidated user and developer documentation.
 

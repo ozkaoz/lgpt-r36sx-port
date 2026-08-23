@@ -5,6 +5,7 @@ set -Eeuo pipefail
 # Default: repo diagnostics + context-contract test
 # Optional: --sd <mount>  (read-only mount/fs inspection)
 #           --sd-write-probe (requires --sd, creates unique temp file then removes it)
+#           --allow-dirty (allow dirty worktree to continue)
 # Never writes to SD by default, never runs fs repair automatically.
 
 ROOT=""
@@ -14,11 +15,13 @@ UPSTREAM=""
 AHEAD_BEHIND=""
 SD_PATH=""
 WRITE_PROBE=0
+ALLOW_DIRTY=0
 
 usage() {
-  echo "Usage: $0 [--sd <mount>] [--sd-write-probe] [--help]"
+  echo "Usage: $0 [--sd <mount>] [--sd-write-probe] [--allow-dirty] [--help]"
   echo "  --sd <mount>         optional SD mount to inspect (e.g. /mnt/g, /mnt/f, G:\)"
   echo "  --sd-write-probe     with --sd, perform one unique temp-file write then remove"
+  echo "  --allow-dirty        allow dirty worktree to continue (else dirty → PREFLIGHT_RESULT=FAIL)"
   echo "  --help               show this help"
 }
 
@@ -29,6 +32,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --sd-write-probe)
       WRITE_PROBE=1; shift
+      ;;
+    --allow-dirty)
+      ALLOW_DIRTY=1; shift
       ;;
     --help|-h)
       usage; exit 0
@@ -66,6 +72,25 @@ echo "AHEAD_BEHIND=$AHEAD_BEHIND"
 echo "--- git status ---"
 git -C "$ROOT" status --short --branch || true
 
+# Dirty worktree policy (AGENTS.md: unexplained local modifications require STOP)
+# Default: dirty → nonzero. --allow-dirty continues but reports WORKTREE_DIRTY=YES
+DIRTY_COUNT="$(git -C "$ROOT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+if [[ "$DIRTY_COUNT" != "0" ]]; then
+  echo "WORKTREE_DIRTY=YES (modified/untracked files: $DIRTY_COUNT)"
+  git -C "$ROOT" status --short 2>/dev/null || true
+  git -C "$ROOT" ls-files --others --exclude-standard 2>/dev/null | head -n 20 || true
+  if [[ "$ALLOW_DIRTY" -eq 0 ]]; then
+    echo "PREFLIGHT_RESULT=FAIL"
+    echo "PREFLIGHT_REASON=DIRTY_WORKTREE"
+    echo "HINT: use --allow-dirty to inspect anyway (does not auto-clean)"
+    exit 1
+  else
+    echo "DIRTY_ALLOWED=YES"
+  fi
+else
+  echo "WORKTREE_DIRTY=NO"
+fi
+
 echo "--- recent commits ---"
 git -C "$ROOT" log --oneline --decorate -10 || true
 
@@ -80,16 +105,32 @@ if [[ "$STASH_COUNT" != "0" ]]; then
 fi
 
 echo "--- context contract test ---"
+CONTRACT_EXIT=0
 if [[ -f "$ROOT/tests/test_agent_context_contract.py" ]]; then
   if command -v python3 >/dev/null 2>&1; then
-    python3 "$ROOT/tests/test_agent_context_contract.py" || echo "CONTEXT_CONTRACT: FAIL (see above)"
+    if ! python3 "$ROOT/tests/test_agent_context_contract.py"; then
+      CONTRACT_EXIT=1
+    fi
   elif command -v python >/dev/null 2>&1; then
-    python "$ROOT/tests/test_agent_context_contract.py" || echo "CONTEXT_CONTRACT: FAIL (see above)"
+    if ! python "$ROOT/tests/test_agent_context_contract.py"; then
+      CONTRACT_EXIT=1
+    fi
   else
-    echo "SKIP: python not found"
+    echo "ERROR: python not found but context-contract test is required" >&2
+    echo "PREFLIGHT_RESULT=FAIL"
+    echo "PREFLIGHT_REASON=PYTHON_MISSING"
+    exit 1
+  fi
+  if [[ "$CONTRACT_EXIT" -ne 0 ]]; then
+    echo "PREFLIGHT_RESULT=FAIL"
+    echo "PREFLIGHT_REASON=CONTEXT_CONTRACT"
+    exit 1
   fi
 else
-  echo "WARN: tests/test_agent_context_contract.py not found"
+  echo "WARN: tests/test_agent_context_contract.py not found" >&2
+  echo "PREFLIGHT_RESULT=FAIL"
+  echo "PREFLIGHT_REASON=CONTRACT_MISSING"
+  exit 1
 fi
 
 # Optional SD inspection — only when explicitly requested
@@ -106,7 +147,6 @@ if [[ -n "$SD_PATH" ]]; then
       df -h "$SD_PATH" 2>&1 || true
     fi
     if command -v mount >/dev/null 2>&1; then
-      # shellcheck disable=SC2143
       if mount | grep -F -- "$SD_PATH" >/dev/null 2>&1; then
         mount | grep -F -- "$SD_PATH" || true
       else
@@ -116,10 +156,13 @@ if [[ -n "$SD_PATH" ]]; then
     fi
     # read-only vs writable indication via mount options and test
     if [[ -r "$SD_PATH" ]]; then echo "SD readable: YES"; else echo "SD readable: NO"; fi
-    # Try to detect ro mount option without writing
-    MOUNT_OPTS=""
+    # Token-aware ro detection (not substring)
     if command -v findmnt >/dev/null 2>&1; then
-      findmnt -n -o OPTIONS --target "$SD_PATH" 2>/dev/null | grep -q "ro" && echo "mount options: read-only (ro)" || echo "mount options: writable (rw or not ro)"
+      if findmnt -n -o OPTIONS --target "$SD_PATH" 2>/dev/null | tr ',' '\n' | grep -qx "ro"; then
+        echo "mount options: read-only (ro)"
+      else
+        echo "mount options: writable (rw or not ro)"
+      fi
     fi
     ls -ld "$SD_PATH" 2>&1 || true
 
@@ -149,4 +192,5 @@ else
   echo "--- SD inspection: SKIPPED (use --sd <mount> to enable read-only inspection) ---"
 fi
 
+echo "PREFLIGHT_RESULT=PASS"
 echo "PREFLIGHT_DONE"

@@ -129,6 +129,8 @@
 **Evidence:** `analyzer_h1_stereo 6 PASS` (in-phase 0.144 antiphase 0.144), `hat_probe A-E PASS`, build `66c966d...` R36SX F1-F7 PASS.
 **Related:** `SpectrumAnalyzer.cpp/h`, `InstrumentEqView.cpp/h`, `scripts/install.sh`, `verify.sh`
 
+**Note (2026-08-23):** Android payload clause (`r36s_aoa_*_h36` + APKs, `lgpt_libretro.so` auto) is historical context from analyzer-era; current Bacon-1.5 H38-only packaging is authoritative via DEC-2026-08-23-02, DEC-2026-08-23-03 and `docs/ai/RELEASE_CONTRACT.md` (H38-only, H36 must remain absent). Analyzer stereo power / DisplayPeak behavior remains ACTIVE.
+
 ---
 
 ## DEC-2026-08-23-01 — Multi-agent context architecture V2

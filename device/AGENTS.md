@@ -16,4 +16,4 @@
 - **OTG/MUSB changes require physical matrix:** `LOCAL | WINDOWS (detect/playback/record) | SP404 | ANDROID` per `docs/ai/RELEASE_CONTRACT.md`. `Detection != Runtime READY != PCM flow != physical PASS`.
 - **Filesystem first:** before blaming runtime, verify SD `mounted && healthy && writable` (dirty exFAT previously faked USB failure). `scripts/agent_preflight.sh --sd <mount>` . Never auto `fsck` — needs user auth.
 - **Volatile vs persistent:** persistent baseline is the 6 files in `docs/ai/RELEASE_CONTRACT.md`. Never package `FIFO / PID / daemon_pid / setup_result / sp404_card / aoa state / /tmp / logs`.
-- **No destructive SD ops** without explicit user approval. `install.sh` here is legacy — see root `AGENTS.md` Section 9.
+- **No destructive SD ops** without explicit user approval. `scripts/install.sh` and `scripts/verify.sh` are legacy U2523 — see root `AGENTS.md` Section 9.

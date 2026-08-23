@@ -1,3 +1,36 @@
+---
+description: Release verification including manifest and download-back
+mode: subagent
+permission:
+  read: allow
+  glob: allow
+  grep: allow
+  list: allow
+  edit: ask
+  bash:
+    "*": ask
+    "git status*": allow
+    "git diff*": allow
+    "git log*": allow
+    "git show*": allow
+    "git rev-parse*": allow
+    "sha256sum *": allow
+    "ls *": allow
+    "cat *": allow
+    "python3 tests/test_release_audio_bootstrap.py": allow
+    "python3 tests/test_agent_context_contract.py": allow
+    "unzip -t*": allow
+    "git push*": ask
+    "gh release*": ask
+    "git tag*": ask
+    "cp *": ask
+    "rm *": deny
+    "git reset*": deny
+    "git clean*": deny
+  webfetch: allow
+  external_directory: ask
+---
+
 # release — Release Verification
 
 Lightweight role overlay. Root `AGENTS.md` remains canonical.
@@ -12,9 +45,9 @@ Release-specific verification: manifest consistency, package identity, clean-ins
 
 ## Permissions
 
-- Edit: allowed only for manifest/docs packaging checks
-- Destructive / external publication: requires explicit user authorization
-- SD write / hardware deploy: requires explicit approval
+- Edit: ask by frontmatter (`edit: ask`) — only for manifest/docs packaging checks
+- Destructive / external publication: ask (`gh release*": ask`, `git push*": ask`)
+- SD write / hardware deploy: ask (`cp *": ask`)
 
 ## Must Do
 

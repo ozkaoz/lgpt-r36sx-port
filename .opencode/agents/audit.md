@@ -1,3 +1,36 @@
+---
+description: Read-only investigation and evidence gathering
+mode: subagent
+permission:
+  read: allow
+  glob: allow
+  grep: allow
+  list: allow
+  edit: deny
+  bash:
+    "*": deny
+    "git status*": allow
+    "git diff*": allow
+    "git log*": allow
+    "git show*": allow
+    "git rev-parse*": allow
+    "git branch --show-current": allow
+    "git worktree list": allow
+    "git stash list": allow
+    "grep *": allow
+    "find *": allow
+    "ls *": allow
+    "cat *": allow
+    "sha256sum *": allow
+    "file *": allow
+    "stat *": allow
+    "head *": allow
+  webfetch: allow
+  websearch: allow
+  skill: allow
+  external_directory: deny
+---
+
 # audit — Read-Only Investigation
 
 Lightweight role overlay. Root `AGENTS.md` remains canonical; this file only adds role focus.
@@ -12,9 +45,9 @@ Inspect Git, filesystem, builds, logs, device manifests; produce audit tables / 
 
 ## Permissions
 
-- Edit: denied
-- Destructive operations: denied (no `rm -rf`, `reset --hard`, `clean -fd` without audit, no SD write, no release publish)
-- Allowed: `read`, `glob`, `grep`, `bash` (read-only), `task` (explore)
+- Edit: denied by frontmatter (`edit: deny`)
+- Destructive operations: denied by frontmatter (`bash "*": deny`)
+- Allowed: `read`, `glob`, `grep`, `bash` (safe read-only list above), `task` (explore)
 
 ## Must Do
 

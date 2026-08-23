@@ -50,9 +50,8 @@ Rule: `CURRENT.md IS A CACHE`. If CURRENT contradicts direct evidence, direct ev
 TARGET        = R36SX (TreeFrogUI, kernel 4.4.186-release)
 AUDIO_RATE    = 48000 Hz (TreeFrogAudio.cpp / TreeFrogLibretro.cpp)
 AUDIO_CHANNELS= 2 Stereo (SubmitStereo48000 / MixUsbCaptureMonitorStereo48000)
-CANONICAL_CORE= cubegm/cores/lgpt_core.so  (SHA 46bd84ebb0d1b1be8caec7c76fecbe6fb4baa8e9bbd603b44488bcc929dedec6, 1559548)
-RELEASE_ZIP   = LGPT_R36SX_Bacon-1.5_SD_ROOT.zip (C5C77A0212..., 7138546, 56 files, H38-only)
-# Current Bacon-1.5 protected baseline — resolve future identities via CURRENT.md + docs/BACON_1_5_RELEASE_MANIFEST.md + LGPT_R36SX_Bacon-1.5_SHA256SUMS.txt
+CURRENT_CORE_IDENTITY     = resolve from current Source/Physical/Release Golden evidence (CURRENT.md, docs/BACON_1_5_RELEASE_MANIFEST.md, LGPT_R36SX_Bacon-1.5_SHA256SUMS.txt, Git)
+CURRENT_RELEASE_IDENTITY  = resolve from authoritative release manifests (ZIP name = authoritative SHA; see docs/ai/RELEASE_CONTRACT.md)
 ```
 
 No MONO fallback, no 44100 resampling, no unapproved H36 APK without explicit DECISION.
@@ -85,13 +84,11 @@ Physical test never inferred. Labels: `STATIC PASS | HOST PASS | PACKAGING PASS 
 - **SD health:** before blaming runtime, verify mount healthy/writable/not read-only. Dirty exFAT caused false USB/bootstrap failures. `Detection != Runtime READY != PCM flow != physical PASS`. Never auto-run fs repair — requires explicit user authorization.
 - **Kernel lifecycle:** `CONFIG_MODULE_UNLOAD=n` observed — do not assume hot-swap of ALSA families without evidence.
 
-## 7. SD / Core / Release Immutability (This Task)
+## 7. Golden Protection (Permanent)
 
-```
-CORE_CHANGED=NO  RUNTIME_CHANGED=NO  RELEASE_PAYLOAD_CHANGED=NO  SD_ROOT_CHANGED=NO
-```
-
-Do NOT rebuild/replace Bacon-1.5 ZIP, do NOT copy to physical SD, do NOT deploy, do NOT modify core/audio/daemons/APK/MUSB/TreeFrogUI.
+- Current PHYSICAL/RELEASE GOLDEN must not be modified incidentally. CLASS A/B tasks must produce `SD_ROOT_CHANGED=NO` / `CORE_CHANGED=NO` / `RUNTIME_CHANGED=NO` (verify `git diff -- sd_root`).
+- A CLASS C/D/E task may intentionally modify runtime/deployment/release only when explicitly approved, scoped, and its validation gate (Section 4 + docs/ai/VALIDATION.md) is followed.
+- No rebuild/replace of release ZIP, SD deploy, or core/audio/daemons/APK/MUSB/TreeFrogUI mutation without explicit approval and evidence.
 
 ## 8. Git & Checkpoint Rules
 
