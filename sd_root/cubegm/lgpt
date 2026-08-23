@@ -111,6 +111,19 @@ log "INSTRUMENTFOLDER_CONFIG=$INSTRUMENT_CONFIG"
 log "INSTRUMENTFOLDER_RESOLVED=$INSTRUMENTS"
 log "INSTRUMENTFOLDER_OK=1"
 
+# P0 SD WRITEABILITY DIAGNOSTIC (observability, not workaround for dirty FS):
+# Test whether $DATA/otg is writable before provisioning persistent bootstrap.
+if [ -d "$DATA/otg" ]; then
+    if ( : > "$DATA/otg/.write_test.$$" ) 2>/dev/null; then
+        rm -f "$DATA/otg/.write_test.$$" 2>/dev/null || true
+        log "SD_WRITEABLE=YES path=$DATA/otg"
+    else
+        log "SD_WRITEABLE=NO path=$DATA/otg (read-only, dirty exFAT, or permission)"
+    fi
+else
+    log "SD_WRITEABLE=UNKNOWN path=$DATA/otg missing (will be created)"
+fi
+
 # U2.52.7 STEREO_48K_PROVISION:
 # The UAC2 bridge sentinel and the default USB audio profile used to be
 # created only by install.sh/install_stock.sh. A freshly formatted SD staged as
@@ -118,12 +131,21 @@ log "INSTRUMENTFOLDER_OK=1"
 # gadget setup exited with OTG_DISABLED_NO_SENTINEL and the PC never saw the
 # console. Provisions both on every launcher start, like the runtime dirs.
 if [ ! -e "$DATA/otg/enable_lgpt_uac2_bridge" ]; then
-    : > "$DATA/otg/enable_lgpt_uac2_bridge" 2>>"$LOG" || true
-    log "UAC2_SENTINEL_PROVISIONED=1"
+    if ! : > "$DATA/otg/enable_lgpt_uac2_bridge" 2>>"$LOG"; then
+        log "UAC2_SENTINEL_PROVISION_FAILED_READ_ONLY path=$DATA/otg/enable_lgpt_uac2_bridge"
+        log "SD_WRITEABLE=NO (sentinel provisioning failed)"
+    else
+        log "UAC2_SENTINEL_PROVISIONED=1"
+    fi
+else
+    log "UAC2_SENTINEL_EXISTS=1"
 fi
 if [ ! -s "$DATA/otg/audio_usb_profile" ]; then
-    printf 'STEREO_48K\n' > "$DATA/otg/audio_usb_profile" 2>>"$LOG" || true
-    log "AUDIO_USB_PROFILE_PROVISIONED=STEREO_48K"
+    if ! printf 'STEREO_48K\n' > "$DATA/otg/audio_usb_profile" 2>>"$LOG"; then
+        log "AUDIO_USB_PROFILE_PROVISION_FAILED_READ_ONLY path=$DATA/otg/audio_usb_profile"
+    else
+        log "AUDIO_USB_PROFILE_PROVISIONED=STEREO_48K"
+    fi
 fi
 
 [ -x "$PICO" ] || fail 30 "TreeFrogUI picoarch missing or not executable: $PICO"

@@ -368,6 +368,7 @@ u2414_flush_logs_to_sd(){
         ls -lh "$SRC" 2>/dev/null || true
     } > "$manifest" 2>/dev/null || true
     # Copy diagnostic files FIRST (exclude launcher log, it will be last)
+    # P0 baseline + diagnostic closure: persist additional driver logs and runtime_state for WINDOWS/SP404 diagnosis
     for src in \
         "$SRC/PERF_DIAG_BOOT.log" \
         "$SRC/PERF_AUTO_LOCAL_MAIN.log" \
@@ -381,7 +382,25 @@ u2414_flush_logs_to_sd(){
         "$SRC/MUSB_SNAPSHOT_SP404_ACTIVE"*.log \
         "$SRC/MUSB_SNAPSHOT_POST_LOCAL"*.log \
         "$SRC/COLD_LOCAL_SNAPSHOT.log" \
-        "$SRC/PERF_DIAG.log"; do
+        "$SRC/PERF_DIAG.log" \
+        "$SRC/H35_AUDIO_DRIVER_MODE.log" \
+        "$SRC/H38_HOST_RUNTIME_SUPERVISOR.log" \
+        "$SRC/H38_SP404_HOST_AUDIO_DAEMON.log" \
+        "$SRC/H38_HOST_MODULE_LOAD.err" \
+        "$SRC/uac2_bridge_lgpt.log" \
+        "$SRC/H35_ANDROID_RUNTIME_SUPERVISOR.log" \
+        "$SRC/U2517_AUDIO_DRIVER_SETUP.log" \
+        "$SRC/U2517_USB_AUDIO_DAEMON.log" \
+        "/tmp/r36sx_lgpt_logs/H35_AUDIO_DRIVER_MODE.log" \
+        "/tmp/r36sx_lgpt_logs/H38_HOST_RUNTIME_SUPERVISOR.log" \
+        "/tmp/r36sx_lgpt_logs/H38_SP404_HOST_AUDIO_DAEMON.log" \
+        "/tmp/r36sx_lgpt_logs/H38_HOST_MODULE_LOAD.err" \
+        "/tmp/r36sx_lgpt_logs/uac2_bridge_lgpt.log" \
+        "$LOGROOT/H35_AUDIO_DRIVER_MODE.log" \
+        "$LOGROOT/H38_HOST_RUNTIME_SUPERVISOR.log" \
+        "$LOGROOT/H38_SP404_HOST_AUDIO_DAEMON.log" \
+        "$LOGROOT/H38_HOST_MODULE_LOAD.err" \
+        "$LOGROOT/uac2_bridge_lgpt.log"; do
         # Expand glob (if no match, skip)
         for f in $src; do
             [ -e "$f" ] || continue
@@ -407,6 +426,43 @@ u2414_flush_logs_to_sd(){
                 rm -f "$tmp" 2>/dev/null || true
             fi
         done
+    done
+    # Diagnostic runtime_state persistence (LGPT_OTG_LOGS/runtime_state/)
+    mkdir -p "$DST/runtime_state" 2>/dev/null || true
+    for src in \
+        "/tmp/r36sx_lgpt_usb/setup_result" \
+        "/tmp/r36sx_lgpt_usb/daemon_version" \
+        "/tmp/r36sx_lgpt_usb/capture_abi" \
+        "/tmp/r36sx_lgpt_usb/audio_channels" \
+        "/tmp/r36sx_lgpt_usb/audio_rate" \
+        "/tmp/r36sx_lgpt_usb/audio_profile" \
+        "/tmp/r36sx_lgpt_usb/sp404_card" \
+        "/tmp/r36sx_lgpt_usb/sp404_playback_pcm" \
+        "/tmp/r36sx_lgpt_usb/sp404_capture_pcm" \
+        "/tmp/r36sx_lgpt_usb/aoa_state" \
+        "/tmp/r36sx_lgpt_usb/aoa_result" \
+        "/tmp/r36sx_lgpt_usb/aoa_bulk_accessory_present" \
+        "/tmp/r36sx_lgpt_usb/aoa_bulk_stream_ready" \
+        "/tmp/r36sx_lgpt_usb/h35_android_supervisor_pid" \
+        "/tmp/r36sx_lgpt_usb/h38_host_supervisor_pid" \
+        "/tmp/r36sx_lgpt_usb/sp404_daemon_pid" \
+        "/tmp/r36sx_lgpt_usb/daemon_pid" \
+        "/tmp/r36sx_lgpt_usb/cold_local_musb_role" \
+        "/tmp/r36sx_lgpt_usb/audio_driver_mode" \
+        "/tmp/r36sx_lgpt_usb/audio_driver_policy"; do
+        [ -e "$src" ] || continue
+        sz=$(stat -c%s "$src" 2>/dev/null || wc -c < "$src" 2>/dev/null || echo 0)
+        case "$sz" in ''|*[!0-9]*) sz=0;; esac
+        if [ "$sz" -gt 65536 ]; then continue; fi
+        base=$(basename "$src")
+        tmp="$DST/runtime_state/.flush_tmp.$base.$$"
+        if cp -f "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$DST/runtime_state/$base" 2>/dev/null; then
+            echo "FLUSH_OK src=$src dst=$DST/runtime_state/$base sz=$sz" || true
+            total=$((total + sz))
+            if [ "$total" -gt "$max_bytes" ]; then echo "FLUSH_STOP budget_exceeded total=$total max=$max_bytes" >&2 || true; break; fi
+        else
+            rm -f "$tmp" 2>/dev/null || true
+        fi
     done
     # Also flush from /tmp/r36sx_lgpt_usb for backward compat (cold_local, etc.)
     for src in \
