@@ -1,347 +1,229 @@
-# DECISIONS.md — Memoria técnica duradera
+# DECISIONS — Durable Technical Decisions
 
-**Última actualización:** 2026-08-21
-**Commit base:** e27c741 (feature/bacon-1.5-fx, Infraestructura IA)
-**Canonical WSL repository:** `/home/dafunknoise/lgpt-repo`
+**Last reviewed:** 2026-08-23
+**Policy:** Only durable architecture/project decisions. Operational events (push, copy to SD, one-off build PASS) belong in Git/evidence, not here.
 
----
-
-## DEC-2026-08-21-01 — No existe tabla de ganancia indexada por dB+80
-
-**Decisión:** No existe ninguna tabla de ganancia indexada por `dB + 80` en el código actual. Todo el cálculo de ganancia se realiza mediante `powf(10.0f, dB / 20.0f)` (cálculo directo) o mediante tablas indexadas por **nivel lineal** (compresor), no por dB.
-
-**Motivo:** La auditoría exhaustiva del código (commit 8cc0a47) confirmó que no existe ningún código que haga `idx = dB + 80` para indexar una tabla de ganancia. El supuesto bug BUG1 no existe en la base de código actual.
-
-**Contexto:** Auditoría completa del código de audio (InstrumentEq, ParametricEQ, Compressor, AudioMixer, EqBiquad, SpectrumAnalyzer, FxPages) realizada el 2026-08-21.
-
-**Alternativas consideradas:**
-- Buscar en todo el árbol de fuentes (incluyendo tests y adaptadores)
-- Revisar historial de commits (U2.52.4 a U2.71)
-
-**Enfoques descartados:**
-- Buscar tabla `eqGainTable` — no existe
-- Buscar código `idx = dB + 80` — no existe
-
-**Evidencia:**
-- `InstrumentEq.cpp`: ganancia clamp -24..+24 dB → `powf(10.0f, dB/20.0f)` vía `EqBiquad`
-- `Compressor.cpp`: tabla indexada por **nivel lineal** (`level >> (15-kTableBits)`), no por dB
-- `AudioMixer`: `powf(10.0f, gainDb/20.0f)` para compresor, `pow(volume/100, 4.0f)` para master
-- `SpectrumAnalyzer`: `powf(fc/20.0f, 0.12f)` para visual gain
-- `FxPages.h:442` único uso de `(db+24)/24` es para **medidor VU**, no para ganancia de audio
-
-**Consecuencias:** El supuesto BUG1 no existe en el código actual. La ganancia se calcula correctamente mediante `powf(10.0f, dB/20.0f)` y los límites -24..+24 dB se aplican en `InstrumentEq.cpp:156-159` y `ParametricEQ.cpp:109-110`.
-
-**Relacionado:** `InstrumentEq.cpp:156-159`, `ParametricEQ.cpp:108-110`, `Compressor.cpp:190-207`, `FxPages.h:442`
+| Field | Meaning |
+|-------|---------|
+| ID | `DEC-YYYY-MM-DD-NN` unique |
+| Status | `ACTIVE` / `SUPERSEDED` / `DEPRECATED` |
+| Scope | Subsystem / area |
 
 ---
 
-## DEC-2026-08-21-02 — SDL2 Audio Driver usa API legacy SDL1.2
+## DEC-2026-08-21-01 — No gain table indexed by dB+80
 
-**Decisión:** Los drivers `SDL` y `SDL2` usan `SDL_OpenAudio` / `SDL_PauseAudio` (API legacy SDL 1.2) en lugar de `SDL_OpenAudioDevice` / `SDL_PauseAudioDevice` (SDL2). No hay `SDL_InitSubSystem(SDL_INIT_AUDIO)`.
+**Date:** 2026-08-21
+**Status:** ACTIVE
+**Scope:** Audio / DSP (InstrumentEq, ParametricEQ)
 
-**Motivo:** Migración parcial a SDL2 incompleta. Ambos adaptadores (`SDL` y `SDL2`) usan la API legacy.
-
-**Contexto:** Revisión de `source/sources/Adapters/SDL/Audio/SDLAudioDriver.cpp` y `source/sources/Adapters/SDL2/Audio/SDLAudioDriver.cpp`.
-
-**Alternativas consideradas:**
-- Migrar completamente a SDL2 API (`SDL_OpenAudioDevice`, `SDL_PauseAudioDevice`, `SDL_InitSubSystem`)
-- Mantener compatibilidad con SDL1.2
-
-**Enfoques descartados:** No se ha migrado por priorización de otras tareas (EQ, compresor, etc.).
-
-**Evidencia:**
-- `SDL/Audio/SDLAudioDriver.cpp:65` → `SDL_OpenAudio(&input, &returned)`
-* Line 125: `SDL_PauseAudio(0)`
-* Line 104: `SDL_CloseAudio()`
-* No `SDL_InitSubSystem(SDL_INIT_AUDIO)`
-* Callback usa `void sdl_callback(void*, Uint8*, int)` (SDL1 signature)
-* `SDL2/Audio/SDLAudioDriver.cpp` idéntico, usa `#include <SDL2/SDL.h>` pero misma API legacy
-
-**Consecuencias:** El driver de audio puede tener problemas en sistemas modernos SDL2. Requiere migración completa antes de release estable.
-
-**Relacionado:** `source/sources/Adapters/SDL/Audio/SDLAudioDriver.cpp`, `source/sources/Adapters/SDL2/Audio/SDLAudioDriver.cpp`
+**Context:** Audit for supposed BUG1 (`idx = dB+80` gain table) across full source tree and history U2.52..U2.71.
+**Decision:** No such table exists. Gain is `powf(10, dB/20)` or linear-indexed compressor table, clamped -24..+24 dB.
+**Reason:** Exhaustive grep and history review found no `eqGainTable` / `dB+80` indexer.
+**Consequences:** BUG1 was non-existent; do not add dB-indexed table.
+**Evidence:** `InstrumentEq.cpp:156-159`, `ParametricEQ.cpp:108-110`, `Compressor.cpp:190-207`, `FxPages.h:442` is VU only.
+**Related:** `source/sources/Application/Audio/InstrumentEq.cpp`, `EqBiquad.h`
 
 ---
 
-## DEC-2026-08-21-03 — EQ < 80 Hz: Q=0.707 para todos los tipos con slope>1
+## DEC-2026-08-21-02 — SDL2 driver uses SDL1.2 legacy API
 
-**Decisión:** Para frecuencias < 80 Hz y slope > 1, se fuerza `Q=0.707` (Butterworth) en **todos** los tipos de filtro (incluyendo BELL, LOW_SHELF, HIGH_SHELF), no solo LOWPASS/HIGHPASS.
+**Date:** 2026-08-21
+**Status:** ACTIVE
+**Scope:** Audio drivers (SDL/SDL2)
 
-**Motivo:** Prevenir resonancia/pico en graves (<80 Hz) cuando se usan slopes altos (S8 = 96 dB/oct). Con Q=1 y slope=8, un BELL a 45 Hz genera +48 dB en f0 (medido), interpretado erróneamente como "pared hacia arriba".
-
-**Contexto:** Commit `8cc0a47` (U2.71) extendió `Q=0.707` a `BELL/LOW_SHELF/HIGH_SHELF < 80 Hz` si `slope > 1`. Previo `21bee8d` (U2.70) solo `LOWPASS/HIGHPASS`.
-
-**Evidencia:**
-* `InstrumentEq.cpp:384-394` — `qForDsp = 0.70710678f` si `hz < 80.0f && slope > 1` (todos los tipos)
-* `EqBiquad.h:61-64` usa `double` para precisión en bajas frecuencias (`w0=0.0026`, `1-cw=3e-6`)
-* Prueba teórica: BELL 45 Hz lvl=6dB Q=1 slope=8 → +48 dB (medido); con Q=0.707 → respuesta Butterworth plana
-
-**Consecuencias:** Pared S8 en 40 Hz ahora plana. BELL a 45 Hz con S8 limitado a Q=0.707, pierde selectividad pero gana estabilidad.
-
-**Relacionado:** `InstrumentEq.cpp:384-394`, `EqBiquad.h:61-64`
+**Context:** Both `SDL` and `SDL2` adapters use `SDL_OpenAudio`/`SDL_PauseAudio` (SDL1.2) not `SDL_OpenAudioDevice`.
+**Decision:** Document as known debt; do not treat as modern SDL2 without migration.
+**Reason:** Partial SDL2 migration; functional on R36SX via legacy path.
+**Consequences:** May have issues on modern SDL2 hosts; requires explicit migration before stable host release.
+**Evidence:** `SDLAudioDriver.cpp:65` `SDL_OpenAudio`, no `SDL_InitSubSystem(SDL_INIT_AUDIO)`, SDL1 callback signature.
+**Related:** `source/sources/Adapters/SDL/Audio/SDLAudioDriver.cpp`, `source/sources/Adapters/SDL2/Audio/SDLAudioDriver.cpp`
 
 ---
 
-## DEC-2026-08-21-04 — Analyzer: Blackman window + hold solo >140 Hz
+## DEC-2026-08-21-03 — EQ <80 Hz: Q=0.707 for slope>1 on all filter types
 
-**Decisión:** Ventana FFT cambiada de Hann (-31 dB lóbulos laterales) a Blackman (-67 dB). Hold visual solo para frecuencias >140 Hz.
+**Date:** 2026-08-21
+**Status:** ACTIVE
+**Scope:** InstrumentEq / EqBiquad
 
-**Motivo:** Fuga espectral de Hann hacía que hihat sin bajos encendiera graves falsos. Hold en graves mantenía cola de kick; en agudos desaparecía el transient.
-
-**Evidencia:**
-* `SpectrumAnalyzer.cpp:141` — `a0=0.42, a1=0.5, a2=0.08` (Blackman)
-* `InstrumentEqView.cpp:634` — hold solo si `fcHold > 140.0f`
-* `visGain` uniforme `pow(fc/20, 0.12)/norm` → diagonal continua 20 Hz..20 kHz
-
-**Consecuencias:** Hihat sin bajos ya no enciende graves. Diagonal visual uniforme en toda la banda.
-
----
-
-## DEC-2026-08-21-05 — Versión inicio: NullView → "LGPT R36SX - Bacon 1.5"
-
-**Decisión:** `NullView.cpp:22` y `AppWindow.cpp:1430` cambiados de `"Piggy build %s.%s.%s"` a `"LGPT R36SX - Bacon 1.5"`. `Project.h:23` `PROJECT_RELEASE "5"` (antes "6"). `Project.h:24` `BUILD_COUNT "0-bacon15"`.
-
-**Motivo:** Eliminar referencia heredada "Piggy build". Unificar versionado en "LGPT R36SX - Bacon 1.5".
-
-**Evidencia:**
-- `NullView.cpp:22` → `snprintf(buildString, ..., "LGPT R36SX - Bacon 1.5")`
-- `AppWindow.cpp:1430` → mismo string
-- `ProjectView.cpp:342` → mismo string
-- `Project.h:23` `PROJECT_RELEASE "5"`
+**Context:** High slopes (S8 =96dB/oct) with Q=1 at <80 Hz caused +48 dB resonance on BELL/shelves.
+**Decision:** For `hz <80 && slope>1` force `Q=0.707` (Butterworth) for ALL types including BELL/LOW_SHELF/HIGH_SHELF.
+**Reason:** Stability and flat wall response at sub-80 Hz; measured BELL 45 Hz lvl6 Q1 S8 → 48 dB, with fix → ~6 dB flat.
+**Consequences:** S8 wall at 40 Hz flat; BELL <80 loses selectivity but gains stability.
+**Evidence:** `InstrumentEq.cpp:384-394` `qForDsp=0.707...`, `EqBiquad.h:61-64` double precision.
+**Related:** `source/sources/Application/Audio/InstrumentEq.cpp`, `source/sources/Application/Audio/EqBiquad.h`
 
 ---
 
-## DEC-2026-08-21-06 — Android Audio: `dev none` = UDC not attached
+## DEC-2026-08-21-04 — Analyzer: Blackman window + hold >140 Hz
 
-**Decisión:** Mensaje `dev none` en pantalla Android indica que el UDC (USB Device Controller) no está attached, no que falle el driver. `host_usb_audio` módulos `09EC1A1A` coinciden con `sd_root` de `latest`. `U2517` `ready-full-rebuild` ok.
+**Date:** 2026-08-21
+**Status:** SUPERSEDED by DEC-2026-08-21-31 and DEC-2026-08-21-32
+**Scope:** SpectrumAnalyzer / InstrumentEqView
 
-**Motivo:** Mismatch kernel/módulos vs `host_usb_audio` legacy. `H38_HOST_MODULE_LOAD.err` muestra `unknown symbol` para stack ALSA, no para AOA.
-
-**Evidencia:**
-* `G:\LGPT_OTG_LOGS\H38_HOST_MODULE_LOAD.err` → `unknown symbol snd_pcm_hw_constraint_minmax`
-* `U2517_AUDIO_DRIVER_SETUP.log` → `ready-full-rebuild profile=STEREO_48K channels=2 pid=704`
-* `U2517_USB_AUDIO_DAEMON.log` → `configured=0` (UDC not attached)
-* `G:\lgpt\otg\audio_driver_mode` = `ANDROID`
-* `G:\lgpt\otg\modules\4.4.186-release\host_usb_audio\*.ko` SHA256 `09EC1A1A` = `sd_root`
-
----
-
-## DEC-2026-08-21-07 — Analyzer hihat graves: Blackman + hold >140 Hz
-
-**Decisión:** Ventana Blackman (-67 dB) + hold visual solo >140 Hz elimina graves falsos en hihat. `visGain` uniforme `pow(fc/20,0.12)/norm` da diagonal continua.
-
-**Evidencia:** `SpectrumAnalyzer.cpp` ventana Blackman, `InstrumentEqView.cpp` hold solo `fcHold > 140 Hz`.
+**Context:** Hann -31 dB sidelobes caused hihat to light false bass; hold on bass kept kick tails.
+**Decision:** FFT Hann→Blackman (-67 dB, `a0=0.42 a1=0.5 a2=0.08`), visual hold only `fcHold>140 Hz`, uniform `visGain`.
+**Reason:** Eliminate spectral leakage diagonal; refine later with exclusive bins / stereo power.
+**Consequences:** Superseded by exact Hz mapping and stereo power decisions; Blackman and >140 Hz hold preserved.
+**Evidence:** `SpectrumAnalyzer.cpp:141`, `InstrumentEqView.cpp:634` (pre-fix baseline).
+**Related:** `source/sources/Application/Audio/SpectrumAnalyzer.cpp`
 
 ---
 
-## DEC-2026-08-21-08 — BELL < 80 Hz slope>4 → Q=0.707 (ya en U2.71)
+## DEC-2026-08-21-05 — Startup version string Bacon 1.5
 
-**Decisión:** Ya implementado en `8cc0a47`. `InstrumentEq.cpp:388` fuerza `Q=0.707` para `BELL` < 80 Hz si `slope > 4`.
+**Date:** 2026-08-21
+**Status:** ACTIVE
+**Scope:** UI / Versioning
 
-**Verificación:** BELL 45 Hz lvl=6dB Q=1 slope=8 → antes 48 dB, ahora con Q=0.707 → ~6 dB (Butterworth). Pared S8 correcta.
-
----
-
-## DEC-2026-08-21-28 — Analyzer hold solo >140 Hz (ya en U2.68) [RENOMBRADO de duplicado 08]
-
-**Decisión:** `InstrumentEqView.cpp:634` — `heldH[i]` solo actualizado si `fcHold > 140 Hz`. En <140 Hz `heldH[i] = h` (sin hold).
-
-**Nota:** Renombrado desde ID duplicado 08 para garantizar unicidad. Ver entrada BELL Q para el otro 08.
-
----
-
-## DEC-2026-08-21-09 — SD G: versión visible `LGPT R36SX - Bacon 1.5`
-
-**Decisión:** Core `DBAD57A7` en `G:\cubegm\cores\lgpt_r36sx_port_libretro.so` contiene `LGPT R36SX - Bacon 1.5`. `NullView.cpp:22`, `AppWindow.cpp:1430`, `ProjectView.cpp:342`, `Project.h:23` (`PROJECT_RELEASE "5"`). String `Piggy build %s.%s.%s` queda huérfana en `.rodata`.
+**Context:** Legacy `Piggy build %s.%s.%s` leaked into R36SX build strings.
+**Decision:** `NullView.cpp:22`, `AppWindow.cpp:1430` → `"LGPT R36SX - Bacon 1.5"`, `Project.h:23` `PROJECT_RELEASE "5"`, `BUILD_COUNT "0-bacon15"`.
+**Reason:** Unified Bacon-1.5 branding; old Piggy string remains orphan in .rodata.
+**Consequences:** Visible version on device is `LGPT R36SX - Bacon 1.5`.
+**Evidence:** `NullView.cpp:22`, `AppWindow.cpp:1430`, `Project.h:23`.
+**Related:** `source/sources/Application/Views/NullView.cpp`, `source/sources/Application/AppWindow.cpp`
 
 ---
 
-## DEC-2026-08-21-10 — Android `dev none` = cable/APK no conectado
+## DEC-2026-08-21-30 — EQ8 sub-80 Hz fix: Q24 round, shelf NaN guard, UI/DSP coherence
 
-**Decisión:** `U2517_USB_AUDIO_DAEMON.log` muestra `configured=0` → UDC not attached. Cable OTG no conectado o APK `LGPTUsbAudioBridge` no iniciada. Módulos host `09EC1A1A` correctos. `U2517` `ready-full-rebuild` ok.
+**Date:** 2026-08-21
+**Status:** ACTIVE
+**Scope:** EqBiquad / InstrumentEq / InstrumentEqView
 
----
-
-## DEC-2026-08-21-11 — SD `G:` estado actual = `DBAD57A7` (U2.71)
-
-**Evidencia:**
-- `G:\cubegm\cores\lgpt_r36sx_port_libretro.so` = `DBAD57A7AEB7D257259104CE5BA0ECC20E5927BD1F6BFFDEF6DCB826F823B96A`
-* `D:\R36S\PORT LPTRACKER\BUILD\U2523\lgpt_r36sx_u2523.so` = mismo hash
-* `INSTALL_STATE_U2523.txt` dice `Version: U2.52.3` (etiqueta legacy, core es U2.71)
-* Proyecto `lgpt_KAOZ` intacto con EQ hipass 40 Hz S8
-
----
-
-## DEC-2026-08-21-29 — Push `8cc0a47` → `origin/feature/bacon-1.5-fx` [RENOMBRADO de duplicado 11]
-
-**Evidencia:** `git push origin feature/bacon-1.5-fx` → `588270c..8cc0a47` ok. `git status` clean.
-
-**Nota:** Renombrado desde ID duplicado 11 para garantizar unicidad. Ver entrada SD DBAD57A7 para el otro 11.
+**Context:** Q15 truncation caused LPF20 `b=0` (-96 dB), HPF20 err 1.8 dB, shelf `sqrt(neg)` NaN, UI Q15 vs DSP Q24 diverged 6 dB.
+**Decision:** `coeffFromDouble` Q24 round-to-nearest + int32 saturate, clamp shelf `arg<0→0`, `GetBandCoeffs` round `(v+256)>>9`, View `eqBiquadCoeffsShift 24` with mirrored `qDraw`. Global `FIXED_SHIFT=15` kept; local precision Q24.
+**Reason:** Q23 failed HPF20 0.15>0.10 and overflow; Q24 minimal passing with margin (8.2G vs 16G/33G for Q25/26) per `eq_study4.py`.
+**Consequences:** HPF/LPF 20-100 Butterworth ` -3.01±0.10`, shelves NaN-free, UI=DSP ±0.2 dB, no float hot path.
+**Evidence:** `eq_sub80_host_test` PASS `HPF20 -3.086 err -0.076`, `eq8_struct` 109 PASS, build `46c4714...` SD PASS 2026-08-21 13:45.
+**Related:** `EqBiquad.h`, `InstrumentEq.cpp/h`, `InstrumentEqView.cpp`
 
 ---
 
-## DEC-2026-08-21-12 — Infraestructura IA (AGENTS.md, CURRENT.md, CONTEXT_MAP.md, DECISIONS.md)
+## DEC-2026-08-21-31 — Analyzer: exclusive bins, correct Hz mapping, Blackman scale
 
-**Decisión:** Implementada infraestructura completa sin tocar código productivo. Archivos creados:
-- `AGENTS.md` — Reglas permanentes
-- `CURRENT.md` — Estado actual
-- `CONTEXT_MAP.md` — Mapa navegación
-- `DECISIONS.md` — Este archivo
+**Date:** 2026-08-21
+**Status:** ACTIVE
+**Scope:** SpectrumAnalyzer / InstrumentEqView
 
-**Verificación:** `git status` clean, `git diff` solo documentación.
-
----
-
-## DEC-2026-08-21-13 — Push `999A2B27` → `origin/feature/bacon-1.5-fx`
-
-**Evidencia:** Build U2.68 con `Blackman -67dB`, `hold >140 Hz`, `EqBiquad double` ya en `origin`.
+**Context:** Overlapped ±30%→±10% windows made 1 kHz tone light 770-1430 Hz; `visGain` tilted treble; Hann/Blackman compensation miscalibrated; ring leaked across instruments.
+**Decision:** Exclusive intervals `sqrt(f[i]*f[i+1])`, `lo=ceil(edgeLow/hzPerBin)` `hi=ceil(edgeHigh/hzPerBin)-1`, power-interpolated sub-bin, `BinFrequency(i)`, peak `7..6826` parabolic once per `Compute()` (`peakHz_`), Blackman `ampScale=2/sum` (0 dBFS→1.0, no visGain/*4), lazy window, ring+mean copy, `clearCapture()` idempotent, `heldH_[308]` member reset on focus.
+**Reason:** One tone → one pixel; uniform -90..0 dB without treble tilt; clean instrument switch.
+**Consequences:** Replaces visGain/windows of DEC-04; preserves Blackman and hold>140.
+**Evidence:** `spectrum_analyzer 50 PASS` (984 Hz 0.9999 width1, sweep ±1px), `analyzer_target 1781 PASS`, build `c43006a` SD PASS.
+**Related:** `SpectrumAnalyzer.cpp/h`, `InstrumentEqView.cpp/h`
 
 ---
 
-## DEC-2026-08-21-14 — Push `3423e35` → `origin/feature/bacon-1.5-fx`
+## DEC-2026-08-21-32 — Analyzer final: stereo power, DisplayPeak tilt, TreeFrog auto
 
-**Evidencia:** `Bacon 1.5 U2.63: feedback #14 revisado`.
+**Date:** 2026-08-21
+**Status:** ACTIVE
+**Scope:** SpectrumAnalyzer / InstrumentEqView / Android payload
 
----
-
-## DEC-2026-08-21-15 — Push `bdbda77` → `origin/feature/bacon-1.5-fx`
-
-**Evidencia:** `Bacon 1.5 U2.66: fix LP/HP 0dB activo`.
-
----
-
-## DEC-2026-08-21-16 — Push `f3273f6` → `origin/feature/bacon-1.5-fx`
-
-**Evidencia:** `Bacon 1.5 U2.67: fix NullView version`.
+**Context:** Stereo hihat cancelled by mono sum; tilt on floor created silence diagonal; Peak used raw mag vs display; hold static; TreeFrog required manual select.
+**Decision:** Stereo `ringL/R` + `power=0.5*(|L|²+|R|²)` `amp=sqrt(power)*2/sum`, `DisplayPeakFrequency()` on 308 bins with `tilt 4.5*log2(fc/1000)` floor -90 (gate before tilt), `exp(-dt/300)` hold 100ms/release 300ms, `canvasW=309` `bx=(i*canvasW)/n`, `hat_probe` 308 bins Tests A-E, Android `r36s_aoa_*_h36` + APKs, TreeFrog auto `lgpt_libretro.so`.
+**Reason:** Antiphase no longer cancels; diagonal silence fixed; peak matches display; Android payload deterministic.
+**Consequences:** Replaces mono windows of DEC-31; preserves Q24 EQ8.
+**Evidence:** `analyzer_h1_stereo 6 PASS` (in-phase 0.144 antiphase 0.144), `hat_probe A-E PASS`, build `66c966d...` R36SX F1-F7 PASS.
+**Related:** `SpectrumAnalyzer.cpp/h`, `InstrumentEqView.cpp/h`, `scripts/install.sh`, `verify.sh`
 
 ---
 
-## DEC-2026-08-21-17 — Push `588270c` → `origin/feature/bacon-1.5-fx`
+## DEC-2026-08-23-01 — Multi-agent context architecture V2
 
-**Evidencia:** `Bacon 1.5 U2.68: Blackman -67dB, hold >140Hz, double EqBiquad <80Hz, NullView version`.
+**Date:** 2026-08-23
+**Status:** ACTIVE
+**Scope:** AI infrastructure / docs
 
----
-
-## DEC-2026-08-21-18 — Push `c74bd86` → `origin/feature/bacon-1.5-fx`
-
-**Evidencia:** `Bacon 1.5 U2.69: fix BELL <80Hz Q limit for S8 wall`.
-
----
-
-## DEC-2026-08-21-19 — Push `21bee8d` → `origin/feature/bacon-1.5-fx`
-
-**Evidencia:** `Bacon 1.5 U2.70: fix lowsh/hishe <80Hz Q limit`.
+**Context:** AGENTS v1.1 (334 lines) hardcoded `feature/bacon-1.5-fx`, WSL path `/home/dafunknoise/lgpt-repo`, machine `/mnt/g`, stale branch/HEAD; CURRENT was 258-line append-only changelog; DECISIONS stored push/SD events; no `docs/ai`, no preflight, no scoped agents, no OpenCode roles.
+**Decision:** Constitution `AGENTS.md v2.0` (150-220 lines, invariants only), `CURRENT.md` concise snapshot with `must verify` stamp, `CONTEXT_MAP.md` stable router, `docs/ai/VALIDATION.md` + `RELEASE_CONTRACT.md`, `scripts/agent_preflight.sh` + `tests/test_agent_context_contract.py`, scoped `device/`, `TREEFROG/`, `tests/` AGENTS, `.opencode/agents/{audit,implement,review,release}.md`, lazy loading, compact handoff.
+**Reason:** Prevent context drift, mutable duplication, machine-specific authority, and legacy U2523 being mistaken for Bacon-1.5.
+**Consequences:** Agents load only relevant context; mutable state lives in Git/CURRENT cache; `scripts/install.sh`/`verify.sh` labeled LEGACY U2523.
+**Evidence:** `tests/test_agent_context_contract.py PASS`, `bash -n scripts/agent_preflight.sh PASS`, `git diff -- sd_root` NO CHANGES, core 46bd84 unchanged.
+**Related:** `AGENTS.md`, `CURRENT.md`, `CONTEXT_MAP.md`, `docs/ai/*`, `scripts/agent_preflight.sh`
 
 ---
 
-## DEC-2026-08-21-20 — Push `8cc0a47` → `origin/feature/bacon-1.5-fx`
+## DEC-2026-08-23-02 — Golden Bootstrap clean-install release closure
 
-**Evidencia:** `Bacon 1.5 U2.71: fix all types <80Hz Q limit, double EqBiquad`.
+**Date:** 2026-08-23
+**Status:** ACTIVE
+**Scope:** Release / OTG / deployment
 
----
-
-## DEC-2026-08-21-21 — Push `DBAD57A7` → SD G: (core U2.71)
-
-**Evidencia:** `Copy-Item` a `G:\cubegm\cores\lgpt_r36sx_port_libretro.so` → `DBAD57A7`.
-
----
-
-## DEC-2026-08-21-22 — Push `10C9B608` → `origin/feature/bacon-1.5-fx`
-
-**Evidencia:** `Bacon 1.5 U2.68: Blackman -67dB, hold >140Hz, double EqBiquad <80Hz, NullView version` (rebuild).
+**Context:** Persistent audio setup was missing from ZIP, requiring manual sentinel creation after install.
+**Decision:** Release ZIP `C5C77A0212...` (7138546, 56 files) includes persistent baseline: `enable_lgpt_uac2_bridge` (empty), `audio_usb_profile STEREO_48K`, `audio_driver_mode/policy LOCAL_CONSOLE`, `active_audio_branch audio_driver_local_console`, `branches/audio_driver_local_console/MODE LOCAL_CONSOLE`. Core `46bd84` unchanged.
+**Reason:** `Stock OS + TreeFrogUI + ZIP contents = fully functional PORT` with `POST_INSTALL_MANUAL_FIXES=0` proven by staged Golden Bootstrap.
+**Consequences:** `WORKS ON DEV SD != RELEASE PACKAGE COMPLETE` is now enforced; `sd_root` is canonical payload source.
+**Evidence:** `docs/BACON_1_5_GOLDEN_BOOTSTRAP_PHYSICAL_PASS.md PASS`, `docs/BACON_1_5_RELEASE_MANIFEST.md`, commit `4429d4e`, merge `b616a5b`.
+**Related:** `sd_root/lgpt/otg/*`, `LGPT_R36SX_Bacon-1.5_SHA256SUMS.txt`, `docs/RELEASE_SD_INCLUDED_FILES.txt`
 
 ---
 
-## DEC-2026-08-21-23 — Push `38F8CF02` → `origin/feature/bacon-1.5-fx`
+## DEC-2026-08-23-03 — Persistent vs volatile packaging
 
-**Evidencia:** `Bacon 1.5 U2.70: fix lowsh/hishe <80Hz Q limit, double EqBiquad`.
+**Date:** 2026-08-23
+**Status:** ACTIVE
+**Scope:** Release / OTG / sd_root
 
----
-
-## DEC-2026-08-21-24 — Push `E9B23E36` → `origin/feature/bacon-1.5-fx`
-
-**Evidencia:** `Bacon 1.5 U2.69: fix BELL <80Hz Q limit for S8 wall, double EqBiquad`.
-
----
-
-## DEC-2026-08-21-25 — Push `DBAD57A7` → `origin/feature/bacon-1.5-fx`
-
-**Evidencia:** `Bacon 1.5 U2.71: fix all types <80Hz Q limit, double EqBiquad` (final U2.71).
+**Context:** Volatile runtime state was at risk of being packaged as if it were install baseline.
+**Decision:** Persistent (may be packaged when required for deterministic install): files in DEC-2026-08-23-02. Volatile (MUST NOT be packaged): FIFO, PID, daemon_pid/version, capture_abi, setup_result, sp404_card, aoa state, device detection state, /tmp, runtime logs.
+**Reason:** Golden Bootstrap proves persistent setup is legitimate install content while volatile is runtime-only.
+**Consequences:** `tests/test_release_audio_bootstrap.py` enforces no volatile under `lgpt/otg/` (except `bin/`).
+**Evidence:** `tests/test_release_audio_bootstrap.py PASS` (sentinel empty, STEREO_48K, LOCAL_CONSOLE, no volatile).
+**Related:** `sd_root/lgpt/otg/`, `tests/test_release_audio_bootstrap.py`
 
 ---
 
-## DEC-2026-08-21-26 — Infraestructura IA completa y push final
+## DEC-2026-08-23-04 — Release publish + download-back identity
 
-**Evidencia:** `AGENTS.md`, `CURRENT.md`, `CONTEXT_MAP.md`, `DECISIONS.md` creados. `git status` clean. Push `f3273f6..8cc0a47` → `origin/feature/bacon-1.5-fx`.
+**Date:** 2026-08-23
+**Status:** ACTIVE
+**Scope:** Release pipeline
 
----
-
-## DEC-2026-08-21-27 — SD `G:` verificada con core `DBAD57A7` + infraestructura IA
-
-**Evidencia:** `sha256sum /mnt/g/cubegm/cores/lgpt_r36sx_port_libretro.so` = `DBAD57A7AEB7D257259104CE5BA0ECC20E5927BD1F6BFFDEF6DCB826F823B96A`. Backup creado en `D:\R36S\PORT LPTRACKER\BACKUPS\SD_U2.71_20260821_002531`. Push final `f3273f6..8cc0a47` → `origin/feature/bacon-1.5-fx`.
-
----
-
-
-## DEC-2026-08-21-30 — EQ8 sub-80 Hz fix: Q24 round, shelf NaN guard, UI DSP coherence
-
-**Decisión:** Corregir `EqBiquad` para usar `coeffFromDouble` con round-to-nearest + saturación int32 (no trunc), clamp `arg` shelves `if(arg<0) arg=0` para evitar NaN, `InstrumentEq::GetBandCoeffs` con round `(v+256)>>9`, `InstrumentEqView` curva con `eqBiquadCoeffsShift …,24` y `qDraw` espejo `recomputeBand` (<80 Hz slope>1 y LP/HP siempre 0.707). Mantener `FIXED_SHIFT=15` global intacto, precisión local Q24.
-
-**Motivo:** Q15 trunc causaba LPF 20 Hz `b=0` (-96 dB), HPF 20 `err -1.8`/`+12` boost espurio, `LPF20 err -0.136>0.10`; shelf `sqrt(neg)` → NaN para HSH 20 +24 S=2; UI Q15 vs DSP Q24 divergencia 6 dB.
-
-**Alternativas:** Q23/Q25/Q26 evaluados (ver `eq_study4.py`): Q23 fail HPF20 0.15>0.10 y overflow HSH, Q24 pass 0.076 y Q25 pass 0.038 pero Q24 más margen (8.2G vs 16G vs 33G). Elegido Q24 por ser mínimo que pasa ≤0.10 con mayor margen que Q25/26.
-
-**Evidencia:**
-- `eq_sub80_host_test` antes FAIL `LPF20 err -0.136`, después PASS `HPF20 -3.086 err -0.076`, `LPF20 -2.993 err 0.017` (Q24 round)
-- `eq8_struct` 109 checks PASS, `sample_eq_edit` 104 checks PASS (umbral ajustado 0.5→0.2 para HPF 0dB active)
-- `EqBiquad.h:61` `coeffFromDouble` + `arg` clamp, `InstrumentEq.h:133` round, `InstrumentEqView.cpp:555` Q24
-- Build `46c4714fd38f7a0714f0d819f65ebc59e5fd9e2f109dc1fcb5415ee75294f2e3` 1.4M, `sha256sum` local==SD `/mnt/g/cubegm/cores/lgpt_r36sx_port_libretro.so`, SD TEST PASS 2026-08-21 13:45
-
-**Consecuencias:** HPF/LPF 20-100 Hz Butterworth `-3.01±0.10`, shelves sin NaN, UI=DSP ±0.2 dB, sin overflow int32 (saturación) ni int64, sin float hot path, 48kHz Stereo preservado.
-
-**Relacionado:** `EqBiquad.h`, `InstrumentEq.cpp/h`, `InstrumentEqView.cpp`, `tests/host/eq_sub80_host_test.cpp`, `tests/host/sample_eq_edit_host_test.cpp:1173`
----
-
-
-## DEC-2026-08-21-31 — Analyzer fix: correct Hz mapping, Blackman 2/sum, clearCapture, hold/barW
-
-**Decisión:** Reemplazar mapeo solapado ±30%→±10% y `visGain` por intervalos exclusivos con bordes `sqrt(f[i]*f[i+1])`, `lo=ceil(edgeLow/hzPerBin)` `hi=ceil(edgeHigh/hzPerBin)-1`, interpolación de potencia si `hi<lo` (pixel < bin), exponer `BinFrequency(i)`, pico solo `7..6826` con parábola una vez por `Compute()` (`peakHz_`), escala Blackman `amplitudeScale=2/sum` (0 dBFS→1.0, -12dBFS 0.25→0.25, clamp 1.0, sin `visGain` ni `*4`), ventana lazy (68kB), `runFft` optimizado (copia ring+media, luego `(wre-mean)*window`), `clearCapture()` y `SetArmed`/`SetInstrumentTarget` no-inline idempotentes (resetean `ringPos_`, `ring_`, `bins_`, `lastSeenGeneration_`, picos), `InstrumentEqView` `heldH_[308]` miembro limpio en ctor/`OnFocus`/`LooseFocus`, `BinFrequency` para hold>140Hz, `fp2fl` sin `*4`, `canvasW=309` `bx=cX0+(i*canvasW)/n` cubre 6..314.
-
-**Motivo:** Ventanas solapadas hacían tono 1kHz iluminar 770-1430Hz y máximo a 1.43k; `visGain` inclinaba agudos; compensaciones Hann→Blackman descalibradas; ring heredaba espectro al cambiar instrumento; hold estático sobrevivía foco.
-
-**Evidencia:**
-- `spectrum_analyzer_host_test` 50 checks PASS (984Hz 0.9999 width1, sweep 30-19000 ±1px Peak<3Hz, -6dBFS 0.35-0.55, DC 0.0000, pulse 0.0139)
-- `analyzer_target` 1781 checks PASS (master fallback, WantsInstrument, clearCapture)
-- `hat_probe` 308 bins sin overflow, `eq8_struct` 109 PASS, `eq_sub80` 22 PASS
-- Build `c43006ae1a62feb3e5891d9e4494c852905f887b7e97e916680b7925c2d9a73a` 1.4M, `host_syntax_check` PASS (SpectrumAnalyzer+InstrumentEqView), `audit` PASS (salvo F10 golden desfasado y WAVs ausentes documentados)
-- SD `c43006a` local==SD, R36SX PASS 2026-08-21 14:45 tonos 40-16k posición correcta, sin diagonal visGain, cambio instrumento limpia espectro
-
-**Consecuencias:** Sustituye `visGain` y ventanas de DEC-04/07, conserva Blackman y `hold>140Hz` de DEC-04/07.
-
-**Relacionado:** `SpectrumAnalyzer.cpp/h`, `InstrumentEqView.cpp/h`, `tests/host/spectrum_analyzer_host_test.cpp`, `tests/host/analyzer_target_host_test.cpp`, `tests/host/hat_probe.cpp`
-
-**Follow-ups (fuera de alcance):** cancelación antiphase L/R por downmix, concatenación multi-canal mismo instrumento, sync para adapters concurrentes.
+**Context:** Publishing without download-back could ship a different artifact than validated.
+**Decision:** `ONE ARTIFACT NAME = ONE AUTHORITATIVE SHA` across GitHub body, SHA256SUMS, manifest, included-files, downloaded asset. After publish: `DOWNLOAD-BACK REQUIRED` and `REMOTE_SHA == LOCAL_SHA`.
+**Reason:** Guarantees release golden = physical golden.
+**Consequences:** Historical SHAs must be marked historical (see `BACON_1_5_RELEASE_MANIFEST.md`); new releases must pass download-back gate before being called golden.
+**Evidence:** `REMOTE_DOWNLOAD_SHA=C5C77A...` `REMOTE_IDENTICAL=YES` `UNZIP_TEST_REMOTE PASS` `BOOTSTRAP_TEST_REMOTE PASS` `MANIFEST_CONSISTENT=YES`.
+**Related:** `docs/BACON_1_5_RELEASE_MANIFEST.md`, `LGPT_R36SX_Bacon-1.5_SHA256SUMS.txt`
 
 ---
 
-## DEC-2026-08-21-32 — Analyzer final: stereo power, DisplayPeak, TreeFrog auto, Android payload
+## DEC-2026-08-23-05 — SD filesystem health before runtime blame
 
-**Decisión:** Completar H1/H4/H5/H6: stereo `ringL/R` + `power=0.5*(|L|²+|R|²)` `amp=sqrt(power)*2/sum` (0dBFS duplicado 0.5→1.0 conservado, antiphase no cancela), `DisplayPeakFrequency()` sobre 308 bins con `tilt 4.5*log2(fc/1000)` y floor -90 (gate `rawDb<=floor→h=0` antes tilt, sin diagonal 1k-20k), `InstrumentEqView` `heldH_[308]` + `lastUpdateMs_` con `exp(-dt/300)` (attack inmediato, hold 100ms, release 300ms), rango `-90..0` sin `h>=2`, `canvasW=309` `bx=(i*canvasW)/n`, `hat_probe` 308 bins + Tests A-E (antiphase 8k, burst 6-16k, -90..0 sensibilidad, tilt, no regresión), `install.sh`/`verify.sh` Android payload + TreeFrog `lgpt_libretro.so` auto (backup, SHA Match).
+**Date:** 2026-08-23
+**Status:** ACTIVE
+**Scope:** Device / filesystem / diagnostics
 
-**Motivo:** Hi-hat estéreo cancelado por mono sum, diagonal silencio por tilt sobre floor, Peak usaba `mag2Combined` crudo vs display, hold estático, TreeFrog requería selección manual, Android faltaban `r36s_aoa_*_h36` + APKs.
-
-**Evidencia:**
-- `analyzer_h1_stereo_test` 6 checks PASS (in-phase 0.144 antiphase 0.144 L-only 0.102)
-- `spectrum_analyzer` 50 PASS (984Hz 0.5 width1, sweep 30-19000 ±1)
-- `InstrumentEqView` diagonal `h==0` para `rawDb<=-90` en 500-20k
-- `DisplayPeak` test `1k -10dB vs 8k -18dB` → Display 8k Raw 1k
-- `hat_probe` Tests A-E PASS, `eq8_struct` 109 PASS, `test_fx_phase19/09` OK
-- Build `66c966d089e6edd090e2f803d43c185eda12415ad27f42ec2e3b6e602b230ea5` 1.4M, `host_syntax_check` OK
-- SD `66c966d` local==SD, R36SX F1-F7 PASS (idle horizontal, hihat, Peak Display, TreeFrog LGPT→port `66c966d`, Android `HOST→enum→AOA→APK→audio`)
-
-**Consecuencias:** Reemplaza ventanas solapadas/`visGain` de DEC-04/07 y mono sum de DEC-31, preserva Blackman+hold>140Hz y Q24 EQ8.
-
-**Relacionado:** `SpectrumAnalyzer.cpp/h`, `InstrumentEqView.cpp/h`, `tests/host/analyzer_h1_stereo_test.cpp`, `hat_probe.cpp`, `scripts/install.sh`, `verify.sh`
+**Context:** Dirty exFAT caused `/mnt/sdcard` read-only, producing false USB/bootstrap failures.
+**Decision:** Before blaming runtime, verify SD `mounted && healthy && writable && not read-only`. Diagnostic layers: `Detection != Runtime READY != PCM flow != physical PASS`. Repair requires explicit user authorization.
+**Reason:** Filesystem failure mimics bootstrap/USB failure; distinction avoids false fixes.
+**Consequences:** Agents must probe mount/options/write-probe (via `agent_preflight.sh --sd`) before kernel/audio changes.
+**Evidence:** `docs/BACON_1_5_GOLDEN_BOOTSTRAP_PHYSICAL_PASS.md` notes exFAT repaired Healthy/SD_WRITEABLE=YES before PASS.
+**Related:** `device/otg_u241_common.sh`, `device/lgpt_launcher_u241.sh`, `scripts/agent_preflight.sh`
 
 ---
-*Fin de DECISIONS.md*
+
+## DEC-2026-08-23-06 — Kernel module lifecycle (CONFIG_MODULE_UNLOAD=n)
+
+**Date:** 2026-08-23
+**Status:** ACTIVE
+**Scope:** Device / kernel / audio
+
+**Context:** Platform showed `CONFIG_MODULE_UNLOAD=n`; replacing loaded ALSA families mid-session may be impossible.
+**Decision:** Agents must verify `CONFIG_MODULE_UNLOAD` before assuming hot module replace; do not hardcode experimental strict-family switch without evidence.
+**Reason:** Shared ALSA modules (`snd`, `snd-pcm`, etc.) may be persistent; false assumption breaks audio host.
+**Consequences:** Any family switch requires evidence and physical validation; default is shared/persistent lifecycle.
+**Evidence:** `docs/BACON_1_5_GOLDEN_BOOTSTRAP_PHYSICAL_PASS.md` H37 apply `76B50C` shared ALSA note, `CONFIG_MODULE_UNLOAD=n`.
+**Related:** `device/otg_h37_apply_driver_mode.sh`, `device/AGENTS.md`
+
+---
+
+### Removed / migrated (not durable — history stays in Git)
+
+- Operational pushes `999A2B27`, `3423e35`, `bdbda77`, `f3273f6`, `588270c`, `c74bd86`, `21bee8d`, `8cc0a47`, `10C9B608`, `38F8CF02`, `E9B23E36`, `DBAD57A7` etc. (DEC-2026-08-21-13..27, DEC-2026-08-21-29) — Git log is authority.
+- One-off SD states `DBAD57A7` (DEC-2026-08-21-11,21,27) — manifest/SHA256SUMS is authority.
+- Duplicate analyzer/BELL entries merged into DEC-04 SUPERSEDED path.
+- Infrastructure checkpoint `628484c` docs-only — superseded by DEC-2026-08-23-01.
