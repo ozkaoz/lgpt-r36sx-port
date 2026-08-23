@@ -52,6 +52,7 @@ AUDIO_RATE    = 48000 Hz (TreeFrogAudio.cpp / TreeFrogLibretro.cpp)
 AUDIO_CHANNELS= 2 Stereo (SubmitStereo48000 / MixUsbCaptureMonitorStereo48000)
 CANONICAL_CORE= cubegm/cores/lgpt_core.so  (SHA 46bd84ebb0d1b1be8caec7c76fecbe6fb4baa8e9bbd603b44488bcc929dedec6, 1559548)
 RELEASE_ZIP   = LGPT_R36SX_Bacon-1.5_SD_ROOT.zip (C5C77A0212..., 7138546, 56 files, H38-only)
+# Current Bacon-1.5 protected baseline — resolve future identities via CURRENT.md + docs/BACON_1_5_RELEASE_MANIFEST.md + LGPT_R36SX_Bacon-1.5_SHA256SUMS.txt
 ```
 
 No MONO fallback, no 44100 resampling, no unapproved H36 APK without explicit DECISION.

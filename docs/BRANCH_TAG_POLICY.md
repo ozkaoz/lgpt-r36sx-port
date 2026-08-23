@@ -1,6 +1,6 @@
 # Branch & Tag Workflow — Bacon 1.5 Canon
 
-**Main is canonical stable state.** `main` always equals the most recently accepted checkpoint/release (currently `Bacon-1.5` at `c778512`, functional `single-startup-actions` at `557b26d`).
+**Main is canonical stable state.** `main` always equals the most recently accepted checkpoint/release. Resolve current identities (e.g. Bacon-1.5, single-startup-actions) via `CURRENT.md`, `git log --oneline --decorate`, and `docs/BACON_1_5_RELEASE_MANIFEST.md` — not hardcoded SHAs.
 
 ## Branches
 - `main` — stable, physically validated, single LGPT, 46bd84 core, H38-only.
