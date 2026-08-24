@@ -223,6 +223,21 @@
 
 ---
 
+## DEC-2026-08-24-01 — TreeFrog Apps migration (LGPT as first-class App)
+
+**Date:** 2026-08-24
+**Status:** ACTIVE
+**Scope:** TreeFrogUI / deployment / release
+
+**Context:** TreeFrogUI v1.0.15_a adds Apps tab (compiled `app_defs[]`, `scan_apps_tab`, `is_app_folder_name`). LGPT was previously `Games→LGPT` via `roms/lgpt/start.lgpt` + `cubegm/lgpt` wrapper. Generic `mipsel-linux-gnu-gcc 12.4` FrogUI builds black-screen (NOTE/GNU_STACK/EH_FRAME drift, GLIBC 2.34). Official SDK `mips-mti 6.3.0` vanilla `f10caa` boots; dual-entry `656242` and Apps-only `76034b` both physically PASS (LOCAL/WINDOWS/SP404/ANDROID + switching).
+**Decision:** LGPT is a TreeFrogUI standalone App (`app_defs {"lgpt","LGPT",NULL,NULL,LGPT_BIN}`), launched via `request_standalone_launch(LGPT_BIN, /mnt/sdcard/roms/lgpt/start.lgpt)` → `/tmp/frogui_launch.txt` → `picoarch` → `cubegm/lgpt` → Bacon runtime. `roms/lgpt` is hidden from Games (`is_app_folder_name` + `lgpt`), but `roms/lgpt/start.lgpt` remains required as launch argument. FrogUI binary derived from `https://github.com/tzubertowski/FrogUI` `r36sx 028b011`, built with SF3000 SDK 6.3.0, patch `patches/frogui_apps_lgpt.patch`, license CC BY-NC-SA 4.0. Required TreeFrogUI is now `v1.0.15_a` (was `v1.0.14_a`).
+**Reason:** Apps tab is compiled-in, not FS-discoverable; external manifest does not exist (audit proved `app_defs` is sole registration). Least-invasive supported mechanism is FrogUI fork. Official toolchain is mandatory for compatible ELF (7 PHDR, no NOTE, GLIBC 2.0/2.15). Single presentation `Apps 1 / Games 0` is final contract.
+**Consequences:** `sd_root` now contains `cubegm/cores/frogui_libretro.so` `76034b` (326700) — previously vendor-only. ZIP grows 56→57 files (`c5c77a` 7138546→`faf7a230` 7295274) with exactly one added path. `POST_INSTALL_MANUAL_FIXES=0` preserved. `core 46bd84`/`wrapper ee1ecfe5`/`H38 89a99d` unchanged. Clean-install now `Stock OS + TreeFrogUI v1.0.15_a + ZIP`.
+**Evidence:** `build/frogui_candidate/vanilla_official/frogui_libretro.so` `f10caa` PASS, `build/frogui_candidate/apps_dual/frogui_libretro.so` `656242` dual PASS, `build/frogui_candidate/apps_only/frogui_libretro.so` `76034b` Apps-only PASS (full matrix + switching), `patches/frogui_apps_lgpt.patch` (3 hunks), `tests/test_frogui_apps_lgpt.py` + `test_treefrog_apps_lgpt_release.py` PASS, `docs/BACON_1_5_RELEASE_MANIFEST.md` updated.
+**Related:** `patches/frogui_apps_lgpt.patch`, `sd_root/cubegm/cores/frogui_libretro.so`, `sd_root/roms/lgpt/start.lgpt`, `docs/BACON_1_5_RELEASE_MANIFEST.md`, `LGPT_R36SX_Bacon-1.5_SHA256SUMS.txt`
+
+---
+
 ### Removed / migrated (not durable — history stays in Git)
 
 - Operational pushes `999A2B27`, `3423e35`, `bdbda77`, `f3273f6`, `588270c`, `c74bd86`, `21bee8d`, `8cc0a47`, `10C9B608`, `38F8CF02`, `E9B23E36`, `DBAD57A7` etc. (DEC-2026-08-21-13..27, DEC-2026-08-21-29) — Git log is authority.
