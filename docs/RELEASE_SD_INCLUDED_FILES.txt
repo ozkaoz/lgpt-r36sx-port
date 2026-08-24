@@ -1,10 +1,15 @@
-﻿ANDROID/LGPTUsbAudioBridge-H38-debug.apk
+ANDROID/LGPTUsbAudioBridge-H38-debug.apk
+LGPT_OTG_LOGS/.keep
+README_PRIMERO_ES.md
+VERSION.txt
+cubegm/cores/frogui_libretro.so
 cubegm/cores/lgpt_core.so
 cubegm/lgpt
 frogui/core_overrides.txt
 lgpt/config.stock.xml
 lgpt/config.xml
 lgpt/instruments/.keep
+lgpt/otg/H38_7_ABI7_THREE_MODE.txt
 lgpt/otg/active_audio_branch
 lgpt/otg/audio_driver_mode
 lgpt/otg/audio_driver_policy
@@ -28,8 +33,6 @@ lgpt/otg/bin/r36s_sp404_host_audio_io
 lgpt/otg/bin/r36s_u241_usb_audio_io
 lgpt/otg/branches/audio_driver_local_console/MODE
 lgpt/otg/enable_lgpt_uac2_bridge
-lgpt/otg/H38_7_ABI7_THREE_MODE.txt
-lgpt/otg/modules/4.4.186-release/host_usb_audio/snd.ko
 lgpt/otg/modules/4.4.186-release/host_usb_audio/snd-hwdep.ko
 lgpt/otg/modules/4.4.186-release/host_usb_audio/snd-pcm.ko
 lgpt/otg/modules/4.4.186-release/host_usb_audio/snd-rawmidi.ko
@@ -37,11 +40,12 @@ lgpt/otg/modules/4.4.186-release/host_usb_audio/snd-seq-device.ko
 lgpt/otg/modules/4.4.186-release/host_usb_audio/snd-timer.ko
 lgpt/otg/modules/4.4.186-release/host_usb_audio/snd-usb-audio.ko
 lgpt/otg/modules/4.4.186-release/host_usb_audio/snd-usbmidi-lib.ko
+lgpt/otg/modules/4.4.186-release/host_usb_audio/snd.ko
 lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/DESCRIPTORES_U2_48K_STEREO.txt
 lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/MODINFO_U2_48K_STEREO.txt
-lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd.ko
 lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd-pcm.ko
 lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd-timer.ko
+lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd.ko
 lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/soundcore.ko
 lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/usb_f_uac2.ko
 lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/usb_f_uac2.ko.bak_e9062ac5
@@ -50,7 +54,4 @@ lgpt/samples/.keep
 lgpt/samples/records/.keep
 lgpt/tmp/record/.keep
 lgpt/usbrecs/.keep
-LGPT_OTG_LOGS/.keep
-README_PRIMERO_ES.md
 roms/lgpt/start.lgpt
-VERSION.txt
