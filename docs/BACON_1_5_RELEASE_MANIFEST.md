@@ -30,3 +30,5 @@ Physical PASS (Apps-only): LOCAL PASS / WINDOWS DETECT+PLAYBACK+RECORD PASS / SP
 **FrogUI attribution:** FrogUI / TreeFrogUI by Tomasz Zubertowski and contributors, source https://github.com/tzubertowski/FrogUI r36sx 028b011, build SF3000 SDK mips-mti-linux-gnu-gcc 6.3.0, patch `patches/frogui_apps_lgpt.patch`, license CC BY-NC-SA 4.0 (non-commercial, ShareAlike).
 
 See `RELEASE_SD_INCLUDED_FILES.txt` (57 files) and `LGPT_R36SX_Bacon-1.5_SHA256SUMS.txt` (57 entries) for per-file hashes. `unzip -t` PASS, `test_release_audio_bootstrap` PASS, `test_treefrog_apps_lgpt_release` PASS, H38 only.
+
+**Release Golden:** `Bacon-1.5` `27edc78` (tag) → `ba43a71` (commit), `LATEST=YES` `PRERELEASE=NO` `DRAFT=NO`, `ZIP faf7a230` `7295274` published `2026-08-24`, `DOWNLOAD-BACK PASS` `REMOTE_SHA==faf7a230` `REMOTE_IDENTICAL=YES`, `TRUE_PHYSICAL_CLEAN_INSTALL PASS` `POST_INSTALL_MANUAL_FIXES=0`.

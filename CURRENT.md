@@ -14,8 +14,8 @@ Do not trust hardcoded historical state.
 ## Repository
 
 - Branch: `main` — verify `git branch --show-current` at session start
-- HEAD: `49a640b` (Bacon-1.5 Apps migration, Apps-only 76034b) — `git rev-parse HEAD`
-- Upstream: `origin/main` `49a640b` — `git status --short --branch`
+- HEAD: `ba43a71` (Bacon-1.5 Apps clean-install + release golden) — `git rev-parse HEAD`
+- Upstream: `origin/main` `ba43a71` — `git status --short --branch`
 - Worktree: environment-specific — `git worktree list`
 - Stash: verify `git stash list`
 
@@ -40,17 +40,19 @@ Do not trust hardcoded historical state.
 
 ## Release Golden
 
-- New ZIP `faf7a230...` `7295274` `57` built deterministically, `unzip -t PASS`, `bootstrap PASS`, `test_treefrog_apps_lgpt_release PASS`, `TRUE_PHYSICAL_CLEAN_INSTALL PASS` — pending download-back after publication.
-- Previous `C5C77A...` was `REMOTE_SHA==LOCAL_SHA`; new will be `faf7a230` after publish.
+- New ZIP `faf7a230c06660b2299664f819f8d517c139311d5bbe8e8a0cbc421623ba0dec` `7295274` `57` built deterministically, `unzip -t PASS`, `bootstrap PASS`, `test_treefrog_apps_lgpt_release PASS`, `TRUE_PHYSICAL_CLEAN_INSTALL PASS`, **published**, **download-back `REMOTE_SHA==LOCAL_SHA` `faf7a230`**, `REMOTE_IDENTICAL=YES`, `LATEST=YES` `PRERELEASE=NO` `DRAFT=NO`.
+- Previous `C5C77A0212e4784a9d0e6d0eddc4de1a8bbe0943b9ebef8b13a18a82a6b9cb1e` `7138546` `56` remains historical (Games→LGPT, v1.0.14_a).
+- Tag `Bacon-1.5` moved from `d404091`/`86e071` to `ba43a71` (`27edc78` annotated) — `RELEASE_GOLDEN_COMMIT=ba43a71`.
 
 ## Current Objective
 
-- **Release publication:** update existing `Bacon-1.5` tag/release with exact RC ZIP `faf7a230...` (Apps-only), keep `Bacon-1.5` as `LATEST`, then `DOWNLOAD-BACK PASS`.
+- **Release golden:** `Bacon-1.5` TreeFrog Apps `RELEASE_GOLDEN=PASS` — `TREEFROGUI_REQUIRED=v1.0.15_a`, `TREEFROG_APPS_ENTRY_LGPT=1 / GAMES=0`, `POST_INSTALL_MANUAL_FIXES=0`, `DOWNLOAD-BACK PASS`.
 
 ## Last Relevant Validation
 
 - `RELEASE_AUDIO_BOOTSTRAP PASS` + `FROG_UI_APPS_LGPT PASS` (Apps-only, hide) + `TREEFROG_APPS_RELEASE PASS` (57 files, frogui 76034b)
 - `TRUE_PHYSICAL_CLEAN_INSTALL PASS` (`Stock OS + TreeFrogUI v1.0.15_a + ZIP` → `POST_INSTALL_MANUAL_FIXES=0`)
+- `DOWNLOAD-BACK PASS` (`/tmp/download_back/LGPT_R36SX_Bacon-1.5_SD_ROOT.zip` `faf7a230` 7295274 57, `unzip -t PASS`, `test_treefrog_apps_lgpt_release PASS`)
 - `ELFs`: shipped `b07bbb` vs vanilla `f10caa` vs apps-only `76034b` — MIPS32r2 O32 hard-float 7 PHDR GLIBC 2.0/2.2/2.3/2.15, no generic drift
 
 ## Known Issues / Risks
@@ -61,12 +63,11 @@ Do not trust hardcoded historical state.
 
 ## Pending Validation
 
-- `DOWNLOAD-BACK` after publication → `REMOTE_SHA==LOCAL_SHA` (`faf7a230`)
-- Tag `Bacon-1.5` finalization to `49a640b`+`RELEASE_GOLDEN_COMMIT`
+- None — `RELEASE_GOLDEN PASS`, awaiting next user-approved objective.
 
 ## Next Exact Action
 
-- Publish: replace `Bacon-1.5` assets with exact RC ZIP `faf7a230...` + `SHA256SUMS.txt`, verify `LATEST=YES`, then `DOWNLOAD-BACK PASS` → `RELEASE_GOLDEN PASS`.
+- Await next task: `bash scripts/agent_preflight.sh`, classify via `docs/ai/VALIDATION.md`, route via `CONTEXT_MAP.md`.
 
 ## Stop Conditions
 
