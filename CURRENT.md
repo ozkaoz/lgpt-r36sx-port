@@ -13,59 +13,60 @@ Do not trust hardcoded historical state.
 
 ## Repository
 
-- Branch: `feature/treefrog-apps-lgpt` — verify `git branch --show-current` at session start (main at `f773504`, feature at `3751a47`)
-- HEAD: RESOLVE FROM GIT — `git rev-parse HEAD` (feature 3751a47, main f773504)
-- Upstream: `origin/main` — verify `git status --short --branch`
-- Worktree: environment-specific — resolve `git worktree list`
+- Branch: `main` — verify `git branch --show-current` at session start
+- HEAD: `49a640b` (Bacon-1.5 Apps migration, Apps-only 76034b) — `git rev-parse HEAD`
+- Upstream: `origin/main` `49a640b` — `git status --short --branch`
+- Worktree: environment-specific — `git worktree list`
 - Stash: verify `git stash list`
 
 ## Current Product Baseline
 
-- Version: Bacon-1.5 TreeFrog Apps Migration (2026-08-24)
-- Core: `46bd84ebb0d1b1be8caec7c76fecbe6fb4baa8e9bbd603b44488bcc929dedec6` (1559548) — unchanged
-- FrogUI: `76034bd3c142a9fe24df8729a1ef0dee6f1d8c6b4e5e046db05ebc890b54a0ef` (326700, `cubegm/cores/frogui_libretro.so`) — Apps LGPT, r36sx 028b011, CC BY-NC-SA 4.0
-- TreeFrogUI required: `v1.0.15_a` (Apps-capable) — previous `v1.0.14_a` is historical
-- ZIP: `LGPT_R36SX_Bacon-1.5_SD_ROOT.zip` `7295274` `faf7a230c06660b2299664f819f8d517c139311d5bbe8e8a0cbc421623ba0dec` (57 files, Apps→LGPT, Games absent) — see `docs/BACON_1_5_RELEASE_MANIFEST.md`
-- Install: `Stock OS + TreeFrogUI v1.0.15_a + ZIP → Apps→LGPT` `POST_INSTALL_MANUAL_FIXES=0`
+- Version: Bacon-1.5 TreeFrog Apps Migration (2026-08-24) — Apps-only
+- Core: `46bd84ebb0d1b1be8caec7c76fecbe6fb4baa8e9bbd603b44488bcc929dedec6` (1559548) — unchanged, `cubegm/cores/lgpt_core.so`
+- FrogUI: `76034bd3c142a9fe24df8729a1ef0dee6f1d8c6b4e5e046db05ebc890b54a0ef` (326700, `cubegm/cores/frogui_libretro.so`) — Apps LGPT, r36sx 028b011, CC BY-NC-SA 4.0, patch `patches/frogui_apps_lgpt.patch`
+- TreeFrogUI required: `v1.0.15_a` (Apps-capable)
+- ZIP: `LGPT_R36SX_Bacon-1.5_SD_ROOT.zip` `7295274` `faf7a230c06660b2299664f819f8d517c139311d5bbe8e8a0cbc421623ba0dec` (57 files, Apps→LGPT, Games absent) — `docs/BACON_1_5_RELEASE_MANIFEST.md`, `LGPT_R36SX_Bacon-1.5_SHA256SUMS.txt`
+- Install: `Stock OS + TreeFrogUI v1.0.15_a + ZIP → Apps→LGPT` `POST_INSTALL_MANUAL_FIXES=0` `VISIBLE_LGPT_ENTRIES_TOTAL=1`
 
 ## Source Golden
 
-- Previous: `4429d4e` + `b616a5b` (Bacon-1.5 bootstrap). New Apps migration source at `3751a47` (feature) — pending merge to main after clean-install PASS.
+- `49a640b` (main) — Apps migration Apps-only, deterministic from `sd_root` (57 files), FrogUI 76034b, wrapper/core unchanged.
 
 ## Physical Golden
 
-- Previous payload `C5C77A...` (56 files, Games→LGPT) PASS via `docs/BACON_1_5_GOLDEN_BOOTSTRAP_PHYSICAL_PASS.md`.
-- New Apps-only payload `faf7a230...` (57 files, Apps→LGPT) physically validated `PHASE_C_PHYSICAL_PASS=YES` (LOCAL/WINDOWS/SP404/ANDROID + switching PASS) via `build/frogui_candidate/apps_only/frogui_libretro.so` `76034b`. Awaiting true clean-install of exact RC ZIP.
+- Payload `faf7a230c06660b2299664f819f8d517c139311d5bbe8e8a0cbc421623ba0dec` (57 files, Apps→LGPT) **TRUE clean-install PASS** via `Stock OS + TreeFrogUI v1.0.15_a + ZIP` `POST_INSTALL_MANUAL_FIXES=0` — `TREEFROGUI_BOOT PASS`, `TREEFROG_APPS_ENTRY_LGPT=1 / GAMES=0`, `LOCAL/WINDOWS/SP404/ANDROID/SWITCHING PASS`, `LGPT functional regression PASS`.
+- Evidence: `docs/BACON_1_5_TREEFROG_APPS_PHYSICAL_PASS.md` (2026-08-24), `build/release_candidate/LGPT_R36SX_Bacon-1.5_SD_ROOT.zip` `faf7a230` physically validated.
+- Previous `C5C77A...` (56 files, Games→LGPT) remains historical.
 
 ## Release Golden
 
-- Previous ZIP `C5C77A...` published, download-back `REMOTE_SHA==LOCAL_SHA`.
-- New ZIP `faf7a230...` built deterministically from `sd_root` (57 files) — package tests `unzip -t PASS`, `bootstrap PASS`, `test_treefrog_apps_lgpt_release PASS` — pending publication after clean-install PASS. Historical release identities retained in `docs/BACON_1_5_RELEASE_MANIFEST.md`.
+- New ZIP `faf7a230...` `7295274` `57` built deterministically, `unzip -t PASS`, `bootstrap PASS`, `test_treefrog_apps_lgpt_release PASS`, `TRUE_PHYSICAL_CLEAN_INSTALL PASS` — pending download-back after publication.
+- Previous `C5C77A...` was `REMOTE_SHA==LOCAL_SHA`; new will be `faf7a230` after publish.
 
 ## Current Objective
 
-- Phase C Apps-only physically PASS; Phase D/E release candidate prepared (feature branch). Next: true clean-install of RC ZIP on stock+TreeFrogUI v1.0.15_a, then publish as revised Bacon-1.5.
+- **Release publication:** update existing `Bacon-1.5` tag/release with exact RC ZIP `faf7a230...` (Apps-only), keep `Bacon-1.5` as `LATEST`, then `DOWNLOAD-BACK PASS`.
 
 ## Last Relevant Validation
 
-- `RELEASE_AUDIO_BOOTSTRAP PASS` + `FROG_UI_APPS_LGPT PASS` + `TREEFROG_APPS_RELEASE PASS` (Apps-only, hide verified)
-- `AGENT_CONTEXT_CONTRACT PASS` + `AGENT_PREFLIGHT PASS`
-- `ELFs`: shipped `b07bbb` vs vanilla `f10caa` vs apps-dual `656242` vs apps-only `76034b` — all MIPS32r2 O32 hard-float, 7 PHDR, GLIBC 2.0/2.2/2.3/2.15, no generic drift
+- `RELEASE_AUDIO_BOOTSTRAP PASS` + `FROG_UI_APPS_LGPT PASS` (Apps-only, hide) + `TREEFROG_APPS_RELEASE PASS` (57 files, frogui 76034b)
+- `TRUE_PHYSICAL_CLEAN_INSTALL PASS` (`Stock OS + TreeFrogUI v1.0.15_a + ZIP` → `POST_INSTALL_MANUAL_FIXES=0`)
+- `ELFs`: shipped `b07bbb` vs vanilla `f10caa` vs apps-only `76034b` — MIPS32r2 O32 hard-float 7 PHDR GLIBC 2.0/2.2/2.3/2.15, no generic drift
 
 ## Known Issues / Risks
 
 - `scripts/install.sh`/`verify.sh` legacy U2523 — not canonical.
 - Dirty exFAT false failures — SD health check before runtime blame.
-- Generic `mipsel-linux-gnu-gcc 12.4` builds black-screen (029584…); official SDK `mips-mti 6.3.0` required.
+- Generic GCC 12.4 black-screen (029584…); official SDK 6.3.0 required.
 
 ## Pending Validation
 
-- `TRUE_PHYSICAL_CLEAN_INSTALL` of RC ZIP `faf7a230...` on clean media → `POST_INSTALL_MANUAL_FIXES=0`
-- `DOWNLOAD-BACK` after publication → `REMOTE_SHA==LOCAL_SHA`
+- `DOWNLOAD-BACK` after publication → `REMOTE_SHA==LOCAL_SHA` (`faf7a230`)
+- Tag `Bacon-1.5` finalization to `49a640b`+`RELEASE_GOLDEN_COMMIT`
 
 ## Next Exact Action
 
-- True clean-install RC ZIP on R36SX (stock+TreeFrogUI v1.0.15_a, only ZIP), run full matrix, then publish revised Bacon-1.5.
+- Publish: replace `Bacon-1.5` assets with exact RC ZIP `faf7a230...` + `SHA256SUMS.txt`, verify `LATEST=YES`, then `DOWNLOAD-BACK PASS` → `RELEASE_GOLDEN PASS`.
 
 ## Stop Conditions
 
