@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # Reanuda el workspace R4 y finaliza exclusivamente los cuatro módulos ALSA.
 # No recompila todo el kernel, no monta y no escribe la SD.
 
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 REPO_ROOT="${REPO_ROOT:-$PROJECT_ROOT/GITHUB/lgpt-r36sx-port}"
 SDK_ROOT="${SDK_ROOT:-$HOME/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot}"
 CROSS_COMPILE="${CROSS_COMPILE:-$SDK_ROOT/bin/mips-mti-linux-gnu-}"

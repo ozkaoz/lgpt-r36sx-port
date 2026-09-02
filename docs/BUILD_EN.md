@@ -14,13 +14,13 @@ $HOME/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot
 
 ```bash
 bash scripts/audit.sh
-PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/build.sh
-SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/install.sh
-SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/verify.sh
+PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/build.sh
+SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/install.sh
+SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/verify.sh
 ```
 
 Full workflow:
 
 ```bash
-SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/build_install.sh
+SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/build_install.sh
 ```

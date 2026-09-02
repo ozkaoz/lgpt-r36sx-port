@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+# NOTE (2026-09-01): PROJECT_ROOT points to the BACKUPS area which STILL lives at
+# /mnt/d/R36S/PORT LPTRACKER/BACKUPS (SD snapshots + git bundles were kept there).
+# Build sources moved to /mnt/d/Toolchains/R36SX — see docs/TOOLCHAINS.md
 PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
 SD="${SD_MOUNT:-/mnt/f}"
 BACKUP="${1:-}"

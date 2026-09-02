@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 SD="${SD_MOUNT:-/mnt/f}"
 TS="$(date +%Y%m%d_%H%M%S)"
 WORK="$PROJECT_ROOT/LOGS/LGPT_U2523_$TS"

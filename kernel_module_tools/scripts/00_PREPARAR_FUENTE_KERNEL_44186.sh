@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 DEST="${KERNEL_SRC_DEST:-$PROJECT_ROOT/KERNEL/linux-4.4.186}"
 TARBALL="$PROJECT_ROOT/KERNEL/linux-4.4.186.tar.xz"
 URL="https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.4.186.tar.xz"

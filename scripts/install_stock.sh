@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 SD="${SD_MOUNT:-/mnt/f}"
 CORE="$PROJECT_ROOT/BUILD/U2523/lgpt_r36sx_u2523.so"
 DAEMON="$PROJECT_ROOT/BUILD/U2523/r36s_u2523_usb_audio_io"

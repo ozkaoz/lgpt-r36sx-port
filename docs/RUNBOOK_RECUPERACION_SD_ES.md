@@ -126,13 +126,13 @@ SD_MOUNT=/mnt/i bash scripts/install.sh
 ```
 o, restaura de raíz de backup:
 ```bash
-cp -a /mnt/d/R36S/PORT LPTRACKER/BACKUPS/SD_FULL_BACKUP_BEFORE_FORMAT_20260806/.  /mnt/i/
+cp -a /mnt/d/Toolchains/R36SX/BACKUPS/SD_FULL_BACKUP_BEFORE_FORMAT_20260806/.  /mnt/i/
 ```
 y luego superponer proyecto + core EQ (ver §5).
 
 ## 5. Overlay imprescindible (fase final de esta sesión)
 
-De `D:\R36S\PORT LPTRACKER\GITHUB\lgpt-r36sx-port\dist`:
+De `D:\GitHub\lgpt-r36sx-port\dist`:
 
 1. **Core EQ**: `cubegm/cores/lgpt_r36sx_port_libretro.so` ← `dist/lgpt_libretro.so`
    SHA256 debe ser `11790c46940fc3d6ca924ad12235c1210e0c8e1af318038458cbe832ca4e5688`.

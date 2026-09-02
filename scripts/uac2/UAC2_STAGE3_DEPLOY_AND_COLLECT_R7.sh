@@ -13,7 +13,7 @@ set -Eeuo pipefail
 #   bash UAC2_STAGE3_DEPLOY_AND_COLLECT_R7.sh collect
 #   bash UAC2_STAGE3_DEPLOY_AND_COLLECT_R7.sh restore
 
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 SD_DRIVE="${SD_DRIVE:-F:}"
 SD_MOUNT="${SD_MOUNT:-/mnt/f}"
 

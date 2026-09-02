@@ -77,7 +77,7 @@ Vermagic:        4.4.186-release preempt MIPS32_R2 32BIT
 Con la SD montada como `F:`:
 
 ```bash
-cd "/mnt/d/R36S/PORT LPTRACKER/LGPT_R36SX_U2414_REPLICAR_AU8_SYNC_UAC2_20260716"
+cd "/mnt/d/Toolchains/R36SX/LGPT_R36SX_U2414_REPLICAR_AU8_SYNC_UAC2_20260716"
 
 bash scripts/04_BUILD_INSTALL_U2414_COMPLETO.sh
 ```

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 SD_MOUNT="${SD_MOUNT:-/mnt/f}"
 SD_DRIVE="${SD_DRIVE:-F:}"
 WORK_ROOT="${WORK_ROOT:-$HOME/lgpt-r36sx-kernel-work}"

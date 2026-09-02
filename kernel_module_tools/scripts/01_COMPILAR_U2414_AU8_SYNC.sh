@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 TC="${TC:-$HOME/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot}"
 WORK_ROOT="${WORK_ROOT:-$HOME/r36sx-kernel-u2414}"
 SOURCE_PATH_FILE="$PROJECT_ROOT/KERNEL/U2414_KERNEL_SOURCE_PATH.txt"

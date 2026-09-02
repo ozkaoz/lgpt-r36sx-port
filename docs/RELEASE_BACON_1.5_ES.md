@@ -275,7 +275,7 @@ SAMPLE_EQ_EDIT 28 + MIXER_VU_CHAIN 48 + bass 72 + piano 46 + HelpOverlay +
 analyzer checks OK (UBSAN limpio), git diff --check limpio,
 DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK,
 SD_MOUNT=/mnt/g install/verify OK (BACKUP en
-/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260818_213642).
+/mnt/d/Toolchains/R36SX/BACKUPS/LGPT_BEFORE_U2523_20260818_213642).
 
 Novedades U2.53 (feedback de la prueba en R36SX #7):
 
@@ -366,7 +366,7 @@ SAMPLE_EQ_EDIT 62 + eq8 77 + MIXER_VU_CHAIN 52 + bass 72 + piano 46 +
 MIXER_64BIT_SUM 22 checks OK (UBSAN limpio), git diff --check limpio,
 DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS, BUILD_U2523_OK,
 SD_MOUNT=/mnt/g install/verify OK (BACKUP en
-/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260819_094512).
+/mnt/d/Toolchains/R36SX/BACKUPS/LGPT_BEFORE_U2523_20260819_094512).
 Core bf8cf44c instalado en SD.
 
 Novedades U2.56 (feedback de la prueba en R36SX #9 - "el sonido de la
@@ -416,7 +416,7 @@ MASTER_SAFETY 24 + MIXER_64BIT_SUM 22 + SAMPLE_EQ_EDIT 62 + eq8 77 +
 MIXER_VU_CHAIN 52 + bass 72 + piano 46 checks OK (ASAN/UBSAN limpio),
 git diff --check limpio, DIAGNOSTIC_GATE=0_ERRORS_0_WARNINGS,
 BUILD_U2523_OK, SD_MOUNT=/mnt/g install/verify OK (BACKUP en
-/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260819_110135).
+/mnt/d/Toolchains/R36SX/BACKUPS/LGPT_BEFORE_U2523_20260819_110135).
 Core c73685b4 instalado en SD.
 
 Novedades U2.57 (feedback de la prueba en R36SX #10 - "se ve en tonos

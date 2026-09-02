@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
-SOURCE="${SOURCE:-$PROJECT_ROOT/WORK/U2523_SOURCE}"
+# Toolchain layout (2026-09-01, see docs/TOOLCHAINS.md):
+#   - Kernel/base sources live in /mnt/d/Toolchains/R36SX (NOT the old PORT LPTRACKER)
+#   - MIPS toolchain lives in WSL: ~/sf3000-work/sf3000toolchain
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
+SOURCE="${SOURCE:-$PROJECT_ROOT/lgpt-u2523-source}"
 TC="${TC:-$HOME/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot}"
 BUILD_ROOT="${BUILD_ROOT:-$HOME/lgpt-r36sx-u2523-build}"
-OUT_DIR="$PROJECT_ROOT/BUILD/U2523"
-LOG_DIR="$PROJECT_ROOT/LOGS"
+OUT_DIR="$PROJECT_ROOT/audio-build-iterations/U2523"
+LOG_DIR="${LOG_DIR:-$PROJECT_ROOT/audio-build-iterations/LOGS}"
 TS="$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$OUT_DIR" "$LOG_DIR"
 exec > >(tee "$LOG_DIR/BUILD_U2523_$TS.log") 2>&1

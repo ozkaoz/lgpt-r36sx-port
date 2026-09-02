@@ -1,0 +1,25 @@
+=== KERNEL MODULES ===
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/extra/dsc.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/crypto/arc4.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/crypto/ccm.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/crypto/ctr.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/crypto/gcm.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/crypto/seqiv.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/drivers/hcdrivers/usb/gadget/function/f_iap.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/drivers/hcdrivers/usb/gadget/function/f_ium.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/drivers/hcdrivers/usb/gadget/legacy/ium.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/drivers/usb/gadget/function/usb_f_mtp.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/drivers/usb/gadget/function/usb_f_ptp.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib/modules/4.4.186-release/kernel/drivers/usb/gadget/libcomposite.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/extra/dsc.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/crypto/arc4.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/crypto/ccm.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/crypto/ctr.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/crypto/gcm.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/crypto/seqiv.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/drivers/hcdrivers/usb/gadget/function/f_iap.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/drivers/hcdrivers/usb/gadget/function/f_ium.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/drivers/hcdrivers/usb/gadget/legacy/ium.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/drivers/usb/gadget/function/usb_f_mtp.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/drivers/usb/gadget/function/usb_f_ptp.ko
+./R36SX V2.6 (0712) Minimal Backup/R36SX V2.6 (0712) Minimal Backup/rootfs/lib32/modules/4.4.186-release/kernel/drivers/usb/gadget/libcomposite.ko

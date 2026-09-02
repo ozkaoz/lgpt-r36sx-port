@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 SD="${SD_MOUNT:-/mnt/f}"
 BUILD="$PROJECT_ROOT/BUILD/U2414"
 MODULE="$BUILD/usb_f_uac2_u2414_au8_sync.ko"
@@ -154,7 +154,7 @@ run_sd cp -f /tmp/U2414_AUDIO_DRIVER_README.txt \
     "$LOGROOT/U2414_AUDIO_DRIVER_README.txt"
 
 cat > "$PROJECT_ROOT/DIAGNOSTICO_WINDOWS_AUDIO_U2414.ps1" <<'POWERSHELL'
-$root = "D:\R36S\PORT LPTRACKER\LOGS"
+$root = "D:\Toolchains\R36SX\audio-build-iterations\LOGS"
 $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $out = Join-Path $root "WINDOWS_AUDIO_U2414_$stamp"
 New-Item -ItemType Directory -Force -Path $out | Out-Null

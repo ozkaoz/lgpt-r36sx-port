@@ -1,0 +1,17 @@
+AUDIT_DIR=/mnt/d/R36S/PORT LPTRACKER/AUDITS/SD_RESIDUAL_AUDIT_20260727_215722
+Collected=2026-07-27T21:57:25-05:00
+SD_DRIVE=F:
+SD_MOUNT=/mnt/f
+NOTE=READ_ONLY_AUDIT_NO_SD_FILES_MODIFIED
+SUSPECTED_TOTAL=8
+--- EXPECTED_STABLE_OTG_FILES ---
+/mnt/f/lgpt/otg/bin/otg_u241_setup_once.sh
+/mnt/f/lgpt/otg/bin/r36s_u241_usb_audio_io
+/mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd-pcm.ko
+/mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd-timer.ko
+/mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd.ko
+/mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/soundcore.ko
+/mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/usb_f_uac2.ko
+--- UNEXPECTED_EXPERIMENTAL_MARKERS ---
+--- VERSION_AND_LAUNCHER_ENTRIES ---
+BASELINE_AUDIT_CLASSIFICATION=PASS_NO_OLD_EXPERIMENTAL_MARKERS

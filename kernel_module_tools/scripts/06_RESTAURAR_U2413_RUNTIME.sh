@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 SD="${SD_MOUNT:-/mnt/f}"
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 BIN="$SD/lgpt/otg/bin"
 DIR="${1:-}"
 

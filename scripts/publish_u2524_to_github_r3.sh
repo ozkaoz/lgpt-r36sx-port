@@ -6,7 +6,7 @@ set -Eeuo pipefail
 # by the previous publishers. It still rejects unrelated working-tree changes,
 # unknown remotes, missing tested binaries, mismatched checksums and failed tests.
 
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 REPO_ROOT="${REPO_ROOT:-$PROJECT_ROOT/GITHUB/lgpt-r36sx-port}"
 SD_DRIVE="${SD_DRIVE:-F:}"
 SD_MOUNT="${SD_MOUNT:-/mnt/f}"

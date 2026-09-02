@@ -1,4 +1,7 @@
 # Instalación por copia directa: U2.52.4 copy-root + ALSA/UAC2 validado
+> **NOTA (2026-09-01):** Las rutas de proyecto de compilación se reorganizaron. La base de
+> compilación ahora vive en `/mnt/d/Toolchains/R36SX` (ver `docs/TOOLCHAINS.md`). Este doc
+> conserva las rutas originales de la era U2524 como referencia histórica.
 
 ## Causa confirmada
 
@@ -13,7 +16,7 @@ Este paquete corrige ambos puntos:
 
 Con Stock OS + TreeFrogUI + el port actualmente funcional ya presentes:
 
-1. Extraiga el ZIP en `D:\R36S\PORT LPTRACKER\LGPT_R36SX_U2524_COPYROOT_UAC2`.
+1. Extraiga el ZIP en `D:\Toolchains\R36SX\LGPT_R36SX_U2524_COPYROOT_UAC2`.
 2. Copie las carpetas `cubegm`, `lgpt`, `roms` y `LGPT_OTG_LOGS` a `F:\`.
 3. Acepte combinar carpetas y reemplazar `cubegm\lgpt`, `lgpt\config.xml`, `lgpt\config.stock.xml` y `roms\lgpt\start.lgpt`.
 4. Expulse la SD de forma segura desde Windows antes de retirarla.

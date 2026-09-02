@@ -1,0 +1,50 @@
+TREEFROGUI PHYSICAL GOLDEN
+DATE=2026-08-24T03:45:39-05:00
+
+PHYSICAL_UI=Recents / Games / Apps / Settings
+
+PHYSICAL_FROGUI_SHA256=bbf93cff15a7aacfe4427b8cf2da45bfe6a6666a16ae8dbfee06da9093445d64
+PHYSICAL_FROGUI_SIZE=324840
+
+=== FROGUI CORES PRESENT ON SD ===
+76034bd3c142a9fe24df8729a1ef0dee6f1d8c6b4e5e046db05ebc890b54a0ef  /mnt/g/cubegm/cores/frogui_libretro.so.fn-test.original
+SIZE=326700 FILE=/mnt/g/cubegm/cores/frogui_libretro.so.fn-test.original
+bbf93cff15a7aacfe4427b8cf2da45bfe6a6666a16ae8dbfee06da9093445d64  /mnt/g/cubegm/cores/frogui_libretro.so
+SIZE=324840 FILE=/mnt/g/cubegm/cores/frogui_libretro.so
+
+=== PICOARCH ===
+7cdff12d2fcece58696852a95292a3321017742edb603aabbacd26a9b1bc2641  /mnt/g/cubegm/picoarch
+SIZE=425072 FILE=/mnt/g/cubegm/picoarch
+87840bd1a1fd99bb9075ec8266f910f5ce7a22d06306ac23d05d12b6758ec16d  /mnt/g/cubegm/picoarch_hi
+SIZE=423380 FILE=/mnt/g/cubegm/picoarch_hi
+
+=== BOOT FILES ===
+53b3e0b3d57fcdbef40d448ae2d3a00159bc84f2fd5be4c10a826827c7f2e01e  /mnt/g/cubegm/vmlinux.uImage
+SIZE=3905970 FILE=/mnt/g/cubegm/vmlinux.uImage
+a9788995db80197db6d743b8b237eadbfd3c424fcf1ab448fcd99c003b0950b2  /mnt/g/cubegm/avp.uImage
+SIZE=1381604 FILE=/mnt/g/cubegm/avp.uImage
+1258f1eba809e43540c581b815c87815540a9e5897a4e8584363ab7de5cc27bb  /mnt/g/cubegm/dtb.bin
+SIZE=33137 FILE=/mnt/g/cubegm/dtb.bin
+
+=== VERSION ===
+46bd84ebb0d1b1be
+
+=== FROGUI SETTINGS ===
+theme=MinUI Style
+font=BPreplayBold.otf
+wallpaper=none
+wallpaper_fit=Stretch
+brightness=75
+volume=100
+filter=bilinear
+auto_resume=off
+autosave_autoload=off
+animations=on
+hide_empty=on
+hide_extensions=on
+backgrounds=off
+folder_cache=on
+battery_color=on
+game_switcher=on
+load_recents=off
+disable_sleep=on

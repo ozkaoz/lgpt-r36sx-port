@@ -7,7 +7,7 @@ set -Eeuo pipefail
 # The release ZIP is copy-to-SD-root (cubegm/, lgpt/, roms/, LGPT_OTG_LOGS/, ANDROID/)
 # and contains the Android APK plus the full repository source snapshot.
 
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 REPO_ROOT="${REPO_ROOT:-$PROJECT_ROOT/GITHUB/lgpt-r36sx-port}"
 VERSION="H38.7"
 TAG="H38.7"

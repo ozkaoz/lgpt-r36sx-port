@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # Compila los módulos ALSA que necesita el usb_f_uac2.ko ya verificado.
 # No instala ni sustituye nada en la SD.
 
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 REPO_ROOT="${REPO_ROOT:-$PROJECT_ROOT/GITHUB/lgpt-r36sx-port}"
 KERNEL_SRC="${KERNEL_SRC:-$PROJECT_ROOT/KERNEL/source/linux-4.4.186}"
 SDK_ROOT="${SDK_ROOT:-$HOME/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot}"

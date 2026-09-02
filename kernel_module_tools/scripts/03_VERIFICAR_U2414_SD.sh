@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 SD="${SD_MOUNT:-/mnt/f}"
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 MODULE="$SD/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/usb_f_uac2.ko"
 BUILD_MODULE="$PROJECT_ROOT/BUILD/U2414/usb_f_uac2_u2414_au8_sync.ko"
 ERRORS=0

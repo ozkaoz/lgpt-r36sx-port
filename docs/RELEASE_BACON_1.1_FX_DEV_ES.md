@@ -151,20 +151,20 @@ Opción A — instalar sobre la SD existente (con backup automático):
 
 ```bash
 # 1) Build (si no está BUILD/U2523)
-PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/build.sh
+PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/build.sh
 
 # 2) Instalar en la SD (montada en /mnt/f)
-SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/install.sh
+SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/install.sh
 
 # 3) Verificar que la SD coincide con el build
-SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/verify.sh
+SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/verify.sh
 # Esperado: ERRORS=0 / VERIFY_U2523_OK
 ```
 
 Todo el proceso en un paso:
 
 ```bash
-SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/build_install.sh
+SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/build_install.sh
 ```
 
 ## Rollback
@@ -175,9 +175,9 @@ SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/build_ins
 
 ```bash
 # Restaura el core, daemon, launcher, scripts OTG y perfil de audio previos
-SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/restore.sh
+SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/restore.sh
 # o con ruta explícita:
-SD_MOUNT=/mnt/f bash scripts/restore.sh "/mnt/d/R36S/PORT LPTRACKER/BACKUPS/LGPT_BEFORE_U2523_20260803_031938"
+SD_MOUNT=/mnt/f bash scripts/restore.sh "/mnt/d/Toolchains/R36SX/BACKUPS/LGPT_BEFORE_U2523_20260803_031938"
 ```
 
 ## Problemas conocidos

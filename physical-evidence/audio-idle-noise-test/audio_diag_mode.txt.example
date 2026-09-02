@@ -1,0 +1,6 @@
+# audio_diag_mode.txt - Diagnostic mode for picoarch audio idle noise
+# Place this file as /mnt/sdcard/cubegm/audio_diag_mode.txt on the SD card
+# Accepted exact modes: NORMAL, NO_INIT, INIT_DEINIT, ZERO_PCM, LSB8_ALT, LSB8_PRNG
+# If file does not exist, is empty, or contains unknown value, MODE=NORMAL
+# NORMAL preserves production behavior
+NORMAL

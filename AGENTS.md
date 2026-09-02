@@ -44,6 +44,28 @@ Prioridad de autoridad (mayor → menor):
 
 ---
 
+## 2b. ENTORNO DE COMPILACIÓN (actualizado 2026-09-01 — ver `docs/TOOLCHAINS.md`)
+
+| Qué | Dónde (WSL) | Dónde (Windows) |
+|-----|-------------|-----------------|
+| Este repo | `/mnt/d/Github/lgpt-r36sx-port` | `D:\GitHub\lgpt-r36sx-port` |
+| Bases de compilación (kernel vanilla 4.4.186, LGPT U2523 source, iteraciones audio) | `/mnt/d/Toolchains/R36SX/` | `D:\Toolchains\R36SX\` |
+| Toolchain MIPS (Codescape GNU 6.3.0) | `~/sf3000-work/sf3000toolchain/` — **NO mover** | — (vive en WSL) |
+| Backups SD + git bundles | `/mnt/d/R36S/PORT LPTRACKER/BACKUPS/` (siguen ahí) | `D:\R36S\PORT LPTRACKER\BACKUPS\` |
+| Evidencia forense FAT32 | — | `D:\R36S\PORT LPTRACKER\PAPELERA_20260811\` (irrepetible) |
+| Evidencia física/binaria del port | `physical-evidence/` (en este repo) | idem |
+
+Variables de los scripts de build (defaults desde 2026-09-01):
+```bash
+PROJECT_ROOT=/mnt/d/Toolchains/R36SX     # antes: /mnt/d/R36S/PORT LPTRACKER
+SOURCE=$PROJECT_ROOT/lgpt-u2523-source     # antes: WORK/U2523_SOURCE
+TC=~/sf3000-work/sf3000toolchain/mipsel-buildroot-linux-gnu_sdk-buildroot
+```
+
+Docs históricos (RELEASE_BACON_*, COPY_ROOT) conservan rutas de su época con nota aclaratoria — no corregirlos salvo que se re-edite su contenido.
+
+---
+
 ## 3. REGLAS DE SEGURIDAD (NO NEGOCIABLES)
 
 **PROHIBIDO alterar sin evidencia y validación:**

@@ -11,11 +11,11 @@ Apague completamente la consola, conecte un cable USB-C de datos y vuelva a ence
 ## Restaurar la versión previa
 
 ```bash
-SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/restore.sh
+SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/restore.sh
 ```
 
 ## Recolectar logs
 
 ```bash
-SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/R36S/PORT LPTRACKER" bash scripts/collect_logs.sh
+SD_MOUNT=/mnt/f PROJECT_ROOT="/mnt/d/Toolchains/R36SX" bash scripts/collect_logs.sh
 ```

@@ -1,0 +1,8 @@
+415a3d2c8785272562acd58f2bbf885f44f8d05c14b1a94dbf41bebcaba86f2f  /mnt/f/lgpt/otg/bin/otg_u241_setup_once.sh
+53258f2b8b3749c866af248814eb147f0762a1b17cfffb644adb573167b52815  /mnt/f/lgpt/otg/bin/r36s_u241_usb_audio_io
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /mnt/f/lgpt/otg/logs/runtime_state/.keep
+48f7d39e97aafb6f61c2ff2f8c9a2a101115875924e22d986f8fc8485f4a2704  /mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd-pcm.ko
+25cb2142f7bea8f92edfc03d28c3a1e82cc656a1aa09ec5a5e1a99be41c87920  /mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd-timer.ko
+91742747579d9a6e8ca0fff0e920eed69afdd9f2fcab57029e351ea13c5f95bb  /mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/snd.ko
+5cd5d4dbdb0ce7379c64611d035bf3643d9f6d3097c046bb49214b2f065d5f39  /mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/soundcore.ko
+e9062ac5a37aa7706c98a3411a57dbe67bc98ef82621c430c1d4e7a89b2fbefe  /mnt/f/lgpt/otg/modules/4.4.186-release/u2_38au8_sync_uac2/usb_f_uac2.ko

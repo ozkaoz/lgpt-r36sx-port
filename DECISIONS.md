@@ -163,7 +163,7 @@
 
 **Evidencia:**
 - `G:\cubegm\cores\lgpt_r36sx_port_libretro.so` = `DBAD57A7AEB7D257259104CE5BA0ECC20E5927BD1F6BFFDEF6DCB826F823B96A`
-* `D:\R36S\PORT LPTRACKER\BUILD\U2523\lgpt_r36sx_u2523.so` = mismo hash
+* `D:\Toolchains\R36SX\audio-build-iterations\U2523\lgpt_r36sx_u2523.so` = mismo hash
 * `INSTALL_STATE_U2523.txt` dice `Version: U2.52.3` (etiqueta legacy, core es U2.71)
 * Proyecto `lgpt_KAOZ` intacto con EQ hipass 40 Hz S8
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/R36S/PORT LPTRACKER}"
+PROJECT_ROOT="${PROJECT_ROOT:-/mnt/d/Toolchains/R36SX}"
 SD="${SD_MOUNT:-/mnt/f}"
 BUILD="$PROJECT_ROOT/BUILD/U2523"
 CORE_BUILD="$BUILD/lgpt_r36sx_u2523.so"
